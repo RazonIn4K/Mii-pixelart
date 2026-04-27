@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "meta": {
+    "name": "Sample 4x4 Grid",
+    "createdAt": "2026-04-26T00:00:00.000Z",
+    "modifiedAt": "2026-04-26T00:00:00.000Z",
+    "notes": "A minimal 4x4 test grid using 4 colors from the Tomodachi Life palette."
+  },
+  "width": 4,
+  "height": 4,
+  "cells": [
+    "R1C1", "R1C1", "R1C2", "R1C2",
+    "R1C1", "R1C1", "R1C2", "R1C2",
+    "R3C1", "R3C1", "R3C2", "R3C2",
+    "R3C1", "R3C1", "R3C2", "R3C2"
+  ],
+  "usedColors": ["R1C1", "R1C2", "R3C1", "R3C2"],
+  "lockedColors": []
+}
