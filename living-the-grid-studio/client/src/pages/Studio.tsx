@@ -9,7 +9,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
-import { Undo2, Redo2, Grid3X3, Hash, Home } from "lucide-react";
+import { AlertTriangle, Undo2, Redo2, Grid3X3, Hash, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -246,6 +246,20 @@ export default function Studio() {
               </button>
             </div>
           )}
+
+          {doc?.meta.importWarnings?.length ? (
+            <div className="px-4 py-2 border-b border-border bg-amber-50 text-amber-950">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <p className="text-xs leading-relaxed">
+                  {doc.meta.importWarnings[0]}
+                  {doc.meta.importWarnings.length > 1
+                    ? ` (${doc.meta.importWarnings.length - 1} more import warnings saved in JSON metadata.)`
+                    : ""}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <Tabs defaultValue="import" className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="w-full rounded-none border-b border-border bg-transparent h-9 px-2">

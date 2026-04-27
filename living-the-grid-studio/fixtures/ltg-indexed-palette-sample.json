@@ -1,0 +1,20 @@
+{
+  "name": "Generic LTG Indexed Palette Sample",
+  "width": 4,
+  "height": 4,
+  "palette": [
+    "#8B0000",
+    "#CC0000",
+    "#112233"
+  ],
+  "grid": [
+    [0, 0, 1, 1],
+    [0, 2, 2, 1],
+    [1, 2, 2, 0],
+    [1, 1, 0, -1]
+  ],
+  "brush": {
+    "sizePx": 8,
+    "grid": "32x32"
+  }
+}

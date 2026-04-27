@@ -32,8 +32,31 @@ export interface GridMeta {
   sourceImage?: string;
   /** Source JSON filename, if imported from JSON */
   sourceJson?: string;
+  /** Machine-readable source format, if imported from another tool */
+  sourceFormat?: string;
+  /** Non-pixel metadata preserved from the imported source JSON */
+  sourceMetadata?: Record<string, unknown>;
+  /** Source palette entries mapped to internal palette IDs during import */
+  sourcePaletteMappings?: SourcePaletteMapping[];
+  /** Non-fatal import issues the user should review */
+  importWarnings?: string[];
   /** Notes */
   notes?: string;
+}
+
+/** Mapping from an imported palette entry to a game palette color */
+export interface SourcePaletteMapping {
+  sourceIndex: number;
+  sourceHex: string;
+  sourceRgb?: [number, number, number];
+  sourcePress?: {
+    h: number;
+    s: number;
+    b: number;
+  };
+  colorId: string;
+  exact: boolean;
+  deltaE: number;
 }
 
 /** The complete grid document */

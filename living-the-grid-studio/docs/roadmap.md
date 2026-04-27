@@ -8,7 +8,7 @@
 
 | Phase | Title | Status | Description |
 |-------|-------|--------|-------------|
-| 0 | JSON Fixture Inspection | Next | Inspect the real Living The Grid JSON and finalize the import adapter |
+| 0 | JSON Fixture Inspection | ✅ Complete | Inspect the real Living The Grid JSON and finalize the import adapter |
 | 1 | JSON Round-Trip | Current | Import JSON → normalize to GridDocument → render canvas → export JSON |
 | 2 | Palette Panel | In Progress | Usage counts, color locking, manual merges, palette editing |
 | 3 | One-Click Optimizer | In Progress | Deterministic color merging, island removal, cleanup passes |
@@ -18,18 +18,23 @@
 
 ---
 
-## Phase 0: JSON Fixture Inspection
+## Phase 0: JSON Fixture Inspection ✅
 
 **Goal:** Obtain and document the real Living The Grid JSON format.
 
-**Tasks:**
-- [ ] Place the `living-the-grid-*.json` fixture file in `fixtures/`
-- [ ] Pretty-print and inspect the JSON structure
-- [ ] Document the schema in `docs/json-format-notes.md`
-- [ ] Update `json-io.ts` with the real format adapter
-- [ ] Write test cases for import/export round-trip
+**Status:** COMPLETE (2026-04-26)
 
-**Blocked on:** The actual JSON fixture file from a Living The Grid save.
+**Completed tasks:**
+- [x] Place the `living-the-grid-*.json` fixture file in `fixtures/living-the-grid-real.json`
+- [x] Pretty-print and inspect the JSON structure (64×64, 15-color palette, v2 format)
+- [x] Document the production indexed-palette schema in `docs/json-format-notes.md`
+- [x] Update `json-io.ts` so indexed-palette imports map to internal palette IDs
+- [x] Verify `json-io.ts` handles the real fixture's exact schema
+- [x] Preserve source RGB and H/S/B press counts in palette mapping metadata
+- [x] Add executable validation and round-trip coverage (`scripts/verify-ltg-import.ts`)
+- [x] Write validation and round-trip documentation (`test-round-trip.md`)
+
+**Outcome:** Living The Grid production format (v2) confirmed and supported by the adapter.
 
 ---
 

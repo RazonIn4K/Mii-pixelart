@@ -102,7 +102,7 @@ export default function Home() {
                       </Button>
                     </Link>
                     <a
-                      href="https://github.com/RazonIn4K/Upwork-Workbook"
+                      href="https://github.com/RazonIn4K/Mii-pixelart"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -232,12 +232,12 @@ export default function Home() {
             </h2>
             <div className="space-y-4">
               {[
-                { phase: "0", title: "JSON Fixture Inspection", status: "next", desc: "Inspect the real Living The Grid JSON and finalize the import adapter." },
-                { phase: "1", title: "JSON Round-Trip", status: "current", desc: "Import JSON → normalize to GridDocument → render canvas → export JSON." },
-                { phase: "2", title: "Palette Panel", status: "planned", desc: "Usage counts, color locking, manual merges, and palette editing." },
-                { phase: "3", title: "One-Click Optimizer", status: "planned", desc: "Deterministic color merging, island removal, and cleanup passes." },
-                { phase: "4", title: "Image Upload", status: "planned", desc: "Crop, resize, and palette quantization from any uploaded image." },
-                { phase: "5", title: "Reference Pack Export", status: "planned", desc: "Download complete reference packs with guide, palette sheet, and JSON." },
+                { phase: "0", title: "JSON Fixture Inspection", status: "done", desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata." },
+                { phase: "1", title: "JSON Round-Trip", status: "done", desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete." },
+                { phase: "2", title: "Palette Panel", status: "done", desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid." },
+                { phase: "3", title: "One-Click Optimizer", status: "done", desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting." },
+                { phase: "4", title: "Image Upload (remaining)", status: "current", desc: "Crop tool, brightness/contrast pre-processing, and preview before committing import." },
+                { phase: "5", title: "Reference Pack Export (remaining)", status: "next", desc: "Palette sheet image, painting order suggestion, and ZIP bundle download." },
                 { phase: "6", title: "AI Suggestions", status: "future", desc: "AI as a suggestion layer only — never a hidden automatic editor." },
               ].map((item) => (
                 <div
@@ -250,11 +250,13 @@ export default function Home() {
                     </span>
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        item.status === "current"
-                          ? "bg-primary"
-                          : item.status === "next"
-                            ? "bg-primary/50"
-                            : "bg-border"
+                        item.status === "done"
+                          ? "bg-green-500"
+                          : item.status === "current"
+                            ? "bg-primary"
+                            : item.status === "next"
+                              ? "bg-primary/50"
+                              : "bg-border"
                       }`}
                     />
                   </div>

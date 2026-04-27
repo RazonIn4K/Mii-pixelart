@@ -8,7 +8,8 @@
 
 **Repo:** `RazonIn4K/Mii-pixelart` (private)  
 **Local path:** `/Users/davidortiz/Git-Projects/Mii-pixelart/`  
-**Live web app:** Deployed via Manus at `https://living-the-grid-studio.manus.space` (checkpoint `686de1c7`)
+**Live web app (sandbox preview):** https://3000-i2ha50xuwsphc8alc30n3-bce98793.us1.manus.computer (checkpoint `686de1c7`)  
+**Last Updated:** 2026-04-27
 
 The repository contains a single sub-project:
 
@@ -19,9 +20,15 @@ Mii-pixelart/
     ├── client/                    ← React SPA (Vite + TypeScript + Tailwind 4)
     ├── server/                    ← Thin Express static-file server (do not touch)
     ├── shared/                    ← Template compatibility stubs (do not touch)
-    ├── docs/                      ← Six documentation files
-    ├── fixtures/                  ← Test data and JSON schema discovery
+    ├── docs/                      ← Seven documentation files (including json-format-notes.md)
+    ├── fixtures/                  ← Real LTG v2 fixture + synthetic samples
     ├── reference-pack-template/   ← Template for exported reference packs
+    ├── scripts/                   ← verify-ltg-import.ts (executable, tsx)
+    ├── test-round-trip.md         ← Phase 0 round-trip verification record (PASSED)
+    ├── package.json               ← pnpm dependencies and scripts
+    ├── pnpm-lock.yaml             ← Lockfile
+    ├── tsconfig.json              ← TypeScript config
+    ├── vite.config.ts             ← Vite config
     └── ideas.md                   ← Design brainstorm (Paper Studio chosen)
 ```
 
@@ -128,7 +135,7 @@ interface GridDocument {
 }
 ```
 
-**Critical design decision:** `cells` stores **palette color IDs** (e.g., `"R1C3"`, `"S4"`) — never raw hex values. This ensures every color in the document maps directly to a physical swatch the user can find in the game's Palette House. The only exception is the placeholder LTG native import adapter, which temporarily stores hex strings until the real fixture is inspected.
+**Critical design decision:** `cells` stores **palette color IDs** (e.g., `"R1C3"`, `"S4"`) — never raw hex values. This ensures every color in the document maps directly to a physical swatch the user can find in the game's Palette House. LTG imports map source palette indices to internal palette IDs and preserve source hex/RGB/H/S/B data in metadata.
 
 **Cell indexing:** `cells[y * width + x]` — row-major order, 0-based.
 
@@ -255,12 +262,13 @@ interface OptimizerConfig {
 - `downloadGridDocument(doc)` → triggers browser download as `{name}-{timestamp}.json`
 - `downloadJson(json, filename)` → generic browser download helper
 
-**Living The Grid native format adapter (PLACEHOLDER — needs real fixture):**
-- `importLtgNative(json)` → tries native GridDocument first, then the LTG placeholder adapter
-- `LtgNativeFormat` interface is a best-guess: `{ width, height, grid: number[][], palette: string[], name? }`
-- `convertLtgToGrid()` currently maps palette indices to hex strings — this needs to be updated to map to `TOMODACHI_PALETTE` IDs once the real format is known
+**Living The Grid native format adapter:**
+- `importLtgNative(json)` → imports indexed-palette JSON with `{ width, height, grid|pixels, palette, name? }`
+- Palette entries can be strings or objects with `hex`/`color`
+- Real v2 fixture: `fixtures/living-the-grid-real.json`
+- `convertLtgToGrid()` maps source palette indices to internal `TOMODACHI_PALETTE` IDs, preserving source RGB, H/S/B press counts, mappings, and import warnings in metadata
 
-**⚠️ Phase 0 blocker:** The real `living-the-grid-*.json` fixture has not been inspected. The LTG adapter is a placeholder. See `docs/json-schema-discovery.md` for the discovery plan.
+**Phase 0 status:** The real `living-the-grid-*.json` fixture has been inspected and is covered by `scripts/verify-ltg-import.ts`. See `docs/json-format-notes.md`.
 
 ### 6.7 `canvas-renderer.ts` — Canvas Rendering
 
@@ -459,7 +467,7 @@ All docs live in `living-the-grid-studio/docs/`:
 | `product-spec.md` | Vision, target user, core workflow, MVP feature set, non-goals, success metrics |
 | `architecture.md` | Stack rationale, module breakdown, data model, optimization pipeline, UI architecture, file I/O, future considerations |
 | `roadmap.md` | Phase-by-phase task lists with completion status checkboxes |
-| `json-schema-discovery.md` | Step-by-step plan for inspecting the real LTG JSON fixture and updating the import adapter |
+| `json-schema-discovery.md` | Schema discovery log — COMPLETE. Confirmed v2 shape documented. |
 | `repaint-optimizer-plan.md` | Optimizer design principles, pass descriptions, config table, quality metrics, future enhancements |
 | `ui-workflow-spec.md` | Detailed interaction spec: layout, tab behaviors, merge mode sequence, keyboard shortcuts, empty state, responsive expectations |
 
@@ -472,19 +480,25 @@ All docs live in `living-the-grid-studio/docs/`:
 | File | Description |
 |------|-------------|
 | `sample-grid-document.json` | Minimal 4×4 test grid using 4 palette colors (R1C3, R4C3, R6C3, R10C2) — use for testing import/export round-trips |
-| `living-the-grid-*.json` | **MISSING — place the real LTG export here** |
+| `living-the-grid-real.json` | **Real LTG v2 export** — 64×64, 15-color palette. Used by `verify-ltg-import.ts`. |
+| `ltg-indexed-palette-sample.json` | Synthetic 4×4 test fixture for unit testing |
 
 ---
 
 ## 11. Roadmap and Open Tasks
 
-### Phase 0 — JSON Fixture Inspection (NEXT — BLOCKED)
-- [ ] Place `living-the-grid-1777253291337.json` (or any LTG export) in `fixtures/`
-- [ ] Inspect the JSON structure and answer the questions in `docs/json-schema-discovery.md`
-- [ ] Create `docs/json-format-notes.md` with the real schema
-- [ ] Update `LtgNativeFormat` interface in `json-io.ts`
-- [ ] Update `convertLtgToGrid()` to map real color representations to `TOMODACHI_PALETTE` IDs
-- [ ] Write round-trip test cases
+### Phase 0 — JSON Fixture Inspection ✅ COMPLETE (2026-04-26)
+- [x] Real LTG v2 fixture placed at `fixtures/living-the-grid-real.json` (64×64, 15-color palette)
+- [x] Schema documented in `docs/json-format-notes.md` and `docs/json-schema-discovery.md`
+- [x] `json-io.ts` adapter updated for confirmed v2 shape (`pixels`, `palette` with `hex`/`rgb`/`press`)
+- [x] Source RGB and H/S/B press counts preserved in `meta.sourcePaletteMappings`
+- [x] `scripts/verify-ltg-import.ts` added — 7 test cases, all passing
+- [x] Round-trip documented in `test-round-trip.md`
+
+**Verification command:** `npx --yes -p tsx tsx scripts/verify-ltg-import.ts`
+
+### Phases 1–3 — Core Studio ✅ COMPLETE
+JSON round-trip, palette panel, and one-click optimizer are all implemented and TypeScript-clean.
 
 ### Phase 4 — Image Upload (Remaining)
 - [ ] Crop tool — select a sub-region before quantization
@@ -501,8 +515,10 @@ All docs live in `living-the-grid-studio/docs/`:
 - Every suggestion is a preview the user explicitly accepts or dismisses
 - Ideas: optimal merge pairs, contrast improvements, painting order, artifact detection
 
-### Home Page Fix
-- The "View on GitHub" button in `Home.tsx` currently links to `RazonIn4K/Upwork-Workbook` — update to `RazonIn4K/Mii-pixelart`
+### Studio UI Browser Verification (OPEN)
+- The import/export flow has not been tested in a real browser since `package.json` was added to the repo.
+- Run `pnpm dev` and test the full cycle: import `fixtures/living-the-grid-real.json` → optimize → export.
+- Check that import warnings banner appears (14 approximate color mappings expected).
 
 ---
 
@@ -510,7 +526,7 @@ All docs live in `living-the-grid-studio/docs/`:
 
 **Immutability:** All engine functions return new objects. Never mutate `GridDocument` in place.
 
-**Color IDs vs hex:** The `cells` array always stores palette color IDs (`"R1C3"`, `"S4"`), never raw hex. The only place hex appears is in the placeholder LTG adapter and in `useGamePalette: false` mode of the image importer.
+**Color IDs vs hex:** The `cells` array should store palette color IDs (`"R1C3"`, `"S4"`), never raw hex. Hex appears in import metadata and in `useGamePalette: false` mode of the image importer.
 
 **`recomputeUsedColors` contract:** Call this after any bulk mutation to `cells`. Individual helpers like `replaceColor` call it automatically, but if you directly assign `doc.cells`, you must call it manually.
 
@@ -561,6 +577,9 @@ pnpm dev
 
 # 4. Type-check
 pnpm check
+
+# 5. Run import verification (no install needed)
+npx --yes -p tsx tsx scripts/verify-ltg-import.ts
 ```
 
 ---
