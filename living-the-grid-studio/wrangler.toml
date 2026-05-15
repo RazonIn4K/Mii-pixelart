@@ -25,3 +25,15 @@ PUBLIC_SITE_URL = "https://tomodachi.pw"
 
 [env.preview.vars]
 PUBLIC_SITE_URL = "https://preview.tomodachi.pw"
+
+# Pre-provisioned KV namespace for edge caching, rate limiting, and any
+# small key/value state Pages Functions need. Provisioned via the
+# Cloudflare API; see docs/cloudflare-deployment.md for usage.
+#
+# Uncomment the binding block when the first Pages Function actually reads
+# or writes to it. While the block is commented out, no Function holds a
+# reference, so leaving the namespace empty costs nothing.
+#
+# [[kv_namespaces]]
+# binding = "EDGE_CACHE"
+# id = "5129b5ce8d2d435cb704b398a437f355"
