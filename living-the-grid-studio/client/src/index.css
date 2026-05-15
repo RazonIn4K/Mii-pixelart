@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Enables `prose` utility classes used by the legal pages
+   (Privacy, Terms, Cookies, Disclosure). */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /*
@@ -201,6 +205,11 @@
   .section-header {
     @apply text-xs font-medium tracking-widest uppercase;
     color: oklch(0.55 0.01 60);
+  }
+
+  .pixel-canvas {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
   }
 }
 

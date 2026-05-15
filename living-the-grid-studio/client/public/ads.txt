@@ -1,0 +1,9 @@
+# IAB ads.txt
+#
+# Replace `pub-0000000000000000` with your real AdSense publisher ID
+# (the one after `ca-` in your `VITE_ADSENSE_PUBLISHER_ID`).
+#
+# When you onboard additional ad partners (e.g. Mediavine, Ezoic), add one
+# line per partner using the format they document.
+
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

@@ -2,9 +2,22 @@ import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import {
+  getOpenRouterModels,
+  getOpenRouterStatus,
+  sendOpenRouterChat,
+  type ApiResult,
+} from "./server/openrouter";
+import {
+  createCheckoutSession,
+  listPublicProducts,
+  verifyCheckoutSession,
+} from "./server/stripe";
+import { formatPrice } from "./shared/products";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -203,7 +216,130 @@ function vitePluginStorageProxy(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()];
+function vitePluginOpenRouterApi(): Plugin {
+  return {
+    name: "openrouter-ai-api",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use("/api/ai", async (req, res, next) => {
+        try {
+          const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+          if (req.method === "GET" && pathname === "/status") {
+            sendJson(res, getOpenRouterStatus());
+            return;
+          }
+          if (req.method === "GET" && pathname === "/models") {
+            sendJson(res, await getOpenRouterModels());
+            return;
+          }
+          if (req.method === "POST" && pathname === "/chat") {
+            const body = await readRequestJson(req);
+            sendJson(res, await sendOpenRouterChat(body));
+            return;
+          }
+          next();
+        } catch (error) {
+          sendJson(res, {
+            status: 500,
+            body: {
+              configured: true,
+              reply:
+                error instanceof Error
+                  ? error.message
+                  : "AI request failed locally.",
+            },
+          });
+        }
+      });
+    },
+  };
+}
+
+function sendJson(res: ServerResponse, result: ApiResult): void {
+  res.writeHead(result.status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(result.body));
+}
+
+function readRequestJson(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+      if (body.length > 1_000_000) {
+        reject(new Error("Request body is too large."));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error("Invalid JSON request body."));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function vitePluginStripeApi(): Plugin {
+  return {
+    name: "stripe-api",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use("/api/stripe", async (req, res, next) => {
+        try {
+          const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+          if (req.method === "GET" && pathname === "/products") {
+            const products = listPublicProducts().map((product) => ({
+              id: product.id,
+              name: product.name,
+              description: product.description,
+              priceLabel: formatPrice(product.amount, product.currency),
+              perks: product.perks ?? [],
+              caveat: product.caveat ?? null,
+            }));
+            sendJson(res, { status: 200, body: { products } });
+            return;
+          }
+          if (req.method === "POST" && pathname === "/checkout") {
+            const body = (await readRequestJson(req)) as Record<string, unknown>;
+            sendJson(res, await createCheckoutSession(body));
+            return;
+          }
+          if (req.method === "GET" && pathname === "/session") {
+            const sessionId = new URL(
+              req.url ?? "/",
+              "http://localhost",
+            ).searchParams.get("session_id") ?? "";
+            sendJson(res, await verifyCheckoutSession(sessionId));
+            return;
+          }
+          next();
+        } catch (error) {
+          sendJson(res, {
+            status: 500,
+            body: {
+              configured: true,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Stripe request failed locally.",
+            },
+          });
+        }
+      });
+    },
+  };
+}
+
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  vitePluginStorageProxy(),
+  vitePluginOpenRouterApi(),
+  vitePluginStripeApi(),
+];
 
 export default defineConfig({
   plugins,

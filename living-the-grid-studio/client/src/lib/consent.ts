@@ -74,9 +74,9 @@ export function setConsent(
       /* Storage might be disabled in private browsing; ignore. */
     }
   }
-  for (const listener of listeners) {
+  listeners.forEach((listener) => {
     listener(state);
-  }
+  });
   return state;
 }
 
@@ -88,9 +88,9 @@ export function resetConsent(): ConsentState {
       /* ignore */
     }
   }
-  for (const listener of listeners) {
+  listeners.forEach((listener) => {
     listener(DEFAULT_STATE);
-  }
+  });
   return DEFAULT_STATE;
 }
 

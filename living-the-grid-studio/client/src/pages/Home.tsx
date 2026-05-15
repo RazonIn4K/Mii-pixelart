@@ -124,10 +124,13 @@ type PasswordBreachResult = {
   count?: number;
 };
 
+// `adsbygoogle` is the global command queue Google's AdSense script consumes.
+// You push command objects onto it; the script eventually replaces it with a
+// real implementation. Typing it as a plain array of command objects is
+// closer to reality than typing each entry as something that itself has a
+// `push` method.
 type WindowWithAds = Window & {
-  adsbygoogle?: {
-    push: (args?: Record<string, unknown>) => void;
-  }[];
+  adsbygoogle?: Array<Record<string, unknown>>;
 };
 
 const defaultErrorMessage = "Something went wrong while running this check.";
@@ -431,7 +434,12 @@ Keep it practical and concise.`,
               public notice
             </a>
             , give them immediate value: a leak-aware checklist, password risk
-            test, and AI recovery guidance.
+            test, and AI recovery guidance. For a structured written plan or a
+            short consult, see{" "}
+            <Link href="/unlock" className="underline underline-offset-2">
+              paid recovery guides
+            </Link>
+            .
           </p>
 
           <div className="grid lg:grid-cols-2 gap-6">

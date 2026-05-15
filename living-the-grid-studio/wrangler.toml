@@ -1,0 +1,27 @@
+# Cloudflare configuration for Living The Grid Studio.
+#
+# Cloudflare Pages does NOT strictly require this file — the Pages dashboard
+# stores build settings and environment variables for you. We keep this file
+# checked in so that:
+#   1. `wrangler pages dev` can run Pages Functions locally.
+#   2. `wrangler pages deploy dist/public` works from CI without UI clicks.
+#   3. The Pages project's compatibility settings are version-controlled.
+#
+# Apply with: `wrangler pages project create tomodachi-studio` once, then
+# `wrangler pages deploy dist/public --project-name=tomodachi-studio`.
+
+name = "tomodachi-studio"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist/public"
+
+# Functions directory is auto-discovered at ./functions.
+# Secrets (OPENROUTER_API_KEY, STRIPE_SECRET_KEY, etc.) MUST be set via:
+#   wrangler pages secret put OPENROUTER_API_KEY --project-name=tomodachi-studio
+# or via the Pages dashboard. Do not commit secret values to this file.
+
+[vars]
+PUBLIC_SITE_URL = "https://tomodachi.pw"
+
+[env.preview.vars]
+PUBLIC_SITE_URL = "https://preview.tomodachi.pw"
