@@ -137,7 +137,9 @@ export async function createCheckoutSession(
   const successUrl = `${site}${product.successPath}${
     product.successPath.includes("?") ? "&" : "?"
   }session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${site}/unlock?canceled=1`;
+  const fallbackCancel =
+    product.category === "support" ? "/support?canceled=1" : "/unlock?canceled=1";
+  const cancelUrl = `${site}${product.cancelPath ?? fallbackCancel}`;
 
   const params = {
     mode: "payment",
@@ -193,6 +195,7 @@ export async function createCheckoutSession(
         id: product.id,
         name: product.name,
         priceLabel: formatPrice(product.amount, product.currency),
+        category: product.category,
       } satisfies PublicProductSummary,
     },
   };
@@ -202,6 +205,7 @@ export interface PublicProductSummary {
   id: PaidProduct["id"];
   name: PaidProduct["name"];
   priceLabel: string;
+  category: PaidProduct["category"];
 }
 
 export async function verifyCheckoutSession(
@@ -254,6 +258,7 @@ export async function verifyCheckoutSession(
             id: product.id,
             name: product.name,
             priceLabel: formatPrice(product.amount, product.currency),
+            category: product.category,
           }
         : null,
     },

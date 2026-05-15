@@ -65,14 +65,21 @@ export const onRequest = async (
 
   try {
     if (method === "GET" && subpath === "products") {
-      const products = listPublicProducts().map((product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        priceLabel: formatPrice(product.amount, product.currency),
-        perks: product.perks ?? [],
-        caveat: product.caveat ?? null,
-      }));
+      const url = new URL(context.request.url);
+      const categoryFilter = url.searchParams.get("category");
+      const products = listPublicProducts()
+        .filter(
+          (product) => !categoryFilter || product.category === categoryFilter,
+        )
+        .map((product) => ({
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          priceLabel: formatPrice(product.amount, product.currency),
+          perks: product.perks ?? [],
+          caveat: product.caveat ?? null,
+          category: product.category,
+        }));
       return jsonResponse({ status: 200, body: { products } });
     }
 

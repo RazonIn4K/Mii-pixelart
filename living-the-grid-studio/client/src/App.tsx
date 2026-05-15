@@ -7,10 +7,12 @@ import CookieConsent from "./components/CookieConsent";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Cookies from "./pages/Cookies";
 import Disclosure from "./pages/Disclosure";
+import Guides from "./pages/Guides";
 import Help from "@/pages/Help";
 import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Studio from "./pages/Studio";
+import Support from "./pages/Support";
 import Terms from "./pages/Terms";
 import Unlock from "./pages/Unlock";
 
@@ -26,7 +28,10 @@ function Router() {
       <Route path={"/disclosure"} component={Disclosure} />
       <Route path={"/affiliate-disclosure"} component={Disclosure} />
       <Route path={"/help"} component={Help} />
+      <Route path={"/guides"} component={Guides} />
       <Route path={"/unlock"} component={Unlock} />
+      <Route path={"/support"} component={Support} />
+      <Route path={"/donate"} component={Support} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

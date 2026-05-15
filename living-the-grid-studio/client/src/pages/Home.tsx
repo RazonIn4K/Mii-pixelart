@@ -832,9 +832,18 @@ Keep it practical and concise.`,
             </span>
           </div>
           <nav
-            aria-label="Legal"
+            aria-label="Site"
             className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
           >
+            <Link href="/guides" className="hover:underline">
+              Guides
+            </Link>
+            <Link href="/unlock" className="hover:underline">
+              Unlock
+            </Link>
+            <Link href="/support" className="hover:underline">
+              Support
+            </Link>
             <Link href="/privacy" className="hover:underline">
               Privacy
             </Link>

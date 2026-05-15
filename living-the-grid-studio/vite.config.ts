@@ -288,14 +288,24 @@ function vitePluginStripeApi(): Plugin {
         try {
           const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
           if (req.method === "GET" && pathname === "/products") {
-            const products = listPublicProducts().map((product) => ({
-              id: product.id,
-              name: product.name,
-              description: product.description,
-              priceLabel: formatPrice(product.amount, product.currency),
-              perks: product.perks ?? [],
-              caveat: product.caveat ?? null,
-            }));
+            const categoryFilter = new URL(
+              req.url ?? "/",
+              "http://localhost",
+            ).searchParams.get("category");
+            const products = listPublicProducts()
+              .filter(
+                (product) =>
+                  !categoryFilter || product.category === categoryFilter,
+              )
+              .map((product) => ({
+                id: product.id,
+                name: product.name,
+                description: product.description,
+                priceLabel: formatPrice(product.amount, product.currency),
+                perks: product.perks ?? [],
+                caveat: product.caveat ?? null,
+                category: product.category,
+              }));
             sendJson(res, { status: 200, body: { products } });
             return;
           }

@@ -27,6 +27,7 @@ interface PublicProduct {
   priceLabel: string;
   perks: string[];
   caveat: string | null;
+  category: "recovery" | "consult" | "support";
 }
 
 interface SessionStatus {
@@ -63,11 +64,16 @@ export default function Unlock() {
 
   useEffect(() => {
     let cancelled = false;
+    // Unlock only sells gated recovery + consult products.
+    // Tip-jar items live on /support so they don't muddy the conversion path.
     fetch("/api/stripe/products")
       .then((response) => response.json())
       .then((payload: { products?: PublicProduct[] }) => {
         if (cancelled) return;
-        setProducts(payload.products ?? []);
+        const visible = (payload.products ?? []).filter(
+          (product) => product.category !== "support",
+        );
+        setProducts(visible);
       })
       .catch((error: unknown) => {
         if (cancelled) return;

@@ -46,15 +46,22 @@ async function startServer() {
     }
   });
 
-  app.get("/api/stripe/products", (_req, res) => {
-    const products = listPublicProducts().map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      priceLabel: formatPrice(product.amount, product.currency),
-      perks: product.perks ?? [],
-      caveat: product.caveat ?? null,
-    }));
+  app.get("/api/stripe/products", (req, res) => {
+    const categoryFilter =
+      typeof req.query.category === "string" ? req.query.category : null;
+    const products = listPublicProducts()
+      .filter(
+        (product) => !categoryFilter || product.category === categoryFilter,
+      )
+      .map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        priceLabel: formatPrice(product.amount, product.currency),
+        perks: product.perks ?? [],
+        caveat: product.caveat ?? null,
+        category: product.category,
+      }));
     res.status(200).json({ products });
   });
 
