@@ -6,26 +6,59 @@
  * warm red as the sole accent color. The interface recedes so the art speaks.
  */
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
-import { Upload, FileJson, Grid3X3, Palette, Sparkles, Download } from "lucide-react";
+import {
+  AlertTriangle,
+  BotMessageSquare,
+  CheckCircle2,
+  Search,
+  ShieldCheck,
+  Upload,
+  FileJson,
+  Grid3X3,
+  Palette,
+  Sparkles,
+  Download,
+} from "lucide-react";
 
-const HERO_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/hero-graph-paper-C4Z7n83FomAaML8Mv4EUY5.webp";
-const CANVAS_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/canvas-demo-ibSTXcy8TWc4nv3PR5GSCG.webp";
-const PALETTE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/palette-swatches-6suMjKFXCiPMd2P6Khydf7.webp";
+const HERO_IMG =
+  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/hero-graph-paper-C4Z7n83FomAaML8Mv4EUY5.webp";
+const CANVAS_IMG =
+  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/canvas-demo-ibSTXcy8TWc4nv3PR5GSCG.webp";
+const PALETTE_IMG =
+  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/palette-swatches-6suMjKFXCiPMd2P6Khydf7.webp";
+const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
+const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
 
 const features = [
   {
     icon: Upload,
-    title: "Import Anything",
+    title: "Import Characters, Logos, Memes",
     description:
-      "Drop in an image (PNG, JPG, GIF) or a Living The Grid JSON file. The studio converts it to a palette-limited grid instantly.",
+      "Drop in a character reference, face photo, logo, brand-style mark, meme, or Living The Grid JSON file. The studio turns it into a paintable grid.",
+  },
+  {
+    icon: Sparkles,
+    title: "Character Presets",
+    description:
+      "Mii Mask, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 presets tune framing, sampling, color count, contrast, and background cleanup for different repaint goals.",
+  },
+  {
+    icon: Grid3X3,
+    title: "Create and Touch Up",
+    description:
+      "Start from original face, mascot, space-crew, horror, schoolhouse, creature, hero, robot, badge, icon, kart, snack, and brand-mark templates or a blank canvas, then paint, erase, pick colors, and fill regions directly on the grid.",
   },
   {
     icon: Palette,
     title: "84-Color Game Palette",
     description:
-      "Every one of Tomodachi Life's 77 base shades plus 7 saturated extras, labeled by row and column for exact in-game matching.",
+      "Every base shade and saturated extra in the Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching.",
   },
   {
     icon: Grid3X3,
@@ -50,10 +83,237 @@ const features = [
     title: "Reference Pack Export",
     description:
       "Download a complete reference pack: the pixel guide image, the palette sheet, and the project JSON — everything needed to repaint.",
+    },
+  ];
+
+const domainMonetizationUseCases = [
+  {
+    domain: "tomodachi.brave",
+    role: "Creative Growth",
+    note: "Use this as the visual studio homepage: pixel tools, tutorials, exports, and premium workflow upgrades.",
+    monetization: [
+      "Display ads on non-critical feature pages once traffic is stable.",
+      "Offer AI-assisted premium pack downloads for advanced users.",
+      "Add affiliate cards for drawing tablets, grips, stylus upgrades.",
+    ],
+  },
+  {
+    domain: "tomodachi.pw",
+    role: "Trust + Utility",
+    note: "Use this as the privacy trust signal + breach response microsite tied to current tomodachishare interest.",
+    monetization: [
+      "Offer one-time 'security recovery guides' and checklists.",
+      "Capture leads with a mailing list for future releases and sponsor content.",
+      "Run privacy/cyber products affiliate placements that match breach pain points.",
+    ],
   },
 ];
 
+type PasswordBreachStatus = "idle" | "checking" | "safe" | "found" | "error";
+
+type PasswordBreachResult = {
+  status: PasswordBreachStatus;
+  message: string;
+  count?: number;
+};
+
+type WindowWithAds = Window & {
+  adsbygoogle?: {
+    push: (args?: Record<string, unknown>) => void;
+  }[];
+};
+
+const defaultErrorMessage = "Something went wrong while running this check.";
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
+
+async function sha1Hex(input: string): Promise<string> {
+  const encoded = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-1", encoded);
+  return bytesToHex(new Uint8Array(hash));
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
 export default function Home() {
+  const [incidentPrompt, setIncidentPrompt] = useState("");
+  const [incidentPlan, setIncidentPlan] = useState("");
+  const [incidentLoading, setIncidentLoading] = useState(false);
+  const [incidentError, setIncidentError] = useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordCheck, setPasswordCheck] = useState<PasswordBreachResult>({
+    status: "idle",
+    message: "",
+  });
+  const adsPublisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID;
+  const adsSlotId = import.meta.env.VITE_ADSENSE_HOMEPAGE_SLOT_ID;
+  const adsEnabled = Boolean(adsPublisherId && adsSlotId);
+
+  useEffect(() => {
+    if (!adsEnabled) return;
+    const scriptId = "ltg-adsense-js";
+    if (document.getElementById(scriptId)) return;
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.async = true;
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(
+      String(adsPublisherId).trim(),
+    )}`;
+    script.crossOrigin = "anonymous";
+    document.head.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
+  }, [adsEnabled, adsPublisherId]);
+
+  useEffect(() => {
+    if (!adsEnabled) return;
+
+    const timeoutId = window.setTimeout(() => {
+      try {
+        const adWindow = window as WindowWithAds;
+        adWindow.adsbygoogle ??= [];
+        adWindow.adsbygoogle.push({});
+      } catch (error) {
+        console.error("Failed to initialize adsbygoogle:", error);
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [adsEnabled]);
+
+  const checkPasswordForBreaches = async () => {
+    const password = passwordInput.trim();
+    if (!password) {
+      setPasswordCheck({
+        status: "error",
+        message: "Type a password first.",
+      });
+      return;
+    }
+
+    setPasswordCheck({
+      status: "checking",
+      message: "Checking hash ranges against open breach indexes.",
+    });
+
+    try {
+      const hash = await sha1Hex(password);
+      const prefix = hash.slice(0, 5);
+      const suffix = hash.slice(5);
+
+      const response = await fetch(`${HIBP_PASSWORD_API}${prefix}`, {
+        headers: {
+          "Add-Padding": "true",
+          Accept: "text/plain",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Breach check service returned ${response.status}.`);
+      }
+
+      const payload = await response.text();
+      const found = payload
+        .split("\n")
+        .map((row) => row.trim())
+        .find((row) => row.startsWith(`${suffix}:`));
+
+      if (!found) {
+        setPasswordCheck({
+          status: "safe",
+          message:
+            "No matches found in available breach lists. Keep using unique long passphrases.",
+        });
+        return;
+      }
+
+      const [, countText] = found.split(":");
+      const count = Number.parseInt(countText ?? "0", 10);
+      setPasswordCheck({
+        status: "found",
+        count,
+        message:
+          count > 0
+            ? `This password appears in ${formatNumber(count)} public breach record${count === 1 ? "" : "s"} — rotate it immediately and clear any reuse across accounts.`
+            : `Exposure lookup returned an invalid count. Try again with a different value.`,
+      });
+    } catch (error) {
+      setPasswordCheck({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : defaultErrorMessage,
+      });
+    }
+  };
+
+  const createBreachRecoveryPlan = async () => {
+    const trimmedPrompt = incidentPrompt.trim();
+    if (!trimmedPrompt) return;
+
+    setIncidentError(null);
+    setIncidentLoading(true);
+    setIncidentPlan("");
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentDocument: null,
+          currentGridImage: null,
+          messages: [
+            {
+              role: "user",
+              content: `You are a plain-language security assistant. Given this situation: ${trimmedPrompt}. Respond with:
+1) Next 24-hour actions,
+2) Browser-safe account cleanup checklist,
+3) Password reset playbook,
+4) Suggested short user message, and
+5) A concise list of what not to do.
+Keep it practical and concise.`,
+            },
+          ],
+          model: "~anthropic/claude-haiku-latest",
+          requestSketch: false,
+          sessionId: "breach-recovery-session",
+        }),
+      });
+
+      const data = (await response.json()) as {
+        configured?: boolean;
+        model?: string;
+        reply?: string;
+        warning?: string;
+      };
+      if (!response.ok || !data.reply) {
+        throw new Error(
+          data.warning ??
+            data.reply ??
+            `AI assistant returned ${response.status}.`,
+        );
+      }
+      setIncidentPlan(data.reply);
+    } catch (error) {
+      setIncidentError(
+        error instanceof Error ? error.message : defaultErrorMessage,
+      );
+    } finally {
+      setIncidentLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Navigation */}
@@ -80,20 +340,23 @@ export default function Home() {
             <div className="container py-20 lg:py-28">
               <div className="grid lg:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
-                  <p className="section-header">Tomodachi Life Pixel Art Tool</p>
+                  <p className="section-header">
+                    Mii Face Mask + Pixel Art Tool
+                  </p>
                   <h1 className="text-3xl lg:text-4xl font-semibold leading-tight tracking-tight text-foreground">
-                    Make pixel art
+                    Make Mii masks
                     <br />
                     <span style={{ color: "oklch(0.58 0.2 25)" }}>
-                      actually repaintable
+                      and pixel art
                     </span>
                     <br />
-                    by hand.
+                    repaintable by hand.
                   </h1>
                   <p className="text-base text-muted-foreground leading-relaxed max-w-md">
-                    A browser-first repaint studio that converts images into
-                    palette-limited grids, merges colors, cleans up noise, and
-                    exports step-by-step reference packs for Tomodachi Life.
+                    A browser-first repaint studio for Tomodachi Life: Living
+                    the Dream Mii face masks, user-supplied character
+                    references, brand-style logos, memes, clothing marks, book
+                    covers, and other creative pixel builds.
                   </p>
                   <div className="flex items-center gap-3 pt-2">
                     <Link href="/studio">
@@ -106,7 +369,11 @@ export default function Home() {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <Button variant="outline" size="lg" className="tracking-wide">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="tracking-wide"
+                      >
                         View on GitHub
                       </Button>
                     </a>
@@ -128,6 +395,127 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Breach Recovery and Trust Section */}
+      <section className="py-20 border-t border-border">
+        <div className="container">
+          <p className="section-header mb-3">
+            Tomodachishare Breach Recovery Hub
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">
+            Help users coming from breach-notice traffic with useful, browser-first
+            tools.
+          </h2>
+          <p className="text-muted-foreground leading-relaxed mb-8">
+            If people land here from the{" "}
+            <a
+              className="underline underline-offset-2"
+              href={BREACH_NOTICE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              public notice
+            </a>
+            , give them immediate value: a leak-aware checklist, password risk
+            test, and AI recovery guidance.
+          </p>
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <article className="p-5 rounded-sm border border-border bg-card">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Password breach check</h3>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Browser-only + k-anonymity
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
+                Paste a password to check if it appears in known breach datasets.
+                Your full password never leaves the page; only a SHA-1 prefix is
+                sent.
+              </p>
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="password-leak-check" className="text-xs">
+                  Password candidate
+                </Label>
+                <Input
+                  id="password-leak-check"
+                  type="password"
+                  placeholder="Type a sample password (never paste credentials)"
+                  value={passwordInput}
+                  onChange={(event) => setPasswordInput(event.target.value)}
+                />
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={checkPasswordForBreaches}
+                  disabled={passwordCheck.status === "checking"}
+                >
+                  <Search className="h-4 w-4 mr-1" />
+                  {passwordCheck.status === "checking"
+                    ? "Checking..."
+                    : "Check password exposure"}
+                </Button>
+                <p
+                  className={`text-xs leading-relaxed ${
+                    passwordCheck.status === "found"
+                      ? "text-destructive"
+                      : passwordCheck.status === "safe"
+                        ? "text-green-700"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  {passwordCheck.message || "Run a check to see results."}
+                </p>
+              </div>
+            </article>
+
+            <article className="p-5 rounded-sm border border-border bg-card">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">
+                  AI recovery assistant
+                </h3>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <BotMessageSquare className="h-4 w-4 text-primary" />
+                  OpenRouter-backed
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
+                Paste what happened in plain language. The assistant returns a
+                practical sequence you can hand to friends, family, or forum
+                users.
+              </p>
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="breach-situation" className="text-xs">
+                  Situation details
+                </Label>
+                <Textarea
+                  id="breach-situation"
+                  rows={5}
+                  placeholder="Example: I saw my email in a leaked list, and I used that password in multiple places."
+                  value={incidentPrompt}
+                  onChange={(event) => setIncidentPrompt(event.target.value)}
+                />
+                <Button
+                  className="w-full"
+                  onClick={createBreachRecoveryPlan}
+                  disabled={incidentLoading}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  {incidentLoading
+                    ? "Generating plan..."
+                    : "Generate 24-hour recovery plan"}
+                </Button>
+                {(incidentError || incidentPlan) && (
+                  <div className="mt-3 p-3 rounded-sm border border-border bg-background text-xs text-muted-foreground whitespace-pre-wrap">
+                    {incidentError ?? incidentPlan}
+                  </div>
+                  )}
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       {/* Workflow Section */}
       <section className="py-20 border-t border-border">
         <div className="container">
@@ -138,16 +526,33 @@ export default function Home() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               The studio handles the tedious conversion work so you can focus on
-              the creative part — actually painting your design in the Palette House.
+              the creative part — actually painting your design in the Palette
+              House.
             </p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-6">
             {[
-              { step: "01", label: "Import", desc: "Upload an image or drop a JSON file" },
-              { step: "02", label: "Convert", desc: "Auto-map to the 84-color game palette" },
-              { step: "03", label: "Optimize", desc: "Merge colors, remove noise, simplify" },
-              { step: "04", label: "Export", desc: "Download your reference pack" },
+              {
+                step: "01",
+                label: "Import",
+                desc: "Upload a character, face, logo, meme, or JSON file",
+              },
+              {
+                step: "02",
+                label: "Preset",
+                desc: "Choose Mii mask, character, sprite, logo, or full-image framing",
+              },
+              {
+                step: "03",
+                label: "Optimize",
+                desc: "Merge colors, remove noise, simplify",
+              },
+              {
+                step: "04",
+                label: "Export",
+                desc: "Download your reference pack",
+              },
             ].map((item) => (
               <div
                 key={item.step}
@@ -159,7 +564,9 @@ export default function Home() {
                 >
                   {item.step}
                 </span>
-                <h3 className="text-sm font-semibold mt-2 mb-1">{item.label}</h3>
+                <h3 className="text-sm font-semibold mt-2 mb-1">
+                  {item.label}
+                </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {item.desc}
                 </p>
@@ -232,13 +639,48 @@ export default function Home() {
             </h2>
             <div className="space-y-4">
               {[
-                { phase: "0", title: "JSON Fixture Inspection", status: "done", desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata." },
-                { phase: "1", title: "JSON Round-Trip", status: "done", desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete." },
-                { phase: "2", title: "Palette Panel", status: "done", desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid." },
-                { phase: "3", title: "One-Click Optimizer", status: "done", desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting." },
-                { phase: "4", title: "Image Upload (remaining)", status: "current", desc: "Crop tool, brightness/contrast pre-processing, and preview before committing import." },
-                { phase: "5", title: "Reference Pack Export (remaining)", status: "next", desc: "Palette sheet image, painting order suggestion, and ZIP bundle download." },
-                { phase: "6", title: "AI Suggestions", status: "future", desc: "AI as a suggestion layer only — never a hidden automatic editor." },
+                {
+                  phase: "0",
+                  title: "JSON Fixture Inspection",
+                  status: "done",
+                  desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata.",
+                },
+                {
+                  phase: "1",
+                  title: "JSON Round-Trip",
+                  status: "done",
+                  desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete.",
+                },
+                {
+                  phase: "2",
+                  title: "Palette Panel",
+                  status: "done",
+                  desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid.",
+                },
+                {
+                  phase: "3",
+                  title: "One-Click Optimizer",
+                  status: "done",
+                  desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting.",
+                },
+                {
+                  phase: "4",
+                  title: "Image Upload (remaining)",
+                  status: "current",
+                  desc: "Face-focused framing, cleanup, tone controls, and import preview are in. Remaining: drag crop/pan controls.",
+                },
+                {
+                  phase: "5",
+                  title: "Reference Pack Export (remaining)",
+                  status: "next",
+                  desc: "Palette sheet image, painting order suggestion, and ZIP bundle download.",
+                },
+                {
+                  phase: "6",
+                  title: "AI Suggestions",
+                  status: "current",
+                  desc: "OpenRouter chat, saved local sessions, 25 model presets, visual grid snapshots, and applyable sketch drafts are available; deeper cleanup suggestions are next.",
+                },
               ].map((item) => (
                 <div
                   key={item.phase}
@@ -269,6 +711,73 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            </div>
+        </div>
+      </section>
+
+      {/* Monetization Section */}
+      <section className="py-20 border-t border-border bg-card">
+        <div className="container">
+          <p className="section-header mb-3">Monetization strategy</p>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">
+            Turn Tomodachi domain traffic into recurring income
+          </h2>
+          <p className="text-muted-foreground leading-relaxed max-w-3xl mb-8">
+            Use the breach moment as a traffic catalyst for a two-domain setup:
+            one domain for creative conversion, one for trust and crisis support.
+            Keep ad content clearly separated from sensitive security guidance.
+          </p>
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            {domainMonetizationUseCases.map((entry) => (
+              <article
+                key={entry.domain}
+                className="rounded-sm border border-border bg-background p-5"
+              >
+                <h3 className="text-sm font-semibold">{entry.domain}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{entry.role}</p>
+                <p className="text-xs leading-relaxed mt-4 text-muted-foreground">
+                  {entry.note}
+                </p>
+                <ul className="mt-4 space-y-2">
+                  {entry.monetization.map((item) => (
+                    <li
+                      key={item}
+                      className="text-xs flex items-start gap-2 text-muted-foreground"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-8 space-y-3">
+            {adsEnabled ? (
+              <div className="rounded-sm border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
+                  Monetization slot (AdSense)
+                </p>
+                <ins
+                  className="adsbygoogle"
+                  style={{ display: "block" }}
+                  data-ad-client={adsPublisherId as string}
+                  data-ad-slot={adsSlotId as string}
+                  data-ad-format="auto"
+                  data-full-width-responsive="true"
+                />
+              </div>
+            ) : (
+              <div className="rounded-sm border border-dashed border-border bg-background p-4">
+                <p className="text-xs text-muted-foreground">
+                  Add environment vars <code>VITE_ADSENSE_PUBLISHER_ID</code> and{" "}
+                  <code>VITE_ADSENSE_HOMEPAGE_SLOT_ID</code> to enable ad slots
+                  on production.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -283,7 +792,8 @@ export default function Home() {
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Not affiliated with Nintendo or Tomodachi Life.
+            Unofficial fan tool. No official game or character assets are
+            bundled.
           </p>
         </div>
       </footer>
