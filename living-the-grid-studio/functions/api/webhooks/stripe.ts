@@ -209,6 +209,14 @@ async function dispatchEvent(event: StripeEvent): Promise<void> {
   }
 }
 
+/**
+ * Pages Functions routes POST requests here automatically because we export
+ * `onRequestPost` (the method-specific handler). GET / PUT / DELETE on this
+ * path will return 405 from Cloudflare's router without entering the
+ * Function. We deliberately do NOT also export a generic `onRequest`: when
+ * both are exported, some Pages versions silently fail to load the module,
+ * which would drop the Function back to the SPA fallback.
+ */
 export const onRequestPost = async (
   context: PagesContext,
 ): Promise<Response> => {
@@ -281,21 +289,5 @@ export const onRequestPost = async (
   return new Response(
     JSON.stringify({ received: true }),
     { status: 200, headers: { "Content-Type": "application/json" } },
-  );
-};
-
-/** Block any non-POST. Helpful for browser hits / health checks. */
-export const onRequest = async (
-  context: PagesContext,
-): Promise<Response> => {
-  if (context.request.method === "POST") {
-    return onRequestPost(context);
-  }
-  return new Response(
-    JSON.stringify({ error: "Method not allowed; use POST." }),
-    {
-      status: 405,
-      headers: { "Content-Type": "application/json", Allow: "POST" },
-    },
   );
 };
