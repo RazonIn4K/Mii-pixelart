@@ -60,7 +60,10 @@ export const onRequest = async (
   context: PagesContext,
 ): Promise<Response> => {
   const subpath = resolveSubpath(context.params).replace(/^\/+|\/+$/g, "");
-  const method = context.request.method.toUpperCase();
+  // RFC 7231 §4.3.2: HEAD must return the same headers as GET. Normalize so
+  // HEAD/`curl -I` against products/session match GET behavior.
+  const rawMethod = context.request.method.toUpperCase();
+  const method = rawMethod === "HEAD" ? "GET" : rawMethod;
   const env = context.env;
 
   try {

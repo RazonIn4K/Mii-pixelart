@@ -134,7 +134,11 @@ export const onRequest = async (
   context: PagesContext,
 ): Promise<Response> => {
   const subpath = resolveSubpath(context.params).replace(/^\/+|\/+$/g, "");
-  const method = context.request.method.toUpperCase();
+  // Normalize HEAD to GET so HEAD/curl -I gets the same headers + status as GET
+  // (RFC 7231 §4.3.2). The Response constructor strips the body for HEAD
+  // automatically once Cloudflare's runtime forwards the request method.
+  const rawMethod = context.request.method.toUpperCase();
+  const method = rawMethod === "HEAD" ? "GET" : rawMethod;
   const env = context.env;
 
   try {
