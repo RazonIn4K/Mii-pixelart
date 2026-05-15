@@ -1,9 +1,9 @@
 # IAB ads.txt
 #
-# Replace `pub-0000000000000000` with your real AdSense publisher ID
-# (the one after `ca-` in your `VITE_ADSENSE_PUBLISHER_ID`).
+# Authorized digital sellers for tomodachi.pw. The publisher ID below is the
+# numeric tail of VITE_ADSENSE_PUBLISHER_ID (drop the `ca-` prefix).
 #
 # When you onboard additional ad partners (e.g. Mediavine, Ezoic), add one
 # line per partner using the format they document.
 
-google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+google.com, pub-4804876802243929, DIRECT, f08c47fec0942fa0
