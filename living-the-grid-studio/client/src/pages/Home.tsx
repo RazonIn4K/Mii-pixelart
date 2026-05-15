@@ -13,6 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
 import {
+  getConsent,
+  onConsentChange,
+  type ConsentState,
+} from "@/lib/consent";
+import {
   AlertTriangle,
   BotMessageSquare,
   CheckCircle2,
@@ -88,23 +93,25 @@ const features = [
 
 const domainMonetizationUseCases = [
   {
-    domain: "tomodachi.brave",
-    role: "Creative Growth",
-    note: "Use this as the visual studio homepage: pixel tools, tutorials, exports, and premium workflow upgrades.",
+    domain: "tomodachi.pw",
+    role: "Canonical Public Site",
+    note: "Use this as the primary landing and monetization surface for SEO, ads, email capture, guides, and paid packs.",
     monetization: [
-      "Display ads on non-critical feature pages once traffic is stable.",
-      "Offer AI-assisted premium pack downloads for advanced users.",
-      "Add affiliate cards for drawing tablets, grips, stylus upgrades.",
+      "Offer a free trust-first /help route plus security guides and recovery paths.",
+      "Enable display ads on secondary creator/helpful pages after trust signals are in place.",
+      "Layer email capture around guides, packs, and template launches.",
+      "Run privacy/cyber affiliate placements aligned to user pain.",
+      "Launch $5-$9 packs and $19-$49 workflow bundles.",
     ],
   },
   {
-    domain: "tomodachi.pw",
-    role: "Trust + Utility",
-    note: "Use this as the privacy trust signal + breach response microsite tied to current tomodachishare interest.",
+    domain: "tomodachi.brave",
+    role: "Brave-native creator promo",
+    note: "Use as a short memorable referral domain in Brave/Web3 communities that points to the canonical experience on tomodachi.pw.",
     monetization: [
-      "Offer one-time 'security recovery guides' and checklists.",
-      "Capture leads with a mailing list for future releases and sponsor content.",
-      "Run privacy/cyber products affiliate placements that match breach pain points.",
+      "Point users to creator workflow pages on the canonical site.",
+      "Promote launch posts, studio demos, and social proof.",
+      "Use community messaging and vanity links to improve discovery.",
     ],
   },
 ];
@@ -154,7 +161,16 @@ export default function Home() {
   });
   const adsPublisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID;
   const adsSlotId = import.meta.env.VITE_ADSENSE_HOMEPAGE_SLOT_ID;
-  const adsEnabled = Boolean(adsPublisherId && adsSlotId);
+  const adsConfigured = Boolean(adsPublisherId && adsSlotId);
+
+  // Track consent so we only inject ad scripts after the visitor opts in.
+  const [consent, setConsentState] = useState<ConsentState | null>(null);
+  useEffect(() => {
+    setConsentState(getConsent());
+    return onConsentChange(setConsentState);
+  }, []);
+  const marketingOk = Boolean(consent?.marketing);
+  const adsEnabled = adsConfigured && marketingOk;
 
   useEffect(() => {
     if (!adsEnabled) return;
@@ -194,8 +210,7 @@ export default function Home() {
   }, [adsEnabled]);
 
   const checkPasswordForBreaches = async () => {
-    const password = passwordInput.trim();
-    if (!password) {
+    if (!passwordInput) {
       setPasswordCheck({
         status: "error",
         message: "Type a password first.",
@@ -209,7 +224,7 @@ export default function Home() {
     });
 
     try {
-      const hash = await sha1Hex(password);
+      const hash = await sha1Hex(passwordInput);
       const prefix = hash.slice(0, 5);
       const suffix = hash.slice(5);
 
@@ -772,9 +787,26 @@ Keep it practical and concise.`,
             ) : (
               <div className="rounded-sm border border-dashed border-border bg-background p-4">
                 <p className="text-xs text-muted-foreground">
-                  Add environment vars <code>VITE_ADSENSE_PUBLISHER_ID</code> and{" "}
-                  <code>VITE_ADSENSE_HOMEPAGE_SLOT_ID</code> to enable ad slots
-                  on production.
+                  {adsConfigured && !marketingOk
+                    ? "Ad slot held until the visitor accepts marketing cookies."
+                    : (
+                      <>
+                        Add environment vars{" "}
+                        <code>VITE_ADSENSE_PUBLISHER_ID</code> and{" "}
+                        <code>VITE_ADSENSE_HOMEPAGE_SLOT_ID</code> to enable ad
+                        slots on production.
+                      </>
+                    )}
+                </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  This page may include affiliate links. See our{" "}
+                  <Link
+                    href="/affiliate-disclosure"
+                    className="underline underline-offset-2"
+                  >
+                    Affiliate Disclosure
+                  </Link>
+                  .
                 </p>
               </div>
             )}
@@ -784,13 +816,30 @@ Keep it practical and concise.`,
 
       {/* Footer */}
       <footer className="py-8 border-t border-border">
-        <div className="container flex items-center justify-between">
+        <div className="container flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="red-dot-sm" />
             <span className="text-xs text-muted-foreground">
               Living The Grid Studio
             </span>
           </div>
+          <nav
+            aria-label="Legal"
+            className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+          >
+            <Link href="/privacy" className="hover:underline">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:underline">
+              Terms
+            </Link>
+            <Link href="/cookies" className="hover:underline">
+              Cookies
+            </Link>
+            <Link href="/affiliate-disclosure" className="hover:underline">
+              Affiliate disclosure
+            </Link>
+          </nav>
           <p className="text-xs text-muted-foreground">
             Unofficial fan tool. No official game or character assets are
             bundled.

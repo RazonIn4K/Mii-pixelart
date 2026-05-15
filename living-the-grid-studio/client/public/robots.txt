@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /studio?*
+Disallow: /help?*
+Disallow: /cookies?*
+Disallow: /disclosure?*
+Disallow: /affiliate-disclosure?*
+
+Sitemap: https://tomodachi.pw/sitemap.xml

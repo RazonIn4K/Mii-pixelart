@@ -3,9 +3,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import CookieConsent from "./components/CookieConsent";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import Cookies from "./pages/Cookies";
+import Disclosure from "./pages/Disclosure";
+import Help from "@/pages/Help";
 import Home from "./pages/Home";
+import Privacy from "./pages/Privacy";
 import Studio from "./pages/Studio";
+import Terms from "./pages/Terms";
 
 
 function Router() {
@@ -13,6 +19,12 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/studio"} component={Studio} />
+      <Route path={"/privacy"} component={Privacy} />
+      <Route path={"/terms"} component={Terms} />
+      <Route path={"/cookies"} component={Cookies} />
+      <Route path={"/disclosure"} component={Disclosure} />
+      <Route path={"/affiliate-disclosure"} component={Disclosure} />
+      <Route path={"/help"} component={Help} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -35,6 +47,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <CookieConsent />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
