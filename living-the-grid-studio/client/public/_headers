@@ -1,5 +1,9 @@
 # Cloudflare Pages security + caching headers.
 # Format: path on the first line, then indented header lines.
+#
+# Email Routing note: Cloudflare Email Routing adds MX + SPF + DKIM records
+# to the zone automatically when enabled. No _headers changes are needed for
+# inbound mail — this file only controls HTTP response headers.
 
 /*
   X-Content-Type-Options: nosniff

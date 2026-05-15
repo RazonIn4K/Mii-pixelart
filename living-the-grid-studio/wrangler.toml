@@ -26,14 +26,16 @@ PUBLIC_SITE_URL = "https://tomodachi.pw"
 [env.preview.vars]
 PUBLIC_SITE_URL = "https://preview.tomodachi.pw"
 
-# Pre-provisioned KV namespace for edge caching, rate limiting, and any
-# small key/value state Pages Functions need. Provisioned via the
-# Cloudflare API; see docs/cloudflare-deployment.md for usage.
+# KV namespace for edge caching (OpenRouter models list, rate-limit counters,
+# Brave Rewards verification token, etc.).
+# Namespace: tomodachi-edge-cache
+# Account:   d45bbb1a6d3f779af15c93a9f2603bc9 (Davidinfosec07@gmail.com)
 #
-# Uncomment the binding block when the first Pages Function actually reads
-# or writes to it. While the block is commented out, no Function holds a
-# reference, so leaving the namespace empty costs nothing.
-#
-# [[kv_namespaces]]
-# binding = "EDGE_CACHE"
-# id = "5129b5ce8d2d435cb704b398a437f355"
+# NOTE: This binding takes effect for `wrangler pages deploy` CLI runs.
+# For Git-triggered Cloudflare Pages builds you ALSO need to add the binding
+# manually in Pages → Settings → Functions → KV namespace bindings:
+#   Variable name: EDGE_CACHE
+#   KV namespace:  tomodachi-edge-cache (5129b5ce8d2d435cb704b398a437f355)
+[[kv_namespaces]]
+binding = "EDGE_CACHE"
+id = "5129b5ce8d2d435cb704b398a437f355"
