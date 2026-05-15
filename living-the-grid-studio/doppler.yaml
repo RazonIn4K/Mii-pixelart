@@ -1,0 +1,19 @@
+# Doppler project binding for this repo.
+#
+# `doppler setup` reads this so anyone cloning the repo and running
+# `doppler run -- pnpm dev` gets the right project/config without thinking
+# about it. The actual secrets live in Doppler, not here.
+#
+# To bootstrap locally:
+#   1. `brew install dopplerhq/cli/doppler` (or see docs.doppler.com/cli)
+#   2. `doppler login`
+#   3. `doppler setup`                  # picks tomodachi-pw / dev for you
+#   4. `doppler run -- pnpm dev`        # injects secrets at runtime
+#
+# Cloudflare Pages is connected via Doppler's Cloudflare Pages integration,
+# so production / preview env vars sync automatically when you change them
+# in the Doppler UI. No need to redeploy to refresh secrets.
+
+setup:
+  project: tomodachi-pw
+  config: dev

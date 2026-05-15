@@ -83,3 +83,17 @@ No new server-side secrets. Tips use the same `STRIPE_SECRET_KEY` as gated produ
 3. Add a newsletter signup block on `/guides` and the breach hub, gated on consent.
 4. Lift the four guide cards into real long-form `/guides/[slug]` pages once the funnel proves out.
 5. Add affiliate placements (Bitwarden, Proton, YubiKey, SimpleLogin) into the relevant guides.
+
+## Live Stripe resources (provisioned via MCP)
+
+These were created against the live Stripe account `acct_1RTxsnP5UmVB5UbV` (David Ortiz). Treat these IDs as the source of truth; do not regenerate without archiving them in the dashboard first.
+
+| Resource         | ID / URL                                                                                                                       | Notes                                                                                          |
+|------------------|--------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| Product          | `prod_UWFmeWnaVGu6Tw`                                                                                                          | "Tomodachi.pw Support Tip" — used for the custom-amount tip Payment Link.                      |
+| Price            | `price_1TXDHMP5UmVB5UbV6pOPgiBC`                                                                                                | `custom_unit_amount` enabled. Preset $10, min $1, max $500.                                    |
+| Payment Link     | <https://buy.stripe.com/bJe00laUWaRs9CK0F04ZG17>                                                                                | After completion, redirects to `https://tomodachi.pw/support?thanks=1&source=custom-amount`.   |
+
+To wire it into the UI, set `VITE_STRIPE_DONATION_LINK=https://buy.stripe.com/bJe00laUWaRs9CK0F04ZG17` in Cloudflare Pages (Production), then redeploy. The `Support.tsx` page reads this at build time and shows the "Custom amount" card only when present.
+
+The fixed tip tiers ($5 / $15 / $25) are NOT separate Payment Links; they flow through the existing `/api/stripe/checkout` endpoint using the products in `shared/products.ts`, which creates a fresh Stripe Checkout Session per click. That keeps the support catalog inside the repo and avoids dashboard-side state drift.
