@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
+import { assertStripeRedirect } from "@/lib/stripeUrl";
 
 interface PublicProduct {
   id: string;
@@ -151,7 +152,8 @@ export default function Unlock() {
       if (!response.ok || !payload.url) {
         throw new Error(payload.error ?? "Could not start Stripe checkout.");
       }
-      window.location.assign(payload.url);
+      // Origin guard: refuse to redirect anywhere except Stripe-owned hosts.
+      window.location.assign(assertStripeRedirect(payload.url));
     } catch (error) {
       setLoadError(
         error instanceof Error

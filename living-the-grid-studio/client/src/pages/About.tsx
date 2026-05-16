@@ -43,7 +43,6 @@ const ABOUT_STRUCTURED_DATA = [
       sameAs: [
         "https://github.com/RazonIn4K",
         "https://tomodachi.brave",
-        "https://tomodachi.pw/",
       ],
       knowsAbout: [
         "Tomodachi Life",

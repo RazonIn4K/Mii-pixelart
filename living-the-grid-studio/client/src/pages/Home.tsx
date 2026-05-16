@@ -168,8 +168,21 @@ function bytesToHex(bytes: Uint8Array): string {
     .toUpperCase();
 }
 
+/**
+ * SHA-1 hex digest.
+ *
+ * Note: SHA-1 here is INTENTIONAL — it's the algorithm the Have I Been Pwned
+ * "Pwned Passwords" k-anonymity API requires by spec
+ * (https://haveibeenpwned.com/API/v3#PwnedPasswords). We send only the first
+ * 5 hex chars of the digest to the API, then compare the remainder locally.
+ * Static analyzers flag SHA-1 as "weak hash" out of the box (CWE-916, etc.)
+ * but that warning applies to password storage; this code path is intentional
+ * and required by the upstream API. Do not "upgrade" to SHA-256 — it will
+ * break the breach lookup.
+ */
 async function sha1Hex(input: string): Promise<string> {
   const encoded = new TextEncoder().encode(input);
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- required by HIBP API spec
   const hash = await crypto.subtle.digest("SHA-1", encoded);
   return bytesToHex(new Uint8Array(hash));
 }

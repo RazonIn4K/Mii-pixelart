@@ -25,6 +25,7 @@ import { CheckCircle2 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
+import { assertStripeRedirect, isStripeRedirectSafe } from "@/lib/stripeUrl";
 
 interface PublicProduct {
   id: string;
@@ -77,9 +78,14 @@ export default function Support() {
   const [verifying, setVerifying] = useState(false);
 
   // Optional custom-amount Stripe Payment Link, configured via env at build time.
-  const customAmountLink = import.meta.env.VITE_STRIPE_DONATION_LINK as
+  // Same origin allowlist as the checkout redirect — render the link only if
+  // the configured URL actually points at Stripe.
+  const rawDonationLink = import.meta.env.VITE_STRIPE_DONATION_LINK as
     | string
     | undefined;
+  const customAmountLink = isStripeRedirectSafe(rawDonationLink)
+    ? rawDonationLink
+    : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +161,8 @@ export default function Support() {
       if (!response.ok || !payload.url) {
         throw new Error(payload.error ?? "Could not start Stripe checkout.");
       }
-      window.location.assign(payload.url);
+      // Origin guard: refuse to redirect anywhere except Stripe-owned hosts.
+      window.location.assign(assertStripeRedirect(payload.url));
     } catch (error) {
       setLoadError(
         error instanceof Error
