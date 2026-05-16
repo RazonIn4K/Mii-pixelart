@@ -1,5 +1,3 @@
-import type { PagesFunction } from '@cloudflare/workers-types';
-
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
   'Facebot',
@@ -41,10 +39,10 @@ const OG_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-export const onRequest: PagesFunction = async (context) => {
+export async function onRequest(context) {
   const { request, next } = context;
-  const ua = request.headers.get('user-agent') || '';
-  const isCrawler = SOCIAL_CRAWLERS.some((bot) => ua.includes(bot));
+  const ua = (request.headers.get('user-agent') || '').toLowerCase();
+  const isCrawler = SOCIAL_CRAWLERS.some((bot) => ua.includes(bot.toLowerCase()));
 
   if (isCrawler) {
     const url = new URL(request.url);
@@ -55,10 +53,11 @@ export const onRequest: PagesFunction = async (context) => {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=3600',
           'X-Robots-Tag': 'index, follow',
+          'X-OG-Middleware': 'hit',
         },
       });
     }
   }
 
   return next();
-};
+}
