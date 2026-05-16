@@ -6,7 +6,30 @@
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Living The Grid Studio</title>
+    <title>Tomodachi · Mii Studio &amp; Recovery Guides</title>
+    <meta name="description" content="Tomodachi is a Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult." />
+    <meta name="theme-color" content="#101016" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://tomodachi.pw/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tomodachi" />
+    <meta property="og:title" content="Tomodachi · Mii Studio &amp; Recovery Guides" />
+    <meta property="og:description" content="A Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult." />
+    <meta property="og:url" content="https://tomodachi.pw/" />
+    <meta property="og:image" content="https://tomodachi.pw/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Tomodachi · Mii Studio and Recovery Guides" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tomodachi · Mii Studio &amp; Recovery Guides" />
+    <meta name="twitter:description" content="A Mii pixel-art studio paired with practical breach-recovery guides." />
+    <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -15,10 +38,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <script type="module">
+      const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
+      const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
+
+      if (endpoint && websiteId) {
+        const script = document.createElement("script");
+        script.defer = true;
+        script.src = `${endpoint.replace(/\/$/, "")}/umami`;
+        script.dataset.websiteId = websiteId;
+        document.body.appendChild(script);
+      }
+    </script>
   </body>
 
 </html>
