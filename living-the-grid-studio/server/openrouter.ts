@@ -1,6 +1,7 @@
 import type { AiChatRequest, AiChatResponse, AiGridSketch } from "../shared/ai";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
-import { buildResidentDesignerPrompt } from "../shared/residents";
+// Resident Designer prompt retired alongside the Island tab in Pass 19.
+// Keep the shared/residents.ts file for ExportPanel.validateMiiResidentSpec.
 
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -145,14 +146,22 @@ export async function sendOpenRouterChat(
     method: "POST",
     headers: getOpenRouterHeaders(true, apiKey, env),
     body: JSON.stringify({
-      max_tokens: request.requestSketch ? 3000 : 1200,
+      // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
+      // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
+      // tokens for rows alone, plus a few hundred tokens of wrapping JSON +
+      // commentary. 3000 was the old budget and it was truncating mid-row,
+      // which is why DeepSeek + Claude both spat out partial/invalid grids.
+      // 16000 fits even 32x32 with room to breathe.
+      max_tokens: request.requestSketch ? 16000 : 1200,
       messages,
       model: normalized.model,
       response_format: request.requestSketch
         ? { type: "json_object" }
         : undefined,
       session_id: normalizeSessionId(request.sessionId),
-      temperature: request.requestSketch ? 0.35 : 0.7,
+      // Lower temperature for sketches — we want deterministic structure, not
+      // creative reinterpretation of the schema. 0.2 keeps it on-grid.
+      temperature: request.requestSketch ? 0.2 : 0.7,
     }),
   });
 
@@ -311,33 +320,38 @@ export function buildAiSystemPrompt(requestSketch: boolean): string {
 
   if (!requestSketch) {
     return [
-      "You are the expert pixel-art director inside Living The Grid Studio, a browser repaint tool for Tomodachi Life: Living the Dream.",
+      "You are the expert pixel-art director inside Tomodachi Studio, a browser repaint tool for Tomodachi Life: Living the Dream.",
       "You specialize in low-resolution pixel art that real players can repaint square by square in the Palette House.",
       "Think like a professional sprite artist: clear silhouette first, then facial landmarks, high-contrast readable details, limited palette, and low painting friction.",
       "Help the user design repaintable Mii masks, character-inspired fan builds, horror starters, icons, logos, memes, and object art.",
       "When giving advice, be specific about grid size, palette IDs, outlines, highlights, shadows, symmetry, brush-change reduction, and which details to paint last.",
-      "When asked for a Layers of Abstraction resident, use the Resident Designer rules and return strict MiiResidentSpec JSON if the user requests JSON.",
       "Keep answers concise and practical.",
       "Do not claim you directly changed the canvas unless you returned a sketch object.",
       paletteGuide,
-      buildResidentDesignerPrompt(),
     ].join(" ");
   }
 
+  // CRITICAL: the model has historically dumped solid-color blobs (the entire
+  // grid filled with one palette ID like R10C7) when the JSON budget ran out
+  // mid-row. The system prompt now (a) STRONGLY discourages solid fills, (b)
+  // gives a real multi-color example with varied cells, (c) caps the default
+  // size at 16x16 so even small-context free models can complete a valid grid.
   return [
-    "You are the expert pixel-art drawer inside Living The Grid Studio.",
-    "You create repaintable Tomodachi Life: Living the Dream pixel guides, not generic image prompts.",
+    "You are the expert pixel-art drawer inside Tomodachi Studio.",
+    "You create repaintable Tomodachi Life pixel guides, not generic image prompts.",
     "Prioritize iconic silhouette, readable face/prop details, clean outlines, limited color counts, and shapes a human can recreate in-game without guessing.",
     "If a current-grid image is attached, inspect it visually and improve the actual composition instead of ignoring it.",
-    "Return only valid JSON, no markdown.",
-    "Create a small repaintable pixel-art sketch from the user's request.",
-    "Use palette color IDs only. Use null for transparent/empty cells. Keep the sketch readable, symmetrical when useful, and easy to repaint.",
-    "Use width and height of 16, 24, or 32. Prefer 16 for icons and 32 for characters.",
-    "Avoid noisy dithering and one-cell artifacts unless they are essential facial details such as pupils, teeth, buttons, or highlights.",
-    "Use R10C1 or R11C1 for strong outlines when needed. Use color blocks and large regions before tiny accents.",
+    "Return ONLY valid JSON. No markdown fences, no commentary outside the JSON.",
+    "DEFAULT to width=16 and height=16 for any request unless the user explicitly asks for a larger size. Only use 24 or 32 if the user asks for it.",
+    "Use palette color IDs only. Use null for transparent/empty cells.",
+    "CRITICAL: produce real pixel art. Do NOT fill the entire grid with a single color ID. The grid must contain multiple distinct colors, with clear shapes (eyes, mouth, outline, fill, accents) where appropriate.",
+    "Use R10C1 (black) or R11C1 (charcoal) for outlines, a different color for the main fill, and at least one accent color for facial features or highlights.",
+    "Avoid noisy dithering. Avoid one-cell artifacts unless they are essential facial details such as pupils, teeth, buttons, or highlights.",
     paletteGuide,
-    'JSON shape: {"reply":"short summary","sketch":{"name":"Project Name","width":16,"height":16,"rows":[["R10C7",null]]},"notes":"optional"}',
-    "The rows array must have exactly height rows, and each row must have exactly width cells.",
+    "Required JSON shape (replace example rows with your actual art):",
+    '{"reply":"Short summary of the design choices.","sketch":{"name":"Project Name","width":16,"height":16,"rows":[ [null,null,null,null,"R10C1","R10C1","R10C1","R10C1","R10C1","R10C1",null,null,null,null,null,null], [null,null,"R10C1","R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1","R10C1",null,null,null,null], [null,"R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1",null,null,null], [null,"R10C1","R9C5","R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1","R9C5","R10C1",null,null,null], [null,"R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1",null,null,null] ]}}',
+    "The rows array must have EXACTLY height rows, and each row must have EXACTLY width cells. Count them before you finish.",
+    "If you must shorten the grid to fit, return a smaller width and height instead of producing an invalid number of cells.",
   ].join(" ");
 }
 
@@ -372,8 +386,10 @@ function normalizeSessionId(value: unknown): string | undefined {
 function parseSketchContent(
   content: string,
 ): { reply: string; sketch: AiGridSketch | null; warning?: string } | null {
+  // First attempt: clean JSON parse on the extracted object.
+  const candidate = extractJsonObject(content);
   try {
-    const data = JSON.parse(extractJsonObject(content)) as {
+    const data = JSON.parse(candidate) as {
       reply?: unknown;
       sketch?: unknown;
       notes?: unknown;
@@ -386,12 +402,118 @@ function parseSketchContent(
       sketch: data.sketch ? (data.sketch as AiGridSketch) : null,
     };
   } catch {
+    /* fall through to salvage */
+  }
+
+  // Salvage attempt: the model likely ran out of tokens mid-row and produced
+  // truncated JSON. Try to recover whatever rows were complete before the
+  // truncation. Common patterns are missing closing brackets and a final row
+  // that was cut mid-array. This is best-effort — if it works, the user gets
+  // a partial sketch they can build on; if it doesn't, we still show the raw
+  // text in the reply so they can debug.
+  const salvaged = trySalvagePartialSketch(candidate);
+  if (salvaged) {
     return {
-      reply: content || "The model did not return readable JSON.",
-      sketch: null,
-      warning: "The model response was not valid sketch JSON.",
+      reply:
+        salvaged.reply ||
+        "Recovered a partial sketch from a truncated response. Some rows may be incomplete.",
+      sketch: salvaged.sketch,
+      warning:
+        "The model response was truncated; the sketch may be missing rows or have incomplete rows filled with nulls.",
     };
   }
+
+  return {
+    reply: content || "The model did not return readable JSON.",
+    sketch: null,
+    warning: "The model response was not valid sketch JSON.",
+  };
+}
+
+/**
+ * Best-effort recovery from a truncated sketch response.
+ *
+ * Pattern: the model emits `{"reply":"...","sketch":{"name":"...","width":16,
+ * "height":16,"rows":[ [ "R10C1", "R9C5", ... ], [ "R10C1", "R9C5",` then
+ * cuts off. We try to extract width/height/name, then walk the partial rows
+ * array, keeping any rows that parse as complete arrays of the right length.
+ * Incomplete final rows are dropped, then padded with null-only rows to reach
+ * the declared height.
+ */
+function trySalvagePartialSketch(candidate: string): {
+  reply: string;
+  sketch: AiGridSketch;
+} | null {
+  // Pull width/height/name from before the rows truncation
+  const widthMatch = candidate.match(/"width"\s*:\s*(\d+)/);
+  const heightMatch = candidate.match(/"height"\s*:\s*(\d+)/);
+  const nameMatch = candidate.match(/"name"\s*:\s*"([^"]{1,80})"/);
+  const replyMatch = candidate.match(/"reply"\s*:\s*"([^"]{0,400})"/);
+
+  if (!widthMatch || !heightMatch) return null;
+  const width = Number(widthMatch[1]);
+  const height = Number(heightMatch[1]);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width < 4 || height < 4 || width > 64 || height > 64) return null;
+
+  // Find the start of the rows array and walk row-by-row
+  const rowsStart = candidate.indexOf('"rows"');
+  if (rowsStart < 0) return null;
+  const arrayStart = candidate.indexOf("[", rowsStart);
+  if (arrayStart < 0) return null;
+
+  const remaining = candidate.slice(arrayStart + 1);
+  const rows: (string | null)[][] = [];
+  // Walk char-by-char, depth-tracking to find each row's full extent
+  let depth = 0;
+  let rowStart = -1;
+  for (let i = 0; i < remaining.length && rows.length < height; i += 1) {
+    const ch = remaining[i];
+    if (ch === "[" && depth === 0) {
+      depth = 1;
+      rowStart = i;
+    } else if (ch === "[") {
+      depth += 1;
+    } else if (ch === "]" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && rowStart >= 0) {
+        const rowText = remaining.slice(rowStart, i + 1);
+        try {
+          const parsed = JSON.parse(rowText) as unknown;
+          if (Array.isArray(parsed) && parsed.length === width) {
+            rows.push(
+              parsed.map((cell) =>
+                typeof cell === "string" ? cell : null,
+              ) as (string | null)[],
+            );
+          }
+        } catch {
+          /* skip unparseable row */
+        }
+        rowStart = -1;
+      }
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  // Pad with null rows to declared height so createGridDocumentFromAiSketch
+  // validation passes. User sees partial art with empty rows below.
+  while (rows.length < height) {
+    rows.push(new Array(width).fill(null));
+  }
+
+  return {
+    reply:
+      replyMatch?.[1] ||
+      `Recovered ${rows.length}-row sketch from truncated response.`,
+    sketch: {
+      name: nameMatch?.[1] || "Recovered Sketch",
+      width,
+      height,
+      rows,
+    },
+  };
 }
 
 function extractJsonObject(content: string): string {

@@ -293,20 +293,57 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     }
   };
 
+  const [isAnimatingApply, setIsAnimatingApply] = useState(false);
+
   const applySketch = () => {
-    if (!pendingSketch) return;
+    if (!pendingSketch || isAnimatingApply) return;
+    let finalDoc;
     try {
-      const doc = createGridDocumentFromAiSketch(pendingSketch);
-      onApplySketch(doc);
-      setPendingSketch(null);
-      setError(null);
+      finalDoc = createGridDocumentFromAiSketch(pendingSketch);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "The AI sketch could not be applied.",
       );
+      return;
     }
+
+    setError(null);
+    setIsAnimatingApply(true);
+
+    // Live-paint animation: instead of dumping the full sketch onto the canvas
+    // in one frame, walk the cells in row-major order and rebuild the doc with
+    // progressively more cells filled in. Users see the pixels appear like the
+    // AI is actually painting. Total animation runs ~1.5s regardless of grid
+    // size by adjusting the per-tick batch.
+    const totalCells = finalDoc.cells.length;
+    const targetTicks = 60; // ~16ms per tick × 60 = 1.0s minimum smooth
+    const cellsPerTick = Math.max(1, Math.ceil(totalCells / targetTicks));
+
+    // First frame: blank doc with the right dimensions so the canvas resizes
+    // immediately and the user sees an empty grid waiting to be painted.
+    const blankCells: (string | null)[] = new Array(totalCells).fill(null);
+    onApplySketch({ ...finalDoc, cells: blankCells });
+
+    let filled = 0;
+    const tick = () => {
+      filled = Math.min(totalCells, filled + cellsPerTick);
+      const partialCells: (string | null)[] = new Array(totalCells).fill(null);
+      for (let i = 0; i < filled; i += 1) partialCells[i] = finalDoc.cells[i];
+      onApplySketch({ ...finalDoc, cells: partialCells });
+      if (filled < totalCells) {
+        requestAnimationFrame(tick);
+      } else {
+        // Final frame: hand back the doc with its real usedColors so the palette
+        // panel updates correctly. createGridDocumentFromAiSketch already ran
+        // recomputeUsedColors so finalDoc has the right palette metadata.
+        onApplySketch(finalDoc);
+        setPendingSketch(null);
+        setIsAnimatingApply(false);
+      }
+    };
+    requestAnimationFrame(tick);
   };
 
   return (
@@ -502,9 +539,14 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                   {pendingSketch.width}x{pendingSketch.height}
                 </p>
               </div>
-              <Button size="sm" className="h-8 text-xs" onClick={applySketch}>
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={applySketch}
+                disabled={isAnimatingApply}
+              >
                 <Paintbrush className="mr-2 h-3.5 w-3.5" />
-                Apply
+                {isAnimatingApply ? "Painting…" : "Apply"}
               </Button>
             </div>
           </div>

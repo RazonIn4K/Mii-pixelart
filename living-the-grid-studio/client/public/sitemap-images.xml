@@ -3,6 +3,7 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://tomodachi.pw/</loc>
+    <lastmod>2026-05-16</lastmod>
     <image:image>
       <image:loc>https://tomodachi.pw/og-image.png</image:loc>
       <image:title>Tomodachi · Mii Studio &amp; Recovery Guides</image:title>
@@ -11,6 +12,7 @@
   </url>
   <url>
     <loc>https://tomodachi.pw/studio</loc>
+    <lastmod>2026-05-16</lastmod>
     <image:image>
       <image:loc>https://tomodachi.pw/og-image.png</image:loc>
       <image:title>Tomodachi Studio · pixel-art editor</image:title>
@@ -19,6 +21,7 @@
   </url>
   <url>
     <loc>https://tomodachi.pw/guides</loc>
+    <lastmod>2026-05-16</lastmod>
     <image:image>
       <image:loc>https://tomodachi.pw/og-image.png</image:loc>
       <image:title>Tomodachi Life player guides</image:title>
