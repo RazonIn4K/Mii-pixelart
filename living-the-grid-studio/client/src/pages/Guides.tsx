@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
 
 interface GuideCard {
   id: string;
@@ -521,8 +522,126 @@ const LONG_GUIDES: LongGuide[] = [
   },
 ];
 
+// Per-guide structured data so each long-form section is eligible for
+// rich-result treatment in Google. The first two (Mii creation, QR + save)
+// are real step-by-step procedures so they use HowTo; the other two are
+// closer to explainer articles so they use Article.
+const GUIDES_STRUCTURED_DATA = [
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: "How to make custom Miis for Tomodachi Life",
+    description:
+      "Step-by-step process for designing recognizable custom Miis: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants in Mii Maker before they're locked into the game save.",
+    inLanguage: "en",
+    url: "https://tomodachi.pw/guides#mii-creation",
+    image: "https://tomodachi.pw/og-image.png",
+    totalTime: "PT15M",
+    step: [
+      {
+        "@type": "HowToStep",
+        position: 1,
+        name: "Start from a Look-Alike Mii, not a blank slate",
+        text: "Open Mii Maker on the 3DS, choose Start from Scratch, then Look-Alike Mii. Use the camera to seed the head shape and skin tone. Output is almost always wrong but faster to fix than to build from blank.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 2,
+        name: "Set eyes and mouth before hair",
+        text: "Recognition lives in the eyes (shape, not color) and the mouth (width matters more than shape). Push eyes slightly closer than Nintendo defaults. Try three eyebrow sets before locking the brows.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 3,
+        name: "Add hair last and re-tune the face",
+        text: "Hair shape changes the apparent head width, which throws off eye spacing. Build face → add hair → re-tune face once more.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 4,
+        name: "Save Mii Maker variants before importing to Tomodachi Life",
+        text: "Mii Maker holds 100 Miis. Save rough, eyes-fixed, mouth-fixed, and final versions. Once a Mii moves into a Tomodachi Life apartment, the face is locked.",
+      },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline:
+      "Tomodachi Life gameplay basics: apartments, food, jobs, friendship, marriage",
+    description:
+      "Beginner walkthrough of the core daily loop in Tomodachi Life — what to check each day, how to read food reactions, how friendship and crush gating actually works, and how to keep an island interesting past 40 Miis.",
+    inLanguage: "en",
+    url: "https://tomodachi.pw/guides#gameplay-basics",
+    image: "https://tomodachi.pw/og-image.png",
+    author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
+    publisher: {
+      "@type": "Organization",
+      name: "Tomodachi",
+      url: "https://tomodachi.pw/",
+      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline:
+      "What to do after the Tomodachishare breach (post-shutdown recovery)",
+    description:
+      "Hour-by-hour breach recovery plan for Tomodachishare users: which password to change first, which 2FA method to pick, how to assess Nintendo Network ID exposure, and a 30-day monitoring rhythm.",
+    inLanguage: "en",
+    url: "https://tomodachi.pw/guides#breach-recovery",
+    image: "https://tomodachi.pw/og-image.png",
+    author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
+    publisher: {
+      "@type": "Organization",
+      name: "Tomodachi",
+      url: "https://tomodachi.pw/",
+      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: "Tomodachi Life QR codes, Mii sharing, and save backup",
+    description:
+      "How to export Miis as QR codes from a 3DS or Wii U, scan QR codes from the wider community into Tomodachi Life, and back up a Tomodachi Life save before the hardware dies.",
+    inLanguage: "en",
+    url: "https://tomodachi.pw/guides#qr-and-backup",
+    image: "https://tomodachi.pw/og-image.png",
+    totalTime: "PT10M",
+    step: [
+      {
+        "@type": "HowToStep",
+        position: 1,
+        name: "Export a Mii as a QR code",
+        text: "From Mii Maker on the 3DS: choose Share → QR Code / Image Options → QR Code. Save the screenshot to SD or photograph the screen.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 2,
+        name: "Import a Mii from a QR code",
+        text: "Mii Maker → Receive a Mii from QR Code/Image. Hold the camera over the code. The Mii lands in Mii Maker but you still need to import it into Tomodachi Life separately.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 3,
+        name: "Bundle an entire island for sharing",
+        text: "Export each Mii as an individual QR, screenshot from Mii Maker before importing to Tomodachi Life, post the screenshots together as a themed gallery.",
+      },
+      {
+        "@type": "HowToStep",
+        position: 4,
+        name: "Back up your Tomodachi Life save",
+        text: "Use Nintendo's system transfer to move data between 3DS units, export game saves from System Settings → Data Management where supported, or use a homebrew tool like Checkpoint for off-device backup.",
+      },
+    ],
+  },
+];
+
 export default function Guides() {
   useDocumentTitle("Guides", "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.");
+  useStructuredData(GUIDES_STRUCTURED_DATA);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
