@@ -7,9 +7,12 @@
 
 import LegalLayout from "@/components/LegalLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Terms() {
   useDocumentTitle("Terms");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Terms", href: "/terms" }])]);
 
   return (
     <LegalLayout

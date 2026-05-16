@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 interface PublicProduct {
   id: string;
@@ -60,6 +62,7 @@ function useQueryParam(name: string): string | null {
 
 export default function Support() {
   useDocumentTitle("Support", "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Support", href: "/support" }])]);
 
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);

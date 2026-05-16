@@ -10,6 +10,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 import { AlertTriangle, Undo2, Redo2, Grid3X3, Hash, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,6 +50,7 @@ export default function Studio() {
     "Studio",
     "Browser-first Mii pixel-art editor. Import a photo or character art, reduce colors to a paintable palette, and export a paint-by-numbers reference.",
   );
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Studio", href: "/studio" }])]);
   const {
     doc,
     imagePreview,

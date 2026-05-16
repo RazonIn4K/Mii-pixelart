@@ -10,9 +10,12 @@
 
 import LegalLayout from "@/components/LegalLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Privacy() {
   useDocumentTitle("Privacy");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Privacy", href: "/privacy" }])]);
 
   return (
     <LegalLayout

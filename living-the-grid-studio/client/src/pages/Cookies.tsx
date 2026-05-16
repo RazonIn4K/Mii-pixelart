@@ -8,9 +8,12 @@ import LegalLayout from "@/components/LegalLayout";
 import { Button } from "@/components/ui/button";
 import { resetConsent } from "@/lib/consent";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Cookies() {
   useDocumentTitle("Cookies");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Cookies", href: "/cookies" }])]);
 
   const [reset, setReset] = useState(false);
 

@@ -5,9 +5,12 @@
 
 import LegalLayout from "@/components/LegalLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Disclosure() {
   useDocumentTitle("Affiliate Disclosure");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Affiliate Disclosure", href: "/affiliate-disclosure" }])]);
 
   return (
     <LegalLayout

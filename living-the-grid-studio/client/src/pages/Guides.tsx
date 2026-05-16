@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 import { useStructuredData } from "@/hooks/useStructuredData";
 
 interface GuideCard {
@@ -527,6 +528,7 @@ const LONG_GUIDES: LongGuide[] = [
 // are real step-by-step procedures so they use HowTo; the other two are
 // closer to explainer articles so they use Article.
 const GUIDES_STRUCTURED_DATA = [
+  breadcrumbFor([{ name: "Home", href: "/" }, { name: "Guides", href: "/guides" }]),
   {
     "@context": "https://schema.org",
     "@type": "HowTo",

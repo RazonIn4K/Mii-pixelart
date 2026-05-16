@@ -8,6 +8,8 @@
 import { Link } from "wouter";
 import { AlertTriangle, BookOpen, Download, ShieldCheck } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 const HELP_STEPS = [
   "If you have a real password concern, stop reuse immediately and rotate the affected credentials first.",
@@ -19,6 +21,7 @@ const HELP_STEPS = [
 
 export default function Help() {
   useDocumentTitle("Help", "Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Help", href: "/help" }])]);
 
   return (
     <div className="min-h-screen">

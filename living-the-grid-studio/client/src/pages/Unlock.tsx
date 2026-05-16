@@ -20,6 +20,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useStructuredData } from "@/hooks/useStructuredData";
+import { breadcrumbFor } from "@/lib/breadcrumb";
 
 interface PublicProduct {
   id: string;
@@ -52,6 +54,7 @@ function useQueryParam(name: string): string | null {
 
 export default function Unlock() {
   useDocumentTitle("Unlock", "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.");
+  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Unlock", href: "/unlock" }])]);
 
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);

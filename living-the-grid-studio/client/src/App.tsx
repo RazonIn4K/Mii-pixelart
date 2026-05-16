@@ -5,8 +5,10 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CookieConsent from "./components/CookieConsent";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import About from "./pages/About";
 import Cookies from "./pages/Cookies";
 import Disclosure from "./pages/Disclosure";
+import Faq from "./pages/Faq";
 import Guides from "./pages/Guides";
 import Help from "@/pages/Help";
 import Home from "./pages/Home";
@@ -29,6 +31,8 @@ function Router() {
       <Route path={"/affiliate-disclosure"} component={Disclosure} />
       <Route path={"/help"} component={Help} />
       <Route path={"/guides"} component={Guides} />
+      <Route path={"/faq"} component={Faq} />
+      <Route path={"/about"} component={About} />
       <Route path={"/unlock"} component={Unlock} />
       <Route path={"/support"} component={Support} />
       <Route path={"/donate"} component={Support} />

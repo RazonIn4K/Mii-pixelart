@@ -897,6 +897,12 @@ Keep it practical and concise.`,
             <Link href="/guides" className="hover:underline">
               Guides
             </Link>
+            <Link href="/faq" className="hover:underline">
+              FAQ
+            </Link>
+            <Link href="/about" className="hover:underline">
+              About
+            </Link>
             <Link href="/unlock" className="hover:underline">
               Unlock
             </Link>
