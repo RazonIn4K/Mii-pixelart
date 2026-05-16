@@ -1,11 +1,14 @@
 # Safe repo-side CI: typecheck + Vite client build only.
-# No Doppler, no production secrets, no deploy — Cloudflare Pages can build from Git.
+# No Doppler, no production secrets, no deploy - Cloudflare Pages builds from Git.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   typecheck:
@@ -17,8 +20,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
