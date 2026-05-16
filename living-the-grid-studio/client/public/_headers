@@ -14,20 +14,36 @@
   X-DNS-Prefetch-Control: on
   # Content-Security-Policy: balances strictness with the third-party
   # integrations we genuinely need.
-  #   - script: self + AdSense (loaded only after consent) + Stripe.js if we ever
-  #     embed it client-side. 'unsafe-inline' kept because Vite ships a small
-  #     inline bootstrap and AdSense uses inline script tags.
-  #   - style: self + Google Fonts CSS. 'unsafe-inline' is required by
-  #     Tailwind v4 and most React runtimes for hydrated styles.
+  #
+  # Known-accepted Google CSP Evaluator warnings:
+  #   - 'unsafe-inline' / 'unsafe-eval' on script-src: required by AdSense's
+  #     inline ad tags and by Vite's HMR bootstrap. Removing them would break
+  #     the site.
+  #   - googlesyndication.com / doubleclick.net: Google itself flags these as
+  #     JSONP-bypass surfaces. Inherent cost of loading AdSense; the only way
+  #     to fully resolve is to move AdSense into a sandboxed iframe, which is
+  #     a separate refactor.
+  #
+  # Per-directive notes:
+  #   - script: self + AdSense (loaded only after consent) + Stripe.js.
+  #     *.google.com was dropped — AdSense doesn't need it.
+  #   - style: self + Google Fonts CSS. 'unsafe-inline' required by Tailwind v4
+  #     and React's runtime style injection.
   #   - font: Google Fonts woff2.
-  #   - img: anywhere over https + data: + blob: (covers the hero CDN, the
-  #     og-image, and user-uploaded preview blobs in /studio).
-  #   - connect: self for our APIs, HIBP for the password breach check,
-  #     OpenRouter for the AI assistant, and Cloudflare NEL for error reports.
-  #   - frame: Stripe Checkout, AdSense.
-  #   - frame-ancestors 'none' is stricter than X-Frame-Options SAMEORIGIN above
-  #     and overrides it in modern browsers — nothing should iframe the studio.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://*.google.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  #   - img: anywhere over https + data: + blob: (hero CDN, og-image,
+  #     studio preview blobs).
+  #   - connect: self for our APIs, HIBP for password breach check, OpenRouter
+  #     for AI, Cloudflare NEL for error reports.
+  #   - frame: Stripe Checkout + AdSense ad frames.
+  #   - frame-ancestors 'none' overrides X-Frame-Options SAMEORIGIN above —
+  #     nothing should iframe the studio.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  # Trusted Types in REPORT-ONLY first so we observe what would break in
+  # production without enforcing. React 18 + Vite don't auto-register a
+  # Trusted Types policy, so flipping this to enforce mode prematurely would
+  # break document.innerHTML calls. Move to enforce once we register a
+  # default policy and confirm no production violations.
+  Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types default 'allow-duplicates'
 
 # Long cache for hashed Vite build artifacts.
 /assets/*

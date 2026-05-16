@@ -407,8 +407,8 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
             Generate applyable sketch JSON
           </label>
           <p className="pl-6 text-[0.68rem] leading-relaxed text-muted-foreground">
-            Turn this off for MiiResidentSpec feature sheets, then validate the
-            JSON in the Island tab.
+            Leave on for paintable grid output. Turn off if you want a free-form
+            critique or written planning instead of an applyable sketch.
           </p>
           <label className="flex items-center gap-2 text-xs">
             <Checkbox

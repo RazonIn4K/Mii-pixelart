@@ -28,12 +28,16 @@ import CreationPanel, {
   type PaintTool,
 } from "@/components/studio/CreationPanel";
 import AiPanel from "@/components/studio/AiPanel";
-import ResidentPanel from "@/components/studio/ResidentPanel";
+// ResidentPanel + Island tab removed — feature wasn't being used and the
+// ResidentSpec sidecar lived only in the AI tab's "validate JSON" path which
+// is now a non-feature.
+// import ResidentPanel from "@/components/studio/ResidentPanel";
 import {
   createCreativeTemplateDocument,
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
-import type { MiiResidentSpec } from "@shared/residents";
+// Resident spec type retired alongside the Island tab.
+// import type { MiiResidentSpec } from "@shared/residents";
 
 const EMPTY_STATE_IMG =
   "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/empty-state-Q4aaauXbcgtENGpUkLP2yT.webp";
@@ -223,24 +227,7 @@ export default function Studio() {
     [setDoc],
   );
 
-  const handleAttachResidentSpec = useCallback(
-    (spec: MiiResidentSpec) => {
-      if (!doc) return;
-      setDoc({
-        ...doc,
-        meta: {
-          ...doc.meta,
-          modifiedAt: new Date().toISOString(),
-          sourceMetadata: {
-            ...(doc.meta.sourceMetadata ?? {}),
-            miiResidentSpec: spec,
-          },
-        },
-      });
-      toast.success(`Attached ${spec.name} feature sheet`);
-    },
-    [doc, setDoc],
-  );
+  // handleAttachResidentSpec removed alongside the Island tab.
 
   const handleCommitImagePreview = useCallback(() => {
     commitImagePreview();
@@ -459,12 +446,6 @@ export default function Studio() {
                 Create
               </TabsTrigger>
               <TabsTrigger
-                value="island"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Island
-              </TabsTrigger>
-              <TabsTrigger
                 value="palette"
                 className="text-xs data-[state=active]:bg-accent rounded-sm"
               >
@@ -519,16 +500,7 @@ export default function Studio() {
                 )}
               </TabsContent>
 
-              <TabsContent value="island" className="mt-0">
-                {imagePreview ? (
-                  <PreviewBlockedPanel title="Island" />
-                ) : (
-                  <ResidentPanel
-                    currentDoc={doc}
-                    onAttachResidentSpec={handleAttachResidentSpec}
-                  />
-                )}
-              </TabsContent>
+              {/* Island tab removed in Pass 19. */}
 
               <TabsContent value="palette" className="mt-0 h-full">
                 {imagePreview ? (
