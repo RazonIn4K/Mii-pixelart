@@ -1,0 +1,12 @@
+# GitHub auto-renders this as a "Sponsor" button at the top of the repo.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+#
+# To enable native GitHub Sponsors, visit https://github.com/sponsors and
+# complete the application for the RazonIn4K account. Until that's live, the
+# custom: URLs below give visitors a working path to support the project
+# (Stripe-backed tip jar + paid recovery products).
+
+github: [RazonIn4K]
+custom:
+  - "https://tomodachi.pw/support"
+  - "https://tomodachi.pw/unlock"

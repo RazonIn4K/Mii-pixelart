@@ -9,9 +9,25 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=(), browsing-topics=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   X-DNS-Prefetch-Control: on
+  # Content-Security-Policy: balances strictness with the third-party
+  # integrations we genuinely need.
+  #   - script: self + AdSense (loaded only after consent) + Stripe.js if we ever
+  #     embed it client-side. 'unsafe-inline' kept because Vite ships a small
+  #     inline bootstrap and AdSense uses inline script tags.
+  #   - style: self + Google Fonts CSS. 'unsafe-inline' is required by
+  #     Tailwind v4 and most React runtimes for hydrated styles.
+  #   - font: Google Fonts woff2.
+  #   - img: anywhere over https + data: + blob: (covers the hero CDN, the
+  #     og-image, and user-uploaded preview blobs in /studio).
+  #   - connect: self for our APIs, HIBP for the password breach check,
+  #     OpenRouter for the AI assistant, and Cloudflare NEL for error reports.
+  #   - frame: Stripe Checkout, AdSense.
+  #   - frame-ancestors 'none' is stricter than X-Frame-Options SAMEORIGIN above
+  #     and overrides it in modern browsers — nothing should iframe the studio.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.doubleclick.net https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://*.google.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
 
 # Long cache for hashed Vite build artifacts.
 /assets/*

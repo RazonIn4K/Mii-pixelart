@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://tomodachi.pw/</loc>
+    <image:image>
+      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:title>Tomodachi · Mii Studio &amp; Recovery Guides</image:title>
+      <image:caption>Tomodachi is a browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://tomodachi.pw/studio</loc>
+    <image:image>
+      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:title>Tomodachi Studio · pixel-art editor</image:title>
+      <image:caption>Browser-based pixel-art editor for designing custom Mii face masks square-by-square.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://tomodachi.pw/guides</loc>
+    <image:image>
+      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:title>Tomodachi Life player guides</image:title>
+      <image:caption>Free in-depth guides covering Mii creation, gameplay basics, Tomodachishare breach recovery, and QR code save backup.</image:caption>
+    </image:image>
+  </url>
+</urlset>

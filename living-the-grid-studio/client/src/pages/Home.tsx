@@ -13,6 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
 import {
+  OPENROUTER_MODEL_PRESETS,
+  type AiModelPreset,
+} from "@shared/ai";
+import {
   getConsent,
   onConsentChange,
   type ConsentState,
@@ -123,6 +127,7 @@ type PasswordBreachResult = {
   message: string;
   count?: number;
 };
+type ModelPresetWithAvailability = AiModelPreset & { available?: boolean };
 
 // `adsbygoogle` is the global command queue Google's AdSense script consumes.
 // You push command objects onto it; the script eventually replaces it with a
@@ -134,6 +139,35 @@ type WindowWithAds = Window & {
 };
 
 const defaultErrorMessage = "Something went wrong while running this check.";
+const BREACH_RECOVERY_DEFAULT_MODEL = "~anthropic/claude-haiku-latest";
+
+function parseModelCost(value: string): number {
+  const match = String(value ?? "").match(/\$([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Number.parseFloat(match[1] ?? "0") : Number.POSITIVE_INFINITY;
+}
+
+function pickCheapestPreset(
+  presets: ModelPresetWithAvailability[],
+): ModelPresetWithAvailability {
+  const available = presets.filter((preset) => preset.available !== false);
+  const candidates = available.length > 0 ? available : presets;
+  return (
+    candidates[0] ??
+    OPENROUTER_MODEL_PRESETS[0]
+  );
+}
+
+function pickCheapestAvailableModel(
+  presets: ModelPresetWithAvailability[],
+): string {
+  const ordered = [...presets].sort((left, right) => {
+    const leftCost = parseModelCost(left.pricingPrompt) + parseModelCost(left.pricingCompletion);
+    const rightCost = parseModelCost(right.pricingPrompt) + parseModelCost(right.pricingCompletion);
+    return leftCost - rightCost;
+  });
+  const fallback = pickCheapestPreset(ordered);
+  return fallback.id;
+}
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -155,6 +189,7 @@ function formatNumber(value: number): string {
 export default function Home() {
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
+  const [incidentModel, setIncidentModel] = useState(BREACH_RECOVERY_DEFAULT_MODEL);
   const [incidentLoading, setIncidentLoading] = useState(false);
   const [incidentError, setIncidentError] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
@@ -165,6 +200,28 @@ export default function Home() {
   const adsPublisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID;
   const adsSlotId = import.meta.env.VITE_ADSENSE_HOMEPAGE_SLOT_ID;
   const adsConfigured = Boolean(adsPublisherId && adsSlotId);
+  useEffect(() => {
+    let canceled = false;
+    const loadCheapestModel = async () => {
+      try {
+        const response = await fetch("/api/ai/models");
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          presets?: ModelPresetWithAvailability[];
+        };
+        if (canceled || !Array.isArray(data.presets) || data.presets.length === 0)
+          return;
+        setIncidentModel(pickCheapestAvailableModel(data.presets));
+      } catch {
+        /* Keep default model if the model catalog endpoint is unavailable. */
+      }
+    };
+
+    loadCheapestModel();
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
   // Track consent so we only inject ad scripts after the visitor opts in.
   const [consent, setConsentState] = useState<ConsentState | null>(null);
@@ -303,7 +360,7 @@ export default function Home() {
 Keep it practical and concise.`,
             },
           ],
-          model: "~anthropic/claude-haiku-latest",
+          model: incidentModel,
           requestSketch: false,
           sessionId: "breach-recovery-session",
         }),

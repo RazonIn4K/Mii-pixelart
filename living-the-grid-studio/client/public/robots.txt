@@ -39,3 +39,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://tomodachi.pw/sitemap.xml
+Sitemap: https://tomodachi.pw/sitemap-images.xml

@@ -22,7 +22,7 @@ export interface ConsentState {
   decidedAt: string | null;
 }
 
-const STORAGE_KEY = "ltg.consent.v1";
+export const STORAGE_KEY = "ltg.consent.v1";
 
 const DEFAULT_STATE: ConsentState = {
   marketing: false,

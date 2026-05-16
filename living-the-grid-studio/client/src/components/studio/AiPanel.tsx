@@ -14,6 +14,7 @@ import {
 import type {
   AiChatMessage,
   AiChatResponse,
+  AiModelPreset,
   AiDocumentSummary,
   AiGridImage,
   AiGridSketch,
@@ -42,6 +43,7 @@ interface AiPanelProps {
 
 const CUSTOM_MODEL_VALUE = "__custom__";
 const AI_SESSION_STORAGE_KEY = "ltg.ai.sessions.v1";
+type ModelPresetWithAvailability = AiModelPreset & { available?: boolean };
 
 const STARTER_PROMPTS = [
   "Draw a 32x32 spooky mascot head with clear eyes and teeth.",
@@ -63,6 +65,13 @@ interface SavedAiSession {
   updatedAt: string;
 }
 
+function getFallbackPreset(presets: ModelPresetWithAvailability[]): ModelPresetWithAvailability {
+  return (
+    presets.find((preset) => preset.available !== false) ??
+    OPENROUTER_MODEL_PRESETS[0]
+  );
+}
+
 export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<SavedAiSession[]>([]);
@@ -79,10 +88,46 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [pendingSketch, setPendingSketch] = useState<AiGridSketch | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [presets, setPresets] = useState<ModelPresetWithAvailability[]>(
+    OPENROUTER_MODEL_PRESETS,
+  );
+
+  useEffect(() => {
+    let active = true;
+    const loadPresets = async () => {
+      try {
+        const response = await fetch("/api/ai/models");
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          presets?: ModelPresetWithAvailability[];
+        };
+        if (!active || !Array.isArray(data.presets) || data.presets.length === 0)
+          return;
+        setPresets(data.presets);
+      } catch {
+        /* Keep built-in presets if endpoint is unavailable. */
+      }
+    };
+
+    loadPresets();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (modelChoice === CUSTOM_MODEL_VALUE) return;
+    const preset = presets.find((entry) => entry.id === modelChoice);
+    if (!preset || preset.available === false) {
+      const fallback = getFallbackPreset(presets);
+      setModelChoice(fallback.id);
+    }
+  }, [modelChoice, presets]);
 
   const selectedModel =
     modelChoice === CUSTOM_MODEL_VALUE ? customModel.trim() : modelChoice;
-  const selectedPreset = OPENROUTER_MODEL_PRESETS.find(
+  const selectedPreset = presets.find(
     (preset) => preset.id === selectedModel,
   );
   const currentSummary = useMemo(
@@ -323,9 +368,14 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               <SelectValue placeholder="Choose model" />
             </SelectTrigger>
             <SelectContent>
-              {OPENROUTER_MODEL_PRESETS.map((preset) => (
-                <SelectItem key={preset.id} value={preset.id}>
+              {presets.map((preset) => (
+                <SelectItem
+                  key={preset.id}
+                  value={preset.id}
+                  disabled={preset.available === false}
+                >
                   #{preset.rank} {preset.label}
+                  {preset.available === false ? " (unavailable)" : ""}
                 </SelectItem>
               ))}
               <SelectItem value={CUSTOM_MODEL_VALUE}>Custom model</SelectItem>

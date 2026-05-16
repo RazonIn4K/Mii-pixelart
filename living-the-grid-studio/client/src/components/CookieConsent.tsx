@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  STORAGE_KEY,
   getConsent,
   onConsentChange,
   setConsent,
@@ -28,7 +29,7 @@ export function CookieConsent() {
     const unsubscribe = onConsentChange(sync);
 
     const onStorage = (event: StorageEvent) => {
-      if (event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
       sync();
     };
 
@@ -125,7 +126,7 @@ export function CookieConsent() {
               size="sm"
               onClick={essentialOnly}
               aria-label="Essential cookies only"
-              className="w-full md:w-auto"
+              className="w-full whitespace-nowrap md:w-auto"
             >
               Essential only
             </Button>
@@ -133,14 +134,14 @@ export function CookieConsent() {
               variant="outline"
               size="sm"
               onClick={rejectAll}
-              className="w-full md:w-auto"
+              className="w-full whitespace-nowrap md:w-auto"
             >
               Reject all
             </Button>
             <Button
               size="sm"
               onClick={acceptAll}
-              className="w-full md:w-auto"
+              className="w-full whitespace-nowrap md:w-auto"
             >
               Accept all
             </Button>
