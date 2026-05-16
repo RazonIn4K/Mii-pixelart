@@ -176,7 +176,7 @@ export default function Unlock() {
         </div>
       </header>
 
-      <main className="container max-w-5xl py-10 sm:py-12 space-y-8">
+      <main id="main-content" className="container max-w-5xl py-10 sm:py-12 space-y-8">
         <section>
           <h1 className="text-3xl font-semibold">Unlock</h1>
           <p className="mt-2 text-muted-foreground">

@@ -400,6 +400,7 @@ Keep it practical and concise.`,
         </div>
       </nav>
 
+      <main id="main-content">
       {/* Hero Section */}
       <section className="pt-14">
         <div className="relative overflow-hidden">
@@ -880,6 +881,7 @@ Keep it practical and concise.`,
           </div>
         </div>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="py-8 border-t border-border">

@@ -360,7 +360,7 @@ export default function Studio() {
 
       {/* Main Content — stacks vertically on mobile (<768px) so the
           right panel doesn't push the canvas off-screen. Side-by-side on md+. */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <main id="main-content" className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Canvas Area (full width on mobile, ~65% on desktop) */}
         <div className="flex-1 min-w-0 p-3 min-h-[60vh] md:min-h-0">
           {visibleDoc ? (
@@ -566,7 +566,7 @@ export default function Studio() {
             </div>
           </Tabs>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

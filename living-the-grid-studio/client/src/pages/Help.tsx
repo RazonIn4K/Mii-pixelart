@@ -25,6 +25,7 @@ export default function Help() {
 
   return (
     <div className="min-h-screen">
+      <main id="main-content">
       <section className="pt-14">
         <div className="container py-12 lg:py-20">
           <p className="section-header mb-3">Account safety help</p>
@@ -80,6 +81,7 @@ export default function Help() {
           </article>
         </div>
       </section>
+      </main>
     </div>
   );
 }

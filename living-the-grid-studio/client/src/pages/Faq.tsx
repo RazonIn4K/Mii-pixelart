@@ -169,7 +169,7 @@ export default function Faq() {
         </div>
       </header>
 
-      <main className="container max-w-3xl py-10 sm:py-12 space-y-10">
+      <main id="main-content" className="container max-w-3xl py-10 sm:py-12 space-y-10">
         <section className="space-y-3">
           <p className="section-header">FAQ</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">

@@ -1,0 +1,41 @@
+{
+  "name": "Tomodachi · Mii Studio & Recovery Guides",
+  "short_name": "Tomodachi",
+  "description": "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "theme_color": "#101016",
+  "background_color": "#fafaf5",
+  "categories": ["productivity", "graphics", "utilities"],
+  "icons": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Studio",
+      "short_name": "Studio",
+      "description": "Browser-first pixel-art editor for Mii face masks.",
+      "url": "/studio"
+    },
+    {
+      "name": "Free guides",
+      "short_name": "Guides",
+      "description": "Mii creation, gameplay basics, breach recovery, QR + save backup.",
+      "url": "/guides"
+    },
+    {
+      "name": "Breach recovery help",
+      "short_name": "Recovery",
+      "description": "Free 24-hour action plan after the Tomodachishare breach.",
+      "url": "/help"
+    }
+  ]
+}

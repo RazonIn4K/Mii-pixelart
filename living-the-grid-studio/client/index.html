@@ -30,6 +30,14 @@
     <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
 
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E" />
+    <!-- PWA: makes the site installable on Android/iOS home screens.
+         Brand color matches the studio header; background_color matches the
+         Paper Studio off-white surface. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/og-image.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Tomodachi" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Image CDN preconnect — saves ~100-200ms on the first hero image fetch. -->

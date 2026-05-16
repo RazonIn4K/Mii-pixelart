@@ -65,7 +65,7 @@ export default function NotFound() {
         </div>
       </header>
 
-      <main className="container max-w-3xl py-12 sm:py-16 space-y-8">
+      <main id="main-content" className="container max-w-3xl py-12 sm:py-16 space-y-8">
         <section className="space-y-3">
           <p className="section-header">404</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">

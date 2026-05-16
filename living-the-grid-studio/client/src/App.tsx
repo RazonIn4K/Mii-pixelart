@@ -55,6 +55,17 @@ function App() {
         defaultTheme="light"
         // switchable
       >
+        {/* Skip-to-main link: keyboard users tabbing into the page get this
+            as the first focusable element. Visually hidden until focused via
+            the sr-only-focusable utility pattern; on Tab it slides into view
+            in the top-left. Targets #main-content which every page renders
+            via its <main> tag below the header. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-sm focus:border focus:border-foreground/30 focus:bg-background focus:px-3 focus:py-1.5 focus:text-xs focus:font-medium focus:shadow"
+        >
+          Skip to main content
+        </a>
         <TooltipProvider>
           <Toaster />
           <Router />

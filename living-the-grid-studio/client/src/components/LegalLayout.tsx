@@ -42,7 +42,7 @@ export function LegalLayout({
         </div>
       </header>
 
-      <main className="container py-12">
+      <main id="main-content" className="container py-12">
         <article className="prose prose-neutral mx-auto max-w-3xl dark:prose-invert">
           <h1>{title}</h1>
           {intro ? <p className="lead">{intro}</p> : null}

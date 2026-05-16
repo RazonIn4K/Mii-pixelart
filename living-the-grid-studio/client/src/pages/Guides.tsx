@@ -656,7 +656,7 @@ export default function Guides() {
         </div>
       </header>
 
-      <main className="container max-w-4xl py-10 sm:py-12 space-y-10 sm:space-y-12">
+      <main id="main-content" className="container max-w-4xl py-10 sm:py-12 space-y-10 sm:space-y-12">
         <section>
           <h1 className="text-3xl sm:text-4xl font-semibold">Guides</h1>
           <p className="mt-2 text-muted-foreground">
