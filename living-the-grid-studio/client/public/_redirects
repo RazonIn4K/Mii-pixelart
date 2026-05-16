@@ -1,5 +1,5 @@
 # Cloudflare Pages routing rules.
 # Pages Functions under /functions/api/* take precedence automatically;
 # everything else falls back to the SPA entry point for wouter routing.
-
-/*    /index.html   200
+# Note: /* /index.html 200 removed - causes infinite redirect loop on CF Pages.
+# Cloudflare Pages serves index.html at root by default.
