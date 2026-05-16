@@ -4,8 +4,11 @@
  */
 
 import LegalLayout from "@/components/LegalLayout";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Disclosure() {
+  useDocumentTitle("Affiliate Disclosure");
+
   return (
     <LegalLayout
       title="Affiliate Disclosure"

@@ -43,7 +43,9 @@ interface AiPanelProps {
 
 const CUSTOM_MODEL_VALUE = "__custom__";
 const AI_SESSION_STORAGE_KEY = "ltg.ai.sessions.v1";
-type ModelPresetWithAvailability = AiModelPreset & { available?: boolean };
+// ModelPresetWithAvailability removed — `available?: boolean` now lives on the
+// canonical AiModelPreset type in shared/ai.ts so client + server share one
+// wire shape.
 
 const STARTER_PROMPTS = [
   "Draw a 32x32 spooky mascot head with clear eyes and teeth.",
@@ -65,7 +67,7 @@ interface SavedAiSession {
   updatedAt: string;
 }
 
-function getFallbackPreset(presets: ModelPresetWithAvailability[]): ModelPresetWithAvailability {
+function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset {
   return (
     presets.find((preset) => preset.available !== false) ??
     OPENROUTER_MODEL_PRESETS[0]
@@ -88,7 +90,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [pendingSketch, setPendingSketch] = useState<AiGridSketch | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [presets, setPresets] = useState<ModelPresetWithAvailability[]>(
+  const [presets, setPresets] = useState<AiModelPreset[]>(
     OPENROUTER_MODEL_PRESETS,
   );
 
@@ -99,7 +101,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
         const response = await fetch("/api/ai/models");
         if (!response.ok) return;
         const data = (await response.json()) as {
-          presets?: ModelPresetWithAvailability[];
+          presets?: AiModelPreset[];
         };
         if (!active || !Array.isArray(data.presets) || data.presets.length === 0)
           return;

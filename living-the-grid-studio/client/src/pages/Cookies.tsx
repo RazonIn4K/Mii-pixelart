@@ -7,8 +7,11 @@ import { useState } from "react";
 import LegalLayout from "@/components/LegalLayout";
 import { Button } from "@/components/ui/button";
 import { resetConsent } from "@/lib/consent";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Cookies() {
+  useDocumentTitle("Cookies");
+
   const [reset, setReset] = useState(false);
 
   return (

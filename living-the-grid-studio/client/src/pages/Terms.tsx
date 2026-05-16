@@ -6,8 +6,11 @@
  */
 
 import LegalLayout from "@/components/LegalLayout";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Terms() {
+  useDocumentTitle("Terms");
+
   return (
     <LegalLayout
       title="Terms of Service"

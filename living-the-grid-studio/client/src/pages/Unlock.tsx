@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface PublicProduct {
   id: string;
@@ -50,6 +51,8 @@ function useQueryParam(name: string): string | null {
 }
 
 export default function Unlock() {
+  useDocumentTitle("Unlock", "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.");
+
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);

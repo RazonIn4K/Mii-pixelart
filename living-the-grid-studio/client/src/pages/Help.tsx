@@ -7,6 +7,7 @@
 
 import { Link } from "wouter";
 import { AlertTriangle, BookOpen, Download, ShieldCheck } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const HELP_STEPS = [
   "If you have a real password concern, stop reuse immediately and rotate the affected credentials first.",
@@ -17,6 +18,8 @@ const HELP_STEPS = [
 ];
 
 export default function Help() {
+  useDocumentTitle("Help", "Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.");
+
   return (
     <div className="min-h-screen">
       <section className="pt-14">

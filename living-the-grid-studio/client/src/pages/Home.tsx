@@ -127,7 +127,9 @@ type PasswordBreachResult = {
   message: string;
   count?: number;
 };
-type ModelPresetWithAvailability = AiModelPreset & { available?: boolean };
+// ModelPresetWithAvailability removed — the `available?: boolean` field now
+// lives on the canonical AiModelPreset type in shared/ai.ts so both client +
+// server agree on the wire shape and type-drift errors surface at compile time.
 
 // `adsbygoogle` is the global command queue Google's AdSense script consumes.
 // You push command objects onto it; the script eventually replaces it with a
@@ -139,34 +141,24 @@ type WindowWithAds = Window & {
 };
 
 const defaultErrorMessage = "Something went wrong while running this check.";
-const BREACH_RECOVERY_DEFAULT_MODEL = "~anthropic/claude-haiku-latest";
+// Source the default model from the shared preset list so we can never ship a
+// dead OpenRouter ID. If the preset list changes, this follows automatically.
+const BREACH_RECOVERY_DEFAULT_MODEL =
+  OPENROUTER_MODEL_PRESETS[0]?.id ?? "deepseek/deepseek-v4-flash:free";
 
-function parseModelCost(value: string): number {
-  const match = String(value ?? "").match(/\$([0-9]+(?:\.[0-9]+)?)/);
-  return match ? Number.parseFloat(match[1] ?? "0") : Number.POSITIVE_INFINITY;
-}
-
-function pickCheapestPreset(
-  presets: ModelPresetWithAvailability[],
-): ModelPresetWithAvailability {
-  const available = presets.filter((preset) => preset.available !== false);
-  const candidates = available.length > 0 ? available : presets;
+// All current presets are free ($0 prompt + $0 completion), so the previous
+// "sort by total cost" logic was a no-op that always returned index 0.
+// Reduced to: first preset that the server hasn't marked unavailable.
+// Treats `available === undefined` as "unknown, try it" — only an explicit
+// `available === false` filters a preset out.
+function pickFirstAvailableModel(presets: AiModelPreset[]): string {
+  const candidate = presets.find((preset) => preset.available !== false);
   return (
-    candidates[0] ??
-    OPENROUTER_MODEL_PRESETS[0]
+    candidate?.id ??
+    presets[0]?.id ??
+    OPENROUTER_MODEL_PRESETS[0]?.id ??
+    "deepseek/deepseek-v4-flash:free"
   );
-}
-
-function pickCheapestAvailableModel(
-  presets: ModelPresetWithAvailability[],
-): string {
-  const ordered = [...presets].sort((left, right) => {
-    const leftCost = parseModelCost(left.pricingPrompt) + parseModelCost(left.pricingCompletion);
-    const rightCost = parseModelCost(right.pricingPrompt) + parseModelCost(right.pricingCompletion);
-    return leftCost - rightCost;
-  });
-  const fallback = pickCheapestPreset(ordered);
-  return fallback.id;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -207,11 +199,11 @@ export default function Home() {
         const response = await fetch("/api/ai/models");
         if (!response.ok) return;
         const data = (await response.json()) as {
-          presets?: ModelPresetWithAvailability[];
+          presets?: AiModelPreset[];
         };
         if (canceled || !Array.isArray(data.presets) || data.presets.length === 0)
           return;
-        setIncidentModel(pickCheapestAvailableModel(data.presets));
+        setIncidentModel(pickFirstAvailableModel(data.presets));
       } catch {
         /* Keep default model if the model catalog endpoint is unavailable. */
       }
@@ -458,9 +450,13 @@ Keep it practical and concise.`,
                   <div className="rounded-sm overflow-hidden shadow-sm border border-border">
                     <img
                       src={HERO_IMG}
-                      alt="Pixel art on graph paper with colored pencils"
+                      alt="Hand-drawn Mii face on engineering grid paper next to colored pencils, illustrating the studio's paint-by-numbers workflow."
                       className="w-full h-auto"
+                      width={1920}
+                      height={1072}
                       loading="eager"
+                      decoding="async"
+                      fetchPriority="high"
                     />
                   </div>
                 </div>
@@ -691,17 +687,23 @@ Keep it practical and concise.`,
               <div className="rounded-sm overflow-hidden border border-border shadow-sm">
                 <img
                   src={CANVAS_IMG}
-                  alt="Pixel art mushroom on graph paper"
+                  alt="Hand-painted pixel-art mushroom on graph paper — example output from the studio's color-reduction optimizer."
                   className="w-full h-auto"
+                  width={1920}
+                  height={1920}
                   loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="rounded-sm overflow-hidden border border-border shadow-sm">
                 <img
                   src={PALETTE_IMG}
-                  alt="Game color palette swatches"
+                  alt="Reference swatches of the 84-color Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching."
                   className="w-full h-auto"
+                  width={1920}
+                  height={1434}
                   loading="lazy"
+                  decoding="async"
                 />
               </div>
             </div>

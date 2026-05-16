@@ -30,6 +30,7 @@ import {
   ScanFace,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface GuideCard {
   id: string;
@@ -521,6 +522,8 @@ const LONG_GUIDES: LongGuide[] = [
 ];
 
 export default function Guides() {
+  useDocumentTitle("Guides", "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.");
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">

@@ -9,8 +9,11 @@
  */
 
 import LegalLayout from "@/components/LegalLayout";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Privacy() {
+  useDocumentTitle("Privacy");
+
   return (
     <LegalLayout
       title="Privacy Policy"

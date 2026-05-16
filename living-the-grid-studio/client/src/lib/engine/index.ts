@@ -14,4 +14,3 @@ export * from "./canvas-renderer";
 export * from "./image-import";
 export * from "./templates";
 export * from "./ai-sketch";
-export * from "./residents";

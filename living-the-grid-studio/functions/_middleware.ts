@@ -51,7 +51,12 @@ export async function onRequest(context) {
         status: 200,
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600',
+          // Short max-age + Vary: User-Agent so an upstream cache that doesn't
+          // key on UA can't accidentally serve this crawler-only shell to a
+          // regular browser. Cloudflare Pages keys Worker responses on UA
+          // correctly; this is belt-and-suspenders for any in-front cache.
+          'Cache-Control': 'public, max-age=300',
+          'Vary': 'User-Agent',
           'X-Robots-Tag': 'index, follow',
           'X-OG-Middleware': 'hit',
         },

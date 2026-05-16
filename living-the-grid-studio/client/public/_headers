@@ -7,7 +7,10 @@
 
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: SAMEORIGIN
+  # CSP's `frame-ancestors 'none'` below is the modern enforcement, but legacy
+  # browsers (pre-Chromium Edge, old IE) only honor X-Frame-Options. DENY
+  # matches the CSP intent — nothing should iframe the studio.
+  X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=(), browsing-topics=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
@@ -35,9 +38,9 @@
   #   - connect: self for our APIs, HIBP for password breach check, OpenRouter
   #     for AI, Cloudflare NEL for error reports.
   #   - frame: Stripe Checkout + AdSense ad frames.
-  #   - frame-ancestors 'none' overrides X-Frame-Options SAMEORIGIN above —
+  #   - frame-ancestors 'none' matches the X-Frame-Options: DENY above —
   #     nothing should iframe the studio.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com https://api.stripe.com https://r.stripe.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
   # Trusted Types in REPORT-ONLY first so we observe what would break in
   # production without enforcing. React 18 + Vite don't auto-register a
   # Trusted Types policy, so flipping this to enforce mode prematurely would

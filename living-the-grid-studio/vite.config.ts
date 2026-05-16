@@ -340,12 +340,20 @@ function vitePluginStripeApi(): Plugin {
   };
 }
 
+// Manus dev tooling (vitePluginManusRuntime + vitePluginManusDebugCollector)
+// was injecting ~366KB of console/network capture runtime into every PROD HTML
+// response. That's bigger than the actual app bundle (~190KB gzipped).
+// Gate both behind dev-mode only so production stays lean. Same logic for
+// jsxLocPlugin which only matters for source-map UX in the dev editor.
+const isDev = process.env.NODE_ENV !== "production";
+const devOnlyPlugins = isDev
+  ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()]
+  : [];
+
 const plugins = [
   react(),
   tailwindcss(),
-  jsxLocPlugin(),
-  vitePluginManusRuntime(),
-  vitePluginManusDebugCollector(),
+  ...devOnlyPlugins,
   vitePluginStorageProxy(),
   vitePluginOpenRouterApi(),
   vitePluginStripeApi(),

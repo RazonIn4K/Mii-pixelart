@@ -57,6 +57,9 @@ export interface AiModelPreset {
   pricingPrompt: string;
   rank: number;
   releaseDate: string;
+  // Populated server-side by /api/ai/models when the OpenRouter catalog is
+  // queryable. Clients should treat undefined as "unknown — try it".
+  available?: boolean;
 }
 
 export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [

@@ -22,6 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2 } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface PublicProduct {
   id: string;
@@ -58,6 +59,8 @@ function useQueryParam(name: string): string | null {
 }
 
 export default function Support() {
+  useDocumentTitle("Support", "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.");
+
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);

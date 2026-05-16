@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AlertTriangle, Undo2, Redo2, Grid3X3, Hash, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,6 +44,10 @@ const EMPTY_STATE_IMG =
   "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/empty-state-Q4aaauXbcgtENGpUkLP2yT.webp";
 
 export default function Studio() {
+  useDocumentTitle(
+    "Studio",
+    "Browser-first Mii pixel-art editor. Import a photo or character art, reduce colors to a paintable palette, and export a paint-by-numbers reference.",
+  );
   const {
     doc,
     imagePreview,
