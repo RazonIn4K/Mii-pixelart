@@ -9,6 +9,15 @@
     "start": "NODE_ENV=production node dist/index.js",
     "preview": "vite preview --host",
     "check": "tsc --noEmit",
+    "verify": "pnpm check && pnpm verify:ltg && pnpm verify:image-import && pnpm verify:templates && pnpm verify:ai-sketch && pnpm verify:residents",
+    "verify:ltg": "tsx scripts/verify-ltg-import.ts",
+    "verify:image-import": "tsx scripts/verify-image-import.ts",
+    "verify:templates": "tsx scripts/verify-creative-templates.ts",
+    "verify:ai-sketch": "tsx scripts/verify-ai-sketch.ts",
+    "verify:residents": "tsx scripts/verify-residents.ts",
+    "verify:studio": "tsx scripts/verify-studio-browser.ts",
+    "save:templates": "tsx scripts/save-creative-template-fixtures.ts",
+    "compare:models": "tsx scripts/compare-openrouter-models.ts",
     "format": "prettier --write ."
   },
   "dependencies": {

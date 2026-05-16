@@ -8,13 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Download, FileJson, Image as ImageIcon, Package } from "lucide-react";
 import type { GridDocument } from "@/lib/engine/grid";
 import { downloadGridDocument, exportGridJson } from "@/lib/engine/json-io";
-import { downloadGridAsPng } from "@/lib/engine/canvas-renderer";
+import {
+  downloadGridAsPng,
+  downloadPaletteSheetAsPng,
+} from "@/lib/engine/canvas-renderer";
+import { TOMODACHI_PALETTE } from "@/lib/engine/palette";
+import { validateMiiResidentSpec } from "@shared/residents";
 
 interface ExportPanelProps {
   doc: GridDocument | null;
+  disabledReason?: string;
 }
 
-export default function ExportPanel({ doc }: ExportPanelProps) {
+export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
   const handleExportJson = () => {
     if (!doc) return;
     downloadGridDocument(doc);
@@ -22,12 +28,22 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
 
   const handleExportPng = () => {
     if (!doc) return;
-    downloadGridAsPng(doc, { cellSize: 16, showGrid: true, showLabels: true });
+    const safeName = getSafeProjectName(doc);
+    downloadGridAsPng(
+      doc,
+      { cellSize: 16, showGrid: true, showLabels: true },
+      `${safeName}-guide-labeled.png`
+    );
   };
 
   const handleExportPngClean = () => {
     if (!doc) return;
-    downloadGridAsPng(doc, { cellSize: 16, showGrid: false, showLabels: false });
+    const safeName = getSafeProjectName(doc);
+    downloadGridAsPng(
+      doc,
+      { cellSize: 16, showGrid: false, showLabels: false },
+      `${safeName}-clean.png`
+    );
   };
 
   const handleExportReferencePack = () => {
@@ -35,14 +51,16 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
 
     // Export JSON
     const json = exportGridJson(doc);
-    const safeName = doc.meta.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeName = getSafeProjectName(doc);
+    const paletteById = new Map(TOMODACHI_PALETTE.map((color) => [color.id, color]));
+    const resident = getAttachedResident(doc);
 
     // Create a simple HTML reference page
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${doc.meta.name} — Reference Pack</title>
+  <title>${escapeHtml(doc.meta.name)} - Reference Pack</title>
   <style>
     body { font-family: "Noto Sans JP", sans-serif; background: #FAFAF5; color: #4A4A4A; padding: 2rem; }
     h1 { font-size: 1.25rem; font-weight: 600; }
@@ -53,19 +71,37 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
   </style>
 </head>
 <body>
-  <h1>${doc.meta.name}</h1>
+  <h1>${escapeHtml(doc.meta.name)}</h1>
   <div class="meta">
     ${doc.width}×${doc.height} grid · ${doc.usedColors.length} colors · Created ${doc.meta.createdAt}
   </div>
+  <p class="meta">Fan-made repaint reference. Not affiliated with Nintendo, TomodachiShare, or any referenced source.</p>
+  ${
+    resident
+      ? `<h2 style="font-size:0.875rem;font-weight:600;">Resident Feature Sheet</h2>
+  <table style="border-collapse:collapse;width:100%;margin:1rem 0;font-size:0.75rem;">
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">Resident</th><td style="border:1px solid #ddd;padding:0.4rem;">${escapeHtml(resident.name)}</td></tr>
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">District</th><td style="border:1px solid #ddd;padding:0.4rem;">${escapeHtml(resident.district)}</td></tr>
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">Bridge Below</th><td style="border:1px solid #ddd;padding:0.4rem;">${escapeHtml(resident.bridgeBelow)}</td></tr>
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">Bridge Above</th><td style="border:1px solid #ddd;padding:0.4rem;">${escapeHtml(resident.bridgeAbove)}</td></tr>
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">Pixel Notes</th><td style="border:1px solid #ddd;padding:0.4rem;">${escapeHtml(resident.pixelArtNotes)}</td></tr>
+    <tr><th style="text-align:left;border:1px solid #ddd;padding:0.4rem;background:#f5f5f0;">Sources</th><td style="border:1px solid #ddd;padding:0.4rem;">${resident.sourceCredits.map(escapeHtml).join("<br>")}</td></tr>
+  </table>`
+      : ""
+  }
   <h2 style="font-size:0.875rem;font-weight:600;">Palette</h2>
   <div class="palette">
     ${doc.usedColors.map((id) => {
-      const c = (globalThis as any).__PALETTE__?.[id];
-      return `<div class="swatch" style="background:${id}" title="${id}"></div>`;
+      const color = paletteById.get(id);
+      const swatchColor = color?.hex ?? id;
+      const title = color
+        ? `${color.id} - ${color.name} - ${color.hex}`
+        : id;
+      return `<div class="swatch" style="background:${escapeHtml(swatchColor)}" title="${escapeHtml(title)}"></div>`;
     }).join("\n    ")}
   </div>
   <h2 style="font-size:0.875rem;font-weight:600;">Project JSON</h2>
-  <pre>${json.replace(/</g, "&lt;")}</pre>
+  <pre>${escapeHtml(json)}</pre>
 </body>
 </html>`;
 
@@ -73,7 +109,12 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
     downloadGridDocument(doc);
 
     // Download PNG guide
-    downloadGridAsPng(doc, { cellSize: 16, showGrid: true, showLabels: true });
+    downloadGridAsPng(
+      doc,
+      { cellSize: 16, showGrid: true, showLabels: true },
+      `${safeName}-guide-labeled.png`
+    );
+    downloadPaletteSheetAsPng(doc, `${safeName}-palette-sheet.png`);
 
     // Download HTML reference
     const blob = new Blob([html], { type: "text/html" });
@@ -94,6 +135,11 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
         <p className="text-xs text-muted-foreground">
           Download your work in various formats.
         </p>
+        {disabledReason && (
+          <p className="mt-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs leading-relaxed text-amber-950">
+            {disabledReason}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -151,4 +197,23 @@ export default function ExportPanel({ doc }: ExportPanelProps) {
       </div>
     </div>
   );
+}
+
+function getSafeProjectName(doc: GridDocument): string {
+  return doc.meta.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function getAttachedResident(doc: GridDocument) {
+  const candidate = doc.meta.sourceMetadata?.miiResidentSpec;
+  const result = validateMiiResidentSpec(candidate);
+  return result.valid ? result.spec : null;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

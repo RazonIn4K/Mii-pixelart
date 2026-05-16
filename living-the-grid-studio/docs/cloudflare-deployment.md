@@ -2,6 +2,39 @@
 
 This is the operational runbook for getting `tomodachi.pw` (ICANN ccTLD) and `tomodachi.brave` (Web3 / alt-root) live on Cloudflare Pages. It assumes the repo state at or after the breach recovery hub work.
 
+## Cloudflare Pages build settings (canonical)
+
+These values assume the Git repository root is the monorepo root and the app lives under `living-the-grid-studio/`:
+
+| Setting | Value |
+| --- | --- |
+| **Root directory** | `living-the-grid-studio` |
+| **Build command** | `pnpm install --frozen-lockfile && pnpm vite build` |
+| **Build output directory** | `dist/public` |
+| **Production branch** | `main` |
+
+If Cloudflare’s UI complains about paths, keep this **root + output** pair together: root `living-the-grid-studio`, output `dist/public` (relative to that root).
+
+### If the deploy “succeeds” but the app is wrong
+
+Check the **build log**. These lines mean Pages is still using **repo root** (`/`) instead of **`living-the-grid-studio`**, and/or has **no build command**:
+
+| Log line | Meaning |
+| --- | --- |
+| `No Wrangler configuration file found` | `wrangler.toml` lives under `living-the-grid-studio/`; Cloudflare never entered that directory. |
+| `No build command specified. Skipping build step` | **Build command** is empty in project settings. |
+| `No functions dir at /functions found` | Pages looked for `/functions` at repo root; this app’s Functions are at `living-the-grid-studio/functions`. |
+
+**Fix:** **Workers & Pages** → your project → **Settings** → **Builds** → set **Root directory** to `living-the-grid-studio`, **Build command** to `pnpm install --frozen-lockfile && pnpm vite build`, **Build output directory** to `dist/public`, then **Retry deployment** on the latest commit. After a correct build, the log should show install + `vite build`, and Functions should be discovered from the subfolder.
+
+**Project name:** Your URL uses **`mii-pixelart`**. That is fine, but then in **Doppler → Cloudflare Pages** pick this **Pages project name** exactly. Our `wrangler.toml` uses `name = "tomodachi-studio"` for CLI deploys; either rename the Pages project to match later or pass `--project-name=mii-pixelart` when using Wrangler against this deployment.
+
+## Workers Routes (zone) vs Workers & Pages (account)
+
+In the Cloudflare dashboard for **tomodachi.pw** (a **zone**), the sidebar may show **Workers Routes**. That screen maps URL patterns on the domain to a **Worker**. It is **not** where you create or manage **Cloudflare Pages** projects, Git builds, or **Doppler → Cloudflare Pages** secret sync—an empty routes table there is normal.
+
+For this app: use **Workers & Pages** from the **account** navigation (click the Cloudflare logo / account switcher if you are stuck inside the zone), open your **Pages** project (`tomodachi-studio`), and manage builds and domains there. Wire secrets through **Doppler** ([`docs/doppler-secrets-setup.md`](doppler-secrets-setup.md)) → **Integrations → Cloudflare Pages**; that flow runs in Doppler’s UI, not on the zone Workers Routes page.
+
 > Important context on the two domains
 >
 > `tomodachi.pw` is a real ICANN ccTLD (Palau). It resolves through the public DNS root, so standard A/AAAA/CNAME records on Cloudflare DNS work normally.
@@ -13,19 +46,19 @@ This is the operational runbook for getting `tomodachi.pw` (ICANN ccTLD) and `to
 1. Sign in at <https://dash.cloudflare.com>. If you do not already have an account, create one with the same email you use for billing.
 2. In the left sidebar, go to **Workers & Pages → Create application → Pages → Connect to Git**.
 3. Authorize Cloudflare to read your GitHub account, then pick the repository for this project.
-4. Configure the build:
+4. Configure the build (same as [Cloudflare Pages build settings](#cloudflare-pages-build-settings-canonical) above):
    - **Project name:** `tomodachi-studio` (matches `wrangler.toml`)
    - **Production branch:** `main`
    - **Framework preset:** None (custom)
    - **Build command:** `pnpm install --frozen-lockfile && pnpm vite build`
    - **Build output directory:** `dist/public`
-   - **Root directory:** leave blank
-   - **Environment variables** (build-time): leave empty for now; we add runtime vars next.
+   - **Root directory:** `living-the-grid-studio` (required so installs and `vite build` run against `living-the-grid-studio/package.json` and `pnpm-lock.yaml`)
+   - **Environment variables** (build-time): prefer [Doppler’s Cloudflare Pages integration](https://docs.doppler.com/docs/cloudflare-pages) so secrets sync from Doppler into Pages (**e.g.** `prd` → **Production** and `stg` → **Preview**, or `prod` / `preview` if you use those config names). Avoid duplicating secrets manually in the Pages UI once sync is on.
 5. Click **Save and Deploy**. The first deploy will fail at the API but the SPA itself will come up at `<project>.pages.dev`.
 
 ## 2. Environment variables and secrets
 
-Pages distinguishes between two scopes: **Production** and **Preview**. Set both.
+Pages distinguishes between two scopes: **Production** and **Preview**. If [Doppler → Cloudflare Pages](https://docs.doppler.com/docs/cloudflare-pages) is connected (for example **`prd` → Production** and **`stg` → Preview**), manage values in Doppler instead of duplicating them here. Otherwise, set both scopes in the dashboard or with Wrangler as below.
 
 ### Required
 
@@ -96,9 +129,39 @@ Then in Cloudflare Pages → **Custom domains**, enter `tomodachi.pw` and `www.t
 
 > Pattern A is operationally simpler and gives you Cloudflare's WAF, bot management, and analytics for free. Pattern B is fine if you want to keep DNS at Unstoppable.
 
-### 4b. Email and other records
+### 4b. Email Routing for inbound email at tomodachi.pw
 
-If you plan to use email at `tomodachi.pw`, set MX records before going live so welcome emails to subscribers do not bounce. Also add an SPF TXT record and DMARC policy when you wire up the newsletter.
+Cloudflare Email Routing is the free path for receiving mail at `help@tomodachi.pw`, `privacy@tomodachi.pw`, `legal@tomodachi.pw`, etc. It only handles inbound; for outbound you still need an SMTP provider later (Gmail "Send As", Workspace, Proton, etc.).
+
+Prereq: `tomodachi.pw` must already be a Cloudflare zone (Pattern A above, or the domain added separately to Cloudflare DNS).
+
+Per the [Email Routing get-started docs](https://developers.cloudflare.com/email-routing/get-started/enable-email-routing/):
+
+1. In the Cloudflare dashboard, go to **Email Routing** (the zone-level page for `tomodachi.pw`).
+2. Review the records Cloudflare proposes. It will add three `MX` records pointing at `route1.mx.cloudflare.net`, `route2.mx.cloudflare.net`, `route3.mx.cloudflare.net`, plus an SPF `TXT` record (`v=spf1 include:_spf.mx.cloudflare.net ~all`) and a DKIM `TXT` record under the `cf2024-1._domainkey` selector.
+3. Select **Add records and enable**. If you already added MX records by hand for any other provider, Cloudflare will ask to delete them first; Email Routing will refuse to enable while conflicting MX records exist.
+4. Under **Routing rules → Custom addresses → Create address**, add one custom address at a time:
+   - `help@tomodachi.pw` → your real inbox
+   - `privacy@tomodachi.pw` → your real inbox (referenced by `Privacy.tsx`)
+   - `legal@tomodachi.pw` → your real inbox (referenced by `Terms.tsx`)
+   - `support@tomodachi.pw` → your real inbox
+   - `creator@tomodachi.pw` → your real inbox (used later for Brave Creator verification correspondence)
+5. Cloudflare emails the destination address a verification link the first time you use it. Click it.
+6. Verify the destination is **Verified** in the dashboard.
+
+> One destination per custom address. If you need to forward `help@` to two humans, set up a Workers Email script later; the basic Routing UI is 1:1.
+
+For outbound (sending FROM `help@tomodachi.pw`) you'll need to configure Gmail "Send As" with an app password, or move to a paid mailbox host. Email Routing alone does not let you send.
+
+### 4c. DMARC policy
+
+After Email Routing is live, add a DMARC `TXT` record at `_dmarc.tomodachi.pw` to lock down spoofing. A safe starting policy:
+
+```
+v=DMARC1; p=none; rua=mailto:postmaster@tomodachi.pw; ruf=mailto:postmaster@tomodachi.pw; pct=100; adkim=s; aspf=s
+```
+
+`p=none` is monitor-only. After a week of reports without seeing legit mail blocked, ratchet to `p=quarantine`, then `p=reject`.
 
 ## 5. Custom domain: tomodachi.brave (Web3 / alt-root)
 
@@ -158,3 +221,33 @@ After your first successful Cloudflare deploy:
 ## 8. Rollback
 
 Cloudflare Pages keeps every deploy. To roll back: **Workers & Pages → tomodachi-studio → Deployments → ⋯ → Rollback to this deployment**. DNS does not change; only the active build pointer flips.
+
+## 9. Pre-provisioned Cloudflare resources
+
+These were created against account `d45bbb1a6d3f779af15c93a9f2603bc9` (`Davidinfosec07@gmail.com`):
+
+| Resource           | ID                                       | Purpose                                                                                                |
+|--------------------|------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| KV namespace       | `5129b5ce8d2d435cb704b398a437f355`        | `tomodachi-edge-cache`. Reserved for edge caching (OpenRouter models list, rate-limit counters, Brave Rewards verification token, etc.). |
+
+The binding lives commented out in `wrangler.toml`. To activate:
+
+1. Uncomment the `[[kv_namespaces]]` block in `wrangler.toml`.
+2. In any Pages Function you can now read/write through `context.env.EDGE_CACHE`:
+
+   ```ts
+   export const onRequest = async (context) => {
+     const cached = await context.env.EDGE_CACHE.get("openrouter:models");
+     if (cached) return new Response(cached, { headers: { "Cache-Control": "no-store" } });
+     const fresh = await fetch("https://openrouter.ai/api/v1/models");
+     const body = await fresh.text();
+     await context.env.EDGE_CACHE.put("openrouter:models", body, { expirationTtl: 3600 });
+     return new Response(body);
+   };
+   ```
+
+3. If the build runs but the binding is missing at runtime, also add a manual KV binding in the Pages dashboard under **Settings → Functions → KV namespace bindings**. The wrangler.toml binding takes effect on `wrangler pages deploy` from CI; the dashboard binding takes effect on Git-triggered builds. Set both for now.
+
+> Free tier KV gives us 100k reads, 1k writes, and 1k deletes per day. Plenty for caching the OpenRouter models list and basic rate limiting; the moment we approach those limits the answer is Workers Cache API at the request layer, not more KV.
+
+R2 (object storage, ideal for serving the paid recovery checklist PDF after Stripe verification) is gated behind a one-click **Enable R2** in the dashboard. Do that when you're ready to upload the first paid asset; this runbook gets a §10 R2 section the day you flip it on.

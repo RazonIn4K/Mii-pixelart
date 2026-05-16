@@ -52,9 +52,6 @@ export function importGridJson(json: string): GridDocument {
  *   "palette": string[] (hex colors),
  *   ...metadata
  * }
- *
- * Once the real `living-the-grid-*.json` fixture is available,
- * update this adapter to match the actual schema.
  */
 export interface LtgNativeFormat {
   width?: number;

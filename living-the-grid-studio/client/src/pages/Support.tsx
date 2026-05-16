@@ -166,7 +166,7 @@ export default function Support() {
       <header className="border-b border-border">
         <div className="container flex items-center justify-between py-4">
           <Link href="/" className="text-sm font-medium hover:underline">
-            ← Living The Grid Studio
+            ← Tomodachi
           </Link>
           <span className="text-xs text-muted-foreground">
             Support the project

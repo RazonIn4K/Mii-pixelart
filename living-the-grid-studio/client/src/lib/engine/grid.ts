@@ -83,7 +83,8 @@ export interface GridDocument {
 export function createGridDocument(
   width: number,
   height: number,
-  name = "Untitled"
+  name = "Untitled",
+  fillColorId: string | null = null,
 ): GridDocument {
   const now = new Date().toISOString();
   return {
@@ -95,8 +96,8 @@ export function createGridDocument(
     },
     width,
     height,
-    cells: new Array(width * height).fill(null),
-    usedColors: [],
+    cells: new Array(width * height).fill(fillColorId),
+    usedColors: fillColorId ? [fillColorId] : [],
     lockedColors: [],
   };
 }
@@ -104,7 +105,11 @@ export function createGridDocument(
 // ─── Cell Access ──────────────────────────────────────────────
 
 /** Get the color ID at (x, y) */
-export function getCell(doc: GridDocument, x: number, y: number): string | null {
+export function getCell(
+  doc: GridDocument,
+  x: number,
+  y: number,
+): string | null {
   if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) return null;
   return doc.cells[y * doc.width + x];
 }
@@ -114,7 +119,7 @@ export function setCell(
   doc: GridDocument,
   x: number,
   y: number,
-  colorId: string | null
+  colorId: string | null,
 ): GridDocument {
   if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) return doc;
   const cells = [...doc.cells];
@@ -129,9 +134,7 @@ export function setCell(
 // ─── Analysis ─────────────────────────────────────────────────
 
 /** Count how many cells use each color ID */
-export function getColorUsageCounts(
-  doc: GridDocument
-): Map<string, number> {
+export function getColorUsageCounts(doc: GridDocument): Map<string, number> {
   const counts = new Map<string, number>();
   for (const id of doc.cells) {
     if (id !== null) {
@@ -158,10 +161,14 @@ export function recomputeUsedColors(doc: GridDocument): GridDocument {
 export function replaceColor(
   doc: GridDocument,
   fromId: string,
-  toId: string
+  toId: string,
 ): GridDocument {
   const cells = doc.cells.map((id) => (id === fromId ? toId : id));
-  const result = { ...doc, cells, meta: { ...doc.meta, modifiedAt: new Date().toISOString() } };
+  const result = {
+    ...doc,
+    cells,
+    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+  };
   return recomputeUsedColors(result);
 }
 
@@ -181,7 +188,7 @@ export function toGrid2D(doc: GridDocument): (string | null)[][] {
 /** Create a GridDocument from a 2D array of color IDs */
 export function fromGrid2D(
   grid: (string | null)[][],
-  name = "Imported"
+  name = "Imported",
 ): GridDocument {
   const height = grid.length;
   const width = height > 0 ? grid[0].length : 0;
@@ -202,7 +209,7 @@ export function fromGrid2D(
 export function resizeGrid(
   doc: GridDocument,
   newWidth: number,
-  newHeight: number
+  newHeight: number,
 ): GridDocument {
   const cells: (string | null)[] = new Array(newWidth * newHeight).fill(null);
   const copyW = Math.min(doc.width, newWidth);
@@ -212,6 +219,39 @@ export function resizeGrid(
       cells[y * newWidth + x] = doc.cells[y * doc.width + x];
     }
   }
+  return recomputeUsedColors({
+    ...doc,
+    width: newWidth,
+    height: newHeight,
+    cells,
+    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+  });
+}
+
+/** Resize the grid by resampling existing cells with nearest-neighbor lookup. */
+export function resampleGridNearest(
+  doc: GridDocument,
+  newWidth: number,
+  newHeight: number,
+): GridDocument {
+  if (newWidth <= 0 || newHeight <= 0) return doc;
+  if (newWidth === doc.width && newHeight === doc.height) return doc;
+
+  const cells: (string | null)[] = new Array(newWidth * newHeight).fill(null);
+  for (let y = 0; y < newHeight; y += 1) {
+    const sourceY = Math.min(
+      doc.height - 1,
+      Math.floor(((y + 0.5) / newHeight) * doc.height),
+    );
+    for (let x = 0; x < newWidth; x += 1) {
+      const sourceX = Math.min(
+        doc.width - 1,
+        Math.floor(((x + 0.5) / newWidth) * doc.width),
+      );
+      cells[y * newWidth + x] = doc.cells[sourceY * doc.width + sourceX];
+    }
+  }
+
   return recomputeUsedColors({
     ...doc,
     width: newWidth,

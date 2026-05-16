@@ -210,13 +210,103 @@ export function exportGridAsPng(
  */
 export function downloadGridAsPng(
   doc: GridDocument,
-  options: Partial<RenderOptions> = {}
+  options: Partial<RenderOptions> = {},
+  filename?: string
 ): void {
   const dataUrl = exportGridAsPng(doc, options);
   const a = document.createElement("a");
   a.href = dataUrl;
   const safeName = doc.meta.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-  a.download = `${safeName}-guide.png`;
+  a.download = filename ?? `${safeName}-guide.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/**
+ * Export a labeled palette sheet for the colors used in a document.
+ */
+export function exportPaletteSheetAsPng(doc: GridDocument): string {
+  const counts = getColorUsageCounts(doc);
+  const sortedColors = doc.usedColors
+    .map((id) => ({
+      color: TOMODACHI_PALETTE.find((entry) => entry.id === id),
+      count: counts.get(id) ?? 0,
+      id,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const width = 760;
+  const headerHeight = 74;
+  const rowHeight = 48;
+  const height = Math.max(180, headerHeight + sortedColors.length * rowHeight + 28);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "#FAFAF5";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#4A4A4A";
+  ctx.font = '600 22px "Noto Sans JP", sans-serif';
+  ctx.fillText(`${doc.meta.name} Palette Sheet`, 24, 34);
+  ctx.font = '12px "Noto Sans Mono", monospace';
+  ctx.fillStyle = "#77736D";
+  ctx.fillText(
+    `${doc.width}x${doc.height} grid · ${sortedColors.length} colors · fan-made repaint reference`,
+    24,
+    56,
+  );
+
+  ctx.strokeStyle = "#E1DDD4";
+  ctx.beginPath();
+  ctx.moveTo(24, headerHeight - 8);
+  ctx.lineTo(width - 24, headerHeight - 8);
+  ctx.stroke();
+
+  sortedColors.forEach((entry, index) => {
+    const y = headerHeight + index * rowHeight;
+    const color = entry.color;
+    const swatchHex = color?.hex ?? "#FFFFFF";
+
+    ctx.fillStyle = index % 2 === 0 ? "#FFFDF7" : "#F5F1E8";
+    ctx.fillRect(24, y, width - 48, rowHeight - 6);
+
+    ctx.fillStyle = swatchHex;
+    ctx.fillRect(36, y + 8, 30, 30);
+    ctx.strokeStyle = "#BFB8AA";
+    ctx.strokeRect(36.5, y + 8.5, 29, 29);
+
+    ctx.fillStyle = "#2F2B26";
+    ctx.font = '700 13px "Noto Sans Mono", monospace';
+    ctx.fillText(entry.id, 80, y + 21);
+
+    ctx.font = '12px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = "#4A4A4A";
+    ctx.fillText(color?.name ?? "Unknown palette color", 146, y + 21);
+
+    ctx.font = '11px "Noto Sans Mono", monospace';
+    ctx.fillStyle = "#77736D";
+    ctx.fillText(color?.hex ?? entry.id, 146, y + 36);
+
+    ctx.fillStyle = "#4A4A4A";
+    ctx.textAlign = "right";
+    ctx.fillText(`${entry.count} cells`, width - 40, y + 28);
+    ctx.textAlign = "left";
+  });
+
+  return canvas.toDataURL("image/png");
+}
+
+export function downloadPaletteSheetAsPng(
+  doc: GridDocument,
+  filename?: string,
+): void {
+  const dataUrl = exportPaletteSheetAsPng(doc);
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  const safeName = doc.meta.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  a.download = filename ?? `${safeName}-palette-sheet.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

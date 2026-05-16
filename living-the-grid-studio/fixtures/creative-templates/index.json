@@ -1,0 +1,282 @@
+[
+  {
+    "id": "face-guide",
+    "name": "Face Guide",
+    "category": "People & Masks",
+    "description": "A simple original face-mask base with skin tones and details.",
+    "width": 64,
+    "height": 64,
+    "filename": "face-guide.json",
+    "colors": 12
+  },
+  {
+    "id": "mascot-head",
+    "name": "Mascot Head",
+    "category": "Characters",
+    "description": "An original mascot-style character head for fan builds.",
+    "width": 64,
+    "height": 64,
+    "filename": "mascot-head.json",
+    "colors": 10
+  },
+  {
+    "id": "space-crew",
+    "name": "Space Crew",
+    "category": "Characters",
+    "description": "An original rounded space-suit character starter for social-deduction style builds.",
+    "width": 64,
+    "height": 64,
+    "filename": "space-crew.json",
+    "colors": 10
+  },
+  {
+    "id": "tiny-dino",
+    "name": "Tiny Dino",
+    "category": "Characters",
+    "description": "A small side-view creature starter with readable pose.",
+    "width": 64,
+    "height": 64,
+    "filename": "tiny-dino.json",
+    "colors": 8
+  },
+  {
+    "id": "cute-monster",
+    "name": "Cute Monster",
+    "category": "Characters",
+    "description": "A playful monster face starter with horns and big eyes.",
+    "width": 64,
+    "height": 64,
+    "filename": "cute-monster.json",
+    "colors": 6
+  },
+  {
+    "id": "haunted-mascot",
+    "name": "Haunted Mascot",
+    "category": "Horror & Spooky",
+    "description": "An original spooky stage-mascot head with exaggerated eyes and teeth.",
+    "width": 64,
+    "height": 64,
+    "filename": "haunted-mascot.json",
+    "colors": 8
+  },
+  {
+    "id": "bald-teacher",
+    "name": "Bald Teacher",
+    "category": "Horror & Spooky",
+    "description": "A generic schoolhouse teacher portrait starter with glasses and ruler.",
+    "width": 64,
+    "height": 64,
+    "filename": "bald-teacher.json",
+    "colors": 12
+  },
+  {
+    "id": "masked-slasher",
+    "name": "Masked Slasher",
+    "category": "Horror & Spooky",
+    "description": "A generic masked villain portrait starter.",
+    "width": 64,
+    "height": 64,
+    "filename": "masked-slasher.json",
+    "colors": 8
+  },
+  {
+    "id": "pumpkin-ghoul",
+    "name": "Pumpkin Ghoul",
+    "category": "Horror & Spooky",
+    "description": "A jack-o-lantern character starter with cloak and glow.",
+    "width": 64,
+    "height": 64,
+    "filename": "pumpkin-ghoul.json",
+    "colors": 10
+  },
+  {
+    "id": "ghost-sheet",
+    "name": "Ghost Sheet",
+    "category": "Horror & Spooky",
+    "description": "A readable sheet-ghost starter for simple spooky builds.",
+    "width": 64,
+    "height": 64,
+    "filename": "ghost-sheet.json",
+    "colors": 5
+  },
+  {
+    "id": "vampire-count",
+    "name": "Vampire Count",
+    "category": "Horror & Spooky",
+    "description": "A classic vampire portrait starter with cape and fangs.",
+    "width": 64,
+    "height": 64,
+    "filename": "vampire-count.json",
+    "colors": 9
+  },
+  {
+    "id": "zombie-buddy",
+    "name": "Zombie Buddy",
+    "category": "Horror & Spooky",
+    "description": "A goofy zombie head starter with scars and uneven eyes.",
+    "width": 64,
+    "height": 64,
+    "filename": "zombie-buddy.json",
+    "colors": 8
+  },
+  {
+    "id": "creepy-clown",
+    "name": "Creepy Clown",
+    "category": "Horror & Spooky",
+    "description": "A spooky clown face starter with bold makeup.",
+    "width": 64,
+    "height": 64,
+    "filename": "creepy-clown.json",
+    "colors": 6
+  },
+  {
+    "id": "heart-sticker",
+    "name": "Heart Sticker",
+    "category": "Marks & Objects",
+    "description": "A bold heart sticker with highlight and shadow.",
+    "width": 64,
+    "height": 64,
+    "filename": "heart-sticker.json",
+    "colors": 8
+  },
+  {
+    "id": "star-badge",
+    "name": "Star Badge",
+    "category": "Marks & Objects",
+    "description": "A badge-style icon with a central star.",
+    "width": 64,
+    "height": 64,
+    "filename": "star-badge.json",
+    "colors": 8
+  },
+  {
+    "id": "smile-icon",
+    "name": "Smile Icon",
+    "category": "Marks & Objects",
+    "description": "A compact 16x16 icon starter.",
+    "width": 16,
+    "height": 16,
+    "filename": "smile-icon.json",
+    "colors": 8
+  },
+  {
+    "id": "portrait-bust",
+    "name": "Portrait Bust",
+    "category": "People & Masks",
+    "description": "A simple person/celebrity-style portrait base.",
+    "width": 64,
+    "height": 64,
+    "filename": "portrait-bust.json",
+    "colors": 12
+  },
+  {
+    "id": "red-cap-hero",
+    "name": "Red Cap Hero",
+    "category": "Characters",
+    "description": "A generic cap-wearing platform hero starter.",
+    "width": 64,
+    "height": 64,
+    "filename": "red-cap-hero.json",
+    "colors": 13
+  },
+  {
+    "id": "green-adventurer",
+    "name": "Green Adventurer",
+    "category": "Characters",
+    "description": "A generic fantasy adventurer starter.",
+    "width": 64,
+    "height": 64,
+    "filename": "green-adventurer.json",
+    "colors": 10
+  },
+  {
+    "id": "blue-speed-mascot",
+    "name": "Blue Speed Mascot",
+    "category": "Characters",
+    "description": "A generic fast mascot head starter.",
+    "width": 64,
+    "height": 64,
+    "filename": "blue-speed-mascot.json",
+    "colors": 9
+  },
+  {
+    "id": "arcade-fighter",
+    "name": "Arcade Fighter",
+    "category": "People & Masks",
+    "description": "A generic fighting-game portrait starter.",
+    "width": 64,
+    "height": 64,
+    "filename": "arcade-fighter.json",
+    "colors": 11
+  },
+  {
+    "id": "space-helmet",
+    "name": "Space Helmet",
+    "category": "People & Masks",
+    "description": "A sci-fi helmet starter for armored characters.",
+    "width": 64,
+    "height": 64,
+    "filename": "space-helmet.json",
+    "colors": 15
+  },
+  {
+    "id": "robot-face",
+    "name": "Robot Face",
+    "category": "People & Masks",
+    "description": "A mechanical face starter for robots and masks.",
+    "width": 64,
+    "height": 64,
+    "filename": "robot-face.json",
+    "colors": 8
+  },
+  {
+    "id": "letter-mark",
+    "name": "Letter Mark",
+    "category": "Marks & Objects",
+    "description": "A bold badge starter for brand-style marks.",
+    "width": 64,
+    "height": 64,
+    "filename": "letter-mark.json",
+    "colors": 6
+  },
+  {
+    "id": "controller-icon",
+    "name": "Controller Icon",
+    "category": "Marks & Objects",
+    "description": "A simple game-object icon starter.",
+    "width": 32,
+    "height": 32,
+    "filename": "controller-icon.json",
+    "colors": 9
+  },
+  {
+    "id": "racing-kart",
+    "name": "Racing Kart",
+    "category": "Marks & Objects",
+    "description": "A small kart-style vehicle icon for fun room and item builds.",
+    "width": 64,
+    "height": 64,
+    "filename": "racing-kart.json",
+    "colors": 10
+  },
+  {
+    "id": "pizza-slice",
+    "name": "Pizza Slice",
+    "category": "Marks & Objects",
+    "description": "A bold snack icon starter with toppings and crust.",
+    "width": 64,
+    "height": 64,
+    "filename": "pizza-slice.json",
+    "colors": 9
+  },
+  {
+    "id": "sword-badge",
+    "name": "Sword Badge",
+    "category": "Marks & Objects",
+    "description": "A fantasy badge starter with a readable sword silhouette.",
+    "width": 64,
+    "height": 64,
+    "filename": "sword-badge.json",
+    "colors": 9
+  }
+]

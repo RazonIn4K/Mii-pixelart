@@ -11,13 +11,33 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getConsent, setConsent, type ConsentState } from "@/lib/consent";
+import {
+  getConsent,
+  onConsentChange,
+  setConsent,
+  type ConsentState,
+} from "@/lib/consent";
 
 export function CookieConsent() {
   const [state, setState] = useState<ConsentState | null>(null);
 
   useEffect(() => {
-    setState(getConsent());
+    const sync = () => setState(getConsent());
+
+    sync();
+    const unsubscribe = onConsentChange(sync);
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage) return;
+      sync();
+    };
+
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   if (!state || state.decision !== "unset") {
@@ -56,13 +76,28 @@ export function CookieConsent() {
       role="dialog"
       aria-label="Cookie consent"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3 sm:px-6 sm:pb-6"
+      // Pinned to bottom across all viewports. Edge-to-edge gutter on mobile,
+      // a small breathing margin on sm+.
+      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-2 pt-2 sm:px-4 sm:pt-4"
+      style={{
+        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0.5rem))",
+      }}
     >
-      <Card className="w-full max-w-3xl border-foreground/15 bg-background/95 p-4 shadow-xl backdrop-blur sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <Card
+        className={[
+          // Capped so the card doesn't span an entire 1440px desktop.
+          "w-full max-w-2xl lg:max-w-3xl",
+          "border-foreground/15 bg-background/95 shadow-xl backdrop-blur",
+          "p-3 sm:p-4 md:p-5",
+        ].join(" ")}
+      >
+        {/* Column on mobile / sm (text on top, buttons full-width below),
+            row on md+ (text left, buttons right). Tablet portrait (768px+)
+            is the right break — three buttons + a paragraph don't fit on sm. */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
           <div className="text-sm leading-relaxed text-foreground/85">
             <p className="font-medium">We use cookies to keep this site useful.</p>
-            <p className="mt-1 text-foreground/70">
+            <p className="mt-1 text-xs sm:text-sm text-foreground/70">
               Essential cookies keep the studio working. We only load ads,
               affiliate tracking, and analytics if you opt in. See our{" "}
               <Link href="/privacy" className="underline underline-offset-2">
@@ -82,19 +117,31 @@ export function CookieConsent() {
               .
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+          {/* Mobile: 3 equal-width buttons in a grid row so they never wrap
+              awkwardly. md+: shrink-to-fit row pinned next to the text. */}
+          <div className="grid grid-cols-3 gap-2 md:flex md:shrink-0 md:flex-row md:gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={essentialOnly}
               aria-label="Essential cookies only"
+              className="w-full md:w-auto"
             >
               Essential only
             </Button>
-            <Button variant="outline" size="sm" onClick={rejectAll}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={rejectAll}
+              className="w-full md:w-auto"
+            >
               Reject all
             </Button>
-            <Button size="sm" onClick={acceptAll}>
+            <Button
+              size="sm"
+              onClick={acceptAll}
+              className="w-full md:w-auto"
+            >
               Accept all
             </Button>
           </div>

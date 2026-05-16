@@ -77,8 +77,8 @@ export default function Cookies() {
       </p>
       {reset ? (
         <p>
-          <strong>Preferences cleared.</strong> Refresh the page to choose
-          again.
+          <strong>Preferences cleared.</strong> The cookie banner is ready again
+          on this page.
         </p>
       ) : null}
 

@@ -12,3 +12,6 @@ export * from "./optimizer";
 export * from "./json-io";
 export * from "./canvas-renderer";
 export * from "./image-import";
+export * from "./templates";
+export * from "./ai-sketch";
+export * from "./residents";

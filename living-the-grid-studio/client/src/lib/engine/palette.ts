@@ -24,7 +24,7 @@ export interface PaletteColor {
 }
 
 /**
- * The complete Tomodachi Life palette.
+ * The complete Tomodachi Life: Living the Dream palette.
  * Organized as 11 rows x 7 columns (77 base) + 7 saturated extras.
  * Colors are approximations based on community-documented values.
  */

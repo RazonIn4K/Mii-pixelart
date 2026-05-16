@@ -7,7 +7,7 @@
 # To bootstrap locally:
 #   1. `brew install dopplerhq/cli/doppler` (or see docs.doppler.com/cli)
 #   2. `doppler login`
-#   3. `doppler setup`                  # picks tomodachi-pw / dev for you
+#   3. `doppler setup`                  # picks tomodachi-platform / dev for you
 #   4. `doppler run -- pnpm dev`        # injects secrets at runtime
 #
 # Cloudflare Pages is connected via Doppler's Cloudflare Pages integration,
@@ -15,5 +15,5 @@
 # in the Doppler UI. No need to redeploy to refresh secrets.
 
 setup:
-  project: tomodachi-pw
+  project: tomodachi-platform
   config: dev

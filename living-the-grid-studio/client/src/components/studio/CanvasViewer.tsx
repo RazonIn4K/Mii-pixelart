@@ -7,7 +7,12 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import type { GridDocument } from "@/lib/engine/grid";
-import { renderGrid, canvasToCell, type RenderOptions, DEFAULT_RENDER_OPTIONS } from "@/lib/engine/canvas-renderer";
+import {
+  renderGrid,
+  canvasToCell,
+  type RenderOptions,
+  DEFAULT_RENDER_OPTIONS,
+} from "@/lib/engine/canvas-renderer";
 import { getCell } from "@/lib/engine/grid";
 
 interface CanvasViewerProps {
@@ -16,6 +21,7 @@ interface CanvasViewerProps {
   showGrid: boolean;
   showLabels: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
+  onCellDrag?: (x: number, y: number, colorId: string | null) => void;
   onCellHover?: (x: number, y: number, colorId: string | null) => void;
 }
 
@@ -25,23 +31,68 @@ export default function CanvasViewer({
   showGrid,
   showLabels,
   onCellClick,
+  onCellDrag,
   onCellHover,
 }: CanvasViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const didDrawRef = useRef(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
-  // Calculate cell size to fit the container
-  const getCellSize = useCallback(() => {
-    if (!containerRef.current) return 16;
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxW = (rect.width - 40) / doc.width;
-    const maxH = (rect.height - 40) / doc.height;
-    return Math.max(4, Math.min(32, Math.floor(Math.min(maxW, maxH))));
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setViewportSize({
+        width: Math.max(1, Math.floor(rect.width)),
+        height: Math.max(1, Math.floor(rect.height)),
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
   }, [doc.width, doc.height]);
+
+  const getRenderMetrics = useCallback(() => {
+    const width =
+      viewportSize.width || containerRef.current?.clientWidth || 800;
+    const height =
+      viewportSize.height || containerRef.current?.clientHeight || 600;
+    const padding = 40;
+    const availableWidth = Math.max(1, width - padding);
+    const availableHeight = Math.max(1, height - padding);
+    const fitCellSize = Math.min(
+      availableWidth / doc.width,
+      availableHeight / doc.height,
+      32,
+    );
+    const cellSize = Math.max(1, Math.floor(fitCellSize));
+    const scaledSize = cellSize * zoom;
+    const gridWidth = doc.width * scaledSize;
+    const gridHeight = doc.height * scaledSize;
+
+    return {
+      cellSize,
+      height,
+      panX: Math.round((width - gridWidth) / 2 + pan.x),
+      panY: Math.round((height - gridHeight) / 2 + pan.y),
+      width,
+    };
+  }, [doc.width, doc.height, pan, viewportSize, zoom]);
 
   // Render
   useEffect(() => {
@@ -50,30 +101,59 @@ export default function CanvasViewer({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const cellSize = getCellSize();
-    const scaledSize = cellSize * zoom;
-    canvas.width = doc.width * scaledSize + Math.abs(pan.x) + 100;
-    canvas.height = doc.height * scaledSize + Math.abs(pan.y) + 100;
+    const metrics = getRenderMetrics();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(metrics.width * dpr));
+    canvas.height = Math.max(1, Math.floor(metrics.height * dpr));
+    canvas.style.width = `${metrics.width}px`;
+    canvas.style.height = `${metrics.height}px`;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
 
     renderGrid(ctx, doc, {
-      cellSize,
+      cellSize: metrics.cellSize,
       zoom,
-      panX: pan.x,
-      panY: pan.y,
+      panX: metrics.panX,
+      panY: metrics.panY,
       showGrid,
       showLabels,
       highlightColorId,
     });
-  }, [doc, zoom, pan, showGrid, showLabels, highlightColorId, getCellSize]);
+  }, [
+    doc,
+    zoom,
+    showGrid,
+    showLabels,
+    highlightColorId,
+    getRenderMetrics,
+  ]);
 
   // Mouse wheel zoom
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom((z) => Math.max(0.25, Math.min(8, z * delta)));
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom((z) => Math.max(0.25, Math.min(8, z * delta)));
+  }, []);
+
+  const getEventCell = useCallback(
+    (e: React.MouseEvent) => {
+      if (!canvasRef.current) return null;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const metrics = getRenderMetrics();
+      const cell = canvasToCell(e.clientX - rect.left, e.clientY - rect.top, {
+        cellSize: metrics.cellSize,
+        zoom,
+        panX: metrics.panX,
+        panY: metrics.panY,
+      });
+      if (!cell || cell.x >= doc.width || cell.y >= doc.height) return null;
+      return {
+        ...cell,
+        colorId: getCell(doc, cell.x, cell.y),
+      };
     },
-    []
+    [getRenderMetrics, zoom, doc],
   );
 
   // Pan
@@ -81,10 +161,20 @@ export default function CanvasViewer({
     (e: React.MouseEvent) => {
       if (e.button === 1 || e.altKey) {
         setIsPanning(true);
+        setIsDrawing(false);
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        return;
+      }
+
+      if (e.button === 0 && onCellDrag) {
+        const cell = getEventCell(e);
+        if (!cell) return;
+        setIsDrawing(true);
+        didDrawRef.current = true;
+        onCellDrag(cell.x, cell.y, cell.colorId);
       }
     },
-    [pan]
+    [getEventCell, onCellDrag, pan],
   );
 
   const handleMouseMove = useCallback(
@@ -97,42 +187,40 @@ export default function CanvasViewer({
         return;
       }
 
-      // Hover
-      if (onCellHover && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const cellSize = getCellSize();
-        const cell = canvasToCell(
-          e.clientX - rect.left,
-          e.clientY - rect.top,
-          { cellSize, zoom, panX: pan.x, panY: pan.y }
-        );
-        if (cell && cell.x < doc.width && cell.y < doc.height) {
-          onCellHover(cell.x, cell.y, getCell(doc, cell.x, cell.y));
+      if (isDrawing && onCellDrag && e.buttons === 1) {
+        const cell = getEventCell(e);
+        if (cell) {
+          didDrawRef.current = true;
+          onCellDrag(cell.x, cell.y, cell.colorId);
         }
+        return;
+      }
+
+      // Hover
+      if (onCellHover) {
+        const cell = getEventCell(e);
+        if (cell) onCellHover(cell.x, cell.y, cell.colorId);
       }
     },
-    [isPanning, panStart, onCellHover, getCellSize, zoom, pan, doc]
+    [isPanning, isDrawing, panStart, onCellDrag, onCellHover, getEventCell],
   );
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
+    setIsDrawing(false);
   }, []);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (!onCellClick || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const cellSize = getCellSize();
-      const cell = canvasToCell(
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-        { cellSize, zoom, panX: pan.x, panY: pan.y }
-      );
-      if (cell && cell.x < doc.width && cell.y < doc.height) {
-        onCellClick(cell.x, cell.y, getCell(doc, cell.x, cell.y));
+      if (didDrawRef.current) {
+        didDrawRef.current = false;
+        return;
       }
+      if (!onCellClick) return;
+      const cell = getEventCell(e);
+      if (cell) onCellClick(cell.x, cell.y, cell.colorId);
     },
-    [onCellClick, getCellSize, zoom, pan, doc]
+    [onCellClick, getEventCell],
   );
 
   // Reset view
@@ -151,18 +239,24 @@ export default function CanvasViewer({
         <button
           onClick={() => setZoom((z) => Math.max(0.25, z * 0.8))}
           className="text-xs font-mono text-muted-foreground hover:text-foreground px-1"
+          aria-label="Zoom out"
+          title="Zoom out"
         >
           −
         </button>
         <button
           onClick={resetView}
           className="text-xs font-mono text-muted-foreground hover:text-foreground px-1"
+          aria-label="Reset zoom"
+          title="Reset zoom"
         >
           {Math.round(zoom * 100)}%
         </button>
         <button
           onClick={() => setZoom((z) => Math.min(8, z * 1.25))}
           className="text-xs font-mono text-muted-foreground hover:text-foreground px-1"
+          aria-label="Zoom in"
+          title="Zoom in"
         >
           +
         </button>
@@ -177,7 +271,8 @@ export default function CanvasViewer({
 
       <canvas
         ref={canvasRef}
-        className="cursor-crosshair"
+        className="h-full w-full cursor-crosshair pixel-canvas"
+        aria-label={`${doc.width} by ${doc.height} pixel grid preview`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

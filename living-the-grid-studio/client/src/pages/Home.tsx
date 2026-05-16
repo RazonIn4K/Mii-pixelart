@@ -340,7 +340,7 @@ Keep it practical and concise.`,
           <div className="flex items-center gap-2">
             <div className="red-dot" />
             <span className="font-medium text-sm tracking-wide">
-              Living The Grid Studio
+              Tomodachi
             </span>
           </div>
           <Link href="/studio">
@@ -355,13 +355,13 @@ Keep it practical and concise.`,
       <section className="pt-14">
         <div className="relative overflow-hidden">
           <div className="graph-paper-fine">
-            <div className="container py-20 lg:py-28">
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className="space-y-6">
+            <div className="container py-12 sm:py-16 lg:py-24 xl:py-28">
+              <div className="grid gap-8 lg:gap-12 md:grid-cols-2 items-center">
+                <div className="space-y-5 sm:space-y-6">
                   <p className="section-header">
                     Mii Face Mask + Pixel Art Tool
                   </p>
-                  <h1 className="text-3xl lg:text-4xl font-semibold leading-tight tracking-tight text-foreground">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold leading-tight tracking-tight text-foreground">
                     Make Mii masks
                     <br />
                     <span style={{ color: "oklch(0.58 0.2 25)" }}>
@@ -376,7 +376,7 @@ Keep it practical and concise.`,
                     references, brand-style logos, memes, clothing marks, book
                     covers, and other creative pixel builds.
                   </p>
-                  <div className="flex items-center gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
                     <Link href="/studio">
                       <Button size="lg" className="tracking-wide">
                         Open Studio
@@ -414,12 +414,12 @@ Keep it practical and concise.`,
       </section>
 
       {/* Breach Recovery and Trust Section */}
-      <section className="py-20 border-t border-border">
+      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
         <div className="container">
           <p className="section-header mb-3">
             Tomodachishare Breach Recovery Hub
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight mb-4">
+          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
             Help users coming from breach-notice traffic with useful, browser-first
             tools.
           </h2>
@@ -442,9 +442,9 @@ Keep it practical and concise.`,
             .
           </p>
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
             <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Password breach check</h3>
                 <div className="text-xs text-muted-foreground flex items-center gap-1">
                   <ShieldCheck className="h-4 w-4 text-primary" />
@@ -493,7 +493,7 @@ Keep it practical and concise.`,
             </article>
 
             <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">
                   AI recovery assistant
                 </h3>
@@ -540,11 +540,11 @@ Keep it practical and concise.`,
       </section>
 
       {/* Workflow Section */}
-      <section className="py-20 border-t border-border">
+      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
         <div className="container">
           <div className="max-w-2xl mb-14">
             <p className="section-header mb-3">How It Works</p>
-            <h2 className="text-2xl font-semibold tracking-tight mb-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
               From image to repaint guide in four steps
             </h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -554,7 +554,7 @@ Keep it practical and concise.`,
             </p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 step: "01",
@@ -600,12 +600,12 @@ Keep it practical and concise.`,
       </section>
 
       {/* Features Grid */}
-      <section className="py-20 border-t border-border bg-card">
+      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
         <div className="container">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
+          <div className="grid gap-8 md:gap-12 lg:gap-16 lg:grid-cols-2 items-start">
             <div>
               <p className="section-header mb-3">Features</p>
-              <h2 className="text-2xl font-semibold tracking-tight mb-8">
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-6 sm:mb-8">
                 Built for hand-painting precision
               </h2>
               <div className="space-y-6">
@@ -653,11 +653,11 @@ Keep it practical and concise.`,
       </section>
 
       {/* Roadmap Section */}
-      <section className="py-20 border-t border-border">
+      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
         <div className="container">
           <div className="max-w-2xl mx-auto">
             <p className="section-header mb-3">Roadmap</p>
-            <h2 className="text-2xl font-semibold tracking-tight mb-8">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8">
               What comes next
             </h2>
             <div className="space-y-4">
@@ -739,10 +739,10 @@ Keep it practical and concise.`,
       </section>
 
       {/* Monetization Section */}
-      <section className="py-20 border-t border-border bg-card">
+      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
         <div className="container">
           <p className="section-header mb-3">Monetization strategy</p>
-          <h2 className="text-2xl font-semibold tracking-tight mb-4">
+          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
             Turn Tomodachi domain traffic into recurring income
           </h2>
           <p className="text-muted-foreground leading-relaxed max-w-3xl mb-8">
@@ -751,7 +751,7 @@ Keep it practical and concise.`,
             Keep ad content clearly separated from sensitive security guidance.
           </p>
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
             {domainMonetizationUseCases.map((entry) => (
               <article
                 key={entry.domain}
@@ -828,7 +828,7 @@ Keep it practical and concise.`,
           <div className="flex items-center gap-2">
             <div className="red-dot-sm" />
             <span className="text-xs text-muted-foreground">
-              Living The Grid Studio
+              Tomodachi
             </span>
           </div>
           <nav

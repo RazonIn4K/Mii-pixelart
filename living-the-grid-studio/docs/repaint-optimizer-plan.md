@@ -7,7 +7,7 @@
 
 ## Goal
 
-The repaint optimizer transforms a raw pixel grid into one that is **practical to recreate by hand** in Tomodachi Life's Palette House. The key insight is that a pixel-perfect conversion of a photograph might use 40+ colors and contain hundreds of tiny isolated regions — far too complex for manual painting. The optimizer reduces this complexity while preserving the visual intent.
+The repaint optimizer transforms a raw pixel grid into one that is **practical to recreate by hand** in the Palette House in Tomodachi Life: Living the Dream. The key insight is that a pixel-perfect conversion of a photograph might use 40+ colors and contain hundreds of tiny isolated regions — far too complex for manual painting. The optimizer reduces this complexity while preserving the visual intent.
 
 ## Design Principles
 

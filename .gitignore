@@ -1,0 +1,126 @@
+# =============================================================================
+# OS-generated files
+# macOS Finder metadata and Windows thumbnail cache — never useful in a repo.
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =============================================================================
+# Node / pnpm
+# Dependency trees are fully reproducible from pnpm-lock.yaml, so node_modules
+# must never be committed. pnpm-debug.log is a local crash log.
+# =============================================================================
+node_modules/
+.pnpm-store/
+pnpm-debug.log
+
+# =============================================================================
+# Build outputs
+# Vite writes the client bundle to dist/public/ and esbuild writes the server
+# bundle to dist/index.js. Both are generated artifacts, not source.
+# =============================================================================
+dist/
+build/
+
+# =============================================================================
+# Vite cache
+# Vite pre-bundles dependencies into .vite/ for faster dev starts.
+# Fully regenerated on the next `vite dev` run.
+# =============================================================================
+.vite/
+
+# =============================================================================
+# TypeScript incremental build info
+# tsbuildinfo files speed up tsc --incremental but are machine-local.
+# =============================================================================
+*.tsbuildinfo
+
+# =============================================================================
+# Cloudflare Wrangler
+# `wrangler dev` and `wrangler pages dev` write local state (KV, D1, R2
+# emulation, miniflare SQLite) into .wrangler/. Never commit this.
+# =============================================================================
+.wrangler/
+
+# =============================================================================
+# Environment / secrets
+# Doppler injects secrets at runtime, but .env files are a common fallback.
+# Block all variants so a local .env never accidentally gets committed.
+# The committed doppler.yaml only contains project/config names — no values.
+# =============================================================================
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# =============================================================================
+# Test coverage
+# Vitest (configured in this project) can emit coverage/ when run with
+# --coverage. These are generated reports, not source.
+# =============================================================================
+coverage/
+.nyc_output/
+
+# =============================================================================
+# Script-generated reports
+# The compare-openrouter-models script writes timestamped JSON files into
+# reports/. These are local run artifacts, not versioned data.
+# =============================================================================
+reports/
+
+# =============================================================================
+# Manus debug logs
+# The Vite dev plugin writes browser console, network, and session-replay logs
+# into .manus-logs/ at runtime. Local only.
+# =============================================================================
+.manus-logs/
+
+# =============================================================================
+# General log files
+# Catch-all for any *.log files produced by Node, pnpm, or scripts.
+# =============================================================================
+*.log
+logs/
+
+# =============================================================================
+# IDE — JetBrains (IntelliJ / WebStorm / Rider)
+# .idea/ contains workspace state, run configs, and local shelf data.
+# The nested .idea/.gitignore already excludes the most sensitive files, but
+# the entire directory is personal and should not be shared across developers.
+# =============================================================================
+.idea/
+
+# =============================================================================
+# IDE — VS Code
+# .vscode/settings.json in this repo contains a personal Snyk organisation ID.
+# Ignore the whole directory to avoid leaking workspace-specific credentials.
+# If you want to share launch configs or recommended extensions, commit only
+# .vscode/extensions.json and .vscode/launch.json explicitly.
+# =============================================================================
+.vscode/
+
+# =============================================================================
+# Prettier / editor caches
+# Some editors and tools write local caches alongside config files.
+# =============================================================================
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# =============================================================================
+# Documentation
+# All docs live in living-the-grid-studio/docs/ and are local reference
+# material only — they contain operational runbooks, secrets setup guides,
+# monetization playbooks, and personal Stripe/Doppler IDs that must never
+# be committed or pushed to the remote repository.
+# =============================================================================
+living-the-grid-studio/docs/
+living-the-grid-studio/AI-CONTEXT.md
+living-the-grid-studio/ideas.md
+living-the-grid-studio/test-round-trip.md

@@ -162,7 +162,7 @@ export default function Unlock() {
       <header className="border-b border-border">
         <div className="container flex items-center justify-between py-4">
           <Link href="/" className="text-sm font-medium hover:underline">
-            ← Living The Grid Studio
+            ← Tomodachi
           </Link>
           <span className="text-xs text-muted-foreground">
             Paid recovery content
@@ -170,7 +170,7 @@ export default function Unlock() {
         </div>
       </header>
 
-      <main className="container max-w-3xl py-12 space-y-8">
+      <main className="container max-w-5xl py-10 sm:py-12 space-y-8">
         <section>
           <h1 className="text-3xl font-semibold">Unlock</h1>
           <p className="mt-2 text-muted-foreground">
