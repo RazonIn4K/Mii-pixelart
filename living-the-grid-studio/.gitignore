@@ -72,6 +72,17 @@ NOTES.md
 TODO-private.md
 scratch/
 
+# Internal AI-tooling architecture doc — keep local, don't ship publicly.
+# (Designed to be fed into LLM context windows; reveals full system design.)
+AI-CONTEXT.md
+
+# Internal operational runbooks + business strategy (Doppler setup, deployment
+# procedures, Stripe product config, breach monetization playbook, roadmap).
+# These live locally and ship to private notes, NOT to the public repo.
+# Exception: docs/distribution/ holds launch-day post drafts — re-track those
+# explicitly if you want them in the public repo with `git add -f docs/distribution/`.
+docs/
+
 # Cowork session output (in case it ever lands in the repo dir)
 cowork-output/
 .claude-output/

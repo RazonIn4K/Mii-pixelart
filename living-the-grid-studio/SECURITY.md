@@ -47,7 +47,7 @@ Tomodachi is solo-funded by Stripe tips and consult bookings, so we cannot offer
 
 ## What's already hardened
 
-For context on prior security work, see the audit-trail documents under [`docs/`](./docs/):
+For context on prior security work, see [`CHANGELOG.md`](./CHANGELOG.md) and the relevant headers below:
 
 - Content Security Policy is locked down per Google CSP Evaluator with Trusted Types in report-only mode (see [`client/public/_headers`](./client/public/_headers))
 - Stripe checkout uses an origin allowlist (`assertStripeRedirect` in [`client/src/lib/stripeUrl.ts`](./client/src/lib/stripeUrl.ts)) to block open-redirect attacks

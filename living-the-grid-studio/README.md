@@ -72,7 +72,7 @@ Most SPAs are invisible to Bing / DuckDuckGo because they don't execute JavaScri
 
 One TypeScript file at the edge UA-sniffs known search crawlers (Googlebot, Bingbot, DuckDuckBot, Applebot, etc.) and serves a static pre-rendered HTML shell with route-appropriate JSON-LD. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
 
-See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation and [`docs/distribution/`](./docs/distribution/) for launch posts that talk about it.
+See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation.
 
 ## Quick start
 
@@ -121,7 +121,6 @@ functions/               Cloudflare Pages Functions
     webhooks/stripe.ts   Stripe webhook with HMAC verification
 server/                  Shared TS modules imported by Functions + dev middleware
 shared/                  Types shared between client + functions (ai, products, residents, const)
-docs/                    Architecture notes, deployment guides, distribution drafts
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```
