@@ -2,10 +2,10 @@
  * Privacy Policy page.
  *
  * This is general-purpose template language tuned for the actual data flows
- * Living The Grid Studio runs. It is NOT legal advice. Before going to
- * production with paid services, have a lawyer review it for your
- * jurisdiction and substitute the placeholder contact details for your real
- * mailing address and operator entity.
+ * Tomodachi runs. It is NOT legal advice. Before going to production with
+ * paid services, have a lawyer review it for your jurisdiction and
+ * substitute the placeholder contact details for your real mailing address
+ * and operator entity.
  */
 
 import LegalLayout from "@/components/LegalLayout";
@@ -21,11 +21,11 @@ export default function Privacy() {
     <LegalLayout
       title="Privacy Policy"
       lastUpdated="May 14, 2026"
-      intro="Living The Grid Studio is a browser-first pixel-art tool. We try to collect as little personal data as possible, and we tell you exactly what we do collect, why, and how to control it."
+      intro="Tomodachi is a browser-first Mii pixel-art studio paired with practical breach-recovery guides. We try to collect as little personal data as possible, and we tell you exactly what we do collect, why, and how to control it."
     >
       <h2>1. Who we are</h2>
       <p>
-        Living The Grid Studio (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
+        Tomodachi (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
         operates the websites at <code>tomodachi.pw</code> and{" "}
         <code>tomodachi.brave</code> (collectively, the &quot;Site&quot;). You
         can reach us by email at{" "}

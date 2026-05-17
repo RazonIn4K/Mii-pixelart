@@ -20,7 +20,7 @@ export default function Disclosure() {
     >
       <h2>Plain-language summary</h2>
       <p>
-        Some outbound links on Living The Grid Studio are affiliate links.
+        Some outbound links on Tomodachi are affiliate links.
         When you click one and make a purchase, the merchant may pay us a
         small commission at no extra cost to you. This helps fund the free
         tools on the Site.

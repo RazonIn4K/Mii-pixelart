@@ -18,14 +18,14 @@ export default function Terms() {
     <LegalLayout
       title="Terms of Service"
       lastUpdated="May 14, 2026"
-      intro="These Terms govern your use of Living The Grid Studio. By using the Site you agree to them."
+      intro="These Terms govern your use of Tomodachi. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
       <p>
-        Living The Grid Studio is a browser-based pixel-art and security-utility
-        toolkit. We provide free tools (the studio, the AI assistant, the
-        breach-check) and may also sell paid digital products and consult
-        bookings through the Site.
+        Tomodachi is a browser-based Mii pixel-art studio paired with
+        breach-recovery tools and guides. We provide free tools (the studio,
+        the AI assistant, the password breach-check) and may also sell paid
+        digital products and consult bookings through the Site.
       </p>
 
       <h2>2. Acceptable use</h2>
@@ -78,7 +78,7 @@ export default function Terms() {
       <h2>6. Intellectual property</h2>
       <p>
         The Site, including code, design, and original written content, is
-        owned by Living The Grid Studio and protected by intellectual-property
+        owned by Tomodachi and protected by intellectual-property
         laws. The Tomodachi Life palette and references are used under fair
         use for an unofficial fan tool. We do not bundle official game assets.
       </p>
@@ -92,7 +92,7 @@ export default function Terms() {
 
       <h2>8. Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, Living The Grid Studio is not
+        To the maximum extent permitted by law, Tomodachi is not
         liable for indirect, incidental, special, consequential, or punitive
         damages, or any loss of data or profits, arising from your use of the
         Site. Our total liability for any claim related to the Site will not

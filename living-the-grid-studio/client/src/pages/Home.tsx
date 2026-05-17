@@ -49,7 +49,7 @@ const features = [
     icon: Upload,
     title: "Import Characters, Logos, Memes",
     description:
-      "Drop in a character reference, face photo, logo, brand-style mark, meme, or Living The Grid JSON file. The studio turns it into a paintable grid.",
+      "Drop in a character reference, face photo, logo, brand-style mark, meme, or an indexed-palette JSON file. The studio turns it into a paintable grid.",
   },
   {
     icon: Sparkles,
