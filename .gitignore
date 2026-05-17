@@ -130,3 +130,9 @@ living-the-grid-studio/test-round-trip.md
 Thumbs.db
 .idea/
 .playwright-mcp/
+
+# OS noise + IDE config + automation cache (untracked from root in this commit)
+.DS_Store
+Thumbs.db
+.idea/
+.playwright-mcp/
