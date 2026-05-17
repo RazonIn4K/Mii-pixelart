@@ -124,3 +124,9 @@ living-the-grid-studio/docs/
 living-the-grid-studio/AI-CONTEXT.md
 living-the-grid-studio/ideas.md
 living-the-grid-studio/test-round-trip.md
+
+# OS noise + IDE config + automation cache (untracked from root in this commit)
+.DS_Store
+Thumbs.db
+.idea/
+.playwright-mcp/
