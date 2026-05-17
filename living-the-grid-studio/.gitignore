@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+.vite/
+
+# Local env / secrets — NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.pem
+*.key
+credentials*.json
+secrets*.json
+
+# Doppler local cache
+.doppler/
+
+# Cloudflare Wrangler local state
+.wrangler/
+.dev.vars
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+.cursor/
+.windsurf/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Logs
+*.log
+.manus-logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test artifacts
+coverage/
+.nyc_output/
+*.lcov
+
+# Temp / cache
+.cache/
+.tmp/
+tmp/
+*.tmp
+
+# Generated session fixtures
+fixtures/recorded/
+
+# Local notes / scratchpad (don't ship private brainstorms to public repo)
+NOTES.md
+TODO-private.md
+scratch/
+
+# Cowork session output (in case it ever lands in the repo dir)
+cowork-output/
+.claude-output/
