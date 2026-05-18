@@ -2,7 +2,7 @@
  * useGridDocument — Central state management hook for the grid editor
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
   createGridDocument,
@@ -12,6 +12,7 @@ import {
   getColorUsageCounts,
   resampleGridNearest,
   setCell,
+  setCells,
 } from "@/lib/engine/grid";
 import {
   optimizeGrid,
@@ -207,6 +208,61 @@ export function useGridDocument() {
     [state.doc, pushHistory],
   );
 
+  /**
+   * Stroke transaction grouping.
+   *
+   * Without this, each painted cell during a drag would push its own
+   * history frame, filling the 50-frame undo buffer mid-stroke and making
+   * undo unusable. With this:
+   *   - Studio.tsx calls beginStroke() on mouse-down.
+   *   - paintCell / paintCells during the stroke mutate the live doc in
+   *     place (still immutable per call) WITHOUT appending to history.
+   *   - On mouse-up, endStroke() promotes the final doc state to a single
+   *     history entry.
+   *
+   * A ref (not state) is used so beginStroke/endStroke don't cause a
+   * re-render and so the active flag is read synchronously by the same
+   * tick's paintCell call.
+   */
+  const strokeActiveRef = useRef(false);
+  const strokeStartDocRef = useRef<GridDocument | null>(null);
+
+  const beginStroke = useCallback(() => {
+    strokeActiveRef.current = true;
+    // Capture the pre-stroke doc so we know what to compare against on end.
+    setState((prev) => {
+      strokeStartDocRef.current = prev.doc;
+      return prev;
+    });
+  }, []);
+
+  const endStroke = useCallback(() => {
+    if (!strokeActiveRef.current) return;
+    strokeActiveRef.current = false;
+    setState((prev) => {
+      const startDoc = strokeStartDocRef.current;
+      strokeStartDocRef.current = null;
+      // Nothing happened or the user erased back to the start state — skip.
+      if (!prev.doc || !startDoc || prev.doc === startDoc) return prev;
+      // Promote the in-flight stroke result to a real history entry.
+      // We replace whatever in-stroke state was set so undo lands on the
+      // pre-stroke doc, not on a mid-stroke frame.
+      const trimmed = prev.history.slice(0, prev.historyIndex);
+      // Re-anchor the pre-stroke doc as the prior entry if it isn't already.
+      if (trimmed[trimmed.length - 1] !== startDoc) {
+        trimmed.push(startDoc);
+      }
+      trimmed.push(prev.doc);
+      // Keep the 50-frame cap.
+      while (trimmed.length > 50) trimmed.shift();
+      return {
+        ...prev,
+        history: trimmed,
+        historyIndex: trimmed.length - 1,
+      };
+    });
+  }, []);
+
   const paintCell = useCallback(
     (x: number, y: number, colorId: string | null) => {
       setState((prev) => {
@@ -214,6 +270,39 @@ export function useGridDocument() {
         if (getCell(prev.doc, x, y) === colorId) return prev;
 
         const newDoc = recomputeUsedColors(setCell(prev.doc, x, y, colorId));
+
+        // During a stroke, mutate the live doc without appending history —
+        // endStroke will promote the final state to one history entry.
+        if (strokeActiveRef.current) {
+          return { ...prev, doc: newDoc, imagePreview: null, error: null };
+        }
+        return appendHistory(prev, newDoc);
+      });
+    },
+    [],
+  );
+
+  /**
+   * Batch paint: write `colorId` to many cells in one immutable update.
+   *
+   * Used by the canvas drag handler when a fast mouse stroke skips cells —
+   * the handler calls bresenhamLine() to fill the gaps and feeds the
+   * resulting cell array here. Single immutable update means React only
+   * re-renders once per drag frame.
+   *
+   * Honors the stroke transaction the same way paintCell does.
+   */
+  const paintCells = useCallback(
+    (cells: ReadonlyArray<{ x: number; y: number }>, colorId: string | null) => {
+      if (cells.length === 0) return;
+      setState((prev) => {
+        if (!prev.doc) return prev;
+        const updated = setCells(prev.doc, cells, colorId);
+        if (updated === prev.doc) return prev;
+        const newDoc = recomputeUsedColors(updated);
+        if (strokeActiveRef.current) {
+          return { ...prev, doc: newDoc, imagePreview: null, error: null };
+        }
         return appendHistory(prev, newDoc);
       });
     },
@@ -316,7 +405,10 @@ export function useGridDocument() {
     clearImagePreview,
     importFromJson,
     paintCell,
+    paintCells,
     fillRegion,
+    beginStroke,
+    endStroke,
     resampleCanvas,
     mergeColors,
     toggleColorLock,

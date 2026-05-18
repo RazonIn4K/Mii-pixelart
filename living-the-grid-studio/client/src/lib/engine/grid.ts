@@ -131,6 +131,89 @@ export function setCell(
   };
 }
 
+/**
+ * Batch set: write the same color to many cells in one immutable update.
+ *
+ * Why this exists: a drag stroke can touch dozens of cells per frame and the
+ * Bresenham interpolation that closes gaps in fast drags multiplies that
+ * count. Calling setCell() per cell would clone the cells array per call
+ * (quadratic), and pushing a history frame per cell would also fill the
+ * 50-frame undo buffer in a single stroke. Use this from the canvas drag
+ * handler so an entire stroke becomes one immutable update + (with stroke
+ * grouping) one undo entry.
+ *
+ * Cells with the same color already in place are skipped. Out-of-bounds
+ * cells are skipped silently. Returns the original document unchanged if
+ * nothing actually mutates, so React + history can short-circuit.
+ */
+export function setCells(
+  doc: GridDocument,
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  colorId: string | null,
+): GridDocument {
+  let nextCells: (string | null)[] | null = null;
+  for (const { x, y } of cells) {
+    if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) continue;
+    const index = y * doc.width + x;
+    if (nextCells === null) {
+      if (doc.cells[index] === colorId) continue;
+      nextCells = [...doc.cells];
+    }
+    nextCells[index] = colorId;
+  }
+  if (nextCells === null) return doc;
+  return {
+    ...doc,
+    cells: nextCells,
+    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+  };
+}
+
+/**
+ * Bresenham line interpolation between two cell coordinates.
+ *
+ * Returns the inclusive list of integer cell coordinates that a perfectly
+ * pixel-aligned line would touch, going from (x0, y0) to (x1, y1). Used by
+ * the canvas drag handler so a fast mouse stroke doesn't leave gaps between
+ * sample positions, and by the (future) Line tool to commit a straight
+ * stroke when the user releases.
+ *
+ * Classic integer-only Bresenham — no floating-point error accumulation,
+ * exact-pixel output. https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
+ */
+export function bresenhamLine(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): { x: number; y: number }[] {
+  const points: { x: number; y: number }[] = [];
+  let x = x0;
+  let y = y0;
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  // Guard the loop: even a degenerate input (same start and end) should
+  // produce one point, and a tiny safeguard prevents runaway on bad data.
+  const maxIterations = dx + dy + 2;
+  for (let i = 0; i < maxIterations; i++) {
+    points.push({ x, y });
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+  return points;
+}
+
 // ─── Analysis ─────────────────────────────────────────────────
 
 /** Count how many cells use each color ID */

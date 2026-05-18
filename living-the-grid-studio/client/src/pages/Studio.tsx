@@ -66,7 +66,10 @@ export default function Studio() {
     clearImagePreview,
     importFromJson,
     paintCell,
+    paintCells,
     fillRegion,
+    beginStroke,
+    endStroke,
     resampleCanvas,
     mergeColors,
     toggleColorLock,
@@ -199,6 +202,42 @@ export default function Studio() {
     },
     [doc, imagePreview, paintTool, selectedPaintColorId, paintCell],
   );
+
+  /**
+   * Batched drag handler: receives a Bresenham-interpolated list of cells
+   * between the previous and current pointer sample, so fast strokes never
+   * leave gaps. Single immutable paintCells() update per drag frame
+   * instead of N React re-renders. Paired with beginStroke / endStroke on
+   * the canvas so the whole drag is one undo entry.
+   */
+  const handleCellDragSegment = useCallback(
+    (cells: { x: number; y: number }[]) => {
+      if (imagePreview || !doc) return;
+      if (paintTool === "pencil") {
+        paintCells(cells, selectedPaintColorId);
+      } else if (paintTool === "eraser") {
+        paintCells(cells, null);
+      }
+    },
+    [doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
+  );
+
+  /**
+   * Stroke transactions. The pencil and eraser tools both group the entire
+   * mouse-down → mouse-up drag into one undo entry. Other tools (inspect,
+   * eyedropper, fill) are single-click and don't need transaction grouping.
+   */
+  const handleStrokeBegin = useCallback(() => {
+    if (paintTool === "pencil" || paintTool === "eraser") {
+      beginStroke();
+    }
+  }, [paintTool, beginStroke]);
+
+  const handleStrokeEnd = useCallback(() => {
+    if (paintTool === "pencil" || paintTool === "eraser") {
+      endStroke();
+    }
+  }, [paintTool, endStroke]);
 
   const handleCreateCanvas = useCallback(
     (
@@ -381,7 +420,14 @@ export default function Studio() {
                     ? handleCellDrag
                     : undefined
                 }
+                onCellDragSegment={
+                  paintTool === "pencil" || paintTool === "eraser"
+                    ? handleCellDragSegment
+                    : undefined
+                }
                 onCellHover={handleCellHover}
+                onStrokeBegin={handleStrokeBegin}
+                onStrokeEnd={handleStrokeEnd}
               />
             </div>
           ) : (

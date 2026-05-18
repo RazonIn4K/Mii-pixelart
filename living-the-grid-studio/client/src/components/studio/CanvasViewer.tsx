@@ -13,7 +13,7 @@ import {
   type RenderOptions,
   DEFAULT_RENDER_OPTIONS,
 } from "@/lib/engine/canvas-renderer";
-import { getCell } from "@/lib/engine/grid";
+import { bresenhamLine, getCell } from "@/lib/engine/grid";
 
 interface CanvasViewerProps {
   doc: GridDocument;
@@ -22,7 +22,23 @@ interface CanvasViewerProps {
   showLabels: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
   onCellDrag?: (x: number, y: number, colorId: string | null) => void;
+  /**
+   * Called with a batch of cells produced by Bresenham line interpolation
+   * between the previous and current sample positions. Use this instead of
+   * onCellDrag when the receiver supports a batched immutable paint —
+   * eliminates per-cell React re-renders mid-stroke and fixes the
+   * "fast mouse leaves gaps" bug. If both are provided, this takes
+   * precedence; onCellDrag is only the fallback for the first cell.
+   */
+  onCellDragSegment?: (cells: { x: number; y: number }[]) => void;
   onCellHover?: (x: number, y: number, colorId: string | null) => void;
+  /**
+   * Stroke lifecycle. Studio.tsx wires beginStroke() to mouse-down and
+   * endStroke() to mouse-up so the entire drag becomes ONE undo entry
+   * rather than one entry per painted cell.
+   */
+  onStrokeBegin?: () => void;
+  onStrokeEnd?: () => void;
 }
 
 export default function CanvasViewer({
@@ -32,17 +48,28 @@ export default function CanvasViewer({
   showLabels,
   onCellClick,
   onCellDrag,
+  onCellDragSegment,
   onCellHover,
+  onStrokeBegin,
+  onStrokeEnd,
 }: CanvasViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const didDrawRef = useRef(false);
+  // Last sample position during a drag, used to Bresenham-interpolate the
+  // gap to the current position so fast strokes don't skip cells.
+  const lastDragCellRef = useRef<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  // Hover cell coordinates for the on-canvas readout. Null when the
+  // cursor is outside the grid.
+  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -166,15 +193,24 @@ export default function CanvasViewer({
         return;
       }
 
-      if (e.button === 0 && onCellDrag) {
+      if (e.button === 0 && (onCellDrag || onCellDragSegment)) {
         const cell = getEventCell(e);
         if (!cell) return;
         setIsDrawing(true);
         didDrawRef.current = true;
-        onCellDrag(cell.x, cell.y, cell.colorId);
+        // Begin the stroke transaction so all paints below collapse into
+        // one undo entry. Stroke lifecycle is owned by the parent so the
+        // hook can decide what "one entry" means.
+        onStrokeBegin?.();
+        lastDragCellRef.current = { x: cell.x, y: cell.y };
+        if (onCellDragSegment) {
+          onCellDragSegment([{ x: cell.x, y: cell.y }]);
+        } else {
+          onCellDrag?.(cell.x, cell.y, cell.colorId);
+        }
       }
     },
-    [getEventCell, onCellDrag, pan],
+    [getEventCell, onCellDrag, onCellDragSegment, onStrokeBegin, pan],
   );
 
   const handleMouseMove = useCallback(
@@ -187,28 +223,73 @@ export default function CanvasViewer({
         return;
       }
 
-      if (isDrawing && onCellDrag && e.buttons === 1) {
+      if (
+        isDrawing &&
+        (onCellDrag || onCellDragSegment) &&
+        e.buttons === 1
+      ) {
         const cell = getEventCell(e);
         if (cell) {
           didDrawRef.current = true;
-          onCellDrag(cell.x, cell.y, cell.colorId);
+          const prev = lastDragCellRef.current;
+          // Bresenham-interpolate between the previous and current sample
+          // so fast drags don't leave gaps. Single-cell moves (the common
+          // case) just produce a 1-element segment.
+          const segment =
+            prev && (prev.x !== cell.x || prev.y !== cell.y)
+              ? bresenhamLine(prev.x, prev.y, cell.x, cell.y).slice(1)
+              : prev
+                ? []
+                : [{ x: cell.x, y: cell.y }];
+          if (segment.length > 0) {
+            if (onCellDragSegment) {
+              onCellDragSegment(segment);
+            } else if (onCellDrag) {
+              for (const p of segment) onCellDrag(p.x, p.y, null);
+            }
+          }
+          lastDragCellRef.current = { x: cell.x, y: cell.y };
         }
         return;
       }
 
-      // Hover
-      if (onCellHover) {
-        const cell = getEventCell(e);
-        if (cell) onCellHover(cell.x, cell.y, cell.colorId);
+      // Hover — update local HUD state and forward to parent if it cares.
+      const cell = getEventCell(e);
+      if (cell) {
+        if (!hoverCell || hoverCell.x !== cell.x || hoverCell.y !== cell.y) {
+          setHoverCell({ x: cell.x, y: cell.y });
+        }
+        onCellHover?.(cell.x, cell.y, cell.colorId);
+      } else if (hoverCell) {
+        setHoverCell(null);
       }
     },
-    [isPanning, isDrawing, panStart, onCellDrag, onCellHover, getEventCell],
+    [
+      isPanning,
+      isDrawing,
+      panStart,
+      onCellDrag,
+      onCellDragSegment,
+      onCellHover,
+      getEventCell,
+      hoverCell,
+    ],
   );
 
   const handleMouseUp = useCallback(() => {
+    if (isDrawing) {
+      // Promote the in-flight stroke to a single history entry.
+      onStrokeEnd?.();
+    }
     setIsPanning(false);
     setIsDrawing(false);
-  }, []);
+    lastDragCellRef.current = null;
+  }, [isDrawing, onStrokeEnd]);
+
+  const handleMouseLeave = useCallback(() => {
+    handleMouseUp();
+    setHoverCell(null);
+  }, [handleMouseUp]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -262,10 +343,15 @@ export default function CanvasViewer({
         </button>
       </div>
 
-      {/* Grid info */}
+      {/* Grid info + live coordinate readout */}
       <div className="absolute bottom-3 left-3 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-sm px-2 py-1">
         <span className="text-xs font-mono text-muted-foreground">
           {doc.width}×{doc.height} · {doc.usedColors.length} colors
+          {hoverCell && (
+            <span className="ml-2 text-foreground">
+              · x:{hoverCell.x} y:{hoverCell.y}
+            </span>
+          )}
         </span>
       </div>
 
@@ -277,7 +363,7 @@ export default function CanvasViewer({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       />
     </div>

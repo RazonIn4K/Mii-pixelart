@@ -7,7 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-101016?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-d94f4f?style=flat-square)](https://tomodachi.pw/support)
 
-![Tomodachi · Mii Studio & Recovery Guides](https://tomodachi.pw/og-image.png)
+<p align="center">
+  <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
+</p>
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for Mii face masks. Import a face photo or character art, reduce the colors against the in-game Tomodachi Life: Living the Dream palette, and export a paint-by-numbers reference you can recreate on a real 3DS. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
@@ -51,28 +53,50 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 Most SPAs are invisible to Bing / DuckDuckGo because they don't execute JavaScript at index time. The standard fixes are prerender.io (extra runtime cost) or full SSR (extra framework cost). This project takes a third route:
 
-```
-                ┌─────────────────────────┐
-                │  Cloudflare edge (PoP)  │
-                │                         │
- request ─────▶ │  functions/_middleware  │
-                │  ─ Googlebot / Bingbot? │
-                │  ─ DuckDuckBot / etc.   │
-                │           │             │
-                │           ├─yes─▶ pre-rendered HTML
-                │           │      + per-route JSON-LD
-                │           │      (WebApplication, FAQPage,
-                │           │       SoftwareApplication,
-                │           │       CollectionPage, ItemList,
-                │           │       AboutPage, Article…)
-                │           │
-                │           └─no──▶ React SPA (index.html)
-                └─────────────────────────┘
+```mermaid
+flowchart LR
+    REQ([Incoming request]) --> EDGE{Cloudflare edge<br/>functions/_middleware.ts}
+    EDGE -- User-Agent matches<br/>Googlebot, Bingbot,<br/>DuckDuckBot, Applebot,<br/>Slurp, Baidu, Yandex,<br/>Mojeek, Ahrefs --> SHELL[Pre-rendered HTML shell<br/>+ per-route JSON-LD]
+    EDGE -- Real browser --> SPA[React SPA<br/>index.html]
+    SHELL --> CRAWL([Search index])
+    SPA --> USER([User])
+
+    classDef edge fill:#fff7e8,stroke:#d94f4f,color:#101016,stroke-width:2px
+    classDef shell fill:#e8f1ff,stroke:#3b82f6,color:#101016
+    classDef spa fill:#fef3e8,stroke:#f59e0b,color:#101016
+    classDef terminal fill:#f5f5f5,stroke:#888,color:#101016
+    class EDGE edge
+    class SHELL shell
+    class SPA spa
+    class REQ,CRAWL,USER terminal
 ```
 
-One TypeScript file at the edge UA-sniffs known search crawlers (Googlebot, Bingbot, DuckDuckBot, Applebot, etc.) and serves a static pre-rendered HTML shell with route-appropriate JSON-LD. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
+One TypeScript file at the edge UA-sniffs known search crawlers and serves route-appropriate JSON-LD: `WebApplication` on `/`, `SoftwareApplication` + `BreadcrumbList` on `/studio`, `CollectionPage` with embedded `HowTo` + `Article` on `/guides`, `FAQPage` on `/faq`, `AboutPage` + `Organization` on `/about`, `Article` on `/help`, `ItemList` of `Product` + `Offer` on `/unlock`, `WebPage` on `/support`. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
 
 See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation.
+
+## Studio workflow
+
+```mermaid
+flowchart LR
+    IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
+    QUANT --> GRID[Editable grid<br/>16×16 or 32×32<br/>cell labels: R9C5, R10C1]
+    GRID --> AI{Need a sketch?}
+    AI -- yes --> SKETCH[AI sketch helper<br/>OpenRouter free tier<br/>cell-by-cell paint anim]
+    SKETCH --> GRID
+    AI -- no --> EXPORT[Reference pack export<br/>PDF + JSON + palette sheet]
+    GRID --> EXPORT
+    EXPORT --> COPY([Copy on 3DS])
+
+    classDef io fill:#fff7e8,stroke:#d94f4f,color:#101016,stroke-width:2px
+    classDef step fill:#f5f5f5,stroke:#666,color:#101016
+    classDef ai fill:#e8f1ff,stroke:#3b82f6,color:#101016
+    classDef terminal fill:#f5f5f5,stroke:#888,color:#101016
+    class IMG,EXPORT io
+    class QUANT,GRID step
+    class AI,SKETCH ai
+    class COPY terminal
+```
 
 ## Quick start
 
