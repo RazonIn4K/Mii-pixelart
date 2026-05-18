@@ -42,8 +42,7 @@ import {
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
 
-const EMPTY_STATE_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/empty-state-Q4aaauXbcgtENGpUkLP2yT.webp";
+const EMPTY_STATE_IMG = "/empty-state.webp";
 
 export default function Studio() {
   useDocumentTitle(

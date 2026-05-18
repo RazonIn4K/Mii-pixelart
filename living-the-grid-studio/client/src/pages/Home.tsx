@@ -35,12 +35,9 @@ import {
   Download,
 } from "lucide-react";
 
-const HERO_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/hero-graph-paper-C4Z7n83FomAaML8Mv4EUY5.webp";
-const CANVAS_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/canvas-demo-ibSTXcy8TWc4nv3PR5GSCG.webp";
-const PALETTE_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/palette-swatches-6suMjKFXCiPMd2P6Khydf7.webp";
+const HERO_IMG = "/hero.webp";
+const CANVAS_IMG = "/canvas-demo.webp";
+const PALETTE_IMG = "/palette-swatches.webp";
 const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
 const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
 
