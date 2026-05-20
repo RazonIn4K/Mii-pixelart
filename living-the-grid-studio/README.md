@@ -86,7 +86,8 @@ See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementat
 
 ```mermaid
 flowchart LR
-    IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
+    IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> FRAME[Crop + frame source<br/>face / head / full image]
+    FRAME --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
     QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
     PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}

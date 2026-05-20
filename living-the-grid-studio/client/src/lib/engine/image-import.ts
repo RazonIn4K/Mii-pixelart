@@ -8,7 +8,11 @@
  */
 
 import { findClosestPaletteColor, hexToRgb, type RGB } from "./color";
-import { createGridDocument, recomputeUsedColors, type GridDocument } from "./grid";
+import {
+  createGridDocument,
+  recomputeUsedColors,
+  type GridDocument,
+} from "./grid";
 import { DEFAULT_CONFIG, passLimitPalette } from "./optimizer";
 
 export type ImageFrameMode = "cover" | "contain" | "stretch";
@@ -31,6 +35,17 @@ export interface ImageFocus {
   y: number;
 }
 
+export interface ImageCrop {
+  /** Left crop edge as a percentage of the source image */
+  x: number;
+  /** Top crop edge as a percentage of the source image */
+  y: number;
+  /** Crop width as a percentage of the source image */
+  width: number;
+  /** Crop height as a percentage of the source image */
+  height: number;
+}
+
 /** Options for image import */
 export interface ImageImportOptions {
   /** Target grid width in cells (default: 32) */
@@ -47,6 +62,14 @@ export interface ImageImportOptions {
   focusX: number;
   /** Vertical focus from 0 top to 100 bottom */
   focusY: number;
+  /** Left crop edge from 0 to 100 */
+  cropX: number;
+  /** Top crop edge from 0 to 100 */
+  cropY: number;
+  /** Crop width from 1 to 100 */
+  cropWidth: number;
+  /** Crop height from 1 to 100 */
+  cropHeight: number;
   /** Brightness multiplier as a percentage */
   brightness: number;
   /** Contrast multiplier as a percentage */
@@ -71,6 +94,10 @@ export const DEFAULT_IMPORT_OPTIONS: ImageImportOptions = {
   frameMode: "cover",
   focusX: 50,
   focusY: 50,
+  cropX: 0,
+  cropY: 0,
+  cropWidth: 100,
+  cropHeight: 100,
   brightness: 100,
   contrast: 100,
   saturation: 100,
@@ -100,7 +127,7 @@ export function sampleImage(
   img: HTMLImageElement,
   gridWidth: number,
   gridHeight: number,
-  options: Partial<ImageImportOptions> = {}
+  options: Partial<ImageImportOptions> = {},
 ): RGB[][] {
   const opts = { ...DEFAULT_IMPORT_OPTIONS, ...options };
   const canvas = document.createElement("canvas");
@@ -113,7 +140,13 @@ export function sampleImage(
     gridWidth,
     gridHeight,
     opts.frameMode,
-    { x: opts.focusX, y: opts.focusY }
+    { x: opts.focusX, y: opts.focusY },
+    {
+      x: opts.cropX,
+      y: opts.cropY,
+      width: opts.cropWidth,
+      height: opts.cropHeight,
+    },
   );
 
   ctx.fillStyle = opts.backgroundColor;
@@ -130,7 +163,7 @@ export function sampleImage(
     placement.destX,
     placement.destY,
     placement.destWidth,
-    placement.destHeight
+    placement.destHeight,
   );
   ctx.filter = "none";
 
@@ -154,7 +187,7 @@ export function sampleImage(
     return flattenBackgroundPixels(
       pixels,
       hexToRgb(opts.backgroundColor),
-      opts.backgroundTolerance
+      opts.backgroundTolerance,
     );
   }
 
@@ -168,18 +201,30 @@ export function computeImagePlacement(
   targetWidth: number,
   targetHeight: number,
   frameMode: ImageFrameMode,
-  focus: ImageFocus = { x: 50, y: 50 }
+  focus: ImageFocus = { x: 50, y: 50 },
+  crop: ImageCrop = DEFAULT_IMAGE_CROP,
 ): ImagePlacement {
-  if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+  if (
+    sourceWidth <= 0 ||
+    sourceHeight <= 0 ||
+    targetWidth <= 0 ||
+    targetHeight <= 0
+  ) {
     throw new Error("Image placement dimensions must be positive");
   }
 
+  const normalizedCrop = normalizeImageCrop(crop);
+  const cropSourceX = (sourceWidth * normalizedCrop.x) / 100;
+  const cropSourceY = (sourceHeight * normalizedCrop.y) / 100;
+  const cropSourceWidth = (sourceWidth * normalizedCrop.width) / 100;
+  const cropSourceHeight = (sourceHeight * normalizedCrop.height) / 100;
+
   if (frameMode === "stretch") {
     return {
-      sourceX: 0,
-      sourceY: 0,
-      sourceWidth,
-      sourceHeight,
+      sourceX: cropSourceX,
+      sourceY: cropSourceY,
+      sourceWidth: cropSourceWidth,
+      sourceHeight: cropSourceHeight,
       destX: 0,
       destY: 0,
       destWidth: targetWidth,
@@ -187,18 +232,18 @@ export function computeImagePlacement(
     };
   }
 
-  const sourceAspect = sourceWidth / sourceHeight;
+  const sourceAspect = cropSourceWidth / cropSourceHeight;
   const targetAspect = targetWidth / targetHeight;
 
   if (frameMode === "cover") {
     if (sourceAspect > targetAspect) {
-      const cropWidth = sourceHeight * targetAspect;
-      const maxSourceX = sourceWidth - cropWidth;
+      const coverCropWidth = cropSourceHeight * targetAspect;
+      const maxSourceX = cropSourceWidth - coverCropWidth;
       return {
-        sourceX: maxSourceX * normalizedFocus(focus.x),
-        sourceY: 0,
-        sourceWidth: cropWidth,
-        sourceHeight,
+        sourceX: cropSourceX + maxSourceX * normalizedFocus(focus.x),
+        sourceY: cropSourceY,
+        sourceWidth: coverCropWidth,
+        sourceHeight: cropSourceHeight,
         destX: 0,
         destY: 0,
         destWidth: targetWidth,
@@ -206,13 +251,13 @@ export function computeImagePlacement(
       };
     }
 
-    const cropHeight = sourceWidth / targetAspect;
-    const maxSourceY = sourceHeight - cropHeight;
+    const coverCropHeight = cropSourceWidth / targetAspect;
+    const maxSourceY = cropSourceHeight - coverCropHeight;
     return {
-      sourceX: 0,
-      sourceY: maxSourceY * normalizedFocus(focus.y),
-      sourceWidth,
-      sourceHeight: cropHeight,
+      sourceX: cropSourceX,
+      sourceY: cropSourceY + maxSourceY * normalizedFocus(focus.y),
+      sourceWidth: cropSourceWidth,
+      sourceHeight: coverCropHeight,
       destX: 0,
       destY: 0,
       destWidth: targetWidth,
@@ -221,21 +266,52 @@ export function computeImagePlacement(
   }
 
   const scale =
-    sourceAspect > targetAspect ? targetWidth / sourceWidth : targetHeight / sourceHeight;
-  const destWidth = sourceWidth * scale;
-  const destHeight = sourceHeight * scale;
+    sourceAspect > targetAspect
+      ? targetWidth / cropSourceWidth
+      : targetHeight / cropSourceHeight;
+  const destWidth = cropSourceWidth * scale;
+  const destHeight = cropSourceHeight * scale;
   const maxDestX = targetWidth - destWidth;
   const maxDestY = targetHeight - destHeight;
   return {
-    sourceX: 0,
-    sourceY: 0,
-    sourceWidth,
-    sourceHeight,
+    sourceX: cropSourceX,
+    sourceY: cropSourceY,
+    sourceWidth: cropSourceWidth,
+    sourceHeight: cropSourceHeight,
     destX: maxDestX * normalizedFocus(focus.x),
     destY: maxDestY * normalizedFocus(focus.y),
     destWidth,
     destHeight,
   };
+}
+
+const DEFAULT_IMAGE_CROP: ImageCrop = {
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 100,
+};
+
+export function normalizeImageCrop(crop: Partial<ImageCrop> = {}): ImageCrop {
+  const x = clampPercent(crop.x, 0);
+  const y = clampPercent(crop.y, 0);
+  const width = clampCropSize(crop.width, 100, x);
+  const height = clampCropSize(crop.height, 100, y);
+  return { x, y, width, height };
+}
+
+function clampCropSize(
+  value: number | undefined,
+  fallback: number,
+  offset: number,
+): number {
+  const finite = Number.isFinite(value) ? Number(value) : fallback;
+  return Math.min(100 - offset, Math.max(1, finite));
+}
+
+function clampPercent(value: number | undefined, fallback: number): number {
+  const finite = Number.isFinite(value) ? Number(value) : fallback;
+  return Math.min(99, Math.max(0, finite));
 }
 
 function normalizedFocus(value: number): number {
@@ -297,7 +373,7 @@ export function estimateEdgeBackgroundColor(pixels: RGB[][]): RGB {
     throw new Error("Cannot estimate background color from an empty image");
   }
   const best = bucketValues.reduce((winner, bucket) =>
-    bucket.count > winner.count ? bucket : winner
+    bucket.count > winner.count ? bucket : winner,
   );
 
   return {
@@ -311,7 +387,7 @@ export function estimateEdgeBackgroundColor(pixels: RGB[][]): RGB {
 export function flattenBackgroundPixels(
   pixels: RGB[][],
   replacement: RGB,
-  tolerance: number
+  tolerance: number,
 ): RGB[][] {
   const height = pixels.length;
   const width = pixels[0]?.length ?? 0;
@@ -366,7 +442,7 @@ function rgbDistance(a: RGB, b: RGB): number {
  */
 export async function imageToGridDocument(
   file: File,
-  options: Partial<ImageImportOptions> = {}
+  options: Partial<ImageImportOptions> = {},
 ): Promise<GridDocument> {
   const opts = { ...DEFAULT_IMPORT_OPTIONS, ...options };
   const img = await loadImage(file);
@@ -378,9 +454,32 @@ export async function imageToGridDocument(
   const doc = createGridDocument(
     opts.gridWidth,
     opts.gridHeight,
-    file.name.replace(/\.[^.]+$/, "")
+    file.name.replace(/\.[^.]+$/, ""),
   );
   doc.meta.sourceImage = file.name;
+  doc.meta.sourceFormat = "image";
+  doc.meta.sourceMetadata = {
+    imageImport: {
+      gridWidth: opts.gridWidth,
+      gridHeight: opts.gridHeight,
+      maxColors: opts.maxColors,
+      useGamePalette: opts.useGamePalette,
+      frameMode: opts.frameMode,
+      focusX: opts.focusX,
+      focusY: opts.focusY,
+      cropX: opts.cropX,
+      cropY: opts.cropY,
+      cropWidth: opts.cropWidth,
+      cropHeight: opts.cropHeight,
+      brightness: opts.brightness,
+      contrast: opts.contrast,
+      saturation: opts.saturation,
+      backgroundMode: opts.backgroundMode,
+      backgroundTolerance: opts.backgroundTolerance,
+      backgroundColor: opts.backgroundColor,
+      samplingMode: opts.samplingMode,
+    },
+  };
 
   // Map each pixel to the closest palette color
   const cells: (string | null)[] = [];
@@ -392,7 +491,8 @@ export async function imageToGridDocument(
         cells.push(match.color.id);
       } else {
         // Store raw hex for non-palette mode
-        const hex = `#${rgb.r.toString(16).padStart(2, "0")}${rgb.g.toString(16).padStart(2, "0")}${rgb.b.toString(16).padStart(2, "0")}`.toUpperCase();
+        const hex =
+          `#${rgb.r.toString(16).padStart(2, "0")}${rgb.g.toString(16).padStart(2, "0")}${rgb.b.toString(16).padStart(2, "0")}`.toUpperCase();
         cells.push(hex);
       }
     }
@@ -426,7 +526,7 @@ export async function getImagePreview(
   gridWidth: number,
   gridHeight: number,
   scale: number = 8,
-  options: Partial<ImageImportOptions> = {}
+  options: Partial<ImageImportOptions> = {},
 ): Promise<string> {
   const img = await loadImage(file);
   const canvas = document.createElement("canvas");

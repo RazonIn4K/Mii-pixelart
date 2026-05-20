@@ -257,6 +257,34 @@ async function main(): Promise<void> {
           .some((button) => button.textContent.trim().includes('Commit Preview') && !button.disabled)`,
       ),
     );
+    const importPanelText = await cdp.evaluate<string>(
+      "document.body.innerText",
+    );
+    for (const label of ["Source Frame", "Square", "Head"]) {
+      assert.ok(
+        importPanelText.includes(label),
+        `crop control should be visible: ${label}`,
+      );
+    }
+
+    await clickByText(cdp, "Head", "js");
+    await waitFor(() =>
+      cdp!.evaluate<boolean>(
+        "document.body.innerText.includes('Settings changed') && document.body.innerText.includes('Update Preview')",
+      ),
+    );
+    await clickByText(cdp, "Update Preview", "js");
+    await waitFor(() =>
+      cdp!.evaluate<boolean>(
+        "document.body.innerText.includes('Preview ready') && document.body.innerText.includes('Commit Preview')",
+      ),
+    );
+    await waitFor(() =>
+      cdp!.evaluate<boolean>(
+        `[...document.querySelectorAll('button')]
+          .some((button) => button.textContent.trim().includes('Commit Preview') && !button.disabled)`,
+      ),
+    );
 
     await clickByText(cdp, "Commit Preview", "js");
     await waitFor(() =>

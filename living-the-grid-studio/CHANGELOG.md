@@ -6,6 +6,7 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-05-20
 
+- **Image crop framing:** image import now has a draggable source crop rectangle with Full, Square, and Head shortcuts. Crop settings are applied before cover/contain/stretch placement, preserved in image-import metadata, and verified in both focused import tests and the Studio browser smoke test.
 - **Reference-pack ZIP:** `Export Reference Pack` now downloads a single ZIP bundle instead of firing separate downloads. The archive contains `project.json`, `guide-labeled.png`, `guide-clean.png`, `palette-sheet.png`, `paint-order.csv`, `source-notes.txt`, `manifest.json`, and `reference.html`.
 - **Documentation atlas:** added [`PROJECT_STACK_AND_IMPLEMENTATION.md`](./PROJECT_STACK_AND_IMPLEMENTATION.md), a detailed code-facing implementation map covering the stack, data model, studio flow, image import, LTG JSON support, palette engine, optimizer, AI/OpenRouter path, exports, Cloudflare/security, Stripe, verification scripts, fixtures, and known gaps.
 - **Obsidian project atlas:** mirrored the project into the professional active-project vault under `1200-PROFESSIONAL/Upwork/Active Projects/Tomodachi_Studio/` with `Project_Implementation_Atlas.md` and `00-Command-Center.md`.

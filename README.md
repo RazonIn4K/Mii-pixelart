@@ -11,7 +11,7 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 
 ## What's inside
 
-- **Studio** ([/studio](https://tomodachi.pw/studio)) — Import a face photo, character art, logo, meme, or JSON file; snap to the 84-color Tomodachi Life: Living the Dream palette; preview before commit; touch up; optimize; and export repaint references.
+- **Studio** ([/studio](https://tomodachi.pw/studio)) — Import a face photo, character art, logo, meme, or JSON file; crop/frame it for the mask or icon, snap to the 84-color Tomodachi Life: Living the Dream palette, preview before commit, touch up, optimize, and export repaint references.
 - **Recovery hub** — Browser-only password breach check using HIBP k-anonymity, plus an OpenRouter-backed recovery assistant. Built for visitors arriving from the Tomodachishare credential leak.
 - **Guides** ([/guides](https://tomodachi.pw/guides)) — Long-form articles on Mii creation, gameplay basics, breach recovery, and QR code save backup.
 - **Paid extras** ([/unlock](https://tomodachi.pw/unlock)) — Optional $9 detailed recovery checklist plus a $49 30-min consult.

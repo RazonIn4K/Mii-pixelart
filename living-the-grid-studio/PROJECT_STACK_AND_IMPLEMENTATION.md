@@ -403,6 +403,8 @@ The import pipeline lives in:
 - Image picker.
 - JSON picker.
 - Same-file reprocessing.
+- Draggable source crop rectangle.
+- Full, Square, and Head crop shortcuts.
 - Subject-position focus target.
 - Grid width/height controls.
 - Use-case presets.
@@ -453,6 +455,10 @@ interface ImageImportOptions {
   frameMode: "cover" | "contain" | "stretch";
   focusX: number;
   focusY: number;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
   brightness: number;
   contrast: number;
   saturation: number;
@@ -468,7 +474,8 @@ interface ImageImportOptions {
 ```mermaid
 flowchart TD
   File["Image file"] --> Decode["loadImage()"]
-  Decode --> Placement["computeImagePlacement()"]
+  Decode --> Crop["normalize source crop"]
+  Crop --> Placement["computeImagePlacement()"]
   Placement --> Canvas["Draw to offscreen canvas"]
   Canvas --> Filter["ctx.filter = brightness/contrast/saturation"]
   Filter --> Sample["sampleImage()"]
@@ -1187,9 +1194,10 @@ Based on the current code, these improvements are already implemented:
 - Image upload accepts common browser image formats including AVIF.
 - Image import uses preview before commit.
 - Same uploaded image can be reprocessed when grid size/options change.
+- Source crop can be adjusted with a draggable crop rectangle and Full/Square/Head shortcuts.
 - Subject position can be adjusted with a draggable target over the source image.
 - Background flattening exists for face/character import.
-- Brightness, contrast, saturation, frame mode, focus, sampling mode, and color limits are part of import options.
+- Brightness, contrast, saturation, crop, frame mode, focus, sampling mode, and color limits are part of import options.
 - Detail presets include 64, 96, 128, and 256 paths.
 - Manual pixel editing exists through pencil, eraser, eyedropper, fill, and inspect.
 - Drag painting groups into a single undo history entry.
@@ -1211,7 +1219,6 @@ These are the most useful next engineering targets.
 | Priority | Improvement                                                         | Why It Matters                                                                      |
 | -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | P0       | Run full live browser verification after every import/export change | The studio is visual and file-based; browser proof matters more than static reading |
-| P1       | Add crop rectangle, not just focus point                            | Face/mask imports need exact framing, especially portraits                          |
 | P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
 | P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
 | P2       | Add in-game H/S/B press-count data to `PaletteColor`                | Makes output more game-ready                                                        |

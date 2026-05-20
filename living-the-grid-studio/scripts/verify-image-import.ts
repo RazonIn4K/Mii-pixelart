@@ -4,6 +4,7 @@ import {
   computeImagePlacement,
   estimateEdgeBackgroundColor,
   flattenBackgroundPixels,
+  normalizeImageCrop,
 } from "../client/src/lib/engine/image-import";
 import type { RGB } from "../client/src/lib/engine/color";
 
@@ -88,6 +89,58 @@ function verifyStretch(): void {
   });
 }
 
+function verifyStretchCrop(): void {
+  const placement = computeImagePlacement(
+    1000,
+    200,
+    64,
+    64,
+    "stretch",
+    { x: 50, y: 50 },
+    { x: 10, y: 20, width: 40, height: 50 },
+  );
+  assert.deepEqual(placement, {
+    sourceX: 100,
+    sourceY: 40,
+    sourceWidth: 400,
+    sourceHeight: 100,
+    destX: 0,
+    destY: 0,
+    destWidth: 64,
+    destHeight: 64,
+  });
+}
+
+function verifyCoverCrop(): void {
+  const placement = computeImagePlacement(
+    1000,
+    500,
+    64,
+    64,
+    "cover",
+    { x: 50, y: 50 },
+    { x: 25, y: 0, width: 50, height: 100 },
+  );
+  assert.equal(placement.sourceX, 250);
+  assert.equal(placement.sourceY, 0);
+  assert.equal(placement.sourceWidth, 500);
+  assert.equal(placement.sourceHeight, 500);
+  assert.equal(placement.destWidth, 64);
+  assert.equal(placement.destHeight, 64);
+}
+
+function verifyCropNormalization(): void {
+  assert.deepEqual(
+    normalizeImageCrop({ x: 96, y: -10, width: 20, height: 999 }),
+    {
+      x: 96,
+      y: 0,
+      width: 4,
+      height: 100,
+    },
+  );
+}
+
 function verifyInvalidDimensions(): void {
   assert.throws(() => computeImagePlacement(0, 395, 64, 64, "cover"));
   assert.throws(() => computeImagePlacement(331, 395, 0, 64, "cover"));
@@ -136,6 +189,9 @@ verifyWideCoverFocus();
 verifyContain();
 verifyContainFocus();
 verifyStretch();
+verifyStretchCrop();
+verifyCoverCrop();
+verifyCropNormalization();
 verifyInvalidDimensions();
 verifyBackgroundEstimate();
 verifyBackgroundFlatteningIsEdgeConnected();
