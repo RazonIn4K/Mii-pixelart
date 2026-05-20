@@ -7,33 +7,49 @@ import {
   ISLAND_GROWTH_STAGES,
   RESIDENT_CREATION_STEPS,
   STARTER_RESIDENTS,
+  buildResidentDesignerPrompt,
   evaluateQuestAnswer,
+  validateMiiResidentSpec,
   validateStarterResidents,
-} from "../client/src/lib/engine/residents";
+  type MiiResidentSpec,
+} from "../shared/residents";
 
 const validationErrors = validateStarterResidents();
 assert.deepEqual(validationErrors, []);
 
 assert.equal(DISTRICTS.length, 9);
-assert.ok(DISTRICTS.some((district) => district.id === "silicon-beach"));
-assert.ok(DISTRICTS.some((district) => district.id === "boolean-boardwalk"));
-assert.ok(DISTRICTS.some((district) => district.id === "circuit-plaza"));
-assert.ok(DISTRICTS.some((district) => district.id === "architecture-atrium"));
-assert.ok(DISTRICTS.some((district) => district.id === "assembly-avenue"));
-assert.ok(DISTRICTS.some((district) => district.id === "vm-village"));
-assert.ok(DISTRICTS.some((district) => district.id === "compiler-grove"));
-assert.ok(DISTRICTS.some((district) => district.id === "oz-oasis"));
-assert.ok(DISTRICTS.some((district) => district.id === "perlis-peak"));
+assert.deepEqual(
+  DISTRICTS.map((district) => district.id),
+  [
+    "silicon-beach",
+    "boolean-boardwalk",
+    "circuit-plaza",
+    "architecture-atrium",
+    "assembly-avenue",
+    "vm-village",
+    "compiler-grove",
+    "oz-oasis",
+    "perlis-peak",
+  ],
+);
 
 assert.ok(STARTER_RESIDENTS.length >= 8);
 for (const resident of STARTER_RESIDENTS) {
-  assert.ok(resident.bridgeBelow.length > 0);
-  assert.ok(resident.bridgeAbove.length > 0);
-  assert.ok(resident.questHook.id.length > 0);
-  assert.ok(resident.quirks?.length);
-  assert.ok(resident.giftPlan?.length);
-  assert.ok(resident.homePlan?.length);
-  assert.ok(resident.relationshipPlan?.length);
+  assert.ok(resident.bridgeBelow.length > 0, `${resident.id} bridgeBelow`);
+  assert.ok(resident.bridgeAbove.length > 0, `${resident.id} bridgeAbove`);
+  assert.ok(resident.questHook.id.length > 0, `${resident.id} questHook`);
+  assert.ok(resident.quirks?.length, `${resident.id} quirks`);
+  assert.ok(resident.giftPlan?.length, `${resident.id} giftPlan`);
+  assert.ok(resident.homePlan?.length, `${resident.id} homePlan`);
+  assert.ok(
+    resident.relationshipPlan?.length,
+    `${resident.id} relationshipPlan`,
+  );
+  assert.match(
+    resident.sourceCredits.join(" "),
+    /Fan-made|Unaffiliated/i,
+    `${resident.id} source credits`,
+  );
 }
 
 assert.equal(ISLAND_GROWTH_STAGES.length, 5);
@@ -58,12 +74,16 @@ const stateBridge = CROSS_LAYER_INTERACTIONS.find(
 );
 assert.ok(stateBridge);
 assert.match(stateBridge.quest.expectedOutput, /Hardware state/);
-assert.match(stateBridge.quest.expectedOutput, /software mutable state/);
+assert.match(stateBridge.quest.expectedOutput, /software mutable state/i);
 assert.ok(
   evaluateQuestAnswer(
-    "Hardware state makes memory with a clock, but mutable variables add time and nondeterminism.",
+    "Hardware state makes memory with a clock, but software mutable state adds time.",
     stateBridge.quest,
   ),
+);
+assert.equal(
+  evaluateQuestAnswer("Variables are convenient.", stateBridge.quest),
+  false,
 );
 
 const translation = CROSS_LAYER_INTERACTIONS.find(
@@ -75,9 +95,43 @@ assert.match(translation.quest.expectedOutput, /assembly/);
 assert.match(translation.quest.expectedOutput, /CPU/);
 assert.ok(
   evaluateQuestAnswer(
-    "It preserves behavior through VM, assembly, CPU, and ALU steps.",
+    "The same behavior is preserved through VM commands, assembly, and CPU execution.",
     translation.quest,
   ),
 );
+
+const sampleResident: MiiResidentSpec = {
+  ...STARTER_RESIDENTS[0],
+  id: "schema-validation-copy",
+};
+const valid = validateMiiResidentSpec(sampleResident);
+assert.equal(valid.valid, true);
+assert.equal(valid.errors.length, 0);
+
+const missingQuest = validateMiiResidentSpec({
+  ...sampleResident,
+  questHook: undefined,
+});
+assert.equal(missingQuest.valid, false);
+assert.ok(missingQuest.errors.some((error) => error.includes("questHook")));
+
+const badPlatform = validateMiiResidentSpec({
+  ...sampleResident,
+  platform: "GAMECUBE",
+});
+assert.equal(badPlatform.valid, false);
+assert.ok(badPlatform.errors.some((error) => error.includes("platform")));
+
+const badGrowthFields = validateMiiResidentSpec({
+  ...sampleResident,
+  quirks: "not-an-array",
+});
+assert.equal(badGrowthFields.valid, false);
+assert.ok(badGrowthFields.errors.some((error) => error.includes("quirks")));
+
+const prompt = buildResidentDesignerPrompt();
+assert.match(prompt, /MiiResidentSpec/);
+assert.match(prompt, /giftPlan/);
+assert.match(prompt, /JSON only/);
 
 console.log("Resident system verification passed.");

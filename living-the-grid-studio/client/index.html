@@ -1,13 +1,16 @@
 <!doctype html>
 <html lang="en">
-
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+      content="width=device-width, initial-scale=1.0, maximum-scale=1"
+    />
     <title>Tomodachi · Mii Studio &amp; Recovery Guides</title>
-    <meta name="description" content="Tomodachi is a Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult." />
+    <meta
+      name="description"
+      content="Tomodachi is a Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult."
+    />
     <meta name="theme-color" content="#101016" />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href="https://tomodachi.pw/" />
@@ -15,85 +18,104 @@
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tomodachi" />
-    <meta property="og:title" content="Tomodachi · Mii Studio &amp; Recovery Guides" />
-    <meta property="og:description" content="A Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult." />
+    <meta
+      property="og:title"
+      content="Tomodachi · Mii Studio &amp; Recovery Guides"
+    />
+    <meta
+      property="og:description"
+      content="A Mii pixel-art studio paired with practical breach-recovery guides. Sketch, critique, and ship; or pick up the recovery checklist and consult."
+    />
     <meta property="og:url" content="https://tomodachi.pw/" />
     <meta property="og:image" content="https://tomodachi.pw/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Tomodachi · Mii Studio and Recovery Guides" />
+    <meta
+      property="og:image:alt"
+      content="Tomodachi · Mii Studio and Recovery Guides"
+    />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Tomodachi · Mii Studio &amp; Recovery Guides" />
-    <meta name="twitter:description" content="A Mii pixel-art studio paired with practical breach-recovery guides." />
+    <meta
+      name="twitter:title"
+      content="Tomodachi · Mii Studio &amp; Recovery Guides"
+    />
+    <meta
+      name="twitter:description"
+      content="A Mii pixel-art studio paired with practical breach-recovery guides."
+    />
     <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
 
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E"
+    />
     <!-- PWA: makes the site installable on Android/iOS home screens.
          Brand color matches the studio header; background_color matches the
          Paper Studio off-white surface. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/og-image.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Tomodachi" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Image CDN preconnect — saves ~100-200ms on the first hero image fetch. -->
-    <link rel="preconnect" href="https://d2xsxph8kpxj0f.cloudfront.net" crossorigin />
-    <!-- Preload the LCP image so the browser kicks off the fetch before
-         it finishes parsing the JS bundle. -->
+    <!-- Preload the LCP hero image so the browser kicks off the fetch before
+         it finishes parsing the JS bundle. Image is now served from the same
+         origin so no preconnect hint is needed. -->
     <link
       rel="preload"
       as="image"
-      href="https://d2xsxph8kpxj0f.cloudfront.net/87446053/Wg3eEm5BszEjq4QnLj49VR/hero-graph-paper-C4Z7n83FomAaML8Mv4EUY5.webp"
+      href="/hero.webp"
       fetchpriority="high"
-      type="image/webp" />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      type="image/webp"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Schema.org WebApplication: tells Google this is a free, browser-based
          pixel-art design tool. Eligible for rich results in search. -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Tomodachi",
-      "alternateName": "Tomodachi Studio",
-      "url": "https://tomodachi.pw/",
-      "description": "Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players. Turn photos or character art into repaintable Mii face masks square-by-square, or pick up free guides for QR codes, gameplay basics, and breach recovery.",
-      "applicationCategory": "DesignApplication",
-      "applicationSubCategory": "Pixel Art Editor",
-      "operatingSystem": "Any",
-      "browserRequirements": "Requires JavaScript. Modern browser (Chrome, Firefox, Safari, Edge).",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD",
-        "category": "free"
-      },
-      "image": "https://tomodachi.pw/og-image.png",
-      "screenshot": "https://tomodachi.pw/og-image.png",
-      "featureList": [
-        "Photo-to-pixel-art conversion",
-        "84-color Tomodachi Life palette",
-        "Paint-by-numbers reference export",
-        "Color reduction optimizer",
-        "Reference pack download",
-        "Browser-only k-anonymity password breach check",
-        "OpenRouter-backed AI recovery assistant"
-      ],
-      "publisher": {
-        "@type": "Organization",
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
         "name": "Tomodachi",
+        "alternateName": "Tomodachi Studio",
         "url": "https://tomodachi.pw/",
-        "logo": "https://tomodachi.pw/og-image.png",
-        "sameAs": [
-          "https://github.com/RazonIn4K",
-          "https://tomodachi.brave"
-        ]
+        "description": "Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players. Turn photos or character art into repaintable Mii face masks square-by-square, or pick up free guides for QR codes, gameplay basics, and breach recovery.",
+        "applicationCategory": "DesignApplication",
+        "applicationSubCategory": "Pixel Art Editor",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript. Modern browser (Chrome, Firefox, Safari, Edge).",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "category": "free"
+        },
+        "image": "https://tomodachi.pw/og-image.png",
+        "screenshot": "https://tomodachi.pw/og-image.png",
+        "featureList": [
+          "Photo-to-pixel-art conversion",
+          "84-color Tomodachi Life palette",
+          "Paint-by-numbers reference export",
+          "Color reduction optimizer",
+          "Reference pack download",
+          "Browser-only k-anonymity password breach check",
+          "OpenRouter-backed AI recovery assistant"
+        ],
+        "publisher": {
+          "@type": "Organization",
+          "name": "Tomodachi",
+          "url": "https://tomodachi.pw/",
+          "logo": "https://tomodachi.pw/og-image.png",
+          "sameAs": ["https://github.com/RazonIn4K", "https://tomodachi.brave"]
+        }
       }
-    }
     </script>
   </head>
 
@@ -113,5 +135,4 @@
       }
     </script>
   </body>
-
 </html>
