@@ -92,6 +92,16 @@ const SECURITY_PHASES = new Set([
   "http_request_sbfm",
 ]);
 
+const REQUIRED_TOKEN_PERMISSIONS = [
+  "Zone:Bot Management:Read",
+  "Zone:Bot Management:Edit",
+  "Zone:Zone WAF:Read",
+  "Zone:Zone WAF:Edit",
+  "Zone:Workers Routes:Read",
+  "Zone:Workers Routes:Edit",
+  "Account:Workers Scripts:Read",
+];
+
 function requireToken(): string {
   const token = process.env.CLOUDFLARE_API_TOKEN ?? process.env.CF_API_TOKEN;
   if (!token) {
@@ -224,6 +234,12 @@ function containsBotSkipTarget(actionParameters: unknown): boolean {
   return stringifySkipTargets(actionParameters).includes("http_request_sbfm");
 }
 
+function permissionSummary(): string {
+  return REQUIRED_TOKEN_PERMISSIONS.map((permission) => `- ${permission}`).join(
+    "\n",
+  );
+}
+
 function findingFor(
   ruleset: RulesetDetail,
   rule: RulesetRule,
@@ -270,6 +286,25 @@ async function auditSkipRules(zoneId: string): Promise<SkipRuleFinding[]> {
   }
 
   return findings;
+}
+
+async function auditWorkerRoutes(zoneId: string): Promise<void> {
+  const routes = await cloudflareFetch<
+    Array<{ id: string; pattern: string; script?: string }>
+  >(`/zones/${zoneId}/workers/routes`);
+  const matchingRoutes = routes.filter((route) =>
+    route.pattern.includes(TARGET_ZONE_NAME),
+  );
+
+  console.log(
+    `\nWorker routes for ${TARGET_ZONE_NAME}: ${matchingRoutes.length}`,
+  );
+  if (matchingRoutes.length > 0) {
+    console.table(matchingRoutes);
+    console.log(
+      "\nReview any Worker route that handles the apex/homepage before Pages. The live x-og-worker response for Meta-ExternalAgent appears to come from a zone Worker route, not this repo.",
+    );
+  }
 }
 
 async function main(): Promise<void> {
@@ -322,6 +357,9 @@ async function main(): Promise<void> {
     console.error(
       "The token needs zone-level permission for Bot Management settings on this zone.",
     );
+    console.error(
+      `Required token permissions include:\n${permissionSummary()}`,
+    );
   }
 
   try {
@@ -342,6 +380,26 @@ async function main(): Promise<void> {
     );
     console.error(
       "The token needs zone-level Rulesets/WAF read permission to audit skip rules.",
+    );
+    console.error(
+      `Required token permissions include:\n${permissionSummary()}`,
+    );
+  }
+
+  try {
+    await auditWorkerRoutes(zoneId);
+  } catch (error) {
+    blocked = true;
+    console.error(
+      `\nWorker-route audit unavailable: ${
+        error instanceof Error ? error.message : error
+      }`,
+    );
+    console.error(
+      "The token needs zone-level Workers Routes permission to inspect the route returning x-og-worker.",
+    );
+    console.error(
+      `Required token permissions include:\n${permissionSummary()}`,
     );
   }
 

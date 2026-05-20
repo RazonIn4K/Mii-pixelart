@@ -231,7 +231,21 @@ CLOUDFLARE_ZONE_NAME=tomodachi.pw
 CLOUDFLARE_ZONE_ID=...
 ```
 
-The script can discover the `tomodachi.pw` zone tag from the Cloudflare Pages custom-domain object when the token can read the Pages project. Applying the Security Insights fixes still requires a Cloudflare token with zone-level access to Bot Management settings and Rulesets/WAF read access.
+The script can discover the `tomodachi.pw` zone tag from the Cloudflare Pages custom-domain object when the token can read the Pages project. Applying the Security Insights fixes still requires a Cloudflare token with zone-level access to Bot Management settings, Rulesets/WAF, and Worker routes.
+
+Recommended token permissions for this remediation:
+
+```text
+Zone:Bot Management:Read
+Zone:Bot Management:Edit
+Zone:Zone WAF:Read
+Zone:Zone WAF:Edit
+Zone:Workers Routes:Read
+Zone:Workers Routes:Edit
+Account:Workers Scripts:Read
+```
+
+Scope the token to the `tomodachi.pw` zone where Cloudflare allows zone scoping. The current Doppler token can read the `mii-pixelart` Pages project but returns Cloudflare `10000: Authentication error` for Bot Management, Rulesets/WAF, Workers Scripts, and Worker Routes, so it cannot clear the Security Insights findings by itself.
 
 Apply mode sets:
 
@@ -244,7 +258,9 @@ Apply mode sets:
 }
 ```
 
-That maps to **Block AI bots**, **AI Labyrinth**, and Cloudflare-managed `robots.txt` policy. The script also lists skip rules across the main security phases, but it does not delete them automatically. For each skip rule, confirm the owner/reason, narrow broad expressions to exact paths, methods, hosts, or trusted IPs, and avoid skipping Super Bot Fight Mode unless the source is known and necessary.
+That maps to **Block AI bots**, **AI Labyrinth**, and Cloudflare-managed `robots.txt` policy. The script also lists skip rules across the main security phases and Worker routes for the zone, but it does not delete them automatically. For each skip rule, confirm the owner/reason, narrow broad expressions to exact paths, methods, hosts, or trusted IPs, and avoid skipping Super Bot Fight Mode unless the source is known and necessary.
+
+The live response header `x-og-worker: hit` for `Meta-ExternalAgent` indicates an additional Cloudflare Worker route is still running in front of Pages. Inspect **Workers Routes** for `tomodachi.pw/*` and remove `Meta-ExternalAgent` from that Worker's social-preview allowlist, or disable the Worker route if the Pages middleware now covers the preview behavior.
 
 After applying the dashboard/API settings:
 
