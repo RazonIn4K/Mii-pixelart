@@ -24,7 +24,7 @@ Tomodachi Studio currently combines four product lanes:
    - Preview before commit.
    - Touch up with paint tools.
    - Optimize colors/noise for hand repainting.
-   - Export JSON, PNG guides, palette sheets, and an HTML reference page.
+   - Export JSON, PNG guides, palette sheets, paint-order notes, and reference packs.
 
 2. **Tomodachi Life Mii mask workflow**
    - Face-oriented import presets.
@@ -91,17 +91,17 @@ flowchart TD
 
 This is how the user's abstraction-layer thinking maps onto the actual codebase.
 
-| Layer | What It Means Here | Concrete Project Pieces |
-| --- | --- | --- |
-| L0 Domain/game context | Tomodachi Life: Living the Dream workflow, Palette House repainting, Mii face masks, character/fan-art grids | Product copy, guide pages, import presets, palette naming, starter templates |
-| L1 Source inputs | Raw files and source ideas | Image files, AVIF/JPG/PNG/WebP/BMP/GIF, LTG JSON, starter templates, AI chat prompts |
-| L2 Core data model | The normalized repaintable representation | `GridDocument`, palette IDs, row-major `cells`, metadata, locked colors |
-| L3 Engine logic | Pure transformations that do not depend on React | `grid.ts`, `image-import.ts`, `json-io.ts`, `optimizer.ts`, `canvas-renderer.ts`, `color.ts`, `palette.ts`, `templates.ts`, `ai-sketch.ts` |
-| L4 UI state and interactions | How the user edits the document | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools |
-| L5 Local browser persistence | State that stays in this browser only | AI chat sessions in `localStorage`, consent state, no database in V1 |
-| L6 API/runtime services | Server or edge endpoints | Vite dev middleware, Express server, Cloudflare Pages Functions |
-| L7 External integrations | Services outside the app | OpenRouter, Stripe, Cloudflare KV, Have I Been Pwned password range API |
-| L8 Deployment/security/ops | How it runs publicly and stays controlled | Cloudflare Pages, `wrangler.toml`, `_headers`, `robots.txt`, Cloudflare Bot Management helper, Doppler-managed secrets |
+| Layer                        | What It Means Here                                                                                           | Concrete Project Pieces                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| L0 Domain/game context       | Tomodachi Life: Living the Dream workflow, Palette House repainting, Mii face masks, character/fan-art grids | Product copy, guide pages, import presets, palette naming, starter templates                                                               |
+| L1 Source inputs             | Raw files and source ideas                                                                                   | Image files, AVIF/JPG/PNG/WebP/BMP/GIF, LTG JSON, starter templates, AI chat prompts                                                       |
+| L2 Core data model           | The normalized repaintable representation                                                                    | `GridDocument`, palette IDs, row-major `cells`, metadata, locked colors                                                                    |
+| L3 Engine logic              | Pure transformations that do not depend on React                                                             | `grid.ts`, `image-import.ts`, `json-io.ts`, `optimizer.ts`, `canvas-renderer.ts`, `color.ts`, `palette.ts`, `templates.ts`, `ai-sketch.ts` |
+| L4 UI state and interactions | How the user edits the document                                                                              | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools                                                            |
+| L5 Local browser persistence | State that stays in this browser only                                                                        | AI chat sessions in `localStorage`, consent state, no database in V1                                                                       |
+| L6 API/runtime services      | Server or edge endpoints                                                                                     | Vite dev middleware, Express server, Cloudflare Pages Functions                                                                            |
+| L7 External integrations     | Services outside the app                                                                                     | OpenRouter, Stripe, Cloudflare KV, Have I Been Pwned password range API                                                                    |
+| L8 Deployment/security/ops   | How it runs publicly and stays controlled                                                                    | Cloudflare Pages, `wrangler.toml`, `_headers`, `robots.txt`, Cloudflare Bot Management helper, Doppler-managed secrets                     |
 
 ## 4. Repository Layout
 
@@ -173,27 +173,28 @@ living-the-grid-studio/
 
 ## 5. Main Technologies Being Used
 
-| Area | Tooling | How It Is Used |
-| --- | --- | --- |
-| Language | TypeScript | Shared across client, engine, server helpers, Cloudflare Functions, and scripts |
-| Frontend | React 19 | Studio UI, pages, panels, editor state display |
-| Routing | `wouter` | Lightweight route map in `client/src/App.tsx` |
-| Build/dev server | Vite 7 | React dev server, middleware API proxy, build output to `dist/public` |
-| Styling | Tailwind CSS v4 | Global styles in `client/src/index.css`; utility styling throughout components |
-| UI primitives | Radix UI family | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes |
-| Icons | `lucide-react` | Studio toolbar icons, panel actions, import/export affordances |
-| Canvas | HTML Canvas 2D | Grid renderer, image sampling, PNG export, palette sheet generation |
-| Image import | Browser canvas APIs | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels |
-| Color matching | CIELAB + CIE76 Delta E | Match source pixels to the closest Tomodachi palette color |
-| State | React state + `useGridDocument` | Holds `GridDocument`, image preview, undo/redo history, stroke transactions |
-| AI | OpenRouter Chat Completions | Model picker, chat, optional image snapshot, applyable sketch JSON |
-| Payments | Stripe REST API | Checkout sessions and checkout verification without Stripe Node SDK |
-| Edge hosting | Cloudflare Pages | Static site plus Pages Functions |
-| Edge functions | Cloudflare Pages Functions | `/api/ai/*`, `/api/stripe/*`, webhook route |
-| Edge cache | Cloudflare KV | OpenRouter model list cache through `EDGE_CACHE` binding |
-| Security | Cloudflare + response headers | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper |
-| Secrets | Doppler / env vars | OpenRouter, Stripe, Cloudflare tokens are expected from environment, not committed |
-| Verification | `pnpm verify` scripts | Type-checking and fixture-based verification |
+| Area             | Tooling                         | How It Is Used                                                                        |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
+| Language         | TypeScript                      | Shared across client, engine, server helpers, Cloudflare Functions, and scripts       |
+| Frontend         | React 19                        | Studio UI, pages, panels, editor state display                                        |
+| Routing          | `wouter`                        | Lightweight route map in `client/src/App.tsx`                                         |
+| Build/dev server | Vite 7                          | React dev server, middleware API proxy, build output to `dist/public`                 |
+| Styling          | Tailwind CSS v4                 | Global styles in `client/src/index.css`; utility styling throughout components        |
+| UI primitives    | Radix UI family                 | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes         |
+| Icons            | `lucide-react`                  | Studio toolbar icons, panel actions, import/export affordances                        |
+| Canvas           | HTML Canvas 2D                  | Grid renderer, image sampling, PNG export, palette sheet generation                   |
+| Image import     | Browser canvas APIs             | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels |
+| Color matching   | CIELAB + CIE76 Delta E          | Match source pixels to the closest Tomodachi palette color                            |
+| State            | React state + `useGridDocument` | Holds `GridDocument`, image preview, undo/redo history, stroke transactions           |
+| AI               | OpenRouter Chat Completions     | Model picker, chat, optional image snapshot, applyable sketch JSON                    |
+| Payments         | Stripe REST API                 | Checkout sessions and checkout verification without Stripe Node SDK                   |
+| ZIP export       | JSZip                           | Bundles reference-pack assets into one downloadable archive                           |
+| Edge hosting     | Cloudflare Pages                | Static site plus Pages Functions                                                      |
+| Edge functions   | Cloudflare Pages Functions      | `/api/ai/*`, `/api/stripe/*`, webhook route                                           |
+| Edge cache       | Cloudflare KV                   | OpenRouter model list cache through `EDGE_CACHE` binding                              |
+| Security         | Cloudflare + response headers   | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                   |
+| Secrets          | Doppler / env vars              | OpenRouter, Stripe, Cloudflare tokens are expected from environment, not committed    |
+| Verification     | `pnpm verify` scripts           | Type-checking and fixture-based verification                                          |
 
 ## 6. App Entry And Routing
 
@@ -210,24 +211,24 @@ The app starts in `client/src/main.tsx`, then renders `client/src/App.tsx`.
 
 Routes are declared with `wouter`:
 
-| Route | Component | Purpose |
-| --- | --- | --- |
-| `/` | `Home` | Public landing/recovery/studio hub |
-| `/studio` | `Studio` | Main pixel-art editor |
-| `/privacy` | `Privacy` | Legal page |
-| `/terms` | `Terms` | Legal page |
-| `/cookies` | `Cookies` | Cookie policy |
-| `/disclosure` | `Disclosure` | Disclosure page |
-| `/affiliate-disclosure` | `Disclosure` | Alias route |
-| `/help` | `Help` | Recovery/help page |
-| `/guides` | `Guides` | Guide content |
-| `/faq` | `Faq` | FAQ |
-| `/about` | `About` | About |
-| `/unlock` | `Unlock` | Paid recovery/consult products |
-| `/support` | `Support` | Tip/support products |
-| `/donate` | `Support` | Alias route |
-| `/404` | `NotFound` | Explicit 404 |
-| fallback | `NotFound` | Unknown route |
+| Route                   | Component    | Purpose                            |
+| ----------------------- | ------------ | ---------------------------------- |
+| `/`                     | `Home`       | Public landing/recovery/studio hub |
+| `/studio`               | `Studio`     | Main pixel-art editor              |
+| `/privacy`              | `Privacy`    | Legal page                         |
+| `/terms`                | `Terms`      | Legal page                         |
+| `/cookies`              | `Cookies`    | Cookie policy                      |
+| `/disclosure`           | `Disclosure` | Disclosure page                    |
+| `/affiliate-disclosure` | `Disclosure` | Alias route                        |
+| `/help`                 | `Help`       | Recovery/help page                 |
+| `/guides`               | `Guides`     | Guide content                      |
+| `/faq`                  | `Faq`        | FAQ                                |
+| `/about`                | `About`      | About                              |
+| `/unlock`               | `Unlock`     | Paid recovery/consult products     |
+| `/support`              | `Support`    | Tip/support products               |
+| `/donate`               | `Support`    | Alias route                        |
+| `/404`                  | `NotFound`   | Explicit 404                       |
+| fallback                | `NotFound`   | Unknown route                      |
 
 ## 7. The Central Data Model: `GridDocument`
 
@@ -272,17 +273,17 @@ flowchart LR
 
 ### Core Grid Helpers
 
-| Function | Purpose |
-| --- | --- |
-| `createGridDocument` | Creates a new empty or filled grid |
-| `getCell` | Reads one cell at x/y |
-| `setCell` | Returns an immutable copy with one edited cell |
-| `setCells` | Returns an immutable copy with a batch edit |
-| `bresenhamLine` | Produces drag interpolation points so fast strokes do not leave gaps |
-| `replaceColor` | Merges or replaces one color ID with another |
-| `resizeGrid` | Resizes by preserving existing cell positions |
-| `resampleGridNearest` | Nearest-neighbor resampling for detail upscaling |
-| `recomputeUsedColors` | Rebuilds the used-color list after mutations |
+| Function              | Purpose                                                              |
+| --------------------- | -------------------------------------------------------------------- |
+| `createGridDocument`  | Creates a new empty or filled grid                                   |
+| `getCell`             | Reads one cell at x/y                                                |
+| `setCell`             | Returns an immutable copy with one edited cell                       |
+| `setCells`            | Returns an immutable copy with a batch edit                          |
+| `bresenhamLine`       | Produces drag interpolation points so fast strokes do not leave gaps |
+| `replaceColor`        | Merges or replaces one color ID with another                         |
+| `resizeGrid`          | Resizes by preserving existing cell positions                        |
+| `resampleGridNearest` | Nearest-neighbor resampling for detail upscaling                     |
+| `recomputeUsedColors` | Rebuilds the used-color list after mutations                         |
 
 ## 8. Studio Workspace Implementation
 
@@ -338,13 +339,13 @@ type PaintTool = "inspect" | "pencil" | "eraser" | "eyedropper" | "fill";
 
 Tool behavior:
 
-| Tool | Behavior |
-| --- | --- |
-| Inspect | Lets the user inspect cells without changing them |
-| Pencil | Paints selected palette ID |
-| Eraser | Sets cells to `null` |
-| Eyedropper | Reads the clicked cell color and selects it |
-| Fill | Flood-fills a contiguous region using BFS |
+| Tool       | Behavior                                          |
+| ---------- | ------------------------------------------------- |
+| Inspect    | Lets the user inspect cells without changing them |
+| Pencil     | Paints selected palette ID                        |
+| Eraser     | Sets cells to `null`                              |
+| Eyedropper | Reads the clicked cell color and selects it       |
+| Fill       | Flood-fills a contiguous region using BFS         |
 
 Drag painting uses `CanvasViewer` plus `bresenhamLine` so quick mouse movement still paints a continuous stroke.
 
@@ -428,18 +429,18 @@ Data:
 
 ### Use-Case Presets
 
-| Preset | Size | Important Settings |
-| --- | ---: | --- |
-| Mii Mask | 64x64 | face focus high, background flatten, moderate colors |
-| Character 64 | 64x64 | crisp sampling, stronger contrast/saturation |
-| Face 96 | 96x96 | more facial detail, background flatten |
-| Character 128 | 128x128 | higher detail, more colors |
-| Sprite 32 | 32x32 | contain mode, high contrast, crisp sampling |
-| Logo 64 | 64x64 | contain mode, limited colors |
-| Sticker 64 | 64x64 | contain mode, bold colors |
-| Icon 16 | 16x16 | strong contrast, very limited colors |
-| Full Image | 64x64 | contain mode, keeps background |
-| Pixel Detail | 256x256 | max detail path, no color limit by default |
+| Preset        |    Size | Important Settings                                   |
+| ------------- | ------: | ---------------------------------------------------- |
+| Mii Mask      |   64x64 | face focus high, background flatten, moderate colors |
+| Character 64  |   64x64 | crisp sampling, stronger contrast/saturation         |
+| Face 96       |   96x96 | more facial detail, background flatten               |
+| Character 128 | 128x128 | higher detail, more colors                           |
+| Sprite 32     |   32x32 | contain mode, high contrast, crisp sampling          |
+| Logo 64       |   64x64 | contain mode, limited colors                         |
+| Sticker 64    |   64x64 | contain mode, bold colors                            |
+| Icon 16       |   16x16 | strong contrast, very limited colors                 |
+| Full Image    |   64x64 | contain mode, keeps background                       |
+| Pixel Detail  | 256x256 | max detail path, no color limit by default           |
 
 ### ImageImportOptions
 
@@ -558,14 +559,14 @@ interface PaletteColor {
 
 Examples:
 
-| ID | Meaning |
-| --- | --- |
-| `R10C1` | Black |
-| `R10C7` | White |
-| `R9C5` | Beige |
-| `R11C1` | Charcoal |
-| `R1C2` | Red |
-| `R6C3` | Bright Blue |
+| ID           | Meaning          |
+| ------------ | ---------------- |
+| `R10C1`      | Black            |
+| `R10C7`      | White            |
+| `R9C5`       | Beige            |
+| `R11C1`      | Charcoal         |
+| `R1C2`       | Red              |
+| `R6C3`       | Bright Blue      |
 | `S1` to `S7` | Saturated extras |
 
 Current caveat:
@@ -647,12 +648,12 @@ interface OptimizerConfig {
 
 ### Pass Details
 
-| Pass | What It Does | Why It Matters |
-| --- | --- | --- |
-| `passMergeColors` | Merges less-used visually similar colors under a Delta E threshold | Reduces brush changes |
-| `passRemoveIslands` | Finds small connected regions and replaces them with dominant neighboring colors | Removes noisy regions |
-| `passCleanupSingleCells` | Removes isolated single-cell artifacts | Makes guides easier to repaint |
-| `passLimitPalette` | Repeatedly merges the closest color pair until under the target color count | Creates simpler palette-limited variants |
+| Pass                     | What It Does                                                                     | Why It Matters                           |
+| ------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------- |
+| `passMergeColors`        | Merges less-used visually similar colors under a Delta E threshold               | Reduces brush changes                    |
+| `passRemoveIslands`      | Finds small connected regions and replaces them with dominant neighboring colors | Removes noisy regions                    |
+| `passCleanupSingleCells` | Removes isolated single-cell artifacts                                           | Makes guides easier to repaint           |
+| `passLimitPalette`       | Repeatedly merges the closest color pair until under the target color count      | Creates simpler palette-limited variants |
 
 `lockedColors` protect important colors from being merged or changed by optimizer decisions.
 
@@ -667,12 +668,12 @@ The templates are original/generic starter designs, not direct copyrighted sprit
 
 ### Current Template Categories
 
-| Category | Examples |
-| --- | --- |
-| People & Masks | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face |
-| Characters | Mascot Head, Space Crew, Tiny Dino, Cute Monster, Red Cap Hero, Green Adventurer, Blue Speed Mascot |
+| Category        | Examples                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| People & Masks  | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face                                                 |
+| Characters      | Mascot Head, Space Crew, Tiny Dino, Cute Monster, Red Cap Hero, Green Adventurer, Blue Speed Mascot                 |
 | Horror & Spooky | Haunted Mascot, Bald Teacher, Masked Slasher, Pumpkin Ghoul, Ghost Sheet, Vampire Count, Zombie Buddy, Creepy Clown |
-| Marks & Objects | Heart Sticker, Star Badge, Smile Icon, Letter Mark, Controller Icon, Racing Kart, Pizza Slice, Sword Badge |
+| Marks & Objects | Heart Sticker, Star Badge, Smile Icon, Letter Mark, Controller Icon, Racing Kart, Pizza Slice, Sword Badge          |
 
 ### Template Flow
 
@@ -691,14 +692,14 @@ The fixture scripts can regenerate saved JSON fixtures for these templates so te
 
 AI code is split between client, shared types, and API helpers.
 
-| File | Role |
-| --- | --- |
+| File                                       | Role                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- |
 | `client/src/components/studio/AiPanel.tsx` | UI for chat sessions, model selection, options, sending messages, applying sketches |
-| `shared/ai.ts` | Shared request/response/model/sketch TypeScript types and model presets |
-| `client/src/lib/engine/ai-sketch.ts` | Converts validated AI sketch rows into a `GridDocument` |
-| `server/openrouter.ts` | Shared OpenRouter request, prompt, model list, parsing, salvage logic |
-| `functions/api/ai/[[path]].ts` | Cloudflare Pages Function for deployed `/api/ai/*` |
-| `vite.config.ts` | Vite middleware for local `/api/ai/*` |
+| `shared/ai.ts`                             | Shared request/response/model/sketch TypeScript types and model presets             |
+| `client/src/lib/engine/ai-sketch.ts`       | Converts validated AI sketch rows into a `GridDocument`                             |
+| `server/openrouter.ts`                     | Shared OpenRouter request, prompt, model list, parsing, salvage logic               |
+| `functions/api/ai/[[path]].ts`             | Cloudflare Pages Function for deployed `/api/ai/*`                                  |
+| `vite.config.ts`                           | Vite middleware for local `/api/ai/*`                                               |
 
 ### AI Session Storage
 
@@ -779,17 +780,17 @@ This file defines:
 
 ### Districts Currently Modeled
 
-| District | Role |
-| --- | --- |
-| Silicon Beach | Physical invention layer |
-| Boolean Boardwalk | Logic and truth-table layer |
-| Circuit Plaza | NAND, combinational, and sequential circuit layer |
-| Architecture Atrium | CPU, stored-program, and machine model layer |
-| Assembly Avenue | Machine language and assembler layer |
-| VM Village | Stack VM and hardware-independence layer |
-| Compiler Grove | Language, syntax, parsing, and compilation layer |
-| Oz Oasis | Computation model and concurrency layer |
-| Perlis Peak | Programming philosophy and language-thought layer |
+| District            | Role                                              |
+| ------------------- | ------------------------------------------------- |
+| Silicon Beach       | Physical invention layer                          |
+| Boolean Boardwalk   | Logic and truth-table layer                       |
+| Circuit Plaza       | NAND, combinational, and sequential circuit layer |
+| Architecture Atrium | CPU, stored-program, and machine model layer      |
+| Assembly Avenue     | Machine language and assembler layer              |
+| VM Village          | Stack VM and hardware-independence layer          |
+| Compiler Grove      | Language, syntax, parsing, and compilation layer  |
+| Oz Oasis            | Computation model and concurrency layer           |
+| Perlis Peak         | Programming philosophy and language-thought layer |
 
 ### QuestHook Shape
 
@@ -797,9 +798,19 @@ This file defines:
 interface QuestHook {
   id: string;
   title: string;
-  trigger: "residentChat" | "districtBridge" | "relationshipConflict" | "studySession";
+  trigger:
+    | "residentChat"
+    | "districtBridge"
+    | "relationshipConflict"
+    | "studySession";
   input: string;
-  artifactType: "truthTable" | "circuit" | "assembly" | "vmTrace" | "program" | "stateTrace";
+  artifactType:
+    | "truthTable"
+    | "circuit"
+    | "assembly"
+    | "vmTrace"
+    | "program"
+    | "stateTrace";
   bridgeQuestion: string;
   expectedOutput: string;
   correctionHint: string;
@@ -813,7 +824,7 @@ interface QuestHook {
 `ExportPanel.tsx` checks:
 
 ```ts
-doc.meta.sourceMetadata?.miiResidentSpec
+doc.meta.sourceMetadata?.miiResidentSpec;
 ```
 
 If it validates with `validateMiiResidentSpec()`, the exported HTML reference page includes resident details such as:
@@ -837,21 +848,25 @@ Export code lives in:
 
 ### Export Buttons
 
-| Button | Output |
-| --- | --- |
-| Export JSON | Project JSON |
-| Export Guide (with labels) | Labeled PNG guide |
-| Export Clean Image | Grid PNG without labels/grid lines |
-| Export Reference Pack | Multiple downloads: JSON, labeled guide PNG, palette sheet PNG, HTML reference page |
+| Button                     | Output                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Export JSON                | Project JSON                                                                                                                             |
+| Export Guide (with labels) | Labeled PNG guide                                                                                                                        |
+| Export Clean Image         | Grid PNG without labels/grid lines                                                                                                       |
+| Export Reference Pack      | ZIP archive with JSON, labeled guide PNG, clean PNG, palette sheet PNG, paint-order CSV, source notes, manifest, and HTML reference page |
 
 ### Current Reference Pack Behavior
 
-The reference pack is not a ZIP yet. It triggers several separate browser downloads:
+The reference pack is now a single ZIP download:
 
-- `${project}-guide-labeled.png`
-- `${project}-palette-sheet.png`
-- `${project}-reference.html`
-- project JSON
+- `project.json`
+- `guide-labeled.png`
+- `guide-clean.png`
+- `palette-sheet.png`
+- `paint-order.csv`
+- `source-notes.txt`
+- `manifest.json`
+- `reference.html`
 
 The HTML reference includes:
 
@@ -865,29 +880,29 @@ The HTML reference includes:
 
 ### Known Export Copy Drift
 
-Some crawler-shell/public-copy text refers to a PDF reference pack. The actual implemented export path currently generates PNG, JSON, palette sheet PNG, and HTML. PDF export is not implemented in the current code.
+Some older crawler-shell/public-copy text may still refer to a PDF reference pack. The actual implemented export path currently generates a ZIP containing PNG, JSON, CSV, text notes, manifest JSON, and HTML. PDF export is not implemented in the current code.
 
 ## 19. Public Visual Assets
 
 These are the raster/static assets in `client/public/`.
 
-| Asset | Used For |
-| --- | --- |
-| `hero.webp` | Public homepage hero/branding visual |
-| `canvas-demo.webp` | Studio/demo visual |
-| `empty-state.webp` | Empty state illustration |
-| `palette-swatches.webp` | Palette preview visual |
-| `og-image.png` | OpenGraph/social card image |
-| `icon-192.png` | PWA/app icon |
-| `icon-512.png` | PWA/app icon |
-| `icon-maskable.png` | Maskable PWA icon |
-| `manifest.webmanifest` | PWA metadata |
-| `ads.txt` | Ad network declaration |
-| `robots.txt` | Search/AI crawler policy |
-| `sitemap.xml` | Page sitemap |
-| `sitemap-images.xml` | Image sitemap |
-| `_headers` | Cloudflare Pages HTTP headers |
-| `_redirects` | Cloudflare Pages redirects |
+| Asset                   | Used For                             |
+| ----------------------- | ------------------------------------ |
+| `hero.webp`             | Public homepage hero/branding visual |
+| `canvas-demo.webp`      | Studio/demo visual                   |
+| `empty-state.webp`      | Empty state illustration             |
+| `palette-swatches.webp` | Palette preview visual               |
+| `og-image.png`          | OpenGraph/social card image          |
+| `icon-192.png`          | PWA/app icon                         |
+| `icon-512.png`          | PWA/app icon                         |
+| `icon-maskable.png`     | Maskable PWA icon                    |
+| `manifest.webmanifest`  | PWA metadata                         |
+| `ads.txt`               | Ad network declaration               |
+| `robots.txt`            | Search/AI crawler policy             |
+| `sitemap.xml`           | Page sitemap                         |
+| `sitemap-images.xml`    | Image sitemap                        |
+| `_headers`              | Cloudflare Pages HTTP headers        |
+| `_redirects`            | Cloudflare Pages redirects           |
 
 ### Embedded Asset Preview Paths
 
@@ -925,15 +940,15 @@ id = "5129b5ce8d2d435cb704b398a437f355"
 
 ### Pages Functions
 
-| Route | File | Purpose |
-| --- | --- | --- |
-| `/api/ai/status` | `functions/api/ai/[[path]].ts` | Report whether OpenRouter key is configured |
-| `/api/ai/models` | `functions/api/ai/[[path]].ts` | Return model presets with optional OpenRouter availability, cached in KV |
-| `/api/ai/chat` | `functions/api/ai/[[path]].ts` | Send chat/sketch requests to OpenRouter |
-| `/api/stripe/products` | `functions/api/stripe/[[path]].ts` | List public products |
-| `/api/stripe/checkout` | `functions/api/stripe/[[path]].ts` | Create Stripe Checkout session |
-| `/api/stripe/session` | `functions/api/stripe/[[path]].ts` | Verify Checkout session |
-| Stripe webhook | `functions/api/webhooks/stripe.ts` | Stripe webhook handler |
+| Route                  | File                               | Purpose                                                                  |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `/api/ai/status`       | `functions/api/ai/[[path]].ts`     | Report whether OpenRouter key is configured                              |
+| `/api/ai/models`       | `functions/api/ai/[[path]].ts`     | Return model presets with optional OpenRouter availability, cached in KV |
+| `/api/ai/chat`         | `functions/api/ai/[[path]].ts`     | Send chat/sketch requests to OpenRouter                                  |
+| `/api/stripe/products` | `functions/api/stripe/[[path]].ts` | List public products                                                     |
+| `/api/stripe/checkout` | `functions/api/stripe/[[path]].ts` | Create Stripe Checkout session                                           |
+| `/api/stripe/session`  | `functions/api/stripe/[[path]].ts` | Verify Checkout session                                                  |
+| Stripe webhook         | `functions/api/webhooks/stripe.ts` | Stripe webhook handler                                                   |
 
 ### Edge Middleware
 
@@ -1044,19 +1059,19 @@ Current products include:
 
 The main scripts are in `package.json`.
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm install` | Install dependencies |
-| `pnpm dev` | Start Vite dev server on port 3000 or next available port |
-| `pnpm build` | Build Vite app and bundle Express server |
-| `pnpm start` | Run production Express server from `dist/index.js` |
-| `pnpm preview` | Preview Vite build |
-| `pnpm check` | TypeScript check |
-| `pnpm verify` | Type-check plus core verification scripts |
-| `pnpm verify:studio` | Browser-style studio verification script |
-| `pnpm cloudflare:security-insights` | Cloudflare security audit/helper |
-| `pnpm compare:models` | Compare OpenRouter model behavior |
-| `pnpm save:templates` | Save creative template fixtures |
+| Command                             | Purpose                                                   |
+| ----------------------------------- | --------------------------------------------------------- |
+| `pnpm install`                      | Install dependencies                                      |
+| `pnpm dev`                          | Start Vite dev server on port 3000 or next available port |
+| `pnpm build`                        | Build Vite app and bundle Express server                  |
+| `pnpm start`                        | Run production Express server from `dist/index.js`        |
+| `pnpm preview`                      | Preview Vite build                                        |
+| `pnpm check`                        | TypeScript check                                          |
+| `pnpm verify`                       | Type-check plus core verification scripts                 |
+| `pnpm verify:studio`                | Browser-style studio verification script                  |
+| `pnpm cloudflare:security-insights` | Cloudflare security audit/helper                          |
+| `pnpm compare:models`               | Compare OpenRouter model behavior                         |
+| `pnpm save:templates`               | Save creative template fixtures                           |
 
 ### Vite Dev Middleware
 
@@ -1079,29 +1094,29 @@ The Vite config includes Manus debug collector/runtime tooling only in dev mode.
 
 The project expects secrets from the shell, Doppler, Cloudflare Pages, or Wrangler, not from committed files.
 
-| Variable | Used By | Purpose |
-| --- | --- | --- |
-| `OPENROUTER_API_KEY` | AI API | Authenticate OpenRouter requests |
-| `PUBLIC_SITE_URL` | AI/Stripe/Cloudflare | Referer, success URLs, canonical site URL |
-| `STRIPE_SECRET_KEY` | Stripe API | Create and verify checkout sessions |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook | Verify Stripe webhook signatures |
-| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` | Cloudflare script | Bot/security config audit/apply |
-| `CLOUDFLARE_ZONE_ID` | Cloudflare script | Optional direct zone lookup |
-| `CLOUDFLARE_ZONE_NAME` | Cloudflare script | Defaults to `tomodachi.pw` |
-| `EDGE_CACHE` | Cloudflare Pages Function binding | KV cache for OpenRouter models |
+| Variable                                | Used By                           | Purpose                                   |
+| --------------------------------------- | --------------------------------- | ----------------------------------------- |
+| `OPENROUTER_API_KEY`                    | AI API                            | Authenticate OpenRouter requests          |
+| `PUBLIC_SITE_URL`                       | AI/Stripe/Cloudflare              | Referer, success URLs, canonical site URL |
+| `STRIPE_SECRET_KEY`                     | Stripe API                        | Create and verify checkout sessions       |
+| `STRIPE_WEBHOOK_SECRET`                 | Stripe webhook                    | Verify Stripe webhook signatures          |
+| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` | Cloudflare script                 | Bot/security config audit/apply           |
+| `CLOUDFLARE_ZONE_ID`                    | Cloudflare script                 | Optional direct zone lookup               |
+| `CLOUDFLARE_ZONE_NAME`                  | Cloudflare script                 | Defaults to `tomodachi.pw`                |
+| `EDGE_CACHE`                            | Cloudflare Pages Function binding | KV cache for OpenRouter models            |
 
 ## 24. Verification Coverage
 
 Current verification scripts:
 
-| Script | What It Verifies |
-| --- | --- |
-| `verify-ltg-import.ts` | Living The Grid fixture import compatibility |
-| `verify-image-import.ts` | Image import path and options |
-| `verify-creative-templates.ts` | Starter templates produce valid grid docs |
-| `verify-ai-sketch.ts` | AI sketch validation/conversion |
-| `verify-residents.ts` | Resident schema/spec validity |
-| `verify-studio-browser.ts` | Browser-style studio smoke path |
+| Script                         | What It Verifies                             |
+| ------------------------------ | -------------------------------------------- |
+| `verify-ltg-import.ts`         | Living The Grid fixture import compatibility |
+| `verify-image-import.ts`       | Image import path and options                |
+| `verify-creative-templates.ts` | Starter templates produce valid grid docs    |
+| `verify-ai-sketch.ts`          | AI sketch validation/conversion              |
+| `verify-residents.ts`          | Resident schema/spec validity                |
+| `verify-studio-browser.ts`     | Browser-style studio smoke path              |
 
 `pnpm verify` runs:
 
@@ -1120,13 +1135,13 @@ pnpm verify:residents
 
 Fixtures are used for repeatable testing and documentation.
 
-| Fixture | Purpose |
-| --- | --- |
-| `fixtures/living-the-grid-real.json` | Real Living The Grid export fixture |
-| `fixtures/ltg-indexed-palette-sample.json` | Smaller indexed palette sample |
-| `fixtures/sample-grid-document.json` | Native app grid document sample |
-| `fixtures/creative-templates/*.json` | Saved outputs for starter designs |
-| `fixtures/creative-templates/index.json` | Template fixture index |
+| Fixture                                    | Purpose                             |
+| ------------------------------------------ | ----------------------------------- |
+| `fixtures/living-the-grid-real.json`       | Real Living The Grid export fixture |
+| `fixtures/ltg-indexed-palette-sample.json` | Smaller indexed palette sample      |
+| `fixtures/sample-grid-document.json`       | Native app grid document sample     |
+| `fixtures/creative-templates/*.json`       | Saved outputs for starter designs   |
+| `fixtures/creative-templates/index.json`   | Template fixture index              |
 
 ## 26. Full Studio Data Flow
 
@@ -1185,7 +1200,7 @@ Based on the current code, these improvements are already implemented:
 - AI models can return applyable sketch JSON.
 - AI can optionally receive a current-grid visual snapshot.
 - AI sketch output is validated against palette IDs before being applied.
-- Export includes guide PNGs, palette sheet PNG, JSON, and HTML reference.
+- Export includes individual JSON/PNG assets and a ZIP reference pack with guide PNGs, palette sheet PNG, paint-order CSV, source notes, manifest, and HTML reference.
 - Resident schema and abstraction-island planning data exist in shared code.
 - Cloudflare security helpers and robots policy exist for AI bot/crawler controls.
 
@@ -1193,18 +1208,17 @@ Based on the current code, these improvements are already implemented:
 
 These are the most useful next engineering targets.
 
-| Priority | Improvement | Why It Matters |
-| --- | --- | --- |
-| P0 | Run full live browser verification after every import/export change | The studio is visual and file-based; browser proof matters more than static reading |
-| P1 | Add crop rectangle, not just focus point | Face/mask imports need exact framing, especially portraits |
-| P1 | Add per-pass optimizer preview and change log | Makes optimization trustworthy instead of magical |
-| P1 | Add repaintability score | Shows why one grid is easier to paint than another |
-| P1 | Add ZIP reference-pack export | The current reference pack downloads multiple files separately |
-| P2 | Add in-game H/S/B press-count data to `PaletteColor` | Makes output more game-ready |
-| P2 | Add editable resident feature-sheet UI | Schema exists, but the studio UI tab is not currently active |
-| P2 | Move heavy image/optimizer/export work into a Web Worker | Prevents UI blocking at 128x128 and 256x256 |
-| P2 | Add Playwright visual tests | Pixel output and upload flows need browser-level regression checks |
-| P3 | Add optional local database/cloud sync only after V1 | Current AI sessions are local-first by design |
+| Priority | Improvement                                                         | Why It Matters                                                                      |
+| -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| P0       | Run full live browser verification after every import/export change | The studio is visual and file-based; browser proof matters more than static reading |
+| P1       | Add crop rectangle, not just focus point                            | Face/mask imports need exact framing, especially portraits                          |
+| P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
+| P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
+| P2       | Add in-game H/S/B press-count data to `PaletteColor`                | Makes output more game-ready                                                        |
+| P2       | Add editable resident feature-sheet UI                              | Schema exists, but the studio UI tab is not currently active                        |
+| P2       | Move heavy image/optimizer/export work into a Web Worker            | Prevents UI blocking at 128x128 and 256x256                                         |
+| P2       | Add Playwright visual tests                                         | Pixel output and upload flows need browser-level regression checks                  |
+| P3       | Add optional local database/cloud sync only after V1                | Current AI sessions are local-first by design                                       |
 
 ## 29. Implementation Constraints To Preserve
 

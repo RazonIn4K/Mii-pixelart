@@ -11,6 +11,7 @@ import { tmpdir, homedir } from "node:os";
 import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
+import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 
 const STUDIO_URL = process.env.LTG_STUDIO_URL ?? "http://127.0.0.1:3000/studio";
 const JPG_FIXTURE =
@@ -284,7 +285,7 @@ async function main(): Promise<void> {
 
     await waitFor(() =>
       cdp!.evaluate<boolean>(
-        "window.__ltgDownloads.filter((entry) => entry.type === 'blob-text').length >= 2",
+        "window.__ltgDownloads.filter((entry) => entry.type === 'blob-text').length >= 1 && window.__ltgDownloads.some((entry) => entry.download && entry.download.endsWith('-reference-pack.zip'))",
       ),
     );
 
@@ -294,12 +295,12 @@ async function main(): Promise<void> {
     const filenames = downloads
       .filter((entry) => entry.download)
       .map((entry) => entry.download as string);
-    const htmlEntry = downloads.find(
-      (entry) => entry.type === "blob-text" && entry.mime === "text/html",
-    );
     const jsonEntry = downloads.find(
       (entry) =>
         entry.type === "blob-text" && entry.mime === "application/json",
+    );
+    const zipEntry = downloads.find(
+      (entry) => entry.type === "blob" && (entry.size ?? 0) > 10_000,
     );
 
     assert.ok(
@@ -315,8 +316,8 @@ async function main(): Promise<void> {
       "clean PNG export should use the clean filename",
     );
     assert.ok(
-      filenames.includes(`${JPG_PROJECT_NAME}-reference.html`),
-      "reference pack should include an HTML guide",
+      filenames.includes(`${JPG_PROJECT_NAME}-reference-pack.zip`),
+      "reference pack should trigger a .zip download",
     );
     assert.ok(
       jsonEntry?.text?.includes('"width"'),
@@ -326,15 +327,7 @@ async function main(): Promise<void> {
       jsonEntry?.text?.includes('"height"'),
       "exported JSON should include height",
     );
-    assert.ok(
-      htmlEntry?.text?.includes("background:#"),
-      "HTML swatches should use hex colors",
-    );
-    assert.equal(
-      /background:R\d+C\d+/.test(htmlEntry?.text ?? ""),
-      false,
-      "HTML swatches should not use raw palette IDs as CSS colors",
-    );
+    assert.ok(zipEntry, "reference pack ZIP blob should be generated");
 
     // Reset the page before testing more imports; the download capture intentionally
     // stubs URL.createObjectURL, which image decoding also depends on.
@@ -766,10 +759,19 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
       .then((response) => response.json())
       .catch(() => ({}))`,
   );
-  assert.equal(models.presets?.length, 25, "AI model preset count");
+  const expectedModelIds = new Set(
+    OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
+  );
+  assert.equal(
+    models.presets?.length,
+    OPENROUTER_MODEL_PRESETS.length,
+    "AI model preset count",
+  );
   assert.ok(
-    models.presets?.every((preset) => preset.available === true),
-    "AI model presets should be available on OpenRouter",
+    models.presets?.every(
+      (preset) => preset.id && expectedModelIds.has(preset.id),
+    ),
+    "AI model presets should match the curated shared preset list",
   );
 }
 

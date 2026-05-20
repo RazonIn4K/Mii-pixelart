@@ -22,21 +22,25 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 ## Features
 
 **Studio** — [`/studio`](https://tomodachi.pw/studio)
+
 - 16×16 through 256×256 import/detail presets that snap to the 84-color Tomodachi Life: Living the Dream palette
 - Every color labeled by row + column (R9C5, R10C1, etc.) for exact in-game matching
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
 - AI sketch assistant with local chat sessions, optional grid snapshot context, validation, and cell-by-cell apply animation
-- Export repaint references as JSON, labeled PNG guide, clean PNG, palette sheet PNG, and HTML reference
+- Export individual repaint assets or a ZIP reference pack with JSON, labeled PNG guide, clean PNG, palette sheet PNG, paint-order CSV, notes, manifest, and HTML reference
 
 **Recovery hub** — [`/`](https://tomodachi.pw/)
+
 - Browser-only password breach check using HIBP k-anonymity (only the first 5 chars of the SHA-1 hash ever leave the page)
 - OpenRouter-backed AI recovery assistant on free-tier models (no signup)
 
 **Guides** — [`/guides`](https://tomodachi.pw/guides)
+
 - Long-form articles on Mii creation, gameplay basics (apartments / food / jobs / marriage), Tomodachishare recovery, QR codes + save backup
 
 **Paid extras** (optional)
+
 - [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist, $49 30-minute consult
 - [`/support`](https://tomodachi.pw/support) — $5 / $15 / $25 tip jar
 
@@ -88,7 +92,7 @@ flowchart LR
     GRID --> AI{Need a sketch?}
     AI -- yes --> SKETCH[AI sketch helper<br/>OpenRouter free tier<br/>cell-by-cell paint anim]
     SKETCH --> GRID
-    AI -- no --> EXPORT[Reference export<br/>JSON + labeled PNG<br/>clean PNG + palette sheet<br/>HTML reference]
+    AI -- no --> EXPORT[Reference export<br/>ZIP pack or individual assets<br/>JSON + guide PNGs<br/>palette sheet + HTML]
     GRID --> EXPORT
     EXPORT --> COPY([Copy on 3DS])
 
@@ -120,14 +124,14 @@ pnpm wrangler pages dev dist/public --compatibility-date=2025-05-01
 
 Required environment variables (set via `.env.local` for dev, via Doppler → Cloudflare Pages for prod):
 
-| Variable | Required for | Notes |
-|---|---|---|
-| `OPENROUTER_API_KEY` | AI sketch + recovery assistant | Free-tier key works |
-| `STRIPE_SECRET_KEY` | Paywall + tip jar | Live or test key |
-| `STRIPE_WEBHOOK_SECRET` | Webhook signature verification | Per-endpoint secret from Stripe dashboard |
-| `PUBLIC_SITE_URL` | Sitemap canonical URLs | Defaults to `https://tomodachi.pw` |
-| `VITE_ADSENSE_PUBLISHER_ID` | Optional, AdSense | Only loaded after cookie consent |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense | Homepage slot ID |
+| Variable                        | Required for                   | Notes                                     |
+| ------------------------------- | ------------------------------ | ----------------------------------------- |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                       |
+| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                          |
+| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`        |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent          |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                          |
 
 ## Project structure
 

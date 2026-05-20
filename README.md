@@ -18,14 +18,14 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 
 ## Where to start
 
-| If you want to... | Open this |
-|---|---|
-| Use the live site | [tomodachi.pw](https://tomodachi.pw/) |
-| Read the architecture, contributing guide, and tech stack | [`living-the-grid-studio/README.md`](./living-the-grid-studio/README.md) |
-| Read the detailed implementation atlas | [`living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md`](./living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md) |
-| Report a security issue | [`living-the-grid-studio/SECURITY.md`](./living-the-grid-studio/SECURITY.md) |
-| See the changelog | [`living-the-grid-studio/CHANGELOG.md`](./living-the-grid-studio/CHANGELOG.md) |
-| Sponsor the project | [tomodachi.pw/support](https://tomodachi.pw/support) or the Sponsor button at the top of this repo |
+| If you want to...                                         | Open this                                                                                                                    |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Use the live site                                         | [tomodachi.pw](https://tomodachi.pw/)                                                                                        |
+| Read the architecture, contributing guide, and tech stack | [`living-the-grid-studio/README.md`](./living-the-grid-studio/README.md)                                                     |
+| Read the detailed implementation atlas                    | [`living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md`](./living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md) |
+| Report a security issue                                   | [`living-the-grid-studio/SECURITY.md`](./living-the-grid-studio/SECURITY.md)                                                 |
+| See the changelog                                         | [`living-the-grid-studio/CHANGELOG.md`](./living-the-grid-studio/CHANGELOG.md)                                               |
+| Sponsor the project                                       | [tomodachi.pw/support](https://tomodachi.pw/support) or the Sponsor button at the top of this repo                           |
 
 ## Tech stack (overview)
 
