@@ -11,7 +11,7 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 
 ## What's inside
 
-- **Studio** ([/studio](https://tomodachi.pw/studio)) — Import a face photo or character art, snap to the 84-color Tomodachi Life: Living the Dream palette, export a paint-by-numbers reference pack.
+- **Studio** ([/studio](https://tomodachi.pw/studio)) — Import a face photo, character art, logo, meme, or JSON file; snap to the 84-color Tomodachi Life: Living the Dream palette; preview before commit; touch up; optimize; and export repaint references.
 - **Recovery hub** — Browser-only password breach check using HIBP k-anonymity, plus an OpenRouter-backed recovery assistant. Built for visitors arriving from the Tomodachishare credential leak.
 - **Guides** ([/guides](https://tomodachi.pw/guides)) — Long-form articles on Mii creation, gameplay basics, breach recovery, and QR code save backup.
 - **Paid extras** ([/unlock](https://tomodachi.pw/unlock)) — Optional $9 detailed recovery checklist plus a $49 30-min consult.
@@ -22,13 +22,14 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 |---|---|
 | Use the live site | [tomodachi.pw](https://tomodachi.pw/) |
 | Read the architecture, contributing guide, and tech stack | [`living-the-grid-studio/README.md`](./living-the-grid-studio/README.md) |
+| Read the detailed implementation atlas | [`living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md`](./living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md) |
 | Report a security issue | [`living-the-grid-studio/SECURITY.md`](./living-the-grid-studio/SECURITY.md) |
 | See the changelog | [`living-the-grid-studio/CHANGELOG.md`](./living-the-grid-studio/CHANGELOG.md) |
 | Sponsor the project | [tomodachi.pw/support](https://tomodachi.pw/support) or the Sponsor button at the top of this repo |
 
 ## Tech stack (overview)
 
-- React 18 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui
+- React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui/Radix primitives
 - Cloudflare Pages + Pages Functions (edge runtime)
 - Cloudflare KV cache + Cloudflare Web Analytics
 - Stripe Checkout with HMAC-SHA256 webhook verification at the edge

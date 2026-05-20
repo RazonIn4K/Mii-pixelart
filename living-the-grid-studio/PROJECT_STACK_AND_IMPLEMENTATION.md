@@ -6,6 +6,14 @@ This document is the single source-of-truth overview for what the current projec
 
 The project is a browser-first React/TypeScript studio for turning images, JSON files, AI sketches, and starter templates into repaintable Tomodachi Life: Living the Dream style pixel guides. The important product idea is not only "make pixels"; it is "make a grid a person can repaint square by square without guessing."
 
+Obsidian project atlas mirror:
+
+```text
+/Users/davidortiz/Main-Learning-Vault/Neuronal-Connections/1200-PROFESSIONAL/Upwork/Active Projects/Tomodachi_Studio/Project_Implementation_Atlas.md
+```
+
+The repo document is the code-facing implementation map. The Obsidian atlas is the professional proof/project-context note for the user's vault.
+
 ## 1. Current Purpose
 
 Tomodachi Studio currently combines four product lanes:

@@ -4,6 +4,12 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-05-20
+
+- **Documentation atlas:** added [`PROJECT_STACK_AND_IMPLEMENTATION.md`](./PROJECT_STACK_AND_IMPLEMENTATION.md), a detailed code-facing implementation map covering the stack, data model, studio flow, image import, LTG JSON support, palette engine, optimizer, AI/OpenRouter path, exports, Cloudflare/security, Stripe, verification scripts, fixtures, and known gaps.
+- **Obsidian project atlas:** mirrored the project into the professional active-project vault under `1200-PROFESSIONAL/Upwork/Active Projects/Tomodachi_Studio/` with `Project_Implementation_Atlas.md` and `00-Command-Center.md`.
+- **Docs drift cleanup:** updated README/AI context wording so exports are described as JSON + PNG guide + clean PNG + palette sheet PNG + HTML reference, not PDF; updated stack wording to React 19 and current studio import/edit capabilities.
+
 ### 2026-05-17
 
 - **Public-repo prep:** added MIT [`LICENSE`](./LICENSE), [`SECURITY.md`](./SECURITY.md) (responsible-disclosure policy), and a comprehensive [`.gitignore`](./.gitignore) covering env files, build output, dev session captures, and IDE noise. Rewrote [`README.md`](./README.md) with an architecture diagram, badges, and the edge-prerender engineering story.
@@ -47,7 +53,7 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 Initial production release of tomodachi.pw on Cloudflare Pages.
 
-- Studio: import → quantize to 84-color Tomodachi Life palette → grid editor → PDF/JSON/palette reference-pack export
+- Studio: import → quantize to 84-color Tomodachi Life palette → grid editor → JSON/PNG/palette reference export
 - AI sketch assistant via OpenRouter (free-tier model rotation)
 - Recovery hub: browser-only HIBP k-anonymity password breach check + recovery-assistant chat
 - Stripe-backed paywall ($9 recovery checklist, $49 30-min consult)

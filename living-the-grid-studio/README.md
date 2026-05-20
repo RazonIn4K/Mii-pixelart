@@ -22,11 +22,12 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 ## Features
 
 **Studio** — [`/studio`](https://tomodachi.pw/studio)
-- 16×16 or 32×32 grid editor that snaps to the 84-color Tomodachi Life: Living the Dream palette
+- 16×16 through 256×256 import/detail presets that snap to the 84-color Tomodachi Life: Living the Dream palette
 - Every color labeled by row + column (R9C5, R10C1, etc.) for exact in-game matching
-- Image import with a readability-preserving color-reduction optimizer
-- AI sketch assistant that animates cell-by-cell as it paints
-- Export a paint-by-numbers reference pack (PDF + JSON + palette sheet)
+- Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
+- Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
+- AI sketch assistant with local chat sessions, optional grid snapshot context, validation, and cell-by-cell apply animation
+- Export repaint references as JSON, labeled PNG guide, clean PNG, palette sheet PNG, and HTML reference
 
 **Recovery hub** — [`/`](https://tomodachi.pw/)
 - Browser-only password breach check using HIBP k-anonymity (only the first 5 chars of the SHA-1 hash ever leave the page)
@@ -41,13 +42,15 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 ## Tech stack
 
-- **Frontend:** Vite, React 18, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui, wouter
+- **Frontend:** Vite, React 19, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui/Radix primitives, wouter
 - **Edge runtime:** Cloudflare Pages Functions (TypeScript)
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
 - **Payments:** Stripe Checkout with HMAC-SHA256 webhook verification at the edge
 - **AI:** OpenRouter with free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
 - **Secrets:** Doppler → Cloudflare Pages integration
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
+
+For the detailed implementation atlas, see [`PROJECT_STACK_AND_IMPLEMENTATION.md`](./PROJECT_STACK_AND_IMPLEMENTATION.md).
 
 ## Edge pre-render for search crawlers
 
@@ -80,11 +83,12 @@ See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementat
 ```mermaid
 flowchart LR
     IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
-    QUANT --> GRID[Editable grid<br/>16×16 or 32×32<br/>cell labels: R9C5, R10C1]
+    QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
+    PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}
     AI -- yes --> SKETCH[AI sketch helper<br/>OpenRouter free tier<br/>cell-by-cell paint anim]
     SKETCH --> GRID
-    AI -- no --> EXPORT[Reference pack export<br/>PDF + JSON + palette sheet]
+    AI -- no --> EXPORT[Reference export<br/>JSON + labeled PNG<br/>clean PNG + palette sheet<br/>HTML reference]
     GRID --> EXPORT
     EXPORT --> COPY([Copy on 3DS])
 
