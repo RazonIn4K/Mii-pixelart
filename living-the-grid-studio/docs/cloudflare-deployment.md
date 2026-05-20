@@ -252,15 +252,15 @@ Apply mode sets:
 ```json
 {
   "ai_bots_protection": "block",
+  "content_bots_protection": "disabled",
   "crawler_protection": "enabled",
-  "is_robots_txt_managed": true,
   "cf_robots_variant": "policy_only"
 }
 ```
 
-That maps to **Block AI bots**, **AI Labyrinth**, and Cloudflare-managed `robots.txt` policy. The script also lists skip rules across the main security phases and Worker routes for the zone, but it does not delete them automatically. For each skip rule, confirm the owner/reason, narrow broad expressions to exact paths, methods, hosts, or trusted IPs, and avoid skipping Super Bot Fight Mode unless the source is known and necessary.
+That maps to **Block AI bots** and **AI Labyrinth**. The origin-maintained `client/public/robots.txt` remains the source-controlled robots policy; Cloudflare rejected `is_robots_txt_managed: true` for this zone during the live remediation, so the helper intentionally does not send that field. The script also lists skip rules across the main security phases and Worker routes for the zone, but it does not delete them automatically. For each skip rule, confirm the owner/reason, narrow broad expressions to exact paths, methods, hosts, or trusted IPs, and avoid skipping Super Bot Fight Mode unless the source is known and necessary.
 
-The live response header `x-og-worker: hit` for `Meta-ExternalAgent` indicates an additional Cloudflare Worker route is still running in front of Pages. Inspect **Workers Routes** for `tomodachi.pw/*` and remove `Meta-ExternalAgent` from that Worker's social-preview allowlist, or disable the Worker route if the Pages middleware now covers the preview behavior.
+If the live response header `x-og-worker: hit` appears again for `Meta-ExternalAgent`, an additional Cloudflare Worker route is running in front of Pages. Inspect **Workers Routes** for `tomodachi.pw/*` and remove `Meta-ExternalAgent` from that Worker's social-preview allowlist, or disable the Worker route if the Pages middleware now covers the preview behavior.
 
 After applying the dashboard/API settings:
 

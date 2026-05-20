@@ -198,7 +198,6 @@ function buildBotManagementPayload(
 
   payload.ai_bots_protection = "block";
   payload.crawler_protection = "enabled";
-  payload.is_robots_txt_managed = true;
   payload.cf_robots_variant = "policy_only";
 
   return payload;
@@ -324,8 +323,8 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           ai_bots_protection: desiredBotConfig.ai_bots_protection,
+          content_bots_protection: desiredBotConfig.content_bots_protection,
           crawler_protection: desiredBotConfig.crawler_protection,
-          is_robots_txt_managed: desiredBotConfig.is_robots_txt_managed,
           cf_robots_variant: desiredBotConfig.cf_robots_variant,
         },
         null,
