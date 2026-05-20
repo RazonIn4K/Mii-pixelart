@@ -24,7 +24,6 @@ const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
   'Facebot',
   'facebookcatalog',
-  'meta-externalagent',
   'FacebookBot',
   'Twitterbot',
   'LinkedInBot',
@@ -44,7 +43,6 @@ const SEARCH_CRAWLERS = [
   'YandexBot',
   'Slurp', // Yahoo
   'Sogou',
-  'Applebot',
   'Mojeekbot',
   'AhrefsBot',
 ];

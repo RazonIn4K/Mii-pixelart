@@ -16,6 +16,7 @@
     "verify:ai-sketch": "tsx scripts/verify-ai-sketch.ts",
     "verify:residents": "tsx scripts/verify-residents.ts",
     "verify:studio": "tsx scripts/verify-studio-browser.ts",
+    "cloudflare:security-insights": "tsx scripts/cloudflare-security-insights.ts",
     "save:templates": "tsx scripts/save-creative-template-fixtures.ts",
     "compare:models": "tsx scripts/compare-openrouter-models.ts",
     "format": "prettier --write ."

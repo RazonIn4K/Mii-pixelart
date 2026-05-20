@@ -1,7 +1,5 @@
-# Explicit allows for social media + search link preview scrapers.
-# Listed BEFORE the wildcard so any future Cloudflare-managed Disallow can't
-# accidentally swallow them. These bots fetch OpenGraph metadata only —
-# they're not AI training crawlers.
+# Explicit allows for social media link-preview scrapers.
+# These bots fetch OpenGraph metadata only — they're not AI training crawlers.
 User-agent: facebookexternalhit
 Allow: /
 
@@ -32,11 +30,92 @@ Allow: /
 User-agent: Pinterest
 Allow: /
 
-User-agent: Applebot
+# Content Signals: search indexing is allowed, but AI model input/training is
+# reserved. Cloudflare's managed robots.txt can prepend a broader managed block
+# at the edge; these origin rules keep the policy version-controlled too.
+User-agent: *
+Content-signal: search=yes, ai-input=no, ai-train=no
 Allow: /
 
-User-agent: *
-Allow: /
+# Known AI crawlers and training/scraping agents. This is advisory only:
+# Cloudflare's Block AI Bots setting enforces the block at the edge.
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Applebot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-User
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: DuckAssistBot
+Disallow: /
+
+User-agent: Google-CloudVertexBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: GoogleOther
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: img2dataset
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: Omgili
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Timpibot
+Disallow: /
+
+User-agent: TikTokSpider
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
 
 Sitemap: https://tomodachi.pw/sitemap.xml
 Sitemap: https://tomodachi.pw/sitemap-images.xml

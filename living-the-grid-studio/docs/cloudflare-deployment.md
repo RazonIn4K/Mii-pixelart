@@ -206,7 +206,57 @@ Mirror the static breach-recovery content over IPFS (option 2) and add an obviou
 
 For breach-page traffic spikes you can additionally enable Cloudflare's **Always Online** feature in the dashboard. It serves a cached snapshot if your origin is unreachable, which is exactly what you want during a viral incident.
 
-## 7. Deploy verification checklist
+## 7. Security insights: skip rules and AI crawlers
+
+Cloudflare currently reports three relevant security suggestions for `tomodachi.pw`:
+
+- Reduce skip rules for improved protection.
+- Review and block AI bots from accessing your assets.
+- Review unwanted AI crawlers with AI Labyrinth.
+
+Repo-side policy lives in `client/public/robots.txt`. It allows social preview crawlers, allows normal search indexing, reserves AI model input/training with `Content-signal: search=yes, ai-input=no, ai-train=no`, and explicitly disallows known AI crawlers. The Pages middleware also avoids treating `Meta-ExternalAgent` and `Applebot` as normal preview/search crawlers.
+
+Cloudflare dashboard settings are not stored in the repo. Use the helper script to audit and optionally apply the bot controls once you have a token with zone read/write permissions:
+
+```bash
+cd living-the-grid-studio
+doppler run --project local-mac-work --config dev_personal -- pnpm cloudflare:security-insights
+doppler run --project local-mac-work --config dev_personal -- pnpm cloudflare:security-insights --apply
+```
+
+Optional:
+
+```bash
+CLOUDFLARE_ZONE_NAME=tomodachi.pw
+CLOUDFLARE_ZONE_ID=...
+```
+
+The script can discover the `tomodachi.pw` zone tag from the Cloudflare Pages custom-domain object when the token can read the Pages project. Applying the Security Insights fixes still requires a Cloudflare token with zone-level access to Bot Management settings and Rulesets/WAF read access.
+
+Apply mode sets:
+
+```json
+{
+  "ai_bots_protection": "block",
+  "crawler_protection": "enabled",
+  "is_robots_txt_managed": true,
+  "cf_robots_variant": "policy_only"
+}
+```
+
+That maps to **Block AI bots**, **AI Labyrinth**, and Cloudflare-managed `robots.txt` policy. The script also lists skip rules across the main security phases, but it does not delete them automatically. For each skip rule, confirm the owner/reason, narrow broad expressions to exact paths, methods, hosts, or trusted IPs, and avoid skipping Super Bot Fight Mode unless the source is known and necessary.
+
+After applying the dashboard/API settings:
+
+```bash
+curl -s https://tomodachi.pw/robots.txt | sed -n '1,120p'
+curl -I -A "GPTBot" https://tomodachi.pw/
+curl -I -A "Meta-ExternalAgent" https://tomodachi.pw/
+```
+
+Expected: `robots.txt` includes Cloudflare's managed AI crawler block plus the origin-maintained policy, known AI crawlers are blocked/challenged/mitigated according to the active plan, and normal social preview crawlers still receive OpenGraph metadata.
+
+## 8. Deploy verification checklist
 
 After your first successful Cloudflare deploy:
 
@@ -218,11 +268,11 @@ After your first successful Cloudflare deploy:
 6. `curl -I https://tomodachi.pw/index.html` shows `Cache-Control: no-cache`.
 7. In Brave with Web3 resolution enabled, typing `tomodachi.brave` either redirects to `tomodachi.pw` (option 1) or loads the IPFS mirror (option 2).
 
-## 8. Rollback
+## 9. Rollback
 
 Cloudflare Pages keeps every deploy. To roll back: **Workers & Pages → tomodachi-studio → Deployments → ⋯ → Rollback to this deployment**. DNS does not change; only the active build pointer flips.
 
-## 9. Pre-provisioned Cloudflare resources
+## 10. Pre-provisioned Cloudflare resources
 
 These were created against account `d45bbb1a6d3f779af15c93a9f2603bc9` (`Davidinfosec07@gmail.com`):
 
