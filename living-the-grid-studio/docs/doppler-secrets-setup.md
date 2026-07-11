@@ -218,9 +218,13 @@ All are **public in the client bundle**. Never put private keys behind `VITE_`.
 | `LTG_COMPARE_*`, `LTG_STUDIO_URL`, `LTG_SMOKE_*`, `CHROME_PATH` | `scripts/*` |
 | `PORT` | `server/index.ts` (defaults to `3000`) |
 
-### 6.4 Optional cross-project keys (only if you use those features)
+### 6.4 Credentials owned by other stacks
 
-Examples already copied from `local-mac-work`: `RUNPOD_API_KEY`, `N8N_LEAD_PIXEL_WEBHOOK_URL`. Add more only when application code references them.
+Do not copy `RUNPOD_API_KEY` or `N8N_LEAD_PIXEL_WEBHOOK_URL` into
+`tomodachi-platform`. They remain owned by their source stack, and the current
+Tomodachi application has no executable consumer for either value. Revisit
+ownership only if application code is added and the credential owner approves
+the exact environment mapping described in [§4](#4-cli-copy-from-local-mac-work-into-tomodachi-platform).
 
 ### 6.5 Doppler configs for *extra* isolation (optional)
 
