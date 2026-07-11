@@ -185,28 +185,12 @@ async function markProcessed(
 
 async function dispatchEvent(event: StripeEvent): Promise<void> {
   const type = event.type ?? "(unknown)";
-  const obj = event.data?.object;
-  const productId = obj?.metadata?.productId ?? "(none)";
-  const amount = obj?.amount_total ?? 0;
-  const email = obj?.customer_details?.email ?? "(no email)";
 
-  // Skeleton: log the event. Wire actual fulfillment here in a later pass
+  // Skeleton: record only the allowlisted event category. Wire actual
+  // fulfillment here in a later pass
   // (e.g. R2 signed URL email for the breach recovery PDF, Google Meet link
   // for the 30-min consult, internal Slack/Discord ping, etc.).
-  switch (type) {
-    case "checkout.session.completed":
-      console.log(
-        `[stripe-webhook] checkout completed — product=${productId} amount=${amount} email=${email}`,
-      );
-      break;
-    case "payment_intent.succeeded":
-      console.log(
-        `[stripe-webhook] payment_intent succeeded — id=${obj?.id ?? "?"} amount=${amount}`,
-      );
-      break;
-    default:
-      console.log(`[stripe-webhook] unhandled event type ${type}`);
-  }
+  console.log(JSON.stringify({ eventType: type, message: "stripe_event_received" }));
 }
 
 /**
@@ -279,7 +263,10 @@ export const onRequestPost = async (
     await markProcessed(context.env, eventId);
   } catch (error) {
     // 5xx → Stripe will retry. Don't mark as processed on failure.
-    console.error("[stripe-webhook] dispatch failed:", error);
+    console.error(JSON.stringify({
+      errorType: error instanceof Error ? error.name : "UnknownError",
+      message: "stripe_webhook_dispatch_failed",
+    }));
     return new Response(
       JSON.stringify({ error: "Dispatch failed; will retry." }),
       { status: 500, headers: { "Content-Type": "application/json" } },

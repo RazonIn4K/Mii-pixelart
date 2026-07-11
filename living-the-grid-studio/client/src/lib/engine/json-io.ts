@@ -7,6 +7,7 @@
 
 import type { GridDocument } from "./grid";
 import { createGridDocument, recomputeUsedColors } from "./grid";
+import { GridDocumentV1Schema } from "@shared/community";
 import { deltaERgb, findClosestPaletteColor, hexToRgb } from "./color";
 import { TOMODACHI_PALETTE } from "./palette";
 
@@ -19,24 +20,45 @@ export function exportGridJson(doc: GridDocument): string {
 
 /** Import a GridDocument from JSON string */
 export function importGridJson(json: string): GridDocument {
-  const parsed = JSON.parse(json);
+  const input = JSON.parse(json) as Record<string, unknown>;
+  const width = Number(input.width);
+  const height = Number(input.height);
 
-  // Validate basic structure
-  if (!parsed.version || !parsed.width || !parsed.height || !parsed.cells) {
-    throw new Error("Invalid GridDocument JSON: missing required fields");
+  if (width >= 8 && height >= 8) {
+    return recomputeUsedColors(GridDocumentV1Schema.parse(input));
   }
 
-  if (parsed.version !== 1) {
-    throw new Error(`Unsupported GridDocument version: ${parsed.version}`);
+  // Legacy local files and LTG adapters historically allowed tiny synthetic
+  // grids. Keep those files importable without weakening the 8x8 cloud-save
+  // contract: validate the same payload through the shared schema using a
+  // padded probe, then return the original dimensions for local editing.
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    width > 256 ||
+    height > 256 ||
+    !Array.isArray(input.cells) ||
+    input.cells.length !== width * height
+  ) {
+    throw new Error("Invalid GridDocument JSON: unsupported dimensions or cell count");
   }
-
-  if (parsed.cells.length !== parsed.width * parsed.height) {
-    throw new Error(
-      `Cell count mismatch: expected ${parsed.width * parsed.height}, got ${parsed.cells.length}`
-    );
+  const probeWidth = Math.max(8, width);
+  const probeHeight = Math.max(8, height);
+  const probeCells: unknown[] = new Array(probeWidth * probeHeight).fill(null);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      probeCells[y * probeWidth + x] = input.cells[y * width + x];
+    }
   }
-
-  return recomputeUsedColors(parsed as GridDocument);
+  GridDocumentV1Schema.parse({
+    ...input,
+    width: probeWidth,
+    height: probeHeight,
+    cells: probeCells,
+  });
+  return recomputeUsedColors(input as unknown as GridDocument);
 }
 
 // ─── Living The Grid Native Format ────────────────────────────

@@ -1,8 +1,9 @@
 /**
  * Cloudflare Pages Function: catch-all for `/api/ai/*`.
  *
- * Mirrors the Express routes in `server/index.ts` and the Vite dev middleware
- * in `vite.config.ts`. Reuses the shared OpenRouter helpers from
+ * Legacy Pages rollback route. The active Worker imports the same portable
+ * OpenRouter helpers, so this file is retained only until the cutover soak ends.
+ * It reuses the shared OpenRouter helpers from
  * `server/openrouter.ts`, threading `context.env` through so Workers' env
  * bindings replace `process.env` at the edge.
  *

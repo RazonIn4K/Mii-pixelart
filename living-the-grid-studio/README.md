@@ -39,6 +39,13 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 - Long-form articles on Mii creation, gameplay basics (apartments / food / jobs / marriage), Tomodachishare recovery, QR codes + save backup
 
+**Island Workshop community** — opt-in only
+
+- Google OIDC accounts with generated avatars and private cloud projects
+- Explicit review before public or unlisted publishing; authentication never publishes work
+- Discovery, search, profiles, likes, comments, follows, reports, and role-gated moderation
+- Anonymous editing plus JSON, PNG, CSV, HTML, and ZIP exports remain available without an account
+
 **Paid extras** (optional)
 
 - [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist, $49 30-minute consult
@@ -47,11 +54,13 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 ## Tech stack
 
 - **Frontend:** Vite, React 19, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui/Radix primitives, wouter
-- **Edge runtime:** Cloudflare Pages Functions (TypeScript)
+- **Edge runtime:** One Cloudflare Worker with Static Assets, built through the Cloudflare Vite plugin
+- **Community data:** D1 for relational state and FTS5; private R2 for immutable project revisions and generated media
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
+- **Authentication:** Google authorization-code OIDC, encrypted transaction cookies, and hashed opaque sessions
 - **Payments:** Stripe Checkout with HMAC-SHA256 webhook verification at the edge
 - **AI:** OpenRouter with free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
-- **Secrets:** Doppler → Cloudflare Pages integration
+- **Secrets:** Environment-scoped Wrangler secrets, optionally sourced from Doppler after deployment approval
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
 
 For the detailed implementation atlas, see [`PROJECT_STACK_AND_IMPLEMENTATION.md`](./PROJECT_STACK_AND_IMPLEMENTATION.md).
@@ -62,7 +71,7 @@ Most SPAs are invisible to Bing / DuckDuckGo because they don't execute JavaScri
 
 ```mermaid
 flowchart LR
-    REQ([Incoming request]) --> EDGE{Cloudflare edge<br/>functions/_middleware.ts}
+    REQ([Incoming request]) --> EDGE{Cloudflare Worker<br/>worker/documents.ts}
     EDGE -- User-Agent matches<br/>Googlebot, Bingbot,<br/>DuckDuckBot, Applebot,<br/>Slurp, Baidu, Yandex,<br/>Mojeek, Ahrefs --> SHELL[Pre-rendered HTML shell<br/>+ per-route JSON-LD]
     EDGE -- Real browser --> SPA[React SPA<br/>index.html]
     SHELL --> CRAWL([Search index])
@@ -78,9 +87,9 @@ flowchart LR
     class REQ,CRAWL,USER terminal
 ```
 
-One TypeScript file at the edge UA-sniffs known search crawlers and serves route-appropriate JSON-LD: `WebApplication` on `/`, `SoftwareApplication` + `BreadcrumbList` on `/studio`, `CollectionPage` with embedded `HowTo` + `Article` on `/guides`, `FAQPage` on `/faq`, `AboutPage` + `Organization` on `/about`, `Article` on `/help`, `ItemList` of `Product` + `Offer` on `/unlock`, `WebPage` on `/support`. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
+The Worker UA-sniffs known search crawlers and serves route-appropriate JSON-LD for legacy routes, plus safe canonical/Open Graph documents for public profiles and creations. Private account pages and unlisted work receive `noindex`. Real browsers continue to get the React app through Static Assets with SPA fallback; there is no separate SSR runtime.
 
-See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation.
+See [`worker/documents.ts`](./worker/documents.ts) for the implementation.
 
 ## Studio workflow
 
@@ -114,19 +123,30 @@ pnpm install
 pnpm dev          # Vite dev server on http://localhost:3000
 pnpm check        # TypeScript type check
 pnpm verify       # Full verification suite (LTG import, image import, templates, AI sketch, residents)
+pnpm test:worker  # Worker + local D1/R2 integration and security tests
+pnpm test:e2e     # Browser routes at all required responsive widths
 ```
 
-To run the Cloudflare Pages Functions locally:
+To run the unified Cloudflare Worker locally, apply the forward-only D1
+migrations once and start Vite. To validate the deployable Worker bundle without
+contacting Cloudflare:
 
 ```bash
-pnpm build
-pnpm wrangler pages dev dist/public --compatibility-date=2025-05-01
+pnpm db:migrate:local
+pnpm dev
+pnpm worker:dry-run
 ```
 
-Required environment variables (set via `.env.local` for dev, via Doppler → Cloudflare Pages for prod):
+Worker secrets use an untracked `.dev.vars` locally and Cloudflare secrets after
+an explicit deployment approval. Vite-only `VITE_*` values may use `.env.local`:
 
 | Variable                        | Required for                   | Notes                                     |
 | ------------------------------- | ------------------------------ | ----------------------------------------- |
+| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients |
+| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite              |
+| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                           |
+| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                 |
+| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                   |
 | `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                       |
 | `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                          |
 | `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard |
@@ -146,14 +166,15 @@ client/                  Vite + React SPA
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
     lib/                 engine (JSON import/export, palette ops), breadcrumb, consent, stripeUrl
   public/                Static assets (sitemap.xml, og-image.png, robots.txt, _headers, manifest)
-functions/               Cloudflare Pages Functions
-  _middleware.ts         Search-crawler pre-render + per-route JSON-LD
+worker/                  Unified Cloudflare Worker (API, auth, documents, jobs)
+migrations/              Forward-only D1 migrations
+shared/                  Shared validation and legacy contracts
+functions/               Legacy Pages rollback reference; not the active runtime
   api/
     ai/[[path]].ts       OpenRouter chat + KV-cached model list
     stripe/[[path]].ts   Checkout + session verification + products
     webhooks/stripe.ts   Stripe webhook with HMAC verification
-server/                  Shared TS modules imported by Functions + dev middleware
-shared/                  Types shared between client + functions (ai, products, residents, const)
+server/                  Portable OpenRouter/Stripe helpers shared by legacy parity code and the Worker
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```

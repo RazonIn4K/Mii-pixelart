@@ -1,22 +1,38 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
+import { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CookieConsent from "./components/CookieConsent";
+import { AnalyticsLoader } from "./components/AnalyticsLoader";
+import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import About from "./pages/About";
-import Cookies from "./pages/Cookies";
-import Disclosure from "./pages/Disclosure";
-import Faq from "./pages/Faq";
-import Guides from "./pages/Guides";
-import Help from "@/pages/Help";
 import Home from "./pages/Home";
-import Privacy from "./pages/Privacy";
-import Studio from "./pages/Studio";
-import Support from "./pages/Support";
-import Terms from "./pages/Terms";
-import Unlock from "./pages/Unlock";
+
+const About = lazy(() => import("./pages/About"));
+const Cookies = lazy(() => import("./pages/Cookies"));
+const Disclosure = lazy(() => import("./pages/Disclosure"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Guides = lazy(() => import("./pages/Guides"));
+const Help = lazy(() => import("./pages/Help"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Support = lazy(() => import("./pages/Support"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Unlock = lazy(() => import("./pages/Unlock"));
+const Discover = lazy(() => import("./pages/community/Discover"));
+const Search = lazy(() => import("./pages/community/Search"));
+const UserProfile = lazy(() => import("./pages/community/UserProfile"));
+const CreationDetail = lazy(() => import("./pages/community/CreationDetail"));
+const Setup = lazy(() => import("./pages/community/Setup"));
+const Me = lazy(() => import("./pages/community/Me"));
+const Projects = lazy(() => import("./pages/community/Projects"));
+const Settings = lazy(() => import("./pages/community/Settings"));
+const Moderation = lazy(() => import("./pages/community/Moderation"));
+const CommunityGuidelines = lazy(() => import("./pages/community/CommunityGuidelines"));
+const Copyright = lazy(() => import("./pages/community/Copyright"));
+const Security = lazy(() => import("./pages/community/Security"));
 
 
 function Router() {
@@ -24,6 +40,18 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/studio"} component={Studio} />
+      <Route path={"/discover"} component={Discover} />
+      <Route path={"/search"} component={Search} />
+      <Route path={"/u/:username"} component={UserProfile} />
+      <Route path={"/creation/:slug"} component={CreationDetail} />
+      <Route path={"/me/setup"} component={Setup} />
+      <Route path={"/me/projects"} component={Projects} />
+      <Route path={"/me/settings"} component={Settings} />
+      <Route path={"/me"} component={Me} />
+      <Route path={"/moderation"} component={Moderation} />
+      <Route path={"/community-guidelines"} component={CommunityGuidelines} />
+      <Route path={"/copyright"} component={Copyright} />
+      <Route path={"/security"} component={Security} />
       <Route path={"/privacy"} component={Privacy} />
       <Route path={"/terms"} component={Terms} />
       <Route path={"/cookies"} component={Cookies} />
@@ -66,11 +94,22 @@ function App() {
         >
           Skip to main content
         </a>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-          <CookieConsent />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Suspense
+              fallback={
+                <div className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60" role="status">
+                  Opening the workshop…
+                </div>
+              }
+            >
+              <Router />
+            </Suspense>
+            <AnalyticsLoader />
+            <CookieConsent />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

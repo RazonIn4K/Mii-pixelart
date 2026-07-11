@@ -1,5 +1,11 @@
 # Cloudflare Pages + Unstoppable Domains deployment guide
 
+> **Migration status (2026-07-10):** This remains the production Pages runbook
+> until an explicitly approved Worker cutover. Community-platform staging,
+> migration, cutover, and rollback are governed by
+> [`community-deployment-runbook.md`](community-deployment-runbook.md). Do not
+> combine the two procedures or infer remote authorization from either file.
+
 This is the operational runbook for getting `tomodachi.pw` (ICANN ccTLD) and `tomodachi.brave` (Web3 / alt-root) live on Cloudflare Pages. It assumes the repo state at or after the breach recovery hub work.
 
 ## Cloudflare Pages build settings (canonical)

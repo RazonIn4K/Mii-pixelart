@@ -20,12 +20,22 @@ export default function Cookies() {
   return (
     <LegalLayout
       title="Cookie Notice"
-      lastUpdated="May 14, 2026"
+      lastUpdated="July 10, 2026"
       intro="This page explains what we store in your browser and why. You can change your mind any time."
     >
       <h2>What we use</h2>
       <h3>Essential</h3>
       <ul>
+        <li>
+          <code>__Host-tomodachi.oidc</code> — an encrypted, HttpOnly,
+          ten-minute Google sign-in transaction containing state, nonce, PKCE,
+          and a safe return path.
+        </li>
+        <li>
+          <code>__Host-tomodachi.sid</code> — an opaque, HttpOnly account
+          session token. Only its SHA-256 hash is stored server-side; sessions
+          expire after 30 days without silent extension.
+        </li>
         <li>
           <code>ltg.consent.v1</code> — your cookie preferences. Without this
           entry the banner would appear every visit.
@@ -35,6 +45,15 @@ export default function Cookies() {
           directly. These cookies are required to complete a purchase.
         </li>
       </ul>
+
+      <h3>Local project storage</h3>
+      <p>
+        IndexedDB keeps local drafts, cloud revision metadata, offline retry
+        state, and an OAuth resume marker. This is first-party browser storage,
+        is not used for cross-site tracking, and can be removed through your
+        browser&apos;s site-data controls. Local drafts are not uploaded until you
+        choose Save to account.
+      </p>
 
       <h3>Analytics (opt-in)</h3>
       <ul>

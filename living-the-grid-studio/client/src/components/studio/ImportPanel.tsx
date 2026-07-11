@@ -861,6 +861,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-10">Width</span>
             <Slider
+              aria-label="Grid width"
               value={[gridWidth]}
               onValueChange={([v]) => setGridWidth(v)}
               min={8}
@@ -875,6 +876,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-10">Height</span>
             <Slider
+              aria-label="Grid height"
               value={[gridHeight]}
               onValueChange={([v]) => setGridHeight(v)}
               min={8}
@@ -915,6 +917,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Focus X</span>
             <Slider
+              aria-label="Horizontal image focus"
               value={[focusX]}
               onValueChange={([v]) => setFocusX(v)}
               min={0}
@@ -927,6 +930,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Focus Y</span>
             <Slider
+              aria-label="Vertical image focus"
               value={[focusY]}
               onValueChange={([v]) => setFocusY(v)}
               min={0}
@@ -989,6 +993,7 @@ export default function ImportPanel({
               Tolerance
             </span>
             <Slider
+              aria-label="Background cleanup tolerance"
               value={[backgroundTolerance]}
               onValueChange={([v]) => setBackgroundTolerance(v)}
               min={8}
@@ -1009,6 +1014,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Colors</span>
             <Slider
+              aria-label="Maximum palette colors"
               value={[maxColors]}
               onValueChange={([v]) => setMaxColors(v)}
               min={0}
@@ -1023,6 +1029,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Bright</span>
             <Slider
+              aria-label="Image brightness"
               value={[brightness]}
               onValueChange={([v]) => setBrightness(v)}
               min={50}
@@ -1037,6 +1044,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Contrast</span>
             <Slider
+              aria-label="Image contrast"
               value={[contrast]}
               onValueChange={([v]) => setContrast(v)}
               min={50}
@@ -1051,6 +1059,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Saturate</span>
             <Slider
+              aria-label="Image saturation"
               value={[saturation]}
               onValueChange={([v]) => setSaturation(v)}
               min={0}

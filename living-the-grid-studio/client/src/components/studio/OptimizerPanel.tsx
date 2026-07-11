@@ -60,6 +60,7 @@ export default function OptimizerPanel({
         </p>
         <div className="flex items-center gap-3">
           <Slider
+            aria-label="Color merge threshold"
             value={[mergeThreshold]}
             onValueChange={([v]) => setMergeThreshold(v)}
             min={1}
@@ -83,6 +84,7 @@ export default function OptimizerPanel({
         </p>
         <div className="flex items-center gap-3">
           <Slider
+            aria-label="Maximum island size"
             value={[maxIslandSize]}
             onValueChange={([v]) => setMaxIslandSize(v)}
             min={1}
@@ -131,6 +133,7 @@ export default function OptimizerPanel({
             </p>
             <div className="flex items-center gap-3">
               <Slider
+                aria-label="Maximum optimized palette colors"
                 value={[maxColors || currentColorCount]}
                 onValueChange={([v]) => setMaxColors(v)}
                 min={2}

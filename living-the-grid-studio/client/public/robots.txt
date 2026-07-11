@@ -36,6 +36,10 @@ Allow: /
 User-agent: *
 Content-signal: search=yes, ai-input=no, ai-train=no
 Allow: /
+Disallow: /api/
+Disallow: /me
+Disallow: /moderation
+Disallow: /search
 
 # Known AI crawlers and training/scraping agents. This is advisory only:
 # Cloudflare's Block AI Bots setting enforces the block at the edge.

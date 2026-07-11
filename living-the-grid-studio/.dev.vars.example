@@ -1,0 +1,10 @@
+# Copy to .dev.vars for local development. These are deliberately inert
+# placeholders; never commit real credentials.
+GOOGLE_CLIENT_ID="local-google-client-id"
+GOOGLE_CLIENT_SECRET="local-google-client-secret"
+OIDC_COOKIE_KEY="replace-with-32-byte-base64url-key"
+SESSION_PEPPER="replace-with-random-session-pepper"
+PSEUDONYM_KEY="replace-with-random-hmac-key"
+OPENROUTER_API_KEY=""
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""

@@ -1,121 +1,53 @@
 /**
- * Home.tsx — Landing page
+ * Home.tsx — Tomodachi public landing page
  *
- * DESIGN: "Paper Studio" — Japanese Stationery Minimalism
- * Off-white paper surface, graphite text, pale blue grid accents,
- * warm red as the sole accent color. The interface recedes so the art speaks.
+ * DESIGN: "Island Workshop"
+ * Community discovery from TomodachiShare + the focused, local-first utility
+ * of Living the Grid, expressed through an original editorial/pixel-workshop
+ * system rather than copying either site's interface.
  */
 
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Link } from "wouter";
+import { IslandHeader } from "@/components/layout/IslandHeader";
+import { IslandFooter } from "@/components/layout/IslandFooter";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BotMessageSquare,
+  Brush,
+  CheckCircle2,
+  Download,
+  FileJson,
+  Grid3X3,
+  Heart,
+  Image as ImageIcon,
+  LockKeyhole,
+  Palette,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Users,
+  WandSparkles,
+  Zap,
+} from "lucide-react";
 import {
   OPENROUTER_MODEL_PRESETS,
   type AiModelPreset,
 } from "@shared/ai";
-import {
-  getConsent,
-  onConsentChange,
-  type ConsentState,
-} from "@/lib/consent";
-import {
-  AlertTriangle,
-  BotMessageSquare,
-  CheckCircle2,
-  Search,
-  ShieldCheck,
-  Upload,
-  FileJson,
-  Grid3X3,
-  Palette,
-  Sparkles,
-  Download,
-} from "lucide-react";
 
 const HERO_IMG = "/hero.webp";
 const CANVAS_IMG = "/canvas-demo.webp";
 const PALETTE_IMG = "/palette-swatches.webp";
 const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
 const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
-
-const features = [
-  {
-    icon: Upload,
-    title: "Import Characters, Logos, Memes",
-    description:
-      "Drop in a character reference, face photo, logo, brand-style mark, meme, or an indexed-palette JSON file. The studio turns it into a paintable grid.",
-  },
-  {
-    icon: Sparkles,
-    title: "Character Presets",
-    description:
-      "Mii Mask, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 presets tune framing, sampling, color count, contrast, and background cleanup for different repaint goals.",
-  },
-  {
-    icon: Grid3X3,
-    title: "Create and Touch Up",
-    description:
-      "Start from original face, mascot, space-crew, horror, schoolhouse, creature, hero, robot, badge, icon, kart, snack, and brand-mark templates or a blank canvas, then paint, erase, pick colors, and fill regions directly on the grid.",
-  },
-  {
-    icon: Palette,
-    title: "84-Color Game Palette",
-    description:
-      "Every base shade and saturated extra in the Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching.",
-  },
-  {
-    icon: Grid3X3,
-    title: "Paint-by-Numbers Guide",
-    description:
-      "Each cell gets a number. Hover any swatch to highlight every square that uses it. Copy the design square by square.",
-  },
-  {
-    icon: Sparkles,
-    title: "One-Click Optimizer",
-    description:
-      "Merge similar colors, remove tiny islands, clean up lone pixels, and limit the palette — all deterministic, all reversible.",
-  },
-  {
-    icon: FileJson,
-    title: "JSON Round-Trip",
-    description:
-      "Import and export the full grid document as JSON. Every project is reproducible and shareable.",
-  },
-  {
-    icon: Download,
-    title: "Reference Pack Export",
-    description:
-      "Download a complete reference pack: the pixel guide image, the palette sheet, and the project JSON — everything needed to repaint.",
-    },
-  ];
-
-const domainMonetizationUseCases = [
-  {
-    domain: "tomodachi.pw",
-    role: "Canonical Public Site",
-    note: "Use this as the primary landing and monetization surface for SEO, ads, email capture, guides, and paid packs.",
-    monetization: [
-      "Offer a free trust-first /help route plus security guides and recovery paths.",
-      "Enable display ads on secondary creator/helpful pages after trust signals are in place.",
-      "Layer email capture around guides, packs, and template launches.",
-      "Run privacy/cyber affiliate placements aligned to user pain.",
-      "Launch $5-$9 packs and $19-$49 workflow bundles.",
-    ],
-  },
-  {
-    domain: "tomodachi.brave",
-    role: "Brave-native creator promo",
-    note: "Use as a short memorable referral domain in Brave/Web3 communities that points to the canonical experience on tomodachi.pw.",
-    monetization: [
-      "Point users to creator workflow pages on the canonical site.",
-      "Promote launch posts, studio demos, and social proof.",
-      "Use community messaging and vanity links to improve discovery.",
-    ],
-  },
-];
+const DEFAULT_MODEL =
+  OPENROUTER_MODEL_PRESETS[0]?.id ?? "deepseek/deepseek-v4-flash:free";
 
 type PasswordBreachStatus = "idle" | "checking" | "safe" | "found" | "error";
 
@@ -124,39 +56,76 @@ type PasswordBreachResult = {
   message: string;
   count?: number;
 };
-// ModelPresetWithAvailability removed — the `available?: boolean` field now
-// lives on the canonical AiModelPreset type in shared/ai.ts so both client +
-// server agree on the wire shape and type-drift errors surface at compile time.
 
-// `adsbygoogle` is the global command queue Google's AdSense script consumes.
-// You push command objects onto it; the script eventually replaces it with a
-// real implementation. Typing it as a plain array of command objects is
-// closer to reality than typing each entry as something that itself has a
-// `push` method.
-type WindowWithAds = Window & {
-  adsbygoogle?: Array<Record<string, unknown>>;
-};
+const creationTypes = [
+  { label: "Mii faces", color: "var(--island-coral)" },
+  { label: "Characters", color: "var(--island-blue)" },
+  { label: "Logos", color: "var(--island-yellow)" },
+  { label: "Clothing", color: "var(--island-mint)" },
+  { label: "Sprites", color: "var(--island-lilac)" },
+];
 
-const defaultErrorMessage = "Something went wrong while running this check.";
-// Source the default model from the shared preset list so we can never ship a
-// dead OpenRouter ID. If the preset list changes, this follows automatically.
-const BREACH_RECOVERY_DEFAULT_MODEL =
-  OPENROUTER_MODEL_PRESETS[0]?.id ?? "deepseek/deepseek-v4-flash:free";
+const featureCards = [
+  {
+    icon: Upload,
+    eyebrow: "Bring anything",
+    title: "Import images or JSON",
+    description:
+      "Start with a face, character reference, logo, meme, or a compatible indexed-palette project.",
+    className: "md:col-span-2 bg-[var(--island-blue-soft)]",
+  },
+  {
+    icon: Palette,
+    eyebrow: "Stay accurate",
+    title: "84 game-ready colors",
+    description:
+      "Every swatch has a stable row-and-column ID, so your guide stays reproducible.",
+    className: "bg-[var(--island-yellow-soft)]",
+  },
+  {
+    icon: Brush,
+    eyebrow: "Make it yours",
+    title: "Paint and refine",
+    description:
+      "Pencil, erase, fill, sample colors, undo, and touch up directly on the grid.",
+    className: "bg-[var(--island-mint-soft)]",
+  },
+  {
+    icon: WandSparkles,
+    eyebrow: "Remove the busywork",
+    title: "Optimize without guessing",
+    description:
+      "Merge close colors, remove tiny islands, clean lone pixels, and cap the palette.",
+    className: "md:col-span-2 bg-[var(--island-coral-soft)]",
+  },
+];
 
-// All current presets are free ($0 prompt + $0 completion), so the previous
-// "sort by total cost" logic was a no-op that always returned index 0.
-// Reduced to: first preset that the server hasn't marked unavailable.
-// Treats `available === undefined` as "unknown, try it" — only an explicit
-// `available === false` filters a preset out.
-function pickFirstAvailableModel(presets: AiModelPreset[]): string {
-  const candidate = presets.find((preset) => preset.available !== false);
-  return (
-    candidate?.id ??
-    presets[0]?.id ??
-    OPENROUTER_MODEL_PRESETS[0]?.id ??
-    "deepseek/deepseek-v4-flash:free"
-  );
-}
+const workflow = [
+  {
+    number: "01",
+    icon: ImageIcon,
+    title: "Choose your reference",
+    text: "Upload an image, open a template, or import an existing grid project.",
+  },
+  {
+    number: "02",
+    icon: Grid3X3,
+    title: "Fit it to the grid",
+    text: "Pick a preset for a face, character, sprite, logo, sticker, or full image.",
+  },
+  {
+    number: "03",
+    icon: Sparkles,
+    title: "Clean the design",
+    text: "Tune framing and color, then simplify anything that is hard to repaint.",
+  },
+  {
+    number: "04",
+    icon: Download,
+    title: "Take your recipe",
+    text: "Export the labeled guide, clean image, palette sheet, JSON, or full pack.",
+  },
+];
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -165,21 +134,9 @@ function bytesToHex(bytes: Uint8Array): string {
     .toUpperCase();
 }
 
-/**
- * SHA-1 hex digest.
- *
- * Note: SHA-1 here is INTENTIONAL — it's the algorithm the Have I Been Pwned
- * "Pwned Passwords" k-anonymity API requires by spec
- * (https://haveibeenpwned.com/API/v3#PwnedPasswords). We send only the first
- * 5 hex chars of the digest to the API, then compare the remainder locally.
- * Static analyzers flag SHA-1 as "weak hash" out of the box (CWE-916, etc.)
- * but that warning applies to password storage; this code path is intentional
- * and required by the upstream API. Do not "upgrade" to SHA-256 — it will
- * break the breach lookup.
- */
+/** SHA-1 is required by the HIBP Pwned Passwords k-anonymity API. */
 async function sha1Hex(input: string): Promise<string> {
   const encoded = new TextEncoder().encode(input);
-  // eslint-disable-next-line @typescript-eslint/no-deprecated -- required by HIBP API spec
   const hash = await crypto.subtle.digest("SHA-1", encoded);
   return bytesToHex(new Uint8Array(hash));
 }
@@ -188,10 +145,18 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
+function pickFirstAvailableModel(presets: AiModelPreset[]): string {
+  return (
+    presets.find((preset) => preset.available !== false)?.id ??
+    presets[0]?.id ??
+    DEFAULT_MODEL
+  );
+}
+
 export default function Home() {
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
-  const [incidentModel, setIncidentModel] = useState(BREACH_RECOVERY_DEFAULT_MODEL);
+  const [incidentModel, setIncidentModel] = useState(DEFAULT_MODEL);
   const [incidentLoading, setIncidentLoading] = useState(false);
   const [incidentError, setIncidentError] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
@@ -199,109 +164,48 @@ export default function Home() {
     status: "idle",
     message: "",
   });
-  const adsPublisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID;
-  const adsSlotId = import.meta.env.VITE_ADSENSE_HOMEPAGE_SLOT_ID;
-  const adsConfigured = Boolean(adsPublisherId && adsSlotId);
+
   useEffect(() => {
     let canceled = false;
-    const loadCheapestModel = async () => {
-      try {
-        const response = await fetch("/api/ai/models");
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          presets?: AiModelPreset[];
-        };
-        if (canceled || !Array.isArray(data.presets) || data.presets.length === 0)
-          return;
-        setIncidentModel(pickFirstAvailableModel(data.presets));
-      } catch {
-        /* Keep default model if the model catalog endpoint is unavailable. */
-      }
-    };
 
-    loadCheapestModel();
+    fetch("/api/ai/models")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { presets?: AiModelPreset[] } | null) => {
+        if (!canceled && data?.presets?.length) {
+          setIncidentModel(pickFirstAvailableModel(data.presets));
+        }
+      })
+      .catch(() => undefined);
+
     return () => {
       canceled = true;
     };
   }, []);
 
-  // Track consent so we only inject ad scripts after the visitor opts in.
-  const [consent, setConsentState] = useState<ConsentState | null>(null);
-  useEffect(() => {
-    setConsentState(getConsent());
-    return onConsentChange(setConsentState);
-  }, []);
-  const marketingOk = Boolean(consent?.marketing);
-  const adsEnabled = adsConfigured && marketingOk;
-
-  useEffect(() => {
-    if (!adsEnabled) return;
-    const scriptId = "ltg-adsense-js";
-    if (document.getElementById(scriptId)) return;
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.async = true;
-    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(
-      String(adsPublisherId).trim(),
-    )}`;
-    script.crossOrigin = "anonymous";
-    document.head.appendChild(script);
-
-    return () => {
-      script.remove();
-    };
-  }, [adsEnabled, adsPublisherId]);
-
-  useEffect(() => {
-    if (!adsEnabled) return;
-
-    const timeoutId = window.setTimeout(() => {
-      try {
-        const adWindow = window as WindowWithAds;
-        adWindow.adsbygoogle ??= [];
-        adWindow.adsbygoogle.push({});
-      } catch (error) {
-        console.error("Failed to initialize adsbygoogle:", error);
-      }
-    }, 400);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [adsEnabled]);
-
   const checkPasswordForBreaches = async () => {
     if (!passwordInput) {
-      setPasswordCheck({
-        status: "error",
-        message: "Type a password first.",
-      });
+      setPasswordCheck({ status: "error", message: "Type a password first." });
       return;
     }
 
     setPasswordCheck({
       status: "checking",
-      message: "Checking hash ranges against open breach indexes.",
+      message: "Checking a partial hash against known breach data…",
     });
 
     try {
       const hash = await sha1Hex(passwordInput);
       const prefix = hash.slice(0, 5);
       const suffix = hash.slice(5);
-
       const response = await fetch(`${HIBP_PASSWORD_API}${prefix}`, {
-        headers: {
-          "Add-Padding": "true",
-          Accept: "text/plain",
-        },
+        headers: { "Add-Padding": "true", Accept: "text/plain" },
       });
+
       if (!response.ok) {
-        throw new Error(`Breach check service returned ${response.status}.`);
+        throw new Error(`The breach service returned ${response.status}.`);
       }
 
-      const payload = await response.text();
-      const found = payload
+      const found = (await response.text())
         .split("\n")
         .map((row) => row.trim())
         .find((row) => row.startsWith(`${suffix}:`));
@@ -310,20 +214,16 @@ export default function Home() {
         setPasswordCheck({
           status: "safe",
           message:
-            "No matches found in available breach lists. Keep using unique long passphrases.",
+            "No match was found in the available breach list. Keep using a unique, long passphrase.",
         });
         return;
       }
 
-      const [, countText] = found.split(":");
-      const count = Number.parseInt(countText ?? "0", 10);
+      const count = Number.parseInt(found.split(":")[1] ?? "0", 10);
       setPasswordCheck({
         status: "found",
         count,
-        message:
-          count > 0
-            ? `This password appears in ${formatNumber(count)} public breach record${count === 1 ? "" : "s"} — rotate it immediately and clear any reuse across accounts.`
-            : `Exposure lookup returned an invalid count. Try again with a different value.`,
+        message: `Found in ${formatNumber(count)} public breach record${count === 1 ? "" : "s"}. Change it anywhere it was used and enable MFA.`,
       });
     } catch (error) {
       setPasswordCheck({
@@ -331,18 +231,19 @@ export default function Home() {
         message:
           error instanceof Error
             ? error.message
-            : defaultErrorMessage,
+            : "The check could not be completed.",
       });
     }
   };
 
   const createBreachRecoveryPlan = async () => {
-    const trimmedPrompt = incidentPrompt.trim();
-    if (!trimmedPrompt) return;
+    const prompt = incidentPrompt.trim();
+    if (!prompt) return;
 
-    setIncidentError(null);
     setIncidentLoading(true);
+    setIncidentError(null);
     setIncidentPlan("");
+
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
@@ -353,13 +254,7 @@ export default function Home() {
           messages: [
             {
               role: "user",
-              content: `You are a plain-language security assistant. Given this situation: ${trimmedPrompt}. Respond with:
-1) Next 24-hour actions,
-2) Browser-safe account cleanup checklist,
-3) Password reset playbook,
-4) Suggested short user message, and
-5) A concise list of what not to do.
-Keep it practical and concise.`,
+              content: `You are a plain-language security assistant. Situation: ${prompt}. Return: 1) next 24-hour actions, 2) account cleanup checklist, 3) password reset order, 4) a short message the user can send, and 5) what not to do. Be concise and practical.`,
             },
           ],
           model: incidentModel,
@@ -369,22 +264,18 @@ Keep it practical and concise.`,
       });
 
       const data = (await response.json()) as {
-        configured?: boolean;
-        model?: string;
         reply?: string;
         warning?: string;
       };
+
       if (!response.ok || !data.reply) {
-        throw new Error(
-          data.warning ??
-            data.reply ??
-            `AI assistant returned ${response.status}.`,
-        );
+        throw new Error(data.warning ?? `The assistant returned ${response.status}.`);
       }
+
       setIncidentPlan(data.reply);
     } catch (error) {
       setIncidentError(
-        error instanceof Error ? error.message : defaultErrorMessage,
+        error instanceof Error ? error.message : "The plan could not be created.",
       );
     } finally {
       setIncidentLoading(false);
@@ -392,554 +283,337 @@ Keep it practical and concise.`,
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="container flex items-center justify-between h-14">
-          <div className="flex items-center gap-2">
-            <div className="red-dot" />
-            <span className="font-medium text-sm tracking-wide">
-              Tomodachi
-            </span>
-          </div>
-          <Link href="/studio">
-            <Button size="sm" className="text-xs tracking-wide">
-              Open Studio
-            </Button>
-          </Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background">
+      <IslandHeader fixed />
 
       <main id="main-content">
-      {/* Hero Section */}
-      <section className="pt-14">
-        <div className="relative overflow-hidden">
-          <div className="graph-paper-fine">
-            <div className="container py-12 sm:py-16 lg:py-24 xl:py-28">
-              <div className="grid gap-8 lg:gap-12 md:grid-cols-2 items-center">
-                <div className="space-y-5 sm:space-y-6">
-                  <p className="section-header">
-                    Mii Face Mask + Pixel Art Tool
-                  </p>
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold leading-tight tracking-tight text-foreground">
-                    Make Mii masks
-                    <br />
-                    <span style={{ color: "oklch(0.58 0.2 25)" }}>
-                      and pixel art
-                    </span>
-                    <br />
-                    repaintable by hand.
-                  </h1>
-                  <p className="text-base text-muted-foreground leading-relaxed max-w-md">
-                    A browser-first repaint studio for Tomodachi Life: Living
-                    the Dream Mii face masks, user-supplied character
-                    references, brand-style logos, memes, clothing marks, book
-                    covers, and other creative pixel builds.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <Link href="/studio">
-                      <Button size="lg" className="tracking-wide">
-                        Open Studio
-                      </Button>
-                    </Link>
-                    <a
-                      href="https://github.com/RazonIn4K/Mii-pixelart"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="tracking-wide"
-                      >
-                        View on GitHub
-                      </Button>
-                    </a>
+        <section className="island-hero relative pt-16">
+          <div className="island-orbit island-orbit-one" aria-hidden="true" />
+          <div className="island-orbit island-orbit-two" aria-hidden="true" />
+          <div className="container relative grid min-h-[760px] items-center gap-12 py-16 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
+            <div className="relative z-10 max-w-2xl">
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[var(--island-ink)]/12 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--island-ink)]/65 shadow-sm">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                Fan-made creator toolkit
+              </div>
+
+              <h1
+                aria-label="Your island. Your style. Pixel by pixel."
+                className="max-w-[740px] text-[clamp(3.35rem,8vw,7.25rem)] font-black leading-[0.84] tracking-[-0.075em] text-[var(--island-ink)]"
+              >
+                Your island.
+                <span className="relative mt-2 block w-fit text-primary">
+                  Your style.
+                  <svg className="absolute -bottom-4 left-0 h-4 w-full overflow-visible" viewBox="0 0 500 20" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M4 12 C95 2 178 19 274 9 C350 1 425 14 496 5" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="mt-5 block">Pixel by pixel.</span>
+              </h1>
+
+              <p className="mt-9 max-w-xl text-base font-medium leading-7 text-[var(--island-ink)]/66 sm:text-lg">
+                Turn faces, characters, logos, memes, and sketches into clear,
+                paintable guides—then refine every square in a private,
+                browser-first studio.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Button asChild size="lg" className="island-button h-13 w-full rounded-full px-7 font-bold sm:w-auto">
+                  <Link href="/studio">
+                    Start creating
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline" className="island-outline-button h-13 w-full rounded-full px-7 font-bold sm:w-auto">
+                  <Link href="/guides">
+                    Browse guides
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[var(--island-ink)]/58">
+                <span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" /> No account required</span>
+                <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-[var(--island-yellow-dark)]" /> Runs in your browser</span>
+                <span className="flex items-center gap-1.5"><Heart className="h-3.5 w-3.5 text-primary" /> Made for fans</span>
+              </div>
+            </div>
+
+            <div className="relative mx-auto w-full max-w-[640px] lg:translate-x-5">
+              <div className="island-window rotate-[1.25deg]">
+                <div className="island-window-bar">
+                  <div className="flex gap-1.5" aria-hidden="true">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-coral)]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-yellow)]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-mint)]" />
+                  </div>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--island-ink)]/45">New project / Mii mask</span>
+                  <Grid3X3 className="h-4 w-4 text-[var(--island-ink)]/40" />
+                </div>
+                <div className="relative overflow-hidden bg-[var(--island-paper)] p-3 sm:p-5">
+                  <img
+                    src={HERO_IMG}
+                    alt="A Mii face reference on grid paper beside colored pencils"
+                    className="aspect-[16/10] w-full rounded-[1.1rem] object-cover"
+                    width={1920}
+                    height={1072}
+                    loading="eager"
+                    decoding="async"
+                    fetchPriority="high"
+                  />
+                  <div className="absolute bottom-7 left-7 flex items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-2 text-[11px] font-bold text-[var(--island-ink)] shadow-lg backdrop-blur">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--island-mint-dark)]" />
+                    Ready to repaint
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="rounded-sm overflow-hidden shadow-sm border border-border">
-                    <img
-                      src={HERO_IMG}
-                      alt="Hand-drawn Mii face on engineering grid paper next to colored pencils, illustrating the studio's paint-by-numbers workflow."
-                      className="w-full h-auto"
-                      width={1920}
-                      height={1072}
-                      loading="eager"
-                      decoding="async"
-                      fetchPriority="high"
-                    />
-                  </div>
+              </div>
+
+              <div className="island-float-card -left-5 top-16 hidden -rotate-6 sm:block">
+                <span className="text-2xl font-black text-[var(--island-ink)]">84</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--island-ink)]/50">palette colors</span>
+              </div>
+
+              <div className="island-float-card -bottom-7 right-1 rotate-3">
+                <div className="mb-2 flex gap-1">
+                  {["#f36b5f", "#69b7ef", "#f7cd57", "#6cc5a1", "#9f88d8"].map((color) => (
+                    <span key={color} className="h-5 w-5 rounded-md border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
+                  ))}
                 </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--island-ink)]/50">your working palette</span>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Breach Recovery and Trust Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <p className="section-header mb-3">
-            Tomodachishare Breach Recovery Hub
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-            Help users coming from breach-notice traffic with useful, browser-first
-            tools.
-          </h2>
-          <p className="text-muted-foreground leading-relaxed mb-8">
-            If people land here from the{" "}
-            <a
-              className="underline underline-offset-2"
-              href={BREACH_NOTICE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              public notice
-            </a>
-            , give them immediate value: a leak-aware checklist, password risk
-            test, and AI recovery guidance. For a structured written plan or a
-            short consult, see{" "}
-            <Link href="/unlock" className="underline underline-offset-2">
-              paid recovery guides
-            </Link>
-            .
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Password breach check</h3>
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  Browser-only + k-anonymity
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
-                Paste a password to check if it appears in known breach datasets.
-                Your full password never leaves the page; only a SHA-1 prefix is
-                sent.
-              </p>
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="password-leak-check" className="text-xs">
-                  Password candidate
-                </Label>
-                <Input
-                  id="password-leak-check"
-                  type="password"
-                  placeholder="Type a sample password (never paste credentials)"
-                  value={passwordInput}
-                  onChange={(event) => setPasswordInput(event.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={checkPasswordForBreaches}
-                  disabled={passwordCheck.status === "checking"}
-                >
-                  <Search className="h-4 w-4 mr-1" />
-                  {passwordCheck.status === "checking"
-                    ? "Checking..."
-                    : "Check password exposure"}
-                </Button>
-                <p
-                  className={`text-xs leading-relaxed ${
-                    passwordCheck.status === "found"
-                      ? "text-destructive"
-                      : passwordCheck.status === "safe"
-                        ? "text-green-700"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {passwordCheck.message || "Run a check to see results."}
-                </p>
-              </div>
-            </article>
-
-            <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">
-                  AI recovery assistant
-                </h3>
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <BotMessageSquare className="h-4 w-4 text-primary" />
-                  OpenRouter-backed
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
-                Paste what happened in plain language. The assistant returns a
-                practical sequence you can hand to friends, family, or forum
-                users.
-              </p>
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="breach-situation" className="text-xs">
-                  Situation details
-                </Label>
-                <Textarea
-                  id="breach-situation"
-                  rows={5}
-                  placeholder="Example: I saw my email in a leaked list, and I used that password in multiple places."
-                  value={incidentPrompt}
-                  onChange={(event) => setIncidentPrompt(event.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  onClick={createBreachRecoveryPlan}
-                  disabled={incidentLoading}
-                >
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  {incidentLoading
-                    ? "Generating plan..."
-                    : "Generate 24-hour recovery plan"}
-                </Button>
-                {(incidentError || incidentPlan) && (
-                  <div className="mt-3 p-3 rounded-sm border border-border bg-background text-xs text-muted-foreground whitespace-pre-wrap">
-                    {incidentError ?? incidentPlan}
-                  </div>
-                  )}
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* Workflow Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <div className="max-w-2xl mb-14">
-            <p className="section-header mb-3">How It Works</p>
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-              From image to repaint guide in four steps
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              The studio handles the tedious conversion work so you can focus on
-              the creative part — actually painting your design in the Palette
-              House.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                step: "01",
-                label: "Import",
-                desc: "Upload a character, face, logo, meme, or JSON file",
-              },
-              {
-                step: "02",
-                label: "Preset",
-                desc: "Choose Mii mask, character, sprite, logo, or full-image framing",
-              },
-              {
-                step: "03",
-                label: "Optimize",
-                desc: "Merge colors, remove noise, simplify",
-              },
-              {
-                step: "04",
-                label: "Export",
-                desc: "Download your reference pack",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="p-5 rounded-sm border border-border bg-card"
-              >
-                <span
-                  className="font-mono text-xs font-medium"
-                  style={{ color: "oklch(0.58 0.2 25)" }}
-                >
-                  {item.step}
+        <section id="discover" className="border-y border-[var(--island-ink)]/10 bg-white/72 py-5">
+          <div className="container flex flex-col items-center justify-between gap-4 md:flex-row">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <p className="text-sm font-bold text-[var(--island-ink)]">Made for every kind of island creator</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {creationTypes.map((type) => (
+                <span key={type.label} className="rounded-full border border-[var(--island-ink)]/10 bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--island-ink)]/70 shadow-sm">
+                  <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: type.color }} />
+                  {type.label}
                 </span>
-                <h3 className="text-sm font-semibold mt-2 mb-1">
-                  {item.label}
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features Grid */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
-        <div className="container">
-          <div className="grid gap-8 md:gap-12 lg:gap-16 lg:grid-cols-2 items-start">
-            <div>
-              <p className="section-header mb-3">Features</p>
-              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-6 sm:mb-8">
-                Built for hand-painting precision
-              </h2>
-              <div className="space-y-6">
-                {features.map((f) => (
-                  <div key={f.title} className="flex gap-4">
-                    <div
-                      className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0 mt-0.5"
-                      style={{ backgroundColor: "oklch(0.95 0.02 25)" }}
-                    >
-                      <f.icon
-                        className="w-4 h-4"
-                        style={{ color: "oklch(0.58 0.2 25)" }}
-                      />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold mb-1">{f.title}</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {f.description}
-                      </p>
-                    </div>
+        <section className="py-20 sm:py-28">
+          <div className="container">
+            <div className="mb-12 grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+              <div>
+                <p className="island-kicker">Two paths, one friendly home</p>
+                <h2 className="mt-3 text-4xl font-black tracking-[-0.045em] text-[var(--island-ink)] sm:text-5xl">Create freely.<br />Recover safely.</h2>
+              </div>
+              <p className="max-w-2xl text-base font-medium leading-7 text-[var(--island-ink)]/62 lg:justify-self-end">
+                Tomodachi combines the energy of a community discovery page with
+                a focused creation workspace. The creative studio stays fun;
+                security help stays clearly separated, calm, and practical.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <article className="island-path-card island-path-create">
+                <div className="relative z-10 max-w-md">
+                  <span className="island-card-number">01 / CREATE</span>
+                  <h3 className="mt-8 text-3xl font-black tracking-[-0.04em] text-[var(--island-ink)]">Build something unmistakably yours.</h3>
+                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-ink)]/64">Import, draw, simplify, and export without sending your working image to an account system.</p>
+                  <Link href="/studio" className="mt-7 inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)] underline decoration-primary decoration-2 underline-offset-4">
+                    Enter the studio <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                <Grid3X3 className="absolute -bottom-10 -right-8 h-56 w-56 rotate-12 text-[var(--island-blue)]/18" aria-hidden="true" />
+              </article>
+
+              <article className="island-path-card island-path-help">
+                <div className="relative z-10 max-w-md">
+                  <span className="island-card-number">02 / RECOVER</span>
+                  <h3 className="mt-8 text-3xl font-black tracking-[-0.04em] text-[var(--island-ink)]">Get clear next steps after a breach.</h3>
+                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-ink)]/64">Use a privacy-aware password check, a recovery plan, and plain-language guides without mixing crisis help with ads.</p>
+                  <a href="#recovery" className="mt-7 inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)] underline decoration-[var(--island-mint-dark)] decoration-2 underline-offset-4">
+                    Open recovery tools <ArrowRight className="h-4 w-4" />
+                  </a>
+                </div>
+                <ShieldCheck className="absolute -bottom-10 -right-8 h-56 w-56 -rotate-12 text-[var(--island-mint-dark)]/14" aria-hidden="true" />
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="island-section-blue py-20 sm:py-28">
+          <div className="container">
+            <div className="mx-auto mb-14 max-w-2xl text-center">
+              <p className="island-kicker">A simple creative loop</p>
+              <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">From idea to paintable recipe.</h2>
+              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-ink)]/60">The studio handles conversion and organization. You stay in control of the actual design.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {workflow.map((step) => (
+                <article key={step.number} className="island-step-card group">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold tracking-[0.15em] text-primary">{step.number}</span>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--island-paper)] text-[var(--island-ink)] transition-transform group-hover:-rotate-6 group-hover:scale-110">
+                      <step.icon className="h-5 w-5" />
+                    </span>
                   </div>
+                  <h3 className="mt-10 text-xl font-black tracking-[-0.025em] text-[var(--island-ink)]">{step.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">{step.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-20 sm:py-28">
+          <div className="container grid gap-12 lg:grid-cols-[0.86fr_1.14fr] lg:items-start">
+            <div className="lg:sticky lg:top-28">
+              <p className="island-kicker">The workshop</p>
+              <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">Powerful tools.<br />Playful surface.</h2>
+              <p className="mt-5 max-w-md text-base font-medium leading-7 text-[var(--island-ink)]/60">A friendly interface on top, deterministic grid and palette logic underneath. Every project remains editable and exportable.</p>
+              <div className="mt-8 flex flex-wrap gap-2">
+                {["Preview before commit", "Undoable cleanup", "JSON round-trip", "AI sketches validated"].map((item) => (
+                  <span key={item} className="rounded-full bg-[var(--island-ink)] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white">{item}</span>
                 ))}
               </div>
             </div>
-            <div className="space-y-6">
-              <div className="rounded-sm overflow-hidden border border-border shadow-sm">
-                <img
-                  src={CANVAS_IMG}
-                  alt="Hand-painted pixel-art mushroom on graph paper — example output from the studio's color-reduction optimizer."
-                  className="w-full h-auto"
-                  width={1920}
-                  height={1920}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div className="rounded-sm overflow-hidden border border-border shadow-sm">
-                <img
-                  src={PALETTE_IMG}
-                  alt="Reference swatches of the 84-color Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching."
-                  className="w-full h-auto"
-                  width={1920}
-                  height={1434}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Roadmap Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <div className="max-w-2xl mx-auto">
-            <p className="section-header mb-3">Roadmap</p>
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8">
-              What comes next
-            </h2>
-            <div className="space-y-4">
-              {[
-                {
-                  phase: "0",
-                  title: "JSON Fixture Inspection",
-                  status: "done",
-                  desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata.",
-                },
-                {
-                  phase: "1",
-                  title: "JSON Round-Trip",
-                  status: "done",
-                  desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete.",
-                },
-                {
-                  phase: "2",
-                  title: "Palette Panel",
-                  status: "done",
-                  desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid.",
-                },
-                {
-                  phase: "3",
-                  title: "One-Click Optimizer",
-                  status: "done",
-                  desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting.",
-                },
-                {
-                  phase: "4",
-                  title: "Image Upload (remaining)",
-                  status: "current",
-                  desc: "Face-focused framing, cleanup, tone controls, and import preview are in. Remaining: drag crop/pan controls.",
-                },
-                {
-                  phase: "5",
-                  title: "Reference Pack Export (remaining)",
-                  status: "next",
-                  desc: "Palette sheet image, painting order suggestion, and ZIP bundle download.",
-                },
-                {
-                  phase: "6",
-                  title: "AI Suggestions",
-                  status: "current",
-                  desc: "OpenRouter chat, saved local sessions, 25 model presets, visual grid snapshots, and applyable sketch drafts are available; deeper cleanup suggestions are next.",
-                },
-              ].map((item) => (
-                <div
-                  key={item.phase}
-                  className="flex gap-4 p-4 rounded-sm border border-border bg-card"
-                >
-                  <div className="flex flex-col items-center gap-1 shrink-0">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      P{item.phase}
-                    </span>
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        item.status === "done"
-                          ? "bg-green-500"
-                          : item.status === "current"
-                            ? "bg-primary"
-                            : item.status === "next"
-                              ? "bg-primary/50"
-                              : "bg-border"
-                      }`}
-                    />
+            <div className="grid gap-4 md:grid-cols-2">
+              {featureCards.map((feature) => (
+                <article key={feature.title} className={`island-feature-card ${feature.className}`}>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/75 text-[var(--island-ink)] shadow-sm">
+                    <feature.icon className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">{item.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
+                  <p className="mt-8 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--island-ink)]/45">{feature.eyebrow}</p>
+                  <h3 className="mt-2 text-2xl font-black tracking-[-0.035em] text-[var(--island-ink)]">{feature.title}</h3>
+                  <p className="mt-3 max-w-md text-sm font-medium leading-6 text-[var(--island-ink)]/60">{feature.description}</p>
+                </article>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="border-y border-[var(--island-ink)]/10 bg-white py-20 sm:py-28">
+          <div className="container">
+            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <div>
+                <p className="island-kicker">Designed to be followed by hand</p>
+                <h2 className="mt-3 max-w-3xl text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">Less guessing between screen and game.</h2>
+              </div>
+              <Link href="/studio" className="inline-flex items-center gap-2 text-sm font-extrabold text-primary">
+                Try your own image <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
-        </div>
-      </section>
 
-      {/* Monetization Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
-        <div className="container">
-          <p className="section-header mb-3">Monetization strategy</p>
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-            Turn Tomodachi domain traffic into recurring income
-          </h2>
-          <p className="text-muted-foreground leading-relaxed max-w-3xl mb-8">
-            Use the breach moment as a traffic catalyst for a two-domain setup:
-            one domain for creative conversion, one for trust and crisis support.
-            Keep ad content clearly separated from sensitive security guidance.
-          </p>
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <figure className="island-showcase-card">
+                <img src={CANVAS_IMG} alt="A pixel-art mushroom arranged on graph paper" className="aspect-[4/3] w-full object-cover" width={1920} height={1920} loading="lazy" decoding="async" />
+                <figcaption className="flex items-center justify-between gap-4 p-5">
+                  <div><p className="text-sm font-black text-[var(--island-ink)]">Grid guide</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Clean shapes, visible cells, repeatable result.</p></div>
+                  <Grid3X3 className="h-5 w-5 text-primary" />
+                </figcaption>
+              </figure>
+              <figure className="island-showcase-card lg:translate-y-12">
+                <img src={PALETTE_IMG} alt="A labeled reference sheet showing the available color swatches" className="aspect-[4/3] w-full object-cover" width={1920} height={1434} loading="lazy" decoding="async" />
+                <figcaption className="flex items-center justify-between gap-4 p-5">
+                  <div><p className="text-sm font-black text-[var(--island-ink)]">Palette recipe</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Stable swatch IDs for every color choice.</p></div>
+                  <Palette className="h-5 w-5 text-[var(--island-blue)]" />
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {domainMonetizationUseCases.map((entry) => (
-              <article
-                key={entry.domain}
-                className="rounded-sm border border-border bg-background p-5"
-              >
-                <h3 className="text-sm font-semibold">{entry.domain}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{entry.role}</p>
-                <p className="text-xs leading-relaxed mt-4 text-muted-foreground">
-                  {entry.note}
-                </p>
-                <ul className="mt-4 space-y-2">
-                  {entry.monetization.map((item) => (
-                    <li
-                      key={item}
-                      className="text-xs flex items-start gap-2 text-muted-foreground"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+        <section id="recovery" className="island-recovery py-20 sm:py-28">
+          <div className="container">
+            <div className="mx-auto mb-12 max-w-3xl text-center">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--island-mint)] text-[var(--island-ink)] shadow-[5px_5px_0_var(--island-ink)]">
+                <ShieldCheck className="h-7 w-7" />
+              </div>
+              <p className="island-kicker">TomodachiShare recovery hub</p>
+              <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">Calm help when something goes wrong.</h2>
+              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-ink)]/60">If you arrived from the <a href={BREACH_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="font-bold underline decoration-2 underline-offset-4">public breach notice</a>, start here. These tools are intentionally separated from creator content and advertising.</p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <article className="island-tool-card">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="island-card-number">PRIVATE CHECK</p>
+                    <h3 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[var(--island-ink)]">Has this password appeared in a breach?</h3>
+                  </div>
+                  <Search className="h-6 w-6 shrink-0 text-primary" />
+                </div>
+                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Your full password never leaves the browser. Only the first five characters of its SHA-1 hash are sent to the HIBP range API.</p>
+                <div className="mt-7 space-y-3">
+                  <Label htmlFor="password-leak-check" className="text-xs font-bold">Password to test</Label>
+                  <Input id="password-leak-check" type="password" autoComplete="off" placeholder="Do not paste a current critical credential" value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} className="h-12 rounded-xl border-[var(--island-ink)]/15 bg-white" />
+                  <Button onClick={checkPasswordForBreaches} disabled={passwordCheck.status === "checking"} className="island-button h-12 w-full rounded-xl font-bold">
+                    <Search className="mr-2 h-4 w-4" />
+                    {passwordCheck.status === "checking" ? "Checking…" : "Check exposure"}
+                  </Button>
+                  <p aria-live="polite" className={`min-h-10 rounded-xl p-3 text-xs font-semibold leading-5 ${passwordCheck.status === "found" || passwordCheck.status === "error" ? "bg-red-50 text-red-800" : passwordCheck.status === "safe" ? "bg-emerald-50 text-emerald-800" : "bg-[var(--island-paper)] text-[var(--island-ink)]/48"}`}>
+                    {passwordCheck.message || "Use this as a signal—not proof that a password is safe."}
+                  </p>
+                </div>
               </article>
-            ))}
-          </div>
 
-          <div className="mt-8 space-y-3">
-            {adsEnabled ? (
-              <div className="rounded-sm border border-border bg-background p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
-                  Monetization slot (AdSense)
-                </p>
-                <ins
-                  className="adsbygoogle"
-                  style={{ display: "block" }}
-                  data-ad-client={adsPublisherId as string}
-                  data-ad-slot={adsSlotId as string}
-                  data-ad-format="auto"
-                  data-full-width-responsive="true"
-                />
-              </div>
-            ) : (
-              <div className="rounded-sm border border-dashed border-border bg-background p-4">
-                <p className="text-xs text-muted-foreground">
-                  {adsConfigured && !marketingOk
-                    ? "Ad slot held until the visitor accepts marketing cookies."
-                    : (
-                      <>
-                        Add environment vars{" "}
-                        <code>VITE_ADSENSE_PUBLISHER_ID</code> and{" "}
-                        <code>VITE_ADSENSE_HOMEPAGE_SLOT_ID</code> to enable ad
-                        slots on production.
-                      </>
-                    )}
-                </p>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  This page may include affiliate links. See our{" "}
-                  <Link
-                    href="/affiliate-disclosure"
-                    className="underline underline-offset-2"
-                  >
-                    Affiliate Disclosure
-                  </Link>
-                  .
-                </p>
-              </div>
-            )}
+              <article className="island-tool-card">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="island-card-number">PLAIN-LANGUAGE PLAN</p>
+                    <h3 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[var(--island-ink)]">Build a focused 24-hour recovery plan.</h3>
+                  </div>
+                  <BotMessageSquare className="h-6 w-6 shrink-0 text-[var(--island-blue)]" />
+                </div>
+                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Describe the situation without including passwords, payment details, recovery codes, or other secrets.</p>
+                <div className="mt-7 space-y-3">
+                  <Label htmlFor="breach-situation" className="text-xs font-bold">What happened?</Label>
+                  <Textarea id="breach-situation" rows={4} placeholder="Example: My email appeared in a leak and I reused that password on two accounts…" value={incidentPrompt} onChange={(event) => setIncidentPrompt(event.target.value)} className="rounded-xl border-[var(--island-ink)]/15 bg-white" />
+                  <Button onClick={createBreachRecoveryPlan} disabled={incidentLoading || !incidentPrompt.trim()} className="h-12 w-full rounded-xl bg-[var(--island-blue)] font-bold text-[var(--island-ink)] hover:bg-[var(--island-blue)]/85">
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    {incidentLoading ? "Building your plan…" : "Generate recovery plan"}
+                  </Button>
+                  {(incidentError || incidentPlan) && (
+                    <div aria-live="polite" className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-[var(--island-paper)] p-4 text-xs font-medium leading-5 text-[var(--island-ink)]/70">
+                      {incidentError ?? incidentPlan}
+                    </div>
+                  )}
+                </div>
+              </article>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center justify-between gap-4 rounded-2xl border border-[var(--island-ink)]/10 bg-white/70 p-5 text-center sm:flex-row sm:text-left">
+              <div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-[var(--island-mint-dark)]" /><p className="text-sm font-semibold text-[var(--island-ink)]/68">Need a written checklist or more structured support?</p></div>
+              <Link href="/unlock" className="inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)]">See recovery guides <ArrowRight className="h-4 w-4" /></Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section className="py-20 sm:py-28">
+          <div className="container">
+            <div className="island-final-cta relative overflow-hidden px-6 py-16 text-center sm:px-12 sm:py-20">
+              <div className="relative z-10 mx-auto max-w-3xl">
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-white/60">Your next creation starts here</p>
+                <h2 className="mt-4 text-4xl font-black tracking-[-0.055em] text-white sm:text-6xl">Bring the idea.<br />Leave with the recipe.</h2>
+                <p className="mx-auto mt-5 max-w-xl text-sm font-medium leading-6 text-white/65">No account wall. No cloud project required. Just a focused workspace for turning inspiration into something you can actually repaint.</p>
+                <Button asChild size="lg" className="mt-8 h-13 rounded-full bg-white px-8 font-black text-[var(--island-ink)] hover:bg-[var(--island-yellow)]">
+                  <Link href="/studio">
+                    Open the free studio <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="absolute -left-20 -top-24 h-72 w-72 rounded-full border-[45px] border-[var(--island-coral)]/50" aria-hidden="true" />
+              <div className="absolute -bottom-28 -right-20 h-80 w-80 rounded-full border-[55px] border-[var(--island-blue)]/30" aria-hidden="true" />
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="py-8 border-t border-border">
-        <div className="container flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <div className="red-dot-sm" />
-            <span className="text-xs text-muted-foreground">
-              Tomodachi
-            </span>
-          </div>
-          <nav
-            aria-label="Site"
-            className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
-          >
-            <Link href="/guides" className="hover:underline">
-              Guides
-            </Link>
-            <Link href="/faq" className="hover:underline">
-              FAQ
-            </Link>
-            <Link href="/about" className="hover:underline">
-              About
-            </Link>
-            <Link href="/unlock" className="hover:underline">
-              Unlock
-            </Link>
-            <Link href="/support" className="hover:underline">
-              Support
-            </Link>
-            <Link href="/privacy" className="hover:underline">
-              Privacy
-            </Link>
-            <Link href="/terms" className="hover:underline">
-              Terms
-            </Link>
-            <Link href="/cookies" className="hover:underline">
-              Cookies
-            </Link>
-            <Link href="/affiliate-disclosure" className="hover:underline">
-              Affiliate disclosure
-            </Link>
-          </nav>
-          <p className="text-xs text-muted-foreground">
-            Unofficial fan tool. No official game or character assets are
-            bundled.
-          </p>
-        </div>
-      </footer>
+      <IslandFooter />
     </div>
   );
 }

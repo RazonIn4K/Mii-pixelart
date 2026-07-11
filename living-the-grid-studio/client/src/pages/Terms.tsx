@@ -17,7 +17,7 @@ export default function Terms() {
   return (
     <LegalLayout
       title="Terms of Service"
-      lastUpdated="May 14, 2026"
+      lastUpdated="July 10, 2026"
       intro="These Terms govern your use of Tomodachi. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
@@ -29,6 +29,7 @@ export default function Terms() {
       </p>
 
       <h2>2. Acceptable use</h2>
+      <p>You must be at least 13 years old to create an account or use community features.</p>
       <p>You agree not to:</p>
       <ul>
         <li>
@@ -48,7 +49,26 @@ export default function Terms() {
         </li>
       </ul>
 
-      <h2>3. No professional advice</h2>
+      <h2>3. Accounts, projects, and publishing</h2>
+      <p>
+        Editing and export remain available without an account. Signing in
+        does not upload or publish your local work. The first cloud save is an
+        explicit private action, and publishing requires a separate review of
+        the title, description, tags, visibility, comments, and download
+        permission. Unlisted links are not secret access controls.
+      </p>
+
+      <h2>4. Community content and moderation</h2>
+      <p>
+        You keep ownership of content you create. You grant us a limited,
+        non-exclusive license to store, transform into previews, display, and
+        distribute content only as needed to operate the visibility and sharing
+        choices you make. We may hide content, lock comments, or suspend
+        accounts to enforce these Terms and the Community Guidelines. Reports
+        and copyright notices must be made in good faith.
+      </p>
+
+      <h2>5. No professional advice</h2>
       <p>
         The breach recovery guidance and AI assistant output is informational
         only. It is not legal, security, medical, or financial advice. For an
@@ -56,17 +76,18 @@ export default function Terms() {
         qualified professional.
       </p>
 
-      <h2>4. AI output</h2>
+      <h2>6. AI output</h2>
       <p>
         AI-generated text and sketches are produced by third-party language
         models. They may be incorrect, biased, or out of date. You are
-        responsible for reviewing AI output before relying on it. We do not
-        claim ownership over the AI output you generate, but you grant us a
-        non-exclusive license to operate, debug, and improve the Site using
-        de-identified prompts and outputs.
+        responsible for reviewing AI output before relying on it. Prompts and
+        related grid JSON transit OpenRouter and the selected model provider;
+        review their applicable terms and privacy practices before submitting
+        sensitive material. We do not claim ownership over the AI output you
+        generate.
       </p>
 
-      <h2>5. Paid services</h2>
+      <h2>7. Paid services</h2>
       <p>
         Where the Site offers paid downloads, paid guides, or consult bookings,
         the price, scope, and refund policy will be displayed at checkout.
@@ -75,7 +96,7 @@ export default function Terms() {
         rescheduled with at least 24 hours&apos; notice.
       </p>
 
-      <h2>6. Intellectual property</h2>
+      <h2>8. Intellectual property</h2>
       <p>
         The Site, including code, design, and original written content, is
         owned by Tomodachi and protected by intellectual-property
@@ -83,14 +104,14 @@ export default function Terms() {
         use for an unofficial fan tool. We do not bundle official game assets.
       </p>
 
-      <h2>7. Disclaimers</h2>
+      <h2>9. Disclaimers</h2>
       <p>
         The Site is provided &quot;as is&quot; without warranties of any kind,
         either express or implied. We do not warrant that the Site will be
         uninterrupted, error-free, or secure.
       </p>
 
-      <h2>8. Limitation of liability</h2>
+      <h2>10. Limitation of liability</h2>
       <p>
         To the maximum extent permitted by law, Tomodachi is not
         liable for indirect, incidental, special, consequential, or punitive
@@ -100,13 +121,15 @@ export default function Terms() {
         claim, or USD 50 if you paid us nothing.
       </p>
 
-      <h2>9. Termination</h2>
+      <h2>11. Termination and deletion</h2>
       <p>
         We may suspend or terminate access to the Site for users who violate
-        these Terms or whose use poses a risk to other users.
+        these Terms or whose use poses a risk to other users. User-requested
+        deletion immediately hides content and allows cancellation for seven
+        days before erasure; canceled accounts return with creations private.
       </p>
 
-      <h2>10. Governing law</h2>
+      <h2>12. Governing law</h2>
       <p>
         These Terms are governed by the laws of your principal jurisdiction
         unless otherwise required by mandatory consumer-protection law.
@@ -114,13 +137,13 @@ export default function Terms() {
         chosen jurisdiction.
       </p>
 
-      <h2>11. Changes</h2>
+      <h2>13. Changes</h2>
       <p>
         We may update these Terms occasionally. Material changes will be
         announced on the Site at least 30 days before they take effect.
       </p>
 
-      <h2>12. Contact</h2>
+      <h2>14. Contact</h2>
       <p>
         Questions:{" "}
         <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.

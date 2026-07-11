@@ -7,7 +7,7 @@
  * Thin top bar with project name and minimal controls.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
@@ -23,14 +23,8 @@ import {
 import { toast } from "sonner";
 import { useGridDocument } from "@/hooks/useGridDocument";
 import CanvasViewer from "@/components/studio/CanvasViewer";
-import PalettePanel from "@/components/studio/PalettePanel";
-import OptimizerPanel from "@/components/studio/OptimizerPanel";
-import ImportPanel from "@/components/studio/ImportPanel";
-import ExportPanel from "@/components/studio/ExportPanel";
-import CreationPanel, {
-  type PaintTool,
-} from "@/components/studio/CreationPanel";
-import AiPanel from "@/components/studio/AiPanel";
+import type { PaintTool } from "@/components/studio/CreationPanel";
+import { CloudProjectControls } from "@/components/community/CloudProjectControls";
 // ResidentPanel + Island tab removed — feature wasn't being used and the
 // ResidentSpec sidecar lived only in the AI tab's "validate JSON" path which
 // is now a non-feature.
@@ -43,6 +37,12 @@ import {
 // import type { MiiResidentSpec } from "@shared/residents";
 
 const EMPTY_STATE_IMG = "/empty-state.webp";
+const AiPanel = lazy(() => import("@/components/studio/AiPanel"));
+const CreationPanel = lazy(() => import("@/components/studio/CreationPanel"));
+const ExportPanel = lazy(() => import("@/components/studio/ExportPanel"));
+const ImportPanel = lazy(() => import("@/components/studio/ImportPanel"));
+const OptimizerPanel = lazy(() => import("@/components/studio/OptimizerPanel"));
+const PalettePanel = lazy(() => import("@/components/studio/PalettePanel"));
 
 export default function Studio() {
   useDocumentTitle(
@@ -296,15 +296,11 @@ export default function Studio() {
     <div className="h-screen flex flex-col">
       {/* Top Bar */}
       <header className="h-11 border-b border-border bg-background flex items-center px-4 gap-3 shrink-0">
-        <Link href="/">
-          <button
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Go home"
-            title="Go home"
-          >
+        <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
+          <Link href="/" aria-label="Go home" title="Go home">
             <Home className="w-3.5 h-3.5" />
-          </button>
-        </Link>
+          </Link>
+        </Button>
 
         <div className="flex items-center gap-1.5">
           <div className="red-dot-sm" />
@@ -314,6 +310,8 @@ export default function Studio() {
         </div>
 
         <div className="flex-1" />
+
+        <CloudProjectControls doc={doc} onLoadDocument={setDoc} />
 
         {/* View toggles */}
         <div className="flex items-center gap-1">
@@ -399,6 +397,7 @@ export default function Studio() {
       {/* Main Content — stacks vertically on mobile (<768px) so the
           right panel doesn't push the canvas off-screen. Side-by-side on md+. */}
       <main id="main-content" className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <h1 className="sr-only">Tomodachi Studio pixel editor</h1>
         {/* Canvas Area (full width on mobile, ~65% on desktop) */}
         <div className="flex-1 min-w-0 p-3 min-h-[60vh] md:min-h-0">
           {visibleDoc ? (
@@ -436,6 +435,10 @@ export default function Studio() {
                   src={EMPTY_STATE_IMG}
                   alt="Empty graph paper"
                   className="w-48 h-auto mx-auto mb-4 rounded-sm opacity-60"
+                  width={1434}
+                  height={1920}
+                  loading="lazy"
+                  decoding="async"
                 />
                 <p className="text-sm text-muted-foreground mb-1">
                   No project open
@@ -525,6 +528,7 @@ export default function Studio() {
             </TabsList>
 
             <div className="flex-1 overflow-auto">
+              <Suspense fallback={<PanelLoading />}>
               <TabsContent value="import" className="mt-0">
                 <ImportPanel
                   previewDoc={imagePreview}
@@ -608,12 +612,17 @@ export default function Studio() {
                   }
                 />
               </TabsContent>
+              </Suspense>
             </div>
           </Tabs>
         </div>
       </main>
     </div>
   );
+}
+
+function PanelLoading() {
+  return <div className="p-4 text-xs font-medium text-muted-foreground" role="status">Opening tools…</div>;
 }
 
 function PreviewBlockedPanel({ title }: { title: string }) {

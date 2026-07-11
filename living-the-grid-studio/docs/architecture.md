@@ -3,6 +3,13 @@
 **Version:** 2.0  
 **Last Updated:** 2026-05-15
 
+> **Community expansion note (2026-07-10):** This document describes the
+> anonymous local-first Studio and the pre-migration Pages runtime. Anonymous
+> editing/export remains local. The opt-in account/community architecture is
+> defined by [ADR 0001](adr/0001-workers-community-platform.md), the
+> [data-flow document](community-data-flow.md), and the
+> [threat model](community-threat-model.md).
+
 ---
 
 ## Overview
