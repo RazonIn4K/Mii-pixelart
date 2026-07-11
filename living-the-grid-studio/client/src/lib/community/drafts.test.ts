@@ -124,22 +124,22 @@ describe("local draft IndexedDB lifecycle", () => {
   });
 
   it.each([
-    [
-      "transaction creation",
-      { transactionStartError: new Error("could not create transaction") },
-    ],
-    [
-      "request creation",
-      { operationError: new Error("could not create request") },
-    ],
-  ])("closes after a synchronous %s failure", async (_label, options) => {
-    const expected = options.transactionStartError ?? options.operationError;
-    const harness = installDatabase(options);
+    ["transaction creation", "transactionStartError"],
+    ["request creation", "operationError"],
+  ] as const)(
+    "closes after a synchronous %s failure",
+    async (_label, errorKind) => {
+      const expected = new Error(
+        `could not create ${_label.replace(" creation", "")}`,
+      );
+      const options: HarnessOptions = { [errorKind]: expected };
+      const harness = installDatabase(options);
 
-    await expect(readLocalDraft()).rejects.toBe(expected);
-    expect(harness.close).toHaveBeenCalledTimes(1);
-    expect(harness.transaction.abort).toHaveBeenCalledTimes(
-      options.operationError ? 1 : 0,
-    );
-  });
+      await expect(readLocalDraft()).rejects.toBe(expected);
+      expect(harness.close).toHaveBeenCalledTimes(1);
+      expect(harness.transaction.abort).toHaveBeenCalledTimes(
+        options.operationError ? 1 : 0,
+      );
+    },
+  );
 });

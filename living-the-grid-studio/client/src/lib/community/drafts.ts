@@ -33,7 +33,7 @@ async function withStore<T>(
   operation: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
   const database = await openDatabase();
-  return new Promise<T>((resolve, reject) => {
+  return await new Promise<T>((resolve, reject) => {
     let request: IDBRequest<T> | undefined;
     let requestResult: T | undefined;
     let requestSucceeded = false;
@@ -111,7 +111,9 @@ export async function saveLocalDraft(draft: LocalDraft): Promise<void> {
   await withStore("readwrite", (store) => store.put(draft));
 }
 
-export async function readLocalDraft(id = "current"): Promise<LocalDraft | null> {
+export async function readLocalDraft(
+  id = "current",
+): Promise<LocalDraft | null> {
   return (await withStore("readonly", (store) => store.get(id))) ?? null;
 }
 
@@ -119,7 +121,9 @@ export async function deleteLocalDraft(id = "current"): Promise<void> {
   await withStore("readwrite", (store) => store.delete(id));
 }
 
-export async function markDraftForAuthResume(document: GridDocument): Promise<void> {
+export async function markDraftForAuthResume(
+  document: GridDocument,
+): Promise<void> {
   await saveLocalDraft({
     id: RESUME_KEY,
     document,
