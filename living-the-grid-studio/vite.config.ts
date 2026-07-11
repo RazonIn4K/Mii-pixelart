@@ -1,8 +1,30 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { cp, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+
+function pagesRollbackAssets(): Plugin {
+  const clientDirectory = path.resolve(import.meta.dirname, "dist", "client");
+  const pagesDirectory = path.resolve(import.meta.dirname, "dist", "public");
+
+  return {
+    name: "tomodachi-pages-rollback-assets",
+    apply: "build",
+    async closeBundle() {
+      try {
+        if (!(await stat(clientDirectory)).isDirectory()) return;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+
+      await rm(pagesDirectory, { force: true, recursive: true });
+      await cp(clientDirectory, pagesDirectory, { recursive: true });
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
@@ -16,6 +38,7 @@ export default defineConfig({
       },
       remoteBindings: false,
     }),
+    pagesRollbackAssets(),
   ],
   resolve: {
     alias: {
