@@ -10,9 +10,10 @@
 #   3. `doppler setup`                  # picks tomodachi-platform / dev for you
 #   4. `doppler run -- pnpm dev`        # injects secrets at runtime
 #
-# Cloudflare Pages is connected via Doppler's Cloudflare Pages integration,
-# so production / preview env vars sync automatically when you change them
-# in the Doppler UI. No need to redeploy to refresh secrets.
+# Doppler may sync values into the Cloudflare Pages project settings, but an
+# already-running Pages Functions deployment keeps the bindings it was
+# deployed with. After an approved secret change, create and validate a new
+# Pages deployment before revoking the previous provider credential.
 
 setup:
   project: tomodachi-platform

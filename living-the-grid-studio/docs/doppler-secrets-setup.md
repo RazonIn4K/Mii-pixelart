@@ -67,10 +67,10 @@ cd living-the-grid-studio   # from repo root
 | 1 | `brew install dopplerhq/cli/doppler` (if needed) |
 | 2 | `doppler login` |
 | 3 | `doppler setup` → **Yes** to use `doppler.yaml` → you get **`tomodachi-platform` / `dev`** scoped to this folder |
-| 4 | **Copy shared keys** from `local-mac-work` into `tomodachi-platform` / `dev` only where the credential is truly shared (see [§4](#4-cli-copy-from-local-mac-work-into-tomodachi-platform)) |
+| 4 | **Do not bulk-copy shared keys.** Move a value from another project only after the current Tomodachi source contains an executable consumer and the credential owner approves that exact environment (see [§4](#4-cli-copy-from-local-mac-work-into-tomodachi-platform)) |
 | 5 | **Set Tomodachi core secrets** on `dev`, then `stg`, then `prd` — see **[§6](#6-which-values-does-this-repo-actually-need)** for the full list; use the dashboard or bulk CLI in [§5](#5-bulk-set-dev-stg-prd) |
 | 6 | **Verify:** `doppler secrets -p tomodachi-platform -c dev` (and `stg` / `prd` as needed) |
-| 7 | **Doppler → Cloudflare Pages:** Integration → map **`prd` → Production**, **`stg` → Preview** for project `tomodachi-studio` ([docs](https://docs.doppler.com/docs/cloudflare-pages)) |
+| 7 | **Doppler → Cloudflare Pages:** Integration → map **`prd` → Production**, **`stg` → Preview** for project `mii-pixelart` ([docs](https://docs.doppler.com/docs/cloudflare-pages)). A settings sync does not update an existing Functions deployment; create and validate a new deployment before revoking the old credential. |
 | 8 | **Cloudflare Pages** build: root `living-the-grid-studio`, command `pnpm install --frozen-lockfile && pnpm vite build`, output `dist/public`, branch `main` — see `docs/cloudflare-deployment.md` |
 | 9 | **Smoke test:** `doppler run -- pnpm check` · `doppler run -- pnpm vite build` · `doppler run -- pnpm dev` |
 | 10 | Later: service tokens for automation ([§9](#9-service-tokens-and-github-ci)) |
@@ -85,9 +85,17 @@ There was no rule against CLI copy. The earlier emphasis on **one-key `get` → 
 2. **Not bulk-copying unrelated keys** (Airtable, GHL, etc.) into Tomodachi by mistake.
 3. **Tomodachi-specific values** (`PUBLIC_SITE_URL`, Stripe objects for this site, OpenRouter keys you want for this product) often **do not exist** on `local-mac-work` anyway—you still set those on `tomodachi-platform`.
 
-**Copy when:** same key name, same value is correct, Tomodachi is allowed to use it (e.g. `RUNPOD_API_KEY`). CLI copy is exactly right: `doppler secrets get` from `local-mac-work` piped into `doppler secrets set` on `tomodachi-platform` avoids retyping and avoids a committed `.env`.
+**Copy only when:** the current Tomodachi source has an executable consumer,
+the source and destination are owned by the same provider account, and the
+credential owner has approved that exact environment. Prefer a distinct key
+per environment even when the provider account is shared.
 
-**Do not copy:** unrelated product keys (Airtable, GHL, …) or keys that should be Tomodachi-specific (Stripe, site URLs, OpenRouter key for this app).
+**Do not copy:** unrelated product keys (Airtable, GHL, …), credentials owned by
+another stack, or keys that should be Tomodachi-specific. In particular,
+`RUNPOD_API_KEY` and `N8N_LEAD_PIXEL_WEBHOOK_URL` belong to the separate
+`ai-actor-platform` stack and are not Tomodachi secrets. OpenRouter keys must be
+environment-specific, and Stripe webhook secrets must match the exact Stripe
+endpoint for that environment.
 
 List key names in source (no values):
 
@@ -95,26 +103,20 @@ List key names in source (no values):
 doppler secrets -p local-mac-work -c dev --json | jq -r 'keys[]'
 ```
 
-**One key (nothing typed by hand).** Append **`--silent`** so Doppler does not print the new value to the terminal:
+**One approved key (nothing typed by hand).** Pipe the value through standard
+input so it is not placed in a process argument. Append **`--silent`** so
+Doppler does not print the new value to the terminal:
 
 ```bash
-KEY=RUNPOD_API_KEY
-doppler secrets set "$KEY" "$(doppler secrets get "$KEY" -p local-mac-work -c dev --plain)" \
-  -p tomodachi-platform -c dev --silent
+KEY=<APPROVED_SHARED_KEY>
+doppler secrets get "$KEY" -p <SOURCE_PROJECT> -c <SOURCE_CONFIG> --plain |
+  doppler secrets set "$KEY" -p tomodachi-platform -c dev --silent
 ```
 
-**Several keys:**
-
-```bash
-for KEY in RUNPOD_API_KEY N8N_LEAD_PIXEL_WEBHOOK_URL; do
-  doppler secrets set "$KEY" "$(doppler secrets get "$KEY" -p local-mac-work -c dev --plain)" \
-    -p tomodachi-platform -c dev --silent || true
-done
-```
-
-To copy the same shared keys into **`stg`** or **`prd`**, change `-c dev` at the end to `-c stg` or `-c prd`.
-
-**Practical order:** copy shared keys from `local-mac-work` with the loop or one-liners above, then run your bulk `set` for Tomodachi-only keys on `dev` / `stg` / `prd` in [§5](#5-bulk-set-dev-stg-prd) (or set those in the dashboard if you prefer zero shell history for `prd`).
+Never loop over a generic list of "shared" keys. Repeat the one-key operation
+only after recording the owner, consumer, source config, destination config,
+and revocation plan for that individual value. A value approved for `dev` is
+not implicitly approved for `stg` or `prd`.
 
 ---
 
