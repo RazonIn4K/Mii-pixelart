@@ -233,7 +233,7 @@ test("moderation actions remain disabled until target context and history are re
   await page.route("**/api/moderation/stats", (route) => fulfillJson(route, {
     data: { hiddenComments: 0, hiddenCreations: 0, openReports: 1, suspendedUsers: 0 }, requestId,
   }));
-  await page.route(`**/api/moderation/reports/${report.id}`, (route) => fulfillJson(route, {
+  await page.route(`**/api/moderation/reports/${report.id}?**`, (route) => fulfillJson(route, {
     data: {
       actions: [{ action: "lock_comments", createdAt: 1_699_000_000_000, id: "action-1", reason: "Earlier review" }],
       report,
@@ -247,6 +247,7 @@ test("moderation actions remain disabled until target context and history are re
         visibility: "public",
       },
     },
+    meta: { hasMore: false, limit: 50, nextCursor: null },
     requestId,
   }));
 

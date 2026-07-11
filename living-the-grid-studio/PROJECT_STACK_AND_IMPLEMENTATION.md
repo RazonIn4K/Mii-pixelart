@@ -147,8 +147,24 @@ living-the-grid-studio/
     stripe.ts
   shared/
     ai.ts
+    community.ts
     products.ts
     residents.ts
+  worker/
+    index.ts
+    auth.ts
+    accounts.ts
+    creations.ts
+    discovery.ts
+    social.ts
+    moderation.ts
+    scheduled.ts
+  migrations/
+    0001_community.sql
+    0002_comment_locks.sql
+    0003_atomic_quota_reservations.sql
+  config/
+    deployment-readiness.example.json
   fixtures/
     living-the-grid-real.json
     ltg-indexed-palette-sample.json
@@ -164,11 +180,14 @@ living-the-grid-studio/
     compare-openrouter-models.ts
     cloudflare-security-insights.ts
     save-creative-template-fixtures.ts
-    sync-cloudflare-worker-secrets.sh
+    verify-bundle-budgets.ts
+    worker-release.ts
   package.json
   vite.config.ts
+  vitest.config.ts
+  vitest.preflight.config.ts
   tsconfig.json
-  wrangler.toml
+  wrangler.jsonc
 ```
 
 ## 5. Main Technologies Being Used
@@ -885,9 +904,9 @@ The HTML reference includes:
 - Palette swatches.
 - Full project JSON in a `<pre>` block.
 
-### Known Export Copy Drift
+### Export Copy Alignment
 
-Some older crawler-shell/public-copy text may still refer to a PDF reference pack. The actual implemented export path currently generates a ZIP containing PNG, JSON, CSV, text notes, manifest JSON, and HTML. PDF export is not implemented in the current code.
+Crawler-shell and public product copy now describe the implemented ZIP reference pack: PNG, JSON, CSV, text notes, manifest JSON, and HTML. PDF export is not implemented or advertised.
 
 ## 19. Public Visual Assets
 

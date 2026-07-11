@@ -1,5 +1,27 @@
 const encoder = new TextEncoder();
 
+const PLACEHOLDER_PREFIXES = [
+  "change-me",
+  "change_me",
+  "changeme",
+  "dev-",
+  "dev_",
+  "development-",
+  "example-",
+  "example_",
+  "local-",
+  "local_",
+  "placeholder",
+  "replace-",
+  "replace_",
+  "test-only-",
+  "test_only_",
+  "test-",
+  "test_",
+  "your-",
+  "your_",
+] as const;
+
 export function randomToken(byteLength = 32): string {
   const bytes = new Uint8Array(byteLength);
   crypto.getRandomValues(bytes);
@@ -32,9 +54,9 @@ export async function pseudonymize(
   value: string,
 ): Promise<string> {
   const configured = env.PSEUDONYM_KEY?.trim();
-  const secret = configured || (env.ENVIRONMENT === "local"
-    ? "tomodachi-local-only-pseudonym-key"
-    : null);
+  const secret = env.ENVIRONMENT === "local"
+    ? configured || "tomodachi-local-only-pseudonym-key"
+    : isStrongRuntimeSecret(configured, env.ENVIRONMENT) ? configured : null;
   if (!secret) {
     // This error is deliberately handled by the Worker's redacted error path.
     // Never fall back to an unkeyed digest outside local development.
@@ -56,9 +78,33 @@ export function decodeBase64Url(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-export async function secretKey(secret: string): Promise<Uint8Array> {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
-  return new Uint8Array(digest);
+export function isStrongRuntimeSecret(
+  secret: string | undefined,
+  environment: Env["ENVIRONMENT"],
+): boolean {
+  const value = secret?.trim();
+  if (!value) return false;
+  if (environment === "local") return true;
+  if (encoder.encode(value).byteLength < 32) return false;
+  const normalized = value.toLowerCase();
+  return !PLACEHOLDER_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+export function isValidOidcCookieKey(secret: string | undefined): boolean {
+  const value = secret?.trim();
+  if (!value || !/^[A-Za-z0-9_-]+={0,2}$/u.test(value)) return false;
+  try {
+    return decodeBase64Url(value).byteLength === 32;
+  } catch {
+    return false;
+  }
+}
+
+export function secretKey(secret: string): Uint8Array {
+  if (!isValidOidcCookieKey(secret)) {
+    throw new Error("OIDC cookie key must contain exactly 32 base64url-encoded bytes.");
+  }
+  return decodeBase64Url(secret.trim());
 }
 
 function hex(bytes: Uint8Array): string {

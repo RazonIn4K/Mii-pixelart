@@ -42,9 +42,11 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
    pnpm install --frozen-lockfile
    pnpm check
    pnpm test:worker
+   pnpm test:preflight
    pnpm verify
    pnpm test:e2e
    pnpm worker:dry-run
+   pnpm verify:bundle
    ```
 
 4. Apply `migrations/0001_community.sql` to a disposable local D1 database and
@@ -83,19 +85,42 @@ generated Wrangler `Env` type; do not hand-maintain a parallel binding type.
 Required secrets are:
 
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `OIDC_COOKIE_KEY` (32 random bytes, encoded for secret storage)
-- `SESSION_PEPPER` (independent random value used before hashing session tokens)
-- `PSEUDONYM_KEY` (independent HMAC key for privacy-preserving rate-limit keys
-  and persisted report/moderation pseudonyms; never emitted to logs)
+- `OIDC_COOKIE_KEY` (exactly 32 random bytes, base64url encoded)
+- `SESSION_PEPPER` (at least 32 independent random bytes used before hashing
+  session tokens)
+- `PSEUDONYM_KEY` (at least 32 independent random bytes used as the HMAC key
+  for privacy-preserving rate-limit keys and persisted report/moderation
+  pseudonyms; never emitted to logs)
 - Existing `OPENROUTER_API_KEY`, `STRIPE_SECRET_KEY`, and
   `STRIPE_WEBHOOK_SECRET`
 
+Outside local development the Worker rejects short values and known
+placeholder prefixes for Google credentials, session pepper, and pseudonym
+keys. It also rejects an OIDC cookie key that does not decode to exactly 32
+bytes. Generate values with a cryptographically secure tool; do not reuse a
+value between purposes or environments.
+
 Non-secret environment values include `PUBLIC_SITE_URL`, `GOOGLE_OIDC_REDIRECT_URI`,
-`TERMS_VERSION`, and environment name. Google redirect URIs must be exact:
+`TERMS_VERSION`, `COMMUNITY_MUTATIONS_ENABLED`, and environment name. Google
+redirect URIs must be exact:
 
 - `http://localhost:3000/api/auth/google/callback`
 - `https://staging.tomodachi.pw/api/auth/google/callback`
 - `https://tomodachi.pw/api/auth/google/callback`
+
+`COMMUNITY_MUTATIONS_ENABLED` is fail-closed: only the exact string `true`
+allows profile, project, publishing, social, report, or moderation writes.
+Missing, malformed, and `false` values return the standard `503
+SERVICE_UNAVAILABLE` envelope before a route handler can mutate D1 or R2. Reads,
+anonymous Studio operation, OAuth/session controls, account deletion and
+cancellation, the existing AI/Stripe routes, and Stripe webhooks remain
+available. Local development is enabled; the tracked staging and production
+configurations are deliberately read-only until a reviewed deployment artifact
+sets the flag to `true`.
+
+Because a Wrangler environment variable changes only through deployment, keep
+a validated read-only Worker version ready for rollback. Do not describe this
+flag as a no-deploy control-plane switch.
 
 Do not copy production D1/R2/KV identifiers or OAuth secrets into staging or
 preview. Bind private R2 through the Worker rather than creating a public bucket;
@@ -129,19 +154,31 @@ in `dist/tomodachi_studio`. Preview, dry-run, and any later deployment must use
 `dist/tomodachi_studio/wrangler.json`; do not point Static Assets at a stale
 top-level build directory.
 
-Select a Cloudflare environment at build time, not with `wrangler deploy --env`:
+Use the target-explicit release wrapper. It selects the Cloudflare environment
+at build time, validates the flattened configuration against the selected
+source environment, and never adds `wrangler deploy --env`:
 
 ```bash
-pnpm build:staging
-pnpm exec wrangler deploy --dry-run --config dist/tomodachi_studio/wrangler.json
-
-pnpm build:production
-pnpm exec wrangler deploy --dry-run --config dist/tomodachi_studio/wrangler.json
+pnpm worker:dry-run
+pnpm worker:dry-run:staging
+pnpm worker:dry-run:production
 ```
 
-The non-dry-run form remains approval-gated. Inspect the flattened output config
-before every deploy and confirm its host, resource IDs, rate-limit namespaces,
-and environment variables.
+Dry-run mode always passes `--dry-run`; it permits placeholder remote IDs only
+with a warning. There is no generic deploy command. The only non-dry-run entry
+points are `pnpm worker:deploy:staging` and
+`pnpm worker:deploy:production`, and both fail before the build or Wrangler
+spawn unless every deploy gate below is satisfied.
+
+For an approved deployment, copy
+`config/deployment-readiness.example.json` to the ignored
+`.deployment-readiness/<target>.json`, replace every placeholder, and bind it
+to the exact clean Git commit. The approval expires after 30 minutes and records
+the intended read-only/writable mutation mode. It must also confirm the exact
+Cloudflare/Google/domain, pricing/Images, legal/contact/retention,
+admin/moderator/inbox, consult-fulfillment, Stripe/tax, rollback, and migration
+owners or decisions. The wrapper validates these fields without logging their
+values. Inspect the flattened output config before every deploy.
 
 ## Staging gate and procedure
 
@@ -151,13 +188,20 @@ After explicit approval for resources and staging deployment:
    Google project, owners, and expected cost in the change ticket.
 2. Create isolated staging resources. Copy only synthetic fixtures; never clone
    production identity, project, report, or session data.
-3. Add staging binding IDs to the staging Wrangler environment and write secrets
-   with the secret manager/CLI, never a tracked file.
+3. Add staging binding IDs to the staging Wrangler environment and write only
+   the eight allowlisted secrets with an explicit target through the approved
+   secret manager/CLI flow, never a tracked file. The obsolete bulk-Doppler
+   helper was removed because it selected neither an environment nor an
+   allowlist. `secrets.required` in Wrangler must list the same eight names in
+   every environment.
 4. List unapplied migrations against the **database name**, review the output,
    then apply them only after the migration approval gate.
-5. Run `pnpm build:staging`, inspect the generated output configuration, then
-   deploy that output Worker to its staging hostname. Do not attach the production
-   hostname or route.
+5. Run `pnpm worker:dry-run:staging`, inspect the generated output
+   configuration, then deploy that exact output Worker to its staging hostname
+   after the separate deployment approval. The first deployment remains
+   read-only; enable community mutations only in a later reviewed artifact used
+   for authenticated write acceptance. Do not attach the production hostname or
+   route.
 6. Before treating the deployment as backend acceptance, request
    `/api/discover/recent?limit=1` with `Accept: application/json` and require a
    JSON content type plus the standard `{ data, requestId }` envelope. A `200`
@@ -185,11 +229,14 @@ domain cutover:
    list, DNS/routes, OAuth redirect configuration, and rollback owner.
 3. List and apply only reviewed unapplied D1 migrations by production database
    name. Never re-run SQL manually or edit the migration ledger.
-4. Run `pnpm build:production`, inspect the generated output configuration, and
-   deploy the production Worker without changing the canonical domain. Smoke
-   test its workers.dev/controlled route with authentication disabled unless
-   that exact host exists in the production OAuth client.
-5. Attach `tomodachi.pw` to the Worker. Verify TLS, assets, SPA fallback, dynamic
+4. Run `pnpm worker:dry-run:production`, inspect the generated output
+   configuration, and deploy the production Worker in read-only mode without
+   changing the canonical domain. Smoke test its workers.dev/controlled route
+   with authentication disabled unless that exact host exists in the production
+   OAuth client.
+5. After the read-only smoke test, create and verify the exact production
+   artifact with `COMMUNITY_MUTATIONS_ENABLED=true` under the cutover approval,
+   then attach `tomodachi.pw` to that Worker. Verify TLS, assets, SPA fallback, dynamic
    documents, API headers, Stripe webhook, AI routes, robots/sitemap, and no
    Pages/Worker route overlap.
 6. Run anonymous edit/export, Google sign-in/onboarding, explicit private save,
@@ -203,8 +250,10 @@ domain cutover:
 Use rollback for a material auth, authorization, data-integrity, payment,
 availability, or privacy regression.
 
-1. Disable new community mutations with the server-side kill switch while
-   preserving anonymous Studio operation.
+1. Deploy the validated read-only Worker version (or set
+   `COMMUNITY_MUTATIONS_ENABLED=false` in a reviewed build and deploy it) to
+   disable community mutations while preserving anonymous Studio and the
+   documented operational routes.
 2. Route `tomodachi.pw` back to the recorded Pages deployment or last known-good
    Worker version.
 3. Do **not** roll back D1 by deleting tables or reversing an applied migration.

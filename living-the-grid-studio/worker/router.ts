@@ -32,7 +32,10 @@ export class Router {
       if (!params) continue;
       pathMatched = true;
       if (route.method !== requestMethod && route.method !== "*") continue;
-      return route.handler({ ...context, params });
+      // Keep a synchronously rejected async handler attached to this dispatch
+      // chain so the Worker's outer error boundary can normalize it without a
+      // separate unhandled-rejection signal in workerd.
+      return await route.handler({ ...context, params });
     }
 
     if (pathMatched) {

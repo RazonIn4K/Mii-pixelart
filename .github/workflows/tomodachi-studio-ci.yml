@@ -53,6 +53,9 @@ jobs:
       - name: Run Worker tests
         run: pnpm test:worker
 
+      - name: Test release preflight gates
+        run: pnpm test:preflight
+
       - name: Audit dependencies
         run: pnpm audit --audit-level high
 
@@ -64,6 +67,9 @@ jobs:
 
       - name: Dry-run production Worker package
         run: pnpm worker:dry-run:production
+
+      - name: Enforce client bundle budgets
+        run: pnpm verify:bundle
 
   browser:
     name: Browser and accessibility acceptance

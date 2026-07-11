@@ -10,7 +10,7 @@ ownership, visibility, and object manifests. R2 never decides access.
 ```mermaid
 flowchart LR
   Browser["React/Vite SPA\nlocal GridDocument + IndexedDB"]
-  Worker["Cloudflare Worker\nHono + policy middleware"]
+  Worker["Cloudflare Worker\nHono + policy and mutation gates"]
   Assets["Worker Static Assets"]
   Google["Google OIDC"]
   D1["D1\nidentity + relational state"]
@@ -71,9 +71,9 @@ sequenceDiagram
   participant X as Images
 
   B->>W: POST /api/creations (explicit opt-in; canonical project)
-  W->>W: Authenticate, Origin check, quota + Zod validation
+  W->>W: Mutation gate, authenticate, Origin check, Zod validation
   W->>W: Strip source filenames/arbitrary metadata; recompute colors
-  W->>D: Reserve private creation + uploading revision
+  W->>D: Atomically reserve quota + private creation + uploading revision
   W->>R: PUT immutable project.json
   W->>X: Transcode deterministic grid-only SVG
   X-->>W: WebP thumbnail/preview + JPEG social image

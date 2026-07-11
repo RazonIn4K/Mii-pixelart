@@ -113,3 +113,26 @@ authorization and is outside this API.
   inbox must be monitored.
 - Production Cloudflare/Google resources and any paid Images usage require
   explicit approval; see `docs/community-deployment-runbook.md`.
+
+## Deployment and incident safeguards
+
+- `COMMUNITY_MUTATIONS_ENABLED` fails closed unless its value is exactly
+  `true`. The Worker checks it before dispatching unsafe community routes, so a
+  read-only deployment cannot reach project, publishing, social, report, or
+  moderation handlers.
+- Authentication/session controls, deletion controls, legacy AI and Stripe
+  behavior, and Stripe webhooks are intentionally operational exemptions.
+  Any new unsafe API route is blocked by default until explicitly classified.
+- The tracked staging and production configurations remain read-only. Enabling
+  mutations, replacing placeholder resource IDs, writing secrets, deploying,
+  and attaching a domain are separate approval gates.
+- Target-explicit release commands validate the selected source and generated
+  Worker configurations. Non-dry-run commands reject placeholder bindings,
+  legal launch markers, a dirty/wrong commit, stale or unignored approvals,
+  missing named owners, and an unapproved writable mutation mode before
+  spawning Wrangler.
+- Required secret names are declared per Wrangler environment. Secret values
+  remain out of source control and logs. Non-local session and pseudonym keys
+  must contain at least 32 random bytes, and the AES-GCM OIDC cookie key must
+  decode from base64url to exactly 32 bytes; weak and known-placeholder values
+  fail closed.

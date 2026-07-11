@@ -36,17 +36,13 @@ import {
 } from "./media";
 import type { Router } from "./router";
 
-interface QuotaRow {
-  bytes_total: number;
-  creation_count: number;
-}
-
 interface ObjectRow {
   content_type: string;
   object_key: string;
 }
 
 const PROJECT_REQUEST_LIMIT = COMMUNITY_LIMITS.gridDocumentBytes + 32_768;
+const QUOTA_RESERVATION_TTL_MS = 60 * 60 * 1_000;
 
 export function registerCreationRoutes(router: Router): void {
   router
@@ -68,10 +64,6 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
   const session = await requireOnboardedSession(context);
   await enforceRateLimit(context.env.SAVE_RATE_LIMITER, session.user.id);
   const input = await parseJson(context.request, CreateCreationSchema, PROJECT_REQUEST_LIMIT);
-  const quota = await getQuota(context.env, session.user.id);
-  if (quota.creation_count >= COMMUNITY_LIMITS.creationsPerUser) {
-    throw new HttpError(409, "creation_quota_exceeded", "Cloud creation limit reached.");
-  }
 
   const now = Date.now();
   const creationId = crypto.randomUUID();
@@ -81,25 +73,38 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
   const projectBytes = new TextEncoder().encode(canonicalJson).byteLength;
   const title = (input.title ?? input.project.meta.name).slice(0, COMMUNITY_LIMITS.creationTitleCharacters);
 
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      `INSERT INTO creations
-       (id, owner_user_id, slug, title, description, state, visibility,
-        comments_enabled, project_download_enabled, current_revision_id,
-        bytes_total, created_at, updated_at)
-       VALUES (?, ?, ?, ?, '', 'draft', 'private', 0, 0, NULL, 0, ?, ?)`,
-    ).bind(creationId, session.user.id, slug, title, now, now),
-    context.env.DB.prepare(
-      `INSERT INTO creation_revisions
-       (id, creation_id, revision_number, status, project_bytes, created_at)
-       VALUES (?, ?, 1, 'uploading', ?, ?)`,
-    ).bind(revisionId, creationId, projectBytes, now),
-    context.env.DB.prepare(
-      `INSERT INTO creation_stats
-       (creation_id, like_count, comment_count, popularity_score, updated_at)
-       VALUES (?, 0, 0, 0, ?)`,
-    ).bind(creationId, now),
-  ]);
+  try {
+    await context.env.DB.batch([
+      quotaReservationStatement(context.env, {
+        creationSlots: 1,
+        id: revisionId,
+        now,
+        userId: session.user.id,
+      }),
+      context.env.DB.prepare(
+        `INSERT INTO creations
+         (id, owner_user_id, slug, title, description, state, visibility,
+          comments_enabled, project_download_enabled, current_revision_id,
+          bytes_total, created_at, updated_at)
+         VALUES (?, ?, ?, ?, '', 'draft', 'private', 0, 0, NULL, 0, ?, ?)`,
+      ).bind(creationId, session.user.id, slug, title, now, now),
+      context.env.DB.prepare(
+        `INSERT INTO creation_revisions
+         (id, creation_id, revision_number, status, project_bytes, created_at)
+         VALUES (?, ?, 1, 'uploading', ?, ?)`,
+      ).bind(revisionId, creationId, projectBytes, now),
+      context.env.DB.prepare(
+        `INSERT INTO creation_stats
+         (creation_id, like_count, comment_count, popularity_score, updated_at)
+         VALUES (?, 0, 0, 0, ?)`,
+      ).bind(creationId, now),
+      context.env.DB.prepare(
+        "UPDATE quota_reservations SET creation_slots = 0 WHERE id = ?",
+      ).bind(revisionId),
+    ]);
+  } catch (error) {
+    throw quotaHttpError(error) ?? error;
+  }
 
   let storedObjects: StoredCreationObject[] = [];
   try {
@@ -112,27 +117,27 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
     );
     storedObjects = objects;
     const bytesTotal = totalObjectBytes(objects);
-    if (quota.bytes_total + bytesTotal > COMMUNITY_LIMITS.cloudBytesPerUser) {
-      await context.env.PROJECTS.delete(objects.map((object) => object.key));
-      throw new HttpError(409, "storage_quota_exceeded", "Cloud storage limit reached.");
-    }
+    await reserveStorageQuota(context.env, revisionId, bytesTotal);
     await commitRevision(context.env, {
       bytesTotal,
       creationId,
       objects,
       oldRevisionId: null,
       projectSha256: await sha256(canonicalJson),
+      quotaReservationId: revisionId,
       revisionId,
       revisionNumber: 1,
     });
   } catch (error) {
+    const requestError = quotaHttpError(error) ?? error;
     if (storedObjects.length) {
       await context.env.PROJECTS.delete(storedObjects.map((object) => object.key));
     }
-    await context.env.DB.prepare("DELETE FROM creations WHERE id = ?")
-      .bind(creationId)
-      .run();
-    throw error;
+    await context.env.DB.batch([
+      context.env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?").bind(revisionId),
+      context.env.DB.prepare("DELETE FROM creations WHERE id = ?").bind(creationId),
+    ]);
+    throw requestError;
   }
 
   const created = await getCreationById(context.env, creationId);
@@ -156,16 +161,24 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
   const canonicalJson = JSON.stringify(input.project);
   const projectBytes = new TextEncoder().encode(canonicalJson).byteLength;
   try {
-    await context.env.DB.prepare(
-      `INSERT INTO creation_revisions
-       (id, creation_id, revision_number, status, project_bytes, created_at)
-       VALUES (?, ?, ?, 'uploading', ?, ?)`,
-    ).bind(revisionId, creation.id, revisionNumber, projectBytes, now).run();
+    await context.env.DB.batch([
+      context.env.DB.prepare(
+        `INSERT INTO creation_revisions
+         (id, creation_id, revision_number, status, project_bytes, created_at)
+         VALUES (?, ?, ?, 'uploading', ?, ?)`,
+      ).bind(revisionId, creation.id, revisionNumber, projectBytes, now),
+      quotaReservationStatement(context.env, {
+        creationSlots: 0,
+        id: revisionId,
+        now,
+        userId: session.user.id,
+      }),
+    ]);
   } catch (error) {
     if (error instanceof Error && /unique constraint/iu.test(error.message)) {
       throw new HttpError(409, "revision_conflict", "The cloud project has a newer revision.");
     }
-    throw error;
+    throw quotaHttpError(error) ?? error;
   }
 
   let storedObjects: StoredCreationObject[] = [];
@@ -179,28 +192,29 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
     );
     storedObjects = objects;
     const bytesTotal = totalObjectBytes(objects);
-    const quota = await getQuota(context.env, session.user.id);
-    if (quota.bytes_total + bytesTotal > COMMUNITY_LIMITS.cloudBytesPerUser) {
-      await context.env.PROJECTS.delete(objects.map((object) => object.key));
-      throw new HttpError(409, "storage_quota_exceeded", "Cloud storage limit reached.");
-    }
+    await reserveStorageQuota(context.env, revisionId, bytesTotal);
     await commitRevision(context.env, {
       bytesTotal,
       creationId: creation.id,
       objects,
       oldRevisionId: creation.current_revision_id,
       projectSha256: await sha256(canonicalJson),
+      quotaReservationId: revisionId,
       revisionId,
       revisionNumber,
     });
   } catch (error) {
+    const requestError = quotaHttpError(error) ?? error;
     if (storedObjects.length) {
       await context.env.PROJECTS.delete(storedObjects.map((object) => object.key));
     }
-    await context.env.DB.prepare(
-      "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
-    ).bind(revisionId).run();
-    throw error;
+    await context.env.DB.batch([
+      context.env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?").bind(revisionId),
+      context.env.DB.prepare(
+        "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
+      ).bind(revisionId),
+    ]);
+    throw requestError;
   }
 
   const saved = await getCreationById(context.env, creation.id);
@@ -559,6 +573,7 @@ async function commitRevision(
     objects: StoredCreationObject[];
     oldRevisionId: string | null;
     projectSha256: string;
+    quotaReservationId: string;
     revisionId: string;
     revisionNumber: number;
   },
@@ -602,19 +617,74 @@ async function commitRevision(
       ),
     );
   }
+  statements.push(
+    env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?")
+      .bind(input.quotaReservationId),
+  );
   await env.DB.batch(statements);
 }
 
-async function getQuota(env: Env, userId: string): Promise<QuotaRow> {
-  return (await env.DB.prepare(
-    `SELECT
-       (SELECT COUNT(*) FROM creations WHERE owner_user_id = ?) AS creation_count,
-       COALESCE((
-         SELECT SUM(co.byte_size) FROM creation_objects co
-         JOIN creations c ON c.id = co.creation_id
-         WHERE c.owner_user_id = ?
-       ), 0) AS bytes_total`,
-  ).bind(userId, userId).first<QuotaRow>()) ?? { bytes_total: 0, creation_count: 0 };
+function quotaReservationStatement(
+  env: Env,
+  input: {
+    creationSlots: 0 | 1;
+    id: string;
+    now: number;
+    userId: string;
+  },
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO quota_reservations
+     (id, user_id, creation_slots, storage_bytes, created_at, updated_at, expires_at)
+     VALUES (?, ?, ?, 0, ?, ?, ?)`,
+  ).bind(
+    input.id,
+    input.userId,
+    input.creationSlots,
+    input.now,
+    input.now,
+    input.now + QUOTA_RESERVATION_TTL_MS,
+  );
+}
+
+async function reserveStorageQuota(
+  env: Env,
+  reservationId: string,
+  storageBytes: number,
+): Promise<void> {
+  const now = Date.now();
+  try {
+    const result = await env.DB.prepare(
+      `UPDATE quota_reservations
+       SET creation_slots = 0, storage_bytes = ?, updated_at = ?, expires_at = ?
+       WHERE id = ?`,
+    ).bind(
+      storageBytes,
+      now,
+      now + QUOTA_RESERVATION_TTL_MS,
+      reservationId,
+    ).run();
+    if ((result.meta.changes ?? 0) !== 1) {
+      throw new HttpError(
+        409,
+        "quota_reservation_expired",
+        "The cloud save reservation expired. Try saving again.",
+      );
+    }
+  } catch (error) {
+    throw quotaHttpError(error) ?? error;
+  }
+}
+
+function quotaHttpError(error: unknown): HttpError | null {
+  if (!(error instanceof Error)) return null;
+  if (/creation_quota_exceeded/iu.test(error.message)) {
+    return new HttpError(409, "creation_quota_exceeded", "Cloud creation limit reached.");
+  }
+  if (/storage_quota_exceeded/iu.test(error.message)) {
+    return new HttpError(409, "storage_quota_exceeded", "Cloud storage limit reached.");
+  }
+  return null;
 }
 
 async function loadActiveTags(

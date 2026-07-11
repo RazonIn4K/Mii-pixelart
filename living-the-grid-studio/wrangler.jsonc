@@ -41,7 +41,20 @@
     "ENVIRONMENT": "local",
     "PUBLIC_SITE_URL": "http://localhost:3000",
     "GOOGLE_OIDC_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
-    "TERMS_VERSION": "2026-07-10"
+    "TERMS_VERSION": "2026-07-10",
+    "COMMUNITY_MUTATIONS_ENABLED": "true"
+  },
+  "secrets": {
+    "required": [
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "OIDC_COOKIE_KEY",
+      "SESSION_PEPPER",
+      "PSEUDONYM_KEY",
+      "OPENROUTER_API_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET"
+    ]
   },
   "d1_databases": [
     {
@@ -89,7 +102,20 @@
         "ENVIRONMENT": "staging",
         "PUBLIC_SITE_URL": "https://staging.tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://staging.tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-10"
+        "TERMS_VERSION": "2026-07-10",
+        "COMMUNITY_MUTATIONS_ENABLED": "false"
+      },
+      "secrets": {
+        "required": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "OIDC_COOKIE_KEY",
+          "SESSION_PEPPER",
+          "PSEUDONYM_KEY",
+          "OPENROUTER_API_KEY",
+          "STRIPE_SECRET_KEY",
+          "STRIPE_WEBHOOK_SECRET"
+        ]
       },
       "d1_databases": [
         { "binding": "DB", "database_name": "tomodachi-studio-staging", "database_id": "11111111-1111-1111-1111-111111111111", "migrations_dir": "./migrations" }
@@ -115,7 +141,20 @@
         "ENVIRONMENT": "production",
         "PUBLIC_SITE_URL": "https://tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-10"
+        "TERMS_VERSION": "2026-07-10",
+        "COMMUNITY_MUTATIONS_ENABLED": "false"
+      },
+      "secrets": {
+        "required": [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "OIDC_COOKIE_KEY",
+          "SESSION_PEPPER",
+          "PSEUDONYM_KEY",
+          "OPENROUTER_API_KEY",
+          "STRIPE_SECRET_KEY",
+          "STRIPE_WEBHOOK_SECRET"
+        ]
       },
       "d1_databases": [
         { "binding": "DB", "database_name": "tomodachi-studio-production", "database_id": "22222222-2222-2222-2222-222222222222", "migrations_dir": "./migrations" }

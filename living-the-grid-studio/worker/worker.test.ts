@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalizeGridDocument } from "../shared/community";
 import { clientKey } from "./auth";
-import { safeRelativeReturnTo, sha256 } from "./crypto";
+import { isCommunityMutationBlocked } from "./community-mode";
+import {
+  isStrongRuntimeSecret,
+  isValidOidcCookieKey,
+  safeRelativeReturnTo,
+  secretKey,
+  sha256,
+} from "./crypto";
 import { applySecurityHeaders, failure, readJson } from "./http";
 import { renderGridSvg } from "./media";
 
@@ -35,6 +42,23 @@ describe("Worker security primitives", () => {
     expect(first).not.toBe(await sha256("203.0.113.42"));
   });
 
+  it("rejects weak remote secrets and decodes exact 32-byte OIDC keys", () => {
+    const keyBytes = new Uint8Array(32).fill(7);
+    const encodedKey = btoa(String.fromCharCode(...keyBytes))
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replace(/=+$/u, "");
+    expect(isValidOidcCookieKey(encodedKey)).toBe(true);
+    expect(secretKey(encodedKey)).toEqual(keyBytes);
+    expect(isValidOidcCookieKey("replace-with-32-byte-base64url-key")).toBe(false);
+    expect(() => secretKey("short")).toThrow(/32 base64url/iu);
+
+    expect(isStrongRuntimeSecret("short-local-secret", "local")).toBe(true);
+    expect(isStrongRuntimeSecret("short", "staging")).toBe(false);
+    expect(isStrongRuntimeSecret("test-only-".padEnd(48, "x"), "production")).toBe(false);
+    expect(isStrongRuntimeSecret("7FqQW-1sz9y8wSRjK5odL4hB2cPN6Vmu", "production")).toBe(true);
+  });
+
   it("rejects bodies that exceed a bounded reader limit", async () => {
     const request = new Request("https://example.test/api", {
       body: JSON.stringify({ value: "too large" }),
@@ -54,6 +78,34 @@ describe("Worker security primitives", () => {
     });
     expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
     expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
+  });
+
+  it("fails closed for community mutations while preserving operational controls", () => {
+    for (const value of [undefined, "", "false", "TRUE", "1"]) {
+      expect(isCommunityMutationBlocked("POST", "/api/creations", value)).toBe(true);
+    }
+    expect(isCommunityMutationBlocked("POST", "/api/creations", "true")).toBe(false);
+
+    for (const method of ["GET", "HEAD", "OPTIONS"]) {
+      expect(isCommunityMutationBlocked(method, "/api/creations", undefined)).toBe(false);
+    }
+
+    for (const [method, path] of [
+      ["POST", "/api/auth/google/start"],
+      ["POST", "/api/auth/logout"],
+      ["POST", "/api/auth/revoke-all"],
+      ["DELETE", "/api/me"],
+      ["POST", "/api/me/deletion/cancel"],
+      ["POST", "/api/ai/chat"],
+      ["POST", "/api/stripe/checkout"],
+      ["POST", "/api/webhooks/stripe"],
+    ]) {
+      expect(isCommunityMutationBlocked(method, path, undefined)).toBe(false);
+    }
+
+    expect(isCommunityMutationBlocked("POST", "/api/reports", undefined)).toBe(true);
+    expect(isCommunityMutationBlocked("POST", "/api/moderation/reports/id/actions", undefined)).toBe(true);
+    expect(isCommunityMutationBlocked("POST", "/api/future-write", undefined)).toBe(true);
   });
 });
 

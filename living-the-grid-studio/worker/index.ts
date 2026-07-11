@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { registerAccountRoutes } from "./accounts";
 import { registerAuthRoutes } from "./auth";
 import { registerCreationRoutes } from "./creations";
+import { assertCommunityMutationAllowed } from "./community-mode";
 import { registerDiscoveryRoutes } from "./discovery";
 import { dynamicDocument } from "./documents";
 import {
@@ -31,13 +32,13 @@ const app = new Hono<{ Bindings: Env }>();
 app.all("*", (context) => handleRequest(
   context.req.raw,
   context.env,
-  context.executionCtx as unknown as ExecutionContext,
+  context.executionCtx,
 ));
 
 async function handleRequest(
   request: Request,
   env: Env,
-  executionCtx: ExecutionContext,
+  executionCtx: WorkerRequestContext["executionCtx"],
 ): Promise<Response> {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
@@ -58,6 +59,7 @@ async function handleRequest(
     } else {
       assertSafeOrigin(context);
       if (url.pathname.startsWith("/api/")) {
+        assertCommunityMutationAllowed(context);
         response = (await router.dispatch(context))
           ?? failure(requestId, 404, "route_not_found", "API route was not found.");
       } else {

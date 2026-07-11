@@ -1,9 +1,4 @@
-import {
-  ModerationDecisionSchema,
-  decodeCursor,
-  encodeCursor,
-  type ModerationAction,
-} from "../shared/community";
+import { ModerationDecisionSchema, decodeCursor, encodeCursor, type ModerationAction } from "../shared/community";
 import { requireModerator } from "./auth";
 import { pseudonymize } from "./crypto";
 import { HttpError, normalizeLimit, parseJson, success, type WorkerRequestContext } from "./http";
@@ -42,39 +37,61 @@ export function registerModerationRoutes(router: Router): void {
 
 async function getReport(context: WorkerRequestContext): Promise<Response> {
   await requireModerator(context);
+  const limit = normalizeLimit(context.url.searchParams.get("limit"));
+  const cursor = parseModerationCursor(context.url.searchParams.get("cursor"));
   const report = await context.env.DB.prepare(
     `SELECT id, reporter_pseudonym, target_type, target_id, reason, details,
       status, assigned_moderator_user_id, resolution_note, created_at, updated_at,
       resolved_at FROM reports WHERE id = ? LIMIT 1`,
-  ).bind(context.params.id).first<ModerationReportRow>();
+  )
+    .bind(context.params.id)
+    .first<ModerationReportRow>();
   if (!report) throw new HttpError(404, "report_not_found", "Report was not found.");
+  const cursorClause = cursor ? "AND (created_at > ? OR (created_at = ? AND id > ?))" : "";
+  const values: unknown[] = [context.params.id, report.target_type, report.target_id];
+  if (cursor) values.push(cursor.sortValue, cursor.sortValue, cursor.id);
+  values.push(limit + 1);
   const actions = await context.env.DB.prepare(
     `SELECT id, actor_pseudonym, target_type, target_id, action, reason, created_at
      FROM moderation_actions
-     WHERE report_id = ? OR (target_type = ? AND target_id = ?)
-     ORDER BY created_at ASC`,
-  ).bind(context.params.id, report.target_type, report.target_id).all<{
-    action: string;
-    actor_pseudonym: string;
-    created_at: number;
-    id: string;
-    reason: string;
-    target_id: string;
-    target_type: string;
-  }>();
-  return success(context.requestId, {
-    actions: actions.results.map((action) => ({
-      action: action.action,
-      actorPseudonym: action.actor_pseudonym,
-      createdAt: action.created_at,
-      id: action.id,
-      reason: action.reason,
-      targetId: action.target_id,
-      targetType: action.target_type,
-    })),
-    report: reportToApi(report),
-    target: await reportTargetSummary(context.env, report.target_type, report.target_id),
-  });
+     WHERE (report_id = ? OR (target_type = ? AND target_id = ?)) ${cursorClause}
+     ORDER BY created_at ASC, id ASC LIMIT ?`,
+  )
+    .bind(...values)
+    .all<{
+      action: string;
+      actor_pseudonym: string;
+      created_at: number;
+      id: string;
+      reason: string;
+      target_id: string;
+      target_type: string;
+    }>();
+  const hasMore = actions.results.length > limit;
+  const page = actions.results.slice(0, limit);
+  const last = page.at(-1);
+  return success(
+    context.requestId,
+    {
+      actions: page.map((action) => ({
+        action: action.action,
+        actorPseudonym: action.actor_pseudonym,
+        createdAt: action.created_at,
+        id: action.id,
+        reason: action.reason,
+        targetId: action.target_id,
+        targetType: action.target_type,
+      })),
+      report: reportToApi(report),
+      target: await reportTargetSummary(context.env, report.target_type, report.target_id),
+    },
+    200,
+    {
+      hasMore,
+      limit,
+      nextCursor: hasMore && last ? encodeCursor({ id: last.id, sortValue: last.created_at }) : null,
+    },
+  );
 }
 
 async function moderationStats(context: WorkerRequestContext): Promise<Response> {
@@ -106,10 +123,8 @@ async function listReports(context: WorkerRequestContext): Promise<Response> {
   if (!["open", "reviewing", "resolved", "dismissed"].includes(status)) {
     throw new HttpError(400, "invalid_report_status", "Report status is invalid.");
   }
-  const cursor = parseReportCursor(context.url.searchParams.get("cursor"));
-  const cursorClause = cursor
-    ? "AND (created_at > ? OR (created_at = ? AND id > ?))"
-    : "";
+  const cursor = parseModerationCursor(context.url.searchParams.get("cursor"));
+  const cursorClause = cursor ? "AND (created_at > ? OR (created_at = ? AND id > ?))" : "";
   const values: unknown[] = [status];
   if (cursor) values.push(cursor.sortValue, cursor.sortValue, cursor.id);
   values.push(limit + 1);
@@ -118,16 +133,16 @@ async function listReports(context: WorkerRequestContext): Promise<Response> {
       status, assigned_moderator_user_id, resolution_note, created_at, updated_at,
       resolved_at FROM reports WHERE status = ? ${cursorClause}
       ORDER BY created_at ASC, id ASC LIMIT ?`,
-  ).bind(...values).all<ModerationReportRow>();
+  )
+    .bind(...values)
+    .all<ModerationReportRow>();
   const hasMore = rows.results.length > limit;
   const page = rows.results.slice(0, limit);
   const last = page.at(-1);
   return success(context.requestId, page.map(reportToApi), 200, {
     hasMore,
     limit,
-    nextCursor: hasMore && last
-      ? encodeCursor({ id: last.id, sortValue: last.created_at })
-      : null,
+    nextCursor: hasMore && last ? encodeCursor({ id: last.id, sortValue: last.created_at }) : null,
   });
 }
 
@@ -160,35 +175,39 @@ async function reportTargetSummary(
        u.username AS owner_username, u.display_name AS owner_display_name
        FROM creations c JOIN users u ON u.id = c.owner_user_id
        WHERE c.id = ? LIMIT 1`,
-    ).bind(targetId).first<{
-      comments_enabled: number;
-      comments_locked: number;
-      description: string;
-      id: string;
-      owner_display_name: string;
-      owner_id: string;
-      owner_username: string | null;
-      slug: string;
-      state: string;
-      title: string;
-      visibility: string;
-    }>();
-    return row ? {
-      commentsEnabled: Boolean(row.comments_enabled),
-      commentsLocked: Boolean(row.comments_locked),
-      description: row.description,
-      id: row.id,
-      label: row.title,
-      owner: {
-        displayName: row.owner_display_name,
-        id: row.owner_id,
-        username: row.owner_username,
-      },
-      slug: row.slug,
-      state: row.state,
-      type: "creation",
-      visibility: row.visibility,
-    } : unavailableTarget(targetType, targetId);
+    )
+      .bind(targetId)
+      .first<{
+        comments_enabled: number;
+        comments_locked: number;
+        description: string;
+        id: string;
+        owner_display_name: string;
+        owner_id: string;
+        owner_username: string | null;
+        slug: string;
+        state: string;
+        title: string;
+        visibility: string;
+      }>();
+    return row
+      ? {
+          commentsEnabled: Boolean(row.comments_enabled),
+          commentsLocked: Boolean(row.comments_locked),
+          description: row.description,
+          id: row.id,
+          label: row.title,
+          owner: {
+            displayName: row.owner_display_name,
+            id: row.owner_id,
+            username: row.owner_username,
+          },
+          slug: row.slug,
+          state: row.state,
+          type: "creation",
+          visibility: row.visibility,
+        }
+      : unavailableTarget(targetType, targetId);
   }
 
   if (targetType === "comment") {
@@ -200,60 +219,68 @@ async function reportTargetSummary(
        JOIN users u ON u.id = cm.author_user_id
        JOIN creations c ON c.id = cm.creation_id
        WHERE cm.id = ? LIMIT 1`,
-    ).bind(targetId).first<{
-      author_display_name: string;
-      author_user_id: string;
-      author_username: string | null;
-      body: string;
-      creation_id: string;
-      creation_slug: string;
-      creation_state: string;
-      creation_title: string;
-      id: string;
-      status: string;
-    }>();
-    return row ? {
-      author: {
-        displayName: row.author_display_name,
-        id: row.author_user_id,
-        username: row.author_username,
-      },
-      body: row.body,
-      creation: {
-        id: row.creation_id,
-        slug: row.creation_slug,
-        state: row.creation_state,
-        title: row.creation_title,
-      },
-      id: row.id,
-      label: `Comment on ${row.creation_title}`,
-      state: row.status,
-      type: "comment",
-    } : unavailableTarget(targetType, targetId);
+    )
+      .bind(targetId)
+      .first<{
+        author_display_name: string;
+        author_user_id: string;
+        author_username: string | null;
+        body: string;
+        creation_id: string;
+        creation_slug: string;
+        creation_state: string;
+        creation_title: string;
+        id: string;
+        status: string;
+      }>();
+    return row
+      ? {
+          author: {
+            displayName: row.author_display_name,
+            id: row.author_user_id,
+            username: row.author_username,
+          },
+          body: row.body,
+          creation: {
+            id: row.creation_id,
+            slug: row.creation_slug,
+            state: row.creation_state,
+            title: row.creation_title,
+          },
+          id: row.id,
+          label: `Comment on ${row.creation_title}`,
+          state: row.status,
+          type: "comment",
+        }
+      : unavailableTarget(targetType, targetId);
   }
 
   const row = await env.DB.prepare(
     `SELECT id, username, display_name, bio, role, status, created_at
      FROM users WHERE id = ? LIMIT 1`,
-  ).bind(targetId).first<{
-    bio: string;
-    created_at: number;
-    display_name: string;
-    id: string;
-    role: string;
-    status: string;
-    username: string | null;
-  }>();
-  return row ? {
-    bio: row.bio,
-    createdAt: row.created_at,
-    id: row.id,
-    label: row.display_name,
-    role: row.role,
-    state: row.status,
-    type: "user",
-    username: row.username,
-  } : unavailableTarget(targetType, targetId);
+  )
+    .bind(targetId)
+    .first<{
+      bio: string;
+      created_at: number;
+      display_name: string;
+      id: string;
+      role: string;
+      status: string;
+      username: string | null;
+    }>();
+  return row
+    ? {
+        bio: row.bio,
+        createdAt: row.created_at,
+        id: row.id,
+        label: row.display_name,
+        role: row.role,
+        state: row.status,
+        type: "user",
+        username: row.username,
+      }
+    : unavailableTarget(targetType, targetId);
 }
 
 function unavailableTarget(type: string, id: string): Record<string, unknown> {
@@ -266,16 +293,32 @@ async function decideReport(context: WorkerRequestContext): Promise<Response> {
   if (input.action !== "resolve_report" && input.action !== "dismiss_report") {
     throw new HttpError(400, "invalid_moderation_action", "Use a report decision action.");
   }
-  const report = await context.env.DB.prepare(
-    "SELECT id, status FROM reports WHERE id = ?",
-  ).bind(context.params.id).first<{ id: string; status: string }>();
+  const report = await context.env.DB.prepare("SELECT id, status FROM reports WHERE id = ?")
+    .bind(context.params.id)
+    .first<{ id: string; status: string }>();
   if (!report) throw new HttpError(404, "report_not_found", "Report was not found.");
+  if (report.status === "resolved" || report.status === "dismissed") {
+    throw reportDecisionConflict();
+  }
   const now = Date.now();
   const nextStatus = input.action === "resolve_report" ? "resolved" : "dismissed";
-  await context.env.DB.batch([
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
+      action: input.action,
+      reason: input.reason,
+      reportId: report.id,
+      targetId: report.id,
+      targetType: "report",
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
     context.env.DB.prepare(
       `UPDATE reports SET status = ?, assigned_moderator_user_id = ?, resolution_note = ?,
-       resolved_at = ?, free_text_purge_at = ?, retain_until = ?, updated_at = ? WHERE id = ?`,
+       resolved_at = ?, free_text_purge_at = ?, retain_until = ?, updated_at = ?
+       WHERE id = ? AND status IN ('open', 'reviewing')`,
     ).bind(
       nextStatus,
       moderator.user.id,
@@ -286,15 +329,14 @@ async function decideReport(context: WorkerRequestContext): Promise<Response> {
       now,
       report.id,
     ),
-    await actionStatement(context.env, moderator.user.id, {
-      action: input.action,
-      reason: input.reason,
-      reportId: report.id,
-      targetId: report.id,
-      targetType: "report",
-    }),
+    audit.statement,
   ]);
-  return success(context.requestId, { id: report.id, resolvedAt: now, status: nextStatus });
+  assertTransitionAudited(results, reportDecisionConflict());
+  return success(context.requestId, {
+    id: report.id,
+    resolvedAt: now,
+    status: nextStatus,
+  });
 }
 
 async function suspendUser(context: WorkerRequestContext): Promise<Response> {
@@ -302,47 +344,73 @@ async function suspendUser(context: WorkerRequestContext): Promise<Response> {
   await requireModeratableUser(context, moderator, "suspend");
   const input = await exactAction(context, "suspend_user");
   const now = Date.now();
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      "UPDATE users SET status = 'suspended', updated_at = ? WHERE id = ? AND status = 'active'",
-    ).bind(now, context.params.id),
-    context.env.DB.prepare(
-      "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-    ).bind(now, context.params.id),
-    context.env.DB.prepare(
-      `UPDATE creations SET state = 'hidden', visibility = 'private', hidden_at = ?,
-       published_at = NULL, updated_at = ?
-       WHERE owner_user_id = ? AND state = 'published'`,
-    ).bind(now, now, context.params.id),
-    context.env.DB.prepare(
-      "DELETE FROM creation_search WHERE creation_id IN (SELECT id FROM creations WHERE owner_user_id = ?)",
-    ).bind(context.params.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: context.params.id,
       targetType: "user",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      "UPDATE users SET status = 'suspended', updated_at = ? WHERE id = ? AND status = 'active'",
+    ).bind(now, context.params.id),
+    audit.statement,
+    context.env.DB.prepare(
+      `UPDATE sessions SET revoked_at = ?
+       WHERE user_id = ? AND revoked_at IS NULL
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, context.params.id, audit.id),
+    context.env.DB.prepare(
+      `UPDATE creations SET state = 'hidden', visibility = 'private', hidden_at = ?,
+       published_at = NULL, updated_at = ?
+       WHERE owner_user_id = ? AND state = 'published'
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, now, context.params.id, audit.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_search
+       WHERE creation_id IN (SELECT id FROM creations WHERE owner_user_id = ?)
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(context.params.id, audit.id),
   ]);
-  return success(context.requestId, { id: context.params.id, status: "suspended" });
+  assertTransitionAudited(results, userStateConflict("active"));
+  return success(context.requestId, {
+    id: context.params.id,
+    status: "suspended",
+  });
 }
 
 async function restoreUser(context: WorkerRequestContext): Promise<Response> {
   const moderator = await requireModerator(context);
   await requireModeratableUser(context, moderator, "restore");
   const input = await exactAction(context, "restore_user");
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      "UPDATE users SET status = 'active', updated_at = ? WHERE id = ? AND status = 'suspended'",
-    ).bind(Date.now(), context.params.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const now = Date.now();
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: context.params.id,
       targetType: "user",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      "UPDATE users SET status = 'active', updated_at = ? WHERE id = ? AND status = 'suspended'",
+    ).bind(now, context.params.id),
+    audit.statement,
   ]);
-  return success(context.requestId, { id: context.params.id, status: "active" });
+  assertTransitionAudited(results, userStateConflict("suspended"));
+  return success(context.requestId, {
+    id: context.params.id,
+    status: "active",
+  });
 }
 
 async function hideCreation(context: WorkerRequestContext): Promise<Response> {
@@ -350,19 +418,29 @@ async function hideCreation(context: WorkerRequestContext): Promise<Response> {
   await requireCreationState(context, "published");
   const input = await exactAction(context, "hide_creation");
   const now = Date.now();
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      `UPDATE creations SET state = 'hidden', visibility = 'private', hidden_at = ?,
-       published_at = NULL, updated_at = ? WHERE id = ? AND state = 'published'`,
-    ).bind(now, now, context.params.id),
-    context.env.DB.prepare("DELETE FROM creation_search WHERE creation_id = ?").bind(context.params.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: context.params.id,
       targetType: "creation",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE creations SET state = 'hidden', visibility = 'private', hidden_at = ?,
+       published_at = NULL, updated_at = ? WHERE id = ? AND state = 'published'`,
+    ).bind(now, now, context.params.id),
+    audit.statement,
+    context.env.DB.prepare(
+      `DELETE FROM creation_search WHERE creation_id = ?
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(context.params.id, audit.id),
   ]);
+  assertTransitionAudited(results, creationStateConflict("published"));
   return success(context.requestId, { id: context.params.id, state: "hidden" });
 }
 
@@ -370,80 +448,104 @@ async function restoreCreation(context: WorkerRequestContext): Promise<Response>
   const moderator = await requireModerator(context);
   await requireCreationState(context, "hidden");
   const input = await exactAction(context, "restore_creation");
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      `UPDATE creations SET state = 'draft', visibility = 'private', hidden_at = NULL,
-       updated_at = ? WHERE id = ? AND state = 'hidden'`,
-    ).bind(Date.now(), context.params.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const now = Date.now();
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: context.params.id,
       targetType: "creation",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE creations SET state = 'draft', visibility = 'private', hidden_at = NULL,
+       updated_at = ? WHERE id = ? AND state = 'hidden'`,
+    ).bind(now, context.params.id),
+    audit.statement,
   ]);
-  return success(context.requestId, { id: context.params.id, state: "draft", visibility: "private" });
+  assertTransitionAudited(results, creationStateConflict("hidden"));
+  return success(context.requestId, {
+    id: context.params.id,
+    state: "draft",
+    visibility: "private",
+  });
 }
 
 async function hideComment(context: WorkerRequestContext): Promise<Response> {
   const moderator = await requireModerator(context);
   const input = await exactAction(context, "hide_comment");
-  const comment = await context.env.DB.prepare(
-    "SELECT id, creation_id, status FROM comments WHERE id = ?",
-  ).bind(context.params.id).first<{ creation_id: string; id: string; status: string }>();
+  const comment = await context.env.DB.prepare("SELECT id, creation_id, status FROM comments WHERE id = ?")
+    .bind(context.params.id)
+    .first<{ creation_id: string; id: string; status: string }>();
   if (!comment) throw new HttpError(404, "comment_not_found", "Comment was not found.");
   if (comment.status !== "active") {
-    throw new HttpError(409, "invalid_comment_state", "Only an active comment can be hidden.");
+    throw commentStateConflict("active");
   }
   const now = Date.now();
-  const statements: D1PreparedStatement[] = [
-    context.env.DB.prepare(
-      "UPDATE comments SET status = 'hidden', hidden_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
-    ).bind(now, now, comment.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: comment.id,
       targetType: "comment",
-    }),
-  ];
-  if (comment.status === "active") {
-    statements.push(context.env.DB.prepare(
-      "UPDATE creation_stats SET comment_count = MAX(0, comment_count - 1), updated_at = ? WHERE creation_id = ?",
-    ).bind(now, comment.creation_id));
-  }
-  await context.env.DB.batch(statements);
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      "UPDATE comments SET status = 'hidden', hidden_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
+    ).bind(now, now, comment.id),
+    audit.statement,
+    context.env.DB.prepare(
+      `UPDATE creation_stats SET comment_count = MAX(0, comment_count - 1), updated_at = ?
+       WHERE creation_id = ?
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, comment.creation_id, audit.id),
+  ]);
+  assertTransitionAudited(results, commentStateConflict("active"));
   return success(context.requestId, { id: comment.id, status: "hidden" });
 }
 
 async function restoreComment(context: WorkerRequestContext): Promise<Response> {
   const moderator = await requireModerator(context);
   const input = await exactAction(context, "restore_comment");
-  const comment = await context.env.DB.prepare(
-    "SELECT id, creation_id, status FROM comments WHERE id = ?",
-  ).bind(context.params.id).first<{ creation_id: string; id: string; status: string }>();
+  const comment = await context.env.DB.prepare("SELECT id, creation_id, status FROM comments WHERE id = ?")
+    .bind(context.params.id)
+    .first<{ creation_id: string; id: string; status: string }>();
   if (!comment) throw new HttpError(404, "comment_not_found", "Comment was not found.");
   if (comment.status !== "hidden") {
-    throw new HttpError(409, "invalid_comment_state", "Only a hidden comment can be restored.");
+    throw commentStateConflict("hidden");
   }
   const now = Date.now();
-  const statements: D1PreparedStatement[] = [
-    context.env.DB.prepare(
-      "UPDATE comments SET status = 'active', hidden_at = NULL, updated_at = ? WHERE id = ? AND status = 'hidden'",
-    ).bind(now, comment.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: comment.id,
       targetType: "comment",
-    }),
-  ];
-  if (comment.status === "hidden") {
-    statements.push(context.env.DB.prepare(
-      "UPDATE creation_stats SET comment_count = comment_count + 1, updated_at = ? WHERE creation_id = ?",
-    ).bind(now, comment.creation_id));
-  }
-  await context.env.DB.batch(statements);
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      "UPDATE comments SET status = 'active', hidden_at = NULL, updated_at = ? WHERE id = ? AND status = 'hidden'",
+    ).bind(now, comment.id),
+    audit.statement,
+    context.env.DB.prepare(
+      `UPDATE creation_stats SET comment_count = comment_count + 1, updated_at = ?
+       WHERE creation_id = ?
+       AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, comment.creation_id, audit.id),
+  ]);
+  assertTransitionAudited(results, commentStateConflict("hidden"));
   return success(context.requestId, { id: comment.id, status: "active" });
 }
 
@@ -459,21 +561,29 @@ async function lockComments(context: WorkerRequestContext): Promise<Response> {
   const moderator = await requireModerator(context);
   const creation = await loadModeratedCreation(context);
   if (creation.comments_locked) {
-    throw new HttpError(409, "comments_already_locked", "Comments are already locked.");
+    throw commentsLockConflict(true);
   }
   const input = await exactAction(context, "lock_comments");
   const now = Date.now();
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      "UPDATE creations SET comments_enabled = 0, comments_locked = 1, updated_at = ? WHERE id = ?",
-    ).bind(now, creation.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: creation.id,
       targetType: "creation",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE creations SET comments_enabled = 0, comments_locked = 1, updated_at = ?
+       WHERE id = ? AND comments_locked = 0`,
+    ).bind(now, creation.id),
+    audit.statement,
   ]);
+  assertTransitionAudited(results, commentsLockConflict(true));
   return success(context.requestId, {
     commentsEnabled: false,
     commentsLocked: true,
@@ -485,21 +595,29 @@ async function unlockComments(context: WorkerRequestContext): Promise<Response> 
   const moderator = await requireModerator(context);
   const creation = await loadModeratedCreation(context);
   if (!creation.comments_locked) {
-    throw new HttpError(409, "comments_not_locked", "Comments are not locked.");
+    throw commentsLockConflict(false);
   }
   const input = await exactAction(context, "unlock_comments");
   const now = Date.now();
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      "UPDATE creations SET comments_locked = 0, updated_at = ? WHERE id = ?",
-    ).bind(now, creation.id),
-    await actionStatement(context.env, moderator.user.id, {
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
       action: input.action,
       reason: input.reason,
       targetId: creation.id,
       targetType: "creation",
-    }),
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE creations SET comments_locked = 0, updated_at = ?
+       WHERE id = ? AND comments_locked = 1`,
+    ).bind(now, creation.id),
+    audit.statement,
   ]);
+  assertTransitionAudited(results, commentsLockConflict(false));
   return success(context.requestId, {
     commentsEnabled: Boolean(creation.comments_enabled),
     commentsLocked: false,
@@ -517,16 +635,21 @@ async function actionStatement(
     targetId: string;
     targetType: "comment" | "creation" | "report" | "user";
   },
-): Promise<D1PreparedStatement> {
-  const now = Date.now();
+  createdAt: number,
+): Promise<{ id: string; statement: D1PreparedStatement }> {
+  const id = crypto.randomUUID();
   const actorPseudonym = (await pseudonymize(env, "moderator", moderatorUserId)).slice(0, 24);
-  return env.DB.prepare(
+  // Every caller places this immediately after its guarded UPDATE in the same
+  // D1 batch. SQLite changes() then makes the immutable action conditional on
+  // that transition changing exactly one target row.
+  const statement = env.DB.prepare(
     `INSERT INTO moderation_actions
      (id, report_id, moderator_user_id, actor_pseudonym, target_type, target_id,
       action, reason, created_at, retain_until)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE changes() = 1`,
   ).bind(
-    crypto.randomUUID(),
+    id,
     input.reportId ?? null,
     moderatorUserId,
     actorPseudonym,
@@ -534,23 +657,67 @@ async function actionStatement(
     input.targetId,
     input.action,
     input.reason,
-    now,
-    now + 2 * 365 * 24 * 60 * 60 * 1_000,
+    createdAt,
+    createdAt + 2 * 365 * 24 * 60 * 60 * 1_000,
   );
+  return { id, statement };
+}
+
+function assertTransitionAudited(results: D1Result[], conflict: HttpError): void {
+  const transitionChanges = results[0]?.meta.changes;
+  const actionChanges = results[1]?.meta.changes;
+  if (transitionChanges === 0 && actionChanges === 0) throw conflict;
+  if (transitionChanges !== 1 || actionChanges !== 1) {
+    throw new Error("Moderation transition audit invariant failed.");
+  }
+}
+
+function reportDecisionConflict(): HttpError {
+  return new HttpError(409, "report_already_decided", "The report has already been resolved or dismissed.");
+}
+
+function userStateConflict(expected: "active" | "suspended"): HttpError {
+  return new HttpError(409, "invalid_user_state", `User must be ${expected} for this action.`);
+}
+
+function creationStateConflict(expected: "hidden" | "published"): HttpError {
+  return new HttpError(409, "invalid_creation_state", `Creation must be ${expected} for this action.`);
+}
+
+function commentStateConflict(expected: "active" | "hidden"): HttpError {
+  return new HttpError(
+    409,
+    "invalid_comment_state",
+    `Only a${expected === "active" ? "n" : ""} ${expected} comment can be ${
+      expected === "active" ? "hidden" : "restored"
+    }.`,
+  );
+}
+
+function commentsLockConflict(locking: boolean): HttpError {
+  return locking
+    ? new HttpError(409, "comments_already_locked", "Comments are already locked.")
+    : new HttpError(409, "comments_not_locked", "Comments are not locked.");
 }
 
 async function requireModeratableUser(
   context: WorkerRequestContext,
   actor: Awaited<ReturnType<typeof requireModerator>>,
   transition: "restore" | "suspend",
-): Promise<{ id: string; role: "admin" | "moderator" | "user"; status: string }> {
+): Promise<{
+  id: string;
+  role: "admin" | "moderator" | "user";
+  status: string;
+}> {
   const target = await context.env.DB.prepare(
     "SELECT id, role, status FROM users WHERE id = ? AND status != 'deleted' LIMIT 1",
-  ).bind(context.params.id).first<{
-    id: string;
-    role: "admin" | "moderator" | "user";
-    status: string;
-  }>();
+  )
+    .bind(context.params.id)
+    .first<{
+      id: string;
+      role: "admin" | "moderator" | "user";
+      status: string;
+    }>();
   if (!target) throw new HttpError(404, "user_not_found", "User was not found.");
   if (transition === "suspend" && target.id === actor.user.id) {
     throw new HttpError(400, "cannot_suspend_self", "You cannot suspend your own account.");
@@ -560,21 +727,20 @@ async function requireModeratableUser(
   }
   const expected = transition === "suspend" ? "active" : "suspended";
   if (target.status !== expected) {
-    throw new HttpError(409, "invalid_user_state", `User must be ${expected} for this action.`);
+    throw userStateConflict(expected);
   }
   return target;
 }
 
-async function requireCreationState(
-  context: WorkerRequestContext,
-  expected: "hidden" | "published",
-): Promise<void> {
+async function requireCreationState(context: WorkerRequestContext, expected: "hidden" | "published"): Promise<void> {
   const creation = await context.env.DB.prepare(
     "SELECT id, state FROM creations WHERE id = ? AND state != 'deleted' LIMIT 1",
-  ).bind(context.params.id).first<{ id: string; state: string }>();
+  )
+    .bind(context.params.id)
+    .first<{ id: string; state: string }>();
   if (!creation) throw new HttpError(404, "creation_not_found", "Creation was not found.");
   if (creation.state !== expected) {
-    throw new HttpError(409, "invalid_creation_state", `Creation must be ${expected} for this action.`);
+    throw creationStateConflict(expected);
   }
 }
 
@@ -586,16 +752,18 @@ async function loadModeratedCreation(context: WorkerRequestContext): Promise<{
   const creation = await context.env.DB.prepare(
     `SELECT id, comments_enabled, comments_locked FROM creations
      WHERE id = ? AND state != 'deleted' LIMIT 1`,
-  ).bind(context.params.id).first<{
-    comments_enabled: number;
-    comments_locked: number;
-    id: string;
-  }>();
+  )
+    .bind(context.params.id)
+    .first<{
+      comments_enabled: number;
+      comments_locked: number;
+      id: string;
+    }>();
   if (!creation) throw new HttpError(404, "creation_not_found", "Creation was not found.");
   return creation;
 }
 
-function parseReportCursor(value: string | null): { id: string; sortValue: number } | null {
+function parseModerationCursor(value: string | null): { id: string; sortValue: number } | null {
   if (!value) return null;
   try {
     const cursor = decodeCursor(value);

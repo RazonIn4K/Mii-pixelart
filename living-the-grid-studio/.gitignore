@@ -27,6 +27,9 @@ secrets*.json
 .wrangler/
 .dev.vars
 
+# Fresh, target-specific release approvals are local-only and must never ship.
+.deployment-readiness/
+
 # IDE / editor
 .vscode/
 .idea/

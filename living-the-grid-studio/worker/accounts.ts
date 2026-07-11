@@ -53,6 +53,26 @@ interface PublicProfileRow {
   username: string;
 }
 
+interface ExportPageRow extends Record<string, unknown> {
+  created_at: number;
+  export_id: string;
+}
+
+interface ExportCreationRow extends Record<string, unknown> {
+  created_at: number;
+  id: string;
+  object_key: string | null;
+}
+
+interface ExportQuery {
+  idColumn: string;
+  predicate: string;
+  table: string;
+  type: string;
+}
+
+const EXPORT_PAGE_SIZE = 100;
+
 export function registerAccountRoutes(router: Router): void {
   router
     .add("POST", "/api/me/setup", setupProfile)
@@ -188,39 +208,21 @@ async function exportAccount(context: WorkerRequestContext): Promise<Response> {
     try {
       const account = await getAccount(context.env, session.user.id);
       await writer.write(encoder.encode(`${JSON.stringify({ type: "account", data: account })}\n`));
-      const creations = await context.env.DB.prepare(
-        `SELECT c.*, cr.revision_number, co.object_key
-         FROM creations c
-         LEFT JOIN creation_revisions cr ON cr.id = c.current_revision_id
-         LEFT JOIN creation_objects co ON co.revision_id = cr.id AND co.kind = 'project_json'
-         WHERE c.owner_user_id = ? ORDER BY c.created_at ASC`,
-      ).bind(session.user.id).all<Record<string, unknown> & { object_key: string | null }>();
-      for (const creation of creations.results) {
-        const { object_key: objectKey, ...metadata } = creation;
-        await writer.write(encoder.encode(`${JSON.stringify({ type: "creation", data: metadata })}\n`));
-        if (objectKey) {
-          const object = await context.env.PROJECTS.get(objectKey);
-          if (object) {
-            const text = await object.text();
-            await writer.write(encoder.encode(`${JSON.stringify({
-              type: "project",
-              creationId: metadata.id,
-              data: JSON.parse(text),
-            })}\n`));
-          }
-        }
-      }
-      for (const [type, query] of [
-        ["comment", "SELECT * FROM comments WHERE author_user_id = ? ORDER BY created_at ASC"],
-        ["like", "SELECT * FROM likes WHERE user_id = ? ORDER BY created_at ASC"],
-        ["following", "SELECT * FROM follows WHERE follower_user_id = ? ORDER BY created_at ASC"],
-        ["follower", "SELECT * FROM follows WHERE followed_user_id = ? ORDER BY created_at ASC"],
-        ["report", "SELECT * FROM reports WHERE reporter_user_id = ? ORDER BY created_at ASC"],
-      ] as const) {
-        const rows = await context.env.DB.prepare(query).bind(session.user.id).all<Record<string, unknown>>();
-        for (const row of rows.results) {
-          await writer.write(encoder.encode(`${JSON.stringify({ type, data: row })}\n`));
-        }
+      await writeCreationExport(context, session.user.id, writer, encoder);
+      for (const query of [
+        { type: "comment", table: "comments", predicate: "author_user_id", idColumn: "id" },
+        { type: "like", table: "likes", predicate: "user_id", idColumn: "creation_id" },
+        { type: "following", table: "follows", predicate: "follower_user_id", idColumn: "followed_user_id" },
+        { type: "follower", table: "follows", predicate: "followed_user_id", idColumn: "follower_user_id" },
+        { type: "report", table: "reports", predicate: "reporter_user_id", idColumn: "id" },
+      ] satisfies ExportQuery[]) {
+        await writePagedRows(
+          context.env.DB,
+          session.user.id,
+          query,
+          writer,
+          encoder,
+        );
       }
     } catch (error) {
       console.error(JSON.stringify({
@@ -242,6 +244,104 @@ async function exportAccount(context: WorkerRequestContext): Promise<Response> {
       "X-Request-Id": context.requestId,
     },
   });
+}
+
+async function writeCreationExport(
+  context: WorkerRequestContext,
+  userId: string,
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  encoder: TextEncoder,
+): Promise<void> {
+  let cursorCreatedAt: number | null = null;
+  let cursorId = "";
+
+  while (true) {
+    const creations: D1Result<ExportCreationRow> = await context.env.DB.prepare(
+      `SELECT c.*, cr.revision_number, co.object_key
+       FROM creations c
+       LEFT JOIN creation_revisions cr ON cr.id = c.current_revision_id
+       LEFT JOIN creation_objects co ON co.revision_id = cr.id AND co.kind = 'project_json'
+       WHERE c.owner_user_id = ?
+         AND (? IS NULL OR c.created_at > ? OR (c.created_at = ? AND c.id > ?))
+       ORDER BY c.created_at ASC, c.id ASC LIMIT ?`,
+    ).bind(
+      userId,
+      cursorCreatedAt,
+      cursorCreatedAt,
+      cursorCreatedAt,
+      cursorId,
+      EXPORT_PAGE_SIZE,
+    ).all<ExportCreationRow>();
+
+    for (const creation of creations.results) {
+      const { object_key: objectKey, ...metadata } = creation;
+      await writeNdjson(writer, encoder, { type: "creation", data: metadata });
+      if (objectKey) {
+        const object = await context.env.PROJECTS.get(objectKey);
+        if (object) {
+          const text = await object.text();
+          await writeNdjson(writer, encoder, {
+            type: "project",
+            creationId: metadata.id,
+            data: JSON.parse(text),
+          });
+        }
+      }
+    }
+
+    const last: ExportCreationRow | undefined = creations.results.at(-1);
+    if (!last || creations.results.length < EXPORT_PAGE_SIZE) return;
+    cursorCreatedAt = last.created_at;
+    cursorId = last.id;
+  }
+}
+
+async function writePagedRows(
+  db: D1Database,
+  userId: string,
+  query: ExportQuery,
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  encoder: TextEncoder,
+): Promise<void> {
+  let cursorCreatedAt: number | null = null;
+  let cursorId = "";
+
+  while (true) {
+    // Table and column names come only from the static allowlist above; all
+    // user-controlled values remain bound parameters.
+    const rows: D1Result<ExportPageRow> = await db.prepare(
+      `SELECT *, ${query.idColumn} AS export_id FROM ${query.table}
+       WHERE ${query.predicate} = ?
+         AND (? IS NULL OR created_at > ? OR (created_at = ? AND ${query.idColumn} > ?))
+       ORDER BY created_at ASC, ${query.idColumn} ASC LIMIT ?`,
+    ).bind(
+      userId,
+      cursorCreatedAt,
+      cursorCreatedAt,
+      cursorCreatedAt,
+      cursorId,
+      EXPORT_PAGE_SIZE,
+    ).all<ExportPageRow>();
+
+    for (const row of rows.results) {
+      const data: Record<string, unknown> = { ...row };
+      delete data.export_id;
+      await writeNdjson(writer, encoder, { type: query.type, data });
+    }
+
+    const last: ExportPageRow | undefined = rows.results.at(-1);
+    if (!last || rows.results.length < EXPORT_PAGE_SIZE) return;
+    cursorCreatedAt = last.created_at;
+    cursorId = last.export_id;
+  }
+}
+
+function writeNdjson(
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  encoder: TextEncoder,
+  value: unknown,
+): Promise<void> {
+  return writer.write(encoder.encode(`${JSON.stringify(value)}\n`));
 }
 
 async function requestDeletion(context: WorkerRequestContext): Promise<Response> {

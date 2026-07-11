@@ -61,6 +61,7 @@ interface ModerationTarget {
 
 interface ModerationContext {
   actions: { action: string; createdAt: number; id: string; reason: string }[];
+  actionsCursor?: string | null;
   target: ModerationTarget;
 }
 
@@ -86,6 +87,7 @@ export default function Moderation() {
   const [contexts, setContexts] = useState<Record<string, ModerationContext>>({});
   const [contextErrors, setContextErrors] = useState<Record<string, string>>({});
   const [loadingContextId, setLoadingContextId] = useState<string | null>(null);
+  const [loadingContextActionsId, setLoadingContextActionsId] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -120,8 +122,11 @@ export default function Moderation() {
   const reviewContext = async (report: ReportRecord) => {
     setLoadingContextId(report.id);
     try {
-      const result = await communityApi<ModerationContext>(`/api/moderation/reports/${report.id}`);
-      setContexts((current) => ({ ...current, [report.id]: result.data }));
+      const result = await communityApi<ModerationContext>(`/api/moderation/reports/${report.id}?limit=50`);
+      setContexts((current) => ({
+        ...current,
+        [report.id]: { ...result.data, actionsCursor: result.meta?.nextCursor ?? null },
+      }));
       setContextErrors((current) => {
         const next = { ...current };
         delete next[report.id];
@@ -131,6 +136,33 @@ export default function Moderation() {
       setContextErrors((current) => ({ ...current, [report.id]: messageFromError(reviewError) }));
     } finally {
       setLoadingContextId(null);
+    }
+  };
+
+  const loadMoreContextActions = async (report: ReportRecord) => {
+    const reviewed = contexts[report.id];
+    if (!reviewed?.actionsCursor) return;
+    setLoadingContextActionsId(report.id);
+    try {
+      const result = await communityApi<ModerationContext>(
+        `/api/moderation/reports/${report.id}${queryString({ limit: 50, cursor: reviewed.actionsCursor })}`,
+      );
+      setContexts((current) => {
+        const existing = current[report.id];
+        if (!existing) return current;
+        return {
+          ...current,
+          [report.id]: {
+            ...result.data,
+            actions: [...existing.actions, ...result.data.actions],
+            actionsCursor: result.meta?.nextCursor ?? null,
+          },
+        };
+      });
+    } catch (reviewError) {
+      setContextErrors((current) => ({ ...current, [report.id]: messageFromError(reviewError) }));
+    } finally {
+      setLoadingContextActionsId(null);
     }
   };
 
@@ -277,6 +309,8 @@ export default function Moderation() {
                                 <div className="mt-4 border-t pt-3">
                                   <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Prior actions</p>
                                   {reviewed.actions.length ? <ul className="mt-2 space-y-2">{reviewed.actions.map((action) => <li key={action.id} className="rounded-lg bg-white p-2 text-xs"><strong>{action.action.replaceAll("_", " ")}</strong> · {formatCommunityDate(action.createdAt)}<span className="mt-1 block text-muted-foreground">{action.reason}</span></li>)}</ul> : <p className="mt-2 text-xs text-muted-foreground">No retained actions for this target.</p>}
+                                  {reviewed.actionsCursor ? <Button type="button" size="sm" variant="outline" className="mt-3 bg-white" disabled={loadingContextActionsId === report.id} onClick={() => void loadMoreContextActions(report)}>{loadingContextActionsId === report.id ? "Loading history…" : "Load more history"}</Button> : null}
+                                  {contextErrors[report.id] ? <p className="mt-2 text-xs text-destructive" role="alert">{contextErrors[report.id]}</p> : null}
                                 </div>
                               </div>
                             )}

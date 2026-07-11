@@ -10,7 +10,10 @@ info:
     Studio does not call these routes unless the user explicitly signs in and
     saves. All JSON successes use `{data, meta?, requestId}` and all JSON errors
     use `{error:{code,message,fields?}, requestId}`. Account export and binary
-    project/media downloads are the documented streaming exceptions.
+    project/media downloads are the documented streaming exceptions. Unsafe
+    community mutations can return the shared `503 ServiceUnavailable`
+    response while the fail-closed incident switch is disabled; documented
+    authentication, deletion, AI, Stripe, and webhook controls are exempt.
 servers:
   - url: https://tomodachi.pw
     description: Production (not authorized for deployment by this contract)
@@ -903,6 +906,8 @@ paths:
       summary: Return one report and immutable action history
       parameters:
         - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
           description: Report detail
@@ -935,6 +940,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/moderation/creations/{creationId}/{moderationState}:
     post:
@@ -962,6 +968,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/moderation/creations/{creationId}/lock-comments:
     post:
@@ -986,6 +993,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/moderation/creations/{creationId}/unlock-comments:
     post:
@@ -1010,6 +1018,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/moderation/comments/{commentId}/{moderationState}:
     post:
@@ -1037,6 +1046,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/moderation/users/{userId}/{moderationState}:
     post:
@@ -1064,6 +1074,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
 components:
   securitySchemes:
@@ -1857,13 +1868,15 @@ components:
         target: { $ref: '#/components/schemas/ModerationTargetSummary' }
         actions:
           type: array
+          maxItems: 50
           items: { $ref: '#/components/schemas/ModerationActionRecord' }
     ReportDetailEnvelope:
       type: object
       additionalProperties: false
-      required: [data, requestId]
+      required: [data, meta, requestId]
       properties:
         data: { $ref: '#/components/schemas/ModerationReportDetail' }
+        meta: { $ref: '#/components/schemas/PageMeta' }
         requestId: { $ref: '#/components/schemas/RequestId' }
     ReportListEnvelope:
       type: object

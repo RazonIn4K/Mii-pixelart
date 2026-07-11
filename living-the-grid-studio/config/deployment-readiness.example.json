@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "target": "staging",
+  "intent": "deploy",
+  "gitCommit": "replace-with-the-current-40-character-git-commit",
+  "approvedAt": "replace-with-a-current-ISO-8601-timestamp",
+  "approvedBy": "replace-with-the-approver-identity",
+  "changeTicket": "replace-with-the-change-or-approval-reference",
+  "infrastructure": {
+    "cloudflareAccount": "replace-with-the-audited-account-name-or-reference",
+    "googleProject": "replace-with-the-audited-google-project-id",
+    "domainControlConfirmation": "replace-with-the-domain-control-check-reference",
+    "cloudflarePricingDecision": "replace-with-the-approved-pricing-decision",
+    "imagesUsageDecision": "approved-or-not-required"
+  },
+  "legal": {
+    "operatorIdentity": "replace-with-the-legal-operator",
+    "jurisdiction": "replace-with-the-governing-jurisdiction",
+    "postalAddress": "replace-with-the-public-postal-contact",
+    "contactEmail": "replace-with-the-public-contact-email",
+    "copyrightProcess": "replace-with-the-approved-copyright-process",
+    "retentionConfirmation": "replace-with-the-approved-retention-check"
+  },
+  "owners": {
+    "adminInternalId": "replace-with-the-admin-internal-uuid",
+    "moderatorInternalId": "replace-with-the-moderator-internal-uuid",
+    "legalOwner": "replace-with-the-named-legal-owner",
+    "privacyOwner": "replace-with-the-named-privacy-owner",
+    "securityOwner": "replace-with-the-named-security-owner",
+    "helpOwner": "replace-with-the-named-help-owner",
+    "abuseOwner": "replace-with-the-named-abuse-owner",
+    "consult30FulfillmentOwner": "replace-with-the-named-consult-30-owner",
+    "consult30FulfillmentProcess": "replace-with-the-approved-consult-30-process"
+  },
+  "stripe": {
+    "mode": "staging-test-or-production-live",
+    "taxConfirmation": "replace-with-the-approved-tax-check"
+  },
+  "confirmations": {
+    "targetIsolationConfirmed": false,
+    "bindingsVerified": false,
+    "secretsConfigured": false,
+    "migrationsApproved": false,
+    "legalPlaceholdersReplaced": false,
+    "adminModeratorAssigned": false,
+    "pricingApproved": false,
+    "rollbackReady": false,
+    "deployApproved": false,
+    "stagingDeployApproved": false,
+    "stagingAcceptancePassed": false,
+    "productionCutoverApproved": false,
+    "communityMutationsEnabled": false,
+    "writableCommunityDeployApproved": false
+  }
+}

@@ -11,7 +11,15 @@ import { CompactEncrypt, compactDecrypt } from "jose";
 import { z } from "zod";
 import { GoogleAuthStartSchema } from "../shared/community";
 
-import { pseudonymize, randomToken, safeRelativeReturnTo, secretKey, sha256 } from "./crypto";
+import {
+  isStrongRuntimeSecret,
+  isValidOidcCookieKey,
+  pseudonymize,
+  randomToken,
+  safeRelativeReturnTo,
+  secretKey,
+  sha256,
+} from "./crypto";
 import {
   HttpError,
   cookie,
@@ -224,10 +232,7 @@ export async function optionalSession(
 ): Promise<AuthenticatedSession | null> {
   const token = parseCookies(context.request).get(sessionCookieName(context.env));
   if (!token || token.length > 256) return null;
-  if (!context.env.SESSION_PEPPER) {
-    throw new Error("Session secret is not configured.");
-  }
-  const tokenHash = await sha256(`${context.env.SESSION_PEPPER}:${token}`);
+  const tokenHash = await sha256(`${sessionPepper(context.env)}:${token}`);
   const now = Date.now();
   const row = await context.env.DB.prepare(
     `SELECT
@@ -339,11 +344,14 @@ async function googleConfiguration(env: Env) {
 
 function assertOidcConfigured(env: Env): void {
   if (
-    !env.GOOGLE_CLIENT_ID
-    || !env.GOOGLE_CLIENT_SECRET
-    || !env.OIDC_COOKIE_KEY
-    || !env.SESSION_PEPPER
-    || (!env.PSEUDONYM_KEY && env.ENVIRONMENT !== "local")
+    !isConfiguredCredential(env.GOOGLE_CLIENT_ID, env.ENVIRONMENT)
+    || !isConfiguredCredential(env.GOOGLE_CLIENT_SECRET, env.ENVIRONMENT)
+    || !isValidOidcCookieKey(env.OIDC_COOKIE_KEY)
+    || !isStrongRuntimeSecret(env.SESSION_PEPPER, env.ENVIRONMENT)
+    || (
+      env.ENVIRONMENT !== "local"
+      && !isStrongRuntimeSecret(env.PSEUDONYM_KEY, env.ENVIRONMENT)
+    )
   ) {
     throw new HttpError(503, "oidc_not_configured", "Google sign-in is not configured.");
   }
@@ -385,13 +393,10 @@ async function createSession(
   context: WorkerRequestContext,
   userId: string,
 ): Promise<{ token: string }> {
-  if (!context.env.SESSION_PEPPER) {
-    throw new Error("Session secret is not configured.");
-  }
   const id = crypto.randomUUID();
   const token = randomToken();
   const now = Date.now();
-  const tokenHash = await sha256(`${context.env.SESSION_PEPPER}:${token}`);
+  const tokenHash = await sha256(`${sessionPepper(context.env)}:${token}`);
   const userAgentLabel = normalizeUserAgent(context.request.headers.get("user-agent"));
   await context.env.DB.batch([
     context.env.DB.prepare(
@@ -420,7 +425,7 @@ async function encryptTransaction(
   transaction: z.output<typeof OidcTransactionSchema>,
   env: Env,
 ): Promise<string> {
-  const key = await secretKey(env.OIDC_COOKIE_KEY);
+  const key = secretKey(env.OIDC_COOKIE_KEY);
   return new CompactEncrypt(new TextEncoder().encode(JSON.stringify(transaction)))
     .setProtectedHeader({ alg: "dir", enc: "A256GCM", typ: "JWT" })
     .encrypt(key);
@@ -428,7 +433,7 @@ async function encryptTransaction(
 
 async function decryptTransaction(value: string, env: Env) {
   try {
-    const { plaintext } = await compactDecrypt(value, await secretKey(env.OIDC_COOKIE_KEY));
+    const { plaintext } = await compactDecrypt(value, secretKey(env.OIDC_COOKIE_KEY));
     const parsed = OidcTransactionSchema.safeParse(JSON.parse(new TextDecoder().decode(plaintext)));
     if (parsed.success) return parsed.data;
   } catch {
@@ -436,6 +441,47 @@ async function decryptTransaction(value: string, env: Env) {
   }
   throw new HttpError(400, "invalid_oidc_transaction", "Login transaction is invalid.");
 }
+
+function sessionPepper(env: Env): string {
+  if (!isStrongRuntimeSecret(env.SESSION_PEPPER, env.ENVIRONMENT)) {
+    throw new Error("Session secret is not securely configured.");
+  }
+  return env.SESSION_PEPPER.trim();
+}
+
+function isConfiguredCredential(
+  value: string | undefined,
+  environment: Env["ENVIRONMENT"],
+): boolean {
+  const trimmed = value?.trim();
+  if (!trimmed) return false;
+  if (environment === "local") return true;
+  if (trimmed.length < 16) return false;
+  const normalized = trimmed.toLowerCase();
+  return !PLACEHOLDER_CREDENTIAL_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+const PLACEHOLDER_CREDENTIAL_PREFIXES = [
+  "change-me",
+  "change_me",
+  "changeme",
+  "dev-",
+  "dev_",
+  "development-",
+  "example-",
+  "example_",
+  "local-",
+  "local_",
+  "placeholder",
+  "replace-",
+  "replace_",
+  "test-only-",
+  "test_only_",
+  "test-",
+  "test_",
+  "your-",
+  "your_",
+] as const;
 
 function sessionCookieName(env: Env): string {
   return secureCookies(env) ? "__Host-tomodachi.sid" : "tomodachi.sid";

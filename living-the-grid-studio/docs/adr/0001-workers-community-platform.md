@@ -101,6 +101,9 @@ application runtime. Deploy the Vite SPA as Worker Static Assets and bind it as
    pseudonyms, IPs, cookies, bodies, or project/report content.
 7. No remote resource, secret, migration, deploy, domain, or OAuth change is
    made without the approval gates in `docs/community-deployment-runbook.md`.
+8. Remote builds default to read-only community mode. A target-explicit release
+   preflight must bind any writable deployment to a fresh approval and the
+   exact clean Git commit before Wrangler can run.
 
 ## Validation
 

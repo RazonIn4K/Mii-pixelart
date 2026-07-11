@@ -2,11 +2,15 @@ import type { z } from "zod";
 
 export interface WorkerRequestContext {
   env: Env;
-  executionCtx: ExecutionContext;
+  executionCtx: WorkerExecutionContext;
   params: Readonly<Record<string, string>>;
   request: Request;
   requestId: string;
   url: URL;
+}
+
+export interface WorkerExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ApiMeta {

@@ -183,13 +183,6 @@ async function deleteComment(context: WorkerRequestContext): Promise<Response> {
 async function createReport(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const input = await parseJson(context.request, ReportCreateSchema, 15_000);
-  const cutoff = Date.now() - 24 * 60 * 60 * 1_000;
-  const daily = await context.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM reports WHERE reporter_user_id = ? AND created_at >= ?",
-  ).bind(session.user.id, cutoff).first<{ count: number }>();
-  if ((daily?.count ?? 0) >= 5) {
-    throw new HttpError(429, "report_rate_limited", "Daily report limit reached.");
-  }
   if (!(await reportTargetExists(context.env, input.targetType, input.targetId))) {
     throw new HttpError(404, "report_target_not_found", "Report target was not found.");
   }
@@ -219,6 +212,9 @@ async function createReport(context: WorkerRequestContext): Promise<Response> {
       now + 2 * 365 * 24 * 60 * 60 * 1_000,
     ).run();
   } catch (error) {
+    if (error instanceof Error && /report_daily_quota_exceeded/iu.test(error.message)) {
+      throw new HttpError(429, "report_rate_limited", "Daily report limit reached.");
+    }
     if (error instanceof Error && /unique constraint/iu.test(error.message)) {
       throw new HttpError(409, "duplicate_report", "You already have an open report for this item.");
     }

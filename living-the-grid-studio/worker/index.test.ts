@@ -427,6 +427,74 @@ describe("community Worker integration", () => {
     expect(logout.status).toBe(200);
   });
 
+  it("enforces read-only community mode before handlers mutate storage", async () => {
+    const readOnlyEnv = new Proxy(env as Env, {
+      get(target, property, receiver) {
+        if (property === "COMMUNITY_MUTATIONS_ENABLED") return "false";
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const execution = createExecutionContext();
+    const blocked = await worker.fetch(new Request(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({ project: project("Blocked by read-only mode") }),
+      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      method: "POST",
+    }), readOnlyEnv, execution);
+    await waitOnExecutionContext(execution);
+
+    expect(blocked.status).toBe(503);
+    await expect(blocked.json()).resolves.toMatchObject({
+      error: {
+        code: "SERVICE_UNAVAILABLE",
+        message: "Community changes are temporarily paused. Please try again later.",
+      },
+    });
+    await expect(env.DB.prepare("SELECT COUNT(*) AS count FROM creations").first())
+      .resolves.toMatchObject({ count: 0 });
+
+    const logoutExecution = createExecutionContext();
+    const logout = await worker.fetch(new Request(`${ORIGIN}/api/auth/logout`, {
+      body: "{}",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      method: "POST",
+    }), readOnlyEnv, logoutExecution);
+    await waitOnExecutionContext(logoutExecution);
+    expect(logout.status).toBe(200);
+  });
+
+  it("rejects placeholder identity credentials outside local development", async () => {
+    const productionEnv = new Proxy(env as Env, {
+      get(target, property, receiver) {
+        const overrides: Partial<Env> = {
+          ENVIRONMENT: "production",
+          PUBLIC_SITE_URL: "https://tomodachi.pw",
+          GOOGLE_OIDC_REDIRECT_URI: "https://tomodachi.pw/api/auth/google/callback",
+          GOOGLE_CLIENT_ID: "test-google-client-id",
+          GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+          SESSION_PEPPER: "session hashing phrase for tests only",
+          PSEUDONYM_KEY: "pseudonym signing phrase for tests only",
+        };
+        if (property in overrides) return overrides[property as keyof Env];
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const execution = createExecutionContext();
+    const response = await worker.fetch(new Request(
+      "https://tomodachi.pw/api/auth/google/start",
+      {
+        body: JSON.stringify({ returnTo: "/me" }),
+        headers: { "Content-Type": "application/json", Origin: "https://tomodachi.pw" },
+        method: "POST",
+      },
+    ), productionEnv, execution);
+    await waitOnExecutionContext(execution);
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "SERVICE_UNAVAILABLE" },
+    });
+  });
+
   it("rejects malformed projects and preserves user text as plain JSON data", async () => {
     const owner = await seedUser("plain-text-owner");
     const headers = authenticatedHeaders(await seedSession(owner.id, "plain-text-token"));
