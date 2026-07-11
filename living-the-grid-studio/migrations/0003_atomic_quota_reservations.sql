@@ -23,15 +23,15 @@ CREATE INDEX quota_reservations_user_expiry_idx
 CREATE TRIGGER quota_reservations_enforce_insert
 BEFORE INSERT ON quota_reservations
 BEGIN
-  SELECT CASE WHEN (
+  SELECT RAISE(ABORT, 'creation_quota_exceeded') WHERE (
     (SELECT COUNT(*) FROM creations WHERE owner_user_id = NEW.user_id) +
     COALESCE((
       SELECT SUM(creation_slots) FROM quota_reservations
       WHERE user_id = NEW.user_id AND expires_at > NEW.updated_at
     ), 0) + NEW.creation_slots
-  ) > 100 THEN RAISE(ABORT, 'creation_quota_exceeded') END;
+  ) > 100;
 
-  SELECT CASE WHEN (
+  SELECT RAISE(ABORT, 'storage_quota_exceeded') WHERE (
     COALESCE((
       SELECT SUM(co.byte_size)
       FROM creation_objects co
@@ -42,14 +42,14 @@ BEGIN
       SELECT SUM(storage_bytes) FROM quota_reservations
       WHERE user_id = NEW.user_id AND expires_at > NEW.updated_at
     ), 0) + NEW.storage_bytes
-  ) > 52428800 THEN RAISE(ABORT, 'storage_quota_exceeded') END;
+  ) > 52428800;
 END;
 
 CREATE TRIGGER quota_reservations_enforce_update
 BEFORE UPDATE OF user_id, creation_slots, storage_bytes, updated_at, expires_at
 ON quota_reservations
 BEGIN
-  SELECT CASE WHEN (
+  SELECT RAISE(ABORT, 'creation_quota_exceeded') WHERE (
     (SELECT COUNT(*) FROM creations WHERE owner_user_id = NEW.user_id) +
     COALESCE((
       SELECT SUM(creation_slots) FROM quota_reservations
@@ -57,9 +57,9 @@ BEGIN
         AND id != OLD.id
         AND expires_at > NEW.updated_at
     ), 0) + NEW.creation_slots
-  ) > 100 THEN RAISE(ABORT, 'creation_quota_exceeded') END;
+  ) > 100;
 
-  SELECT CASE WHEN (
+  SELECT RAISE(ABORT, 'storage_quota_exceeded') WHERE (
     COALESCE((
       SELECT SUM(co.byte_size)
       FROM creation_objects co
@@ -72,7 +72,7 @@ BEGIN
         AND id != OLD.id
         AND expires_at > NEW.updated_at
     ), 0) + NEW.storage_bytes
-  ) > 52428800 THEN RAISE(ABORT, 'storage_quota_exceeded') END;
+  ) > 52428800;
 END;
 
 -- These guards keep direct/future writes authoritative even if they bypass
