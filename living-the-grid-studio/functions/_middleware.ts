@@ -190,14 +190,14 @@ const ROUTES: Record<string, RouteShell> = {
       'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the in-game palette, export a paint-by-numbers reference pack.',
     h1: 'Tomodachi Studio',
     body: `
-      <p>A browser-first pixel-art editor for designing custom Mii face masks square-by-square. Import a face photo, character art, or JSON file; reduce noise against the 84-color Tomodachi Life: Living the Dream palette; export a paint-by-numbers reference pack (PDF + palette sheet + JSON).</p>
+      <p>A browser-first pixel-art editor for designing custom Mii face masks square-by-square. Import a face photo, character art, or JSON file; reduce noise against the 84-color Tomodachi Life: Living the Dream palette; export editable JSON, guide PNGs, and a ZIP reference pack with a palette sheet, paint order, and reference HTML.</p>
       <h2>Features</h2>
       <ul>
         <li>Import any image or LTG JSON file.</li>
         <li>84-color in-game palette labeled by row and column for exact matching.</li>
         <li>Color-reduction optimizer that preserves facial readability.</li>
         <li>AI assistant for sketch drafts (OpenRouter, free tier).</li>
-        <li>Reference pack export — PDF + JSON + palette sheet.</li>
+        <li>Reference pack export — ZIP with JSON, guide PNGs, palette sheet, paint order, and reference HTML.</li>
       </ul>
       <p>See the <a href="/guides">guides</a> for step-by-step walkthroughs and the <a href="/faq">FAQ</a> for common questions.</p>`,
     jsonLd: [
@@ -443,7 +443,7 @@ const ROUTES: Record<string, RouteShell> = {
       </ol>
       <h2>Next 24 hours</h2>
       <p>Rotate passwords on accounts in priority order: financial (banks, brokerage, PayPal, crypto), cloud (Google Drive, iCloud, Dropbox), identity (Apple ID, Microsoft, Google), social (X, Instagram, Discord, Reddit), everything else. A password manager makes this an evening of work rather than a month-long fight.</p>
-      <p>For a longer printable checklist + 30-day monitoring plan, the paid <a href="/unlock">recovery checklist ($9)</a> covers the same flow in a printable PDF + Markdown.</p>`,
+      <p>For a longer checklist + 30-day monitoring plan, the paid <a href="/unlock">recovery checklist ($9)</a> spells out the same flow step by step on the return page. It does not include a PDF or Markdown download.</p>`,
     jsonLd: [
       breadcrumbFor('Help', '/help'),
       {
@@ -468,7 +468,7 @@ const ROUTES: Record<string, RouteShell> = {
     body: `
       <p>Free guidance stays free. These are deeper deliverables for people who want a printable written plan or a real human to walk it through with them.</p>
       <h2>Breach Recovery Checklist — $9</h2>
-      <p>A printable 12-step recovery flow for the Tomodachishare breach. PDF + Markdown formats. Sample email templates for contacting services that reused your password. Lifetime updates as the breach disclosure evolves.</p>
+      <p>A browser-based 12-step recovery flow for the Tomodachishare breach, with password, 2FA, session, and 30-day monitoring priorities. The checklist is unlocked on the return page; no PDF or Markdown download is included.</p>
       <h2>30-min Recovery Consult — $49</h2>
       <p>One scheduled call with a security-aware operator. We walk through your specific exposure and leave you with a written action plan. Google Meet link delivered after checkout. Written follow-up summary within 24 hours.</p>
       <p>Not legal or law-enforcement advice. For active criminal incidents contact the appropriate authorities. Payments are processed by Stripe. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
@@ -487,7 +487,7 @@ const ROUTES: Record<string, RouteShell> = {
               '@type': 'Product',
               name: 'Breach Recovery Checklist',
               description:
-                'A printable 12-step recovery flow for the Tomodachishare breach. PDF + Markdown formats.',
+                'A browser-based 12-step recovery flow for the Tomodachishare breach, unlocked on the return page without a PDF or Markdown download.',
               offers: {
                 '@type': 'Offer',
                 price: '9.00',

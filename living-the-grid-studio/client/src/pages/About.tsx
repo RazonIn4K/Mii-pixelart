@@ -145,11 +145,12 @@ export default function About() {
             recovery assistant, and a free 24-hour action plan.
           </p>
           <p className="text-sm leading-relaxed text-foreground/85">
-            The site is hosted on Cloudflare Pages with Pages Functions for the
-            API surface, a small KV namespace for caching the model catalog,
-            Stripe Checkout for the paid items, and the Have I Been Pwned API
-            for the password check. The full stack is documented in the repo
-            README.
+            The production architecture uses one Cloudflare Worker for the API
+            and the React app's Static Assets, with D1 for community data,
+            private R2 for project and generated media objects, and KV for edge
+            caching. Stripe Checkout handles optional paid items, and the Have I
+            Been Pwned API powers the password check. The full stack is
+            documented in the repo README.
           </p>
         </section>
 
@@ -162,9 +163,10 @@ export default function About() {
               <Link href="/studio" className="underline">
                 Studio
               </Link>
-              : import → reduce colors → export a paint-by-numbers reference
-              pack (PDF + JSON + palette sheet). 84-color in-game palette with
-              row/column labels for exact matching.
+              : import → reduce colors → export editable JSON, labeled or clean
+              PNGs, or a ZIP reference pack with a palette sheet, paint order,
+              and reference HTML. 84-color in-game palette with row/column
+              labels for exact matching.
             </li>
             <li>
               <Link href="/" className="underline">

@@ -86,8 +86,9 @@ async function searchCreations(context: WorkerRequestContext): Promise<Response>
   const cursor = parseCursor(parsed.data.cursor);
   const offset = cursor ? searchOffset(cursor) : 0;
   const tagJoin = parsed.data.tag
-    ? "JOIN creation_tags filter_ct ON filter_ct.creation_id = c.id JOIN tags filter_t ON filter_t.id = filter_ct.tag_id AND filter_t.slug = ?"
+    ? "JOIN creation_tags filter_ct ON filter_ct.creation_id = c.id JOIN tags filter_t ON filter_t.id = filter_ct.tag_id"
     : "";
+  const tagFilter = parsed.data.tag ? "AND filter_t.slug = ?" : "";
   const values: unknown[] = [ftsQuery];
   if (parsed.data.tag) values.push(parsed.data.tag);
   values.push(parsed.data.limit + 1, offset);
@@ -96,6 +97,7 @@ async function searchCreations(context: WorkerRequestContext): Promise<Response>
      JOIN creation_search search ON search.creation_id = c.id
      ${tagJoin}
      WHERE creation_search MATCH ? AND c.state = 'published' AND c.visibility = 'public'
+     ${tagFilter}
      ORDER BY bm25(creation_search), c.published_at DESC, c.id DESC LIMIT ? OFFSET ?`,
   ).bind(...values).all<CreationRow>();
   const page = rows.results.slice(0, parsed.data.limit);

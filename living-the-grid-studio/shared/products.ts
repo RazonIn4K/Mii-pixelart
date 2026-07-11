@@ -44,16 +44,16 @@ export const PAID_PRODUCTS: PaidProduct[] = [
     id: "breach-recovery-checklist",
     name: "Breach Recovery Checklist",
     description:
-      "A printable 12-step recovery flow for the Tomodachishare breach. Covers password rotation, 2FA migration, session revocation, and a 30-day monitoring plan.",
+      "A browser-based 12-step recovery flow for the Tomodachishare breach. Covers password rotation, 2FA migration, session revocation, and a 30-day monitoring plan.",
     amount: 900,
     currency: "usd",
     successPath: "/unlock?product=breach-recovery-checklist",
     cancelPath: "/unlock?canceled=1",
     category: "recovery",
     perks: [
-      "PDF + Markdown formats",
-      "Sample email templates for contacting services that reused your password",
-      "Lifetime updates as the breach disclosure evolves",
+      "12-step checklist unlocked on the return page",
+      "Password, 2FA, session, and monitoring priorities",
+      "Plain-language actions designed to follow in order",
     ],
   },
   {

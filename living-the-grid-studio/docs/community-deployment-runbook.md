@@ -106,8 +106,10 @@ Cloudflare documents this direct binding model in the
 
 - Static hashed assets are asset-first.
 - `not_found_handling` is `single-page-application`.
-- `run_worker_first` is narrowly scoped to `/api/*`, `/creation/*`, `/u/*`,
-  `/discover`, and `/search`; review the generated config before deployment.
+- `run_worker_first` selectively covers the API and document routes that need
+  Worker-generated responses, headers, or metadata. Treat the route patterns in
+  `wrangler.jsonc` as the source of truth and review the flattened output config
+  before deployment.
 - Dynamic Worker responses receive CSP and all security headers in middleware.
   Static responses continue to receive the audited `_headers` policy. Keep the
   two script policies aligned; local Worker fallback must not block Vite's
@@ -156,10 +158,14 @@ After explicit approval for resources and staging deployment:
 5. Run `pnpm build:staging`, inspect the generated output configuration, then
    deploy that output Worker to its staging hostname. Do not attach the production
    hostname or route.
-6. Run contract/integration/browser/security/accessibility/performance tests,
+6. Before treating the deployment as backend acceptance, request
+   `/api/discover/recent?limit=1` with `Accept: application/json` and require a
+   JSON content type plus the standard `{ data, requestId }` envelope. A `200`
+   HTML SPA shell is a routing failure, not a successful API smoke test.
+7. Run contract/integration/browser/security/accessibility/performance tests,
    including two-user authorization, OAuth, R2 failure injection, cleanup, and
    crawler metadata.
-7. Observe structured logs/traces for at least one complete cleanup schedule.
+8. Observe structured logs/traces for at least one complete cleanup schedule.
    Request logs must contain only `requestId`, `routeGroup`, `method`, `status`,
    `duration`, and `environment`. Confirm they contain no raw path, query,
    identity or pseudonym, cookie, OAuth value, email, IP, request body, report

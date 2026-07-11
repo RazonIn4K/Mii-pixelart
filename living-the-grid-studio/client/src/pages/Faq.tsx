@@ -90,7 +90,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Is the breach recovery checklist worth $9?",
         answer:
-          "Only if you'd rather follow a printable structured plan than improvise from the free 24-hour actions on /help. The free guidance already covers the four highest-value moves. The paid checklist is a longer printable PDF + Markdown for people who want to share a plan with less-technical family members, or who want a 30-day monitoring rhythm spelled out step by step.",
+          "Only if you'd rather follow a structured on-page plan than improvise from the free 24-hour actions on /help. The free guidance already covers the four highest-value moves. The paid checklist spells out a longer 12-step flow and 30-day monitoring rhythm in the browser; it does not include a PDF or Markdown download.",
       },
     ],
   },

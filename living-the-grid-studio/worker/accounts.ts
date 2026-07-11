@@ -478,19 +478,24 @@ function publicProfileToApi(row: PublicProfileRow) {
 }
 
 async function availableUsernameSuggestions(env: Env, requested: string): Promise<string[]> {
-  const suggestions: string[] = [];
-  for (let suffix = 2; suffix < 1_000 && suggestions.length < 3; suffix += 1) {
-    const suffixText = `-${suffix}`;
-    const base = requested
-      .slice(0, COMMUNITY_LIMITS.usernameMaximum - suffixText.length)
-      .replace(/[-_]+$/u, "");
-    const candidate = `${base}${suffixText}`;
-    const exists = await env.DB.prepare(
-      "SELECT 1 AS found FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
-    ).bind(candidate).first<{ found: number }>();
-    if (!exists) suggestions.push(candidate);
-  }
-  return suggestions;
+  const rows = await env.DB.prepare(
+    `WITH RECURSIVE suffixes(value) AS (
+       SELECT 2
+       UNION ALL
+       SELECT value + 1 FROM suffixes WHERE value < 999
+     ), candidates(value, username) AS (
+       SELECT value,
+         RTRIM(SUBSTR(?, 1, ? - LENGTH('-' || value)), '-_') || '-' || value
+       FROM suffixes
+     )
+     SELECT candidates.username
+     FROM candidates
+     LEFT JOIN users ON users.username = candidates.username COLLATE NOCASE
+     WHERE users.id IS NULL
+     ORDER BY candidates.value ASC
+     LIMIT 3`,
+  ).bind(requested, COMMUNITY_LIMITS.usernameMaximum).all<{ username: string }>();
+  return rows.results.map((row) => row.username);
 }
 
 function parseTimestampCursor(value: string | null): { id: string; sortValue: number } | null {

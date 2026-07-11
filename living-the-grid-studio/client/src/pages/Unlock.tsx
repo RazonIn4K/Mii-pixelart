@@ -286,7 +286,8 @@ export default function Unlock() {
               </li>
             </ol>
             <p className="text-xs text-muted-foreground">
-              Download links and Markdown export coming soon to this page.
+              This purchase unlocks the checklist on this page. No PDF or
+              Markdown download is included.
             </p>
           </Card>
         ) : null}

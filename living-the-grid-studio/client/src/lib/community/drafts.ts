@@ -33,13 +33,77 @@ async function withStore<T>(
   operation: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
   const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, mode);
-    const request = operation(transaction.objectStore(STORE_NAME));
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => reject(transaction.error);
+  return new Promise<T>((resolve, reject) => {
+    let request: IDBRequest<T> | undefined;
+    let requestResult: T | undefined;
+    let requestSucceeded = false;
+    let settled = false;
+    let transaction: IDBTransaction | undefined;
+
+    const close = () => {
+      try {
+        database.close();
+      } catch {
+        // Closing is best-effort after the operation has reached a terminal state.
+      }
+    };
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(requestResult as T);
+    };
+    const rejectOnce = (error: unknown, fallback: string) => {
+      if (settled) return;
+      settled = true;
+      close();
+      reject(error ?? new Error(fallback));
+    };
+
+    try {
+      transaction = database.transaction(STORE_NAME, mode);
+      transaction.oncomplete = () => {
+        if (requestSucceeded) {
+          resolveOnce();
+        } else {
+          rejectOnce(
+            request?.error,
+            "IndexedDB request completed without a result.",
+          );
+        }
+      };
+      transaction.onerror = () => {
+        rejectOnce(
+          transaction?.error ?? request?.error,
+          "IndexedDB transaction failed.",
+        );
+      };
+      transaction.onabort = () => {
+        rejectOnce(
+          transaction?.error ?? request?.error,
+          "IndexedDB transaction was aborted.",
+        );
+      };
+
+      request = operation(transaction.objectStore(STORE_NAME));
+      request.onsuccess = () => {
+        requestResult = request?.result as T;
+        requestSucceeded = true;
+      };
+      request.onerror = () => {
+        rejectOnce(
+          request?.error ?? transaction?.error,
+          "IndexedDB request failed.",
+        );
+      };
+    } catch (error) {
+      rejectOnce(error, "Could not start the IndexedDB transaction.");
+      try {
+        transaction?.abort();
+      } catch {
+        // The transaction may not have started or may already be inactive.
+      }
+    }
   });
 }
 

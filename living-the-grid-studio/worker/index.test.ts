@@ -287,6 +287,8 @@ describe("community Worker integration", () => {
 
   it("offers three database-checked username alternatives on collision", async () => {
     await seedUser("taken-name");
+    await seedUser("taken-name-2");
+    await seedUser("taken-name-3");
     const newcomer = await seedUnconfiguredUser();
     const headers = authenticatedHeaders(await seedSession(newcomer.id, "setup-token"));
     const response = await SELF.fetch(`${ORIGIN}/api/me/setup`, {
@@ -306,7 +308,7 @@ describe("community Worker integration", () => {
     };
     const suggestions = body.error.fields.usernameSuggestions.split(",");
     expect(suggestions).toHaveLength(3);
-    expect(suggestions).toEqual(["taken-name-2", "taken-name-3", "taken-name-4"]);
+    expect(suggestions).toEqual(["taken-name-4", "taken-name-5", "taken-name-6"]);
   });
 
   it("commits onboarding identity, terms, and bio atomically", async () => {
@@ -385,6 +387,17 @@ describe("community Worker integration", () => {
     expect(secondBody.data).toHaveLength(1);
     expect(secondBody.data[0].id).not.toBe(firstBody.data[0].id);
     expect(secondBody.meta.nextCursor).toBeNull();
+
+    const tagged = await SELF.fetch(
+      `${ORIGIN}/api/search?q=spark&tag=portraits&limit=10`,
+    );
+    expect(tagged.status).toBe(200);
+    const taggedBody = await tagged.json() as { data: { id: string }[] };
+    expect(taggedBody.data).toHaveLength(2);
+
+    const wrongTag = await SELF.fetch(`${ORIGIN}/api/search?q=spark&tag=icons&limit=10`);
+    expect(wrongTag.status).toBe(200);
+    await expect(wrongTag.json()).resolves.toMatchObject({ data: [] });
   });
 
   it("lets suspended sessions reach account controls but blocks community mutations", async () => {

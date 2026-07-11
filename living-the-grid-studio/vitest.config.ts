@@ -24,7 +24,11 @@ export default defineConfig({
     })),
   ],
   test: {
-    include: ["worker/**/*.test.ts", "shared/**/*.test.ts"],
+    include: [
+      "worker/**/*.test.ts",
+      "shared/**/*.test.ts",
+      "client/src/lib/community/**/*.test.ts",
+    ],
     setupFiles: ["./worker/test-setup.ts"],
     testTimeout: 15_000,
   },
