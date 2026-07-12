@@ -58,3 +58,16 @@ test("the document permits zoom and advertises the original social card", async 
     /community-og\.jpg$/,
   );
 });
+
+test("the hero image is preloaded only on the homepage", async ({ page }) => {
+  await page.goto("/discover", { waitUntil: "networkidle" });
+  await expect(page.locator('link[rel="preload"][as="image"][href="/hero.webp"]')).toHaveCount(
+    0,
+  );
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.locator('link[rel="preload"][as="image"][href="/hero.webp"]')).toHaveCount(
+    1,
+  );
+  await expect(page.locator('img[src="/hero.webp"]')).toHaveAttribute("fetchpriority", "high");
+});

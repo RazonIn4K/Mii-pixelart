@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { preload } from "react-dom";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,6 +155,8 @@ function pickFirstAvailableModel(presets: AiModelPreset[]): string {
 }
 
 export default function Home() {
+  preload(HERO_IMG, { as: "image", fetchPriority: "high" });
+
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
   const [incidentModel, setIncidentModel] = useState(DEFAULT_MODEL);
