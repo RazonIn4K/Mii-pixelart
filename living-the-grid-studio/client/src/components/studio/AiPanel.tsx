@@ -34,7 +34,11 @@ import { Textarea } from "@/components/ui/textarea";
 import type { GridDocument } from "@/lib/engine/grid";
 import { createGridDocumentFromAiSketch } from "@/lib/engine/ai-sketch";
 import { exportGridAsPng } from "@/lib/engine/canvas-renderer";
-import { normalizeOpenRouterModelChoice } from "@/lib/ai-models";
+import {
+  normalizeOpenRouterModelChoice,
+  parseSavedAiSessions,
+  type SavedAiSession,
+} from "@/lib/ai-models";
 
 interface AiPanelProps {
   currentDoc: GridDocument | null;
@@ -52,18 +56,6 @@ const STARTER_PROMPTS = [
   "Draw a 32x32 bald schoolhouse horror teacher face with glasses and a ruler.",
   "Suggest how to simplify the current grid for repainting.",
 ];
-
-interface SavedAiSession {
-  createdAt: string;
-  id: string;
-  includeGridImage: boolean;
-  includeGridSummary: boolean;
-  messages: AiChatMessage[];
-  modelChoice: string;
-  requestSketch: boolean;
-  title: string;
-  updatedAt: string;
-}
 
 function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset {
   return (
@@ -619,18 +611,9 @@ function inferSessionTitle(messages: AiChatMessage[]): string {
 
 function readAiSessions(): SavedAiSession[] {
   try {
-    const raw = window.localStorage.getItem(AI_SESSION_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as SavedAiSession[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((session) => session.id && Array.isArray(session.messages))
-      .map((session) => ({
-        ...session,
-        includeGridImage: Boolean(session.includeGridImage),
-        modelChoice: normalizeOpenRouterModelChoice(session.modelChoice),
-      }))
-      .slice(0, 20);
+    return parseSavedAiSessions(
+      window.localStorage.getItem(AI_SESSION_STORAGE_KEY),
+    );
   } catch {
     return [];
   }

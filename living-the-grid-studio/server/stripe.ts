@@ -112,16 +112,15 @@ async function stripeRequest(
   return { status: response.status, payload };
 }
 
-interface CheckoutRequest {
-  productId?: unknown;
-  customerEmail?: unknown;
-}
-
 export async function createCheckoutSession(
-  request: CheckoutRequest,
+  request: unknown,
   env?: StripeEnv,
 ): Promise<ApiResult> {
-  const productId = typeof request.productId === "string" ? request.productId : "";
+  const input =
+    request && typeof request === "object" && !Array.isArray(request)
+      ? request as Record<string, unknown>
+      : {};
+  const productId = typeof input.productId === "string" ? input.productId : "";
   const product = findProduct(productId);
   if (!product) {
     return {
@@ -163,8 +162,8 @@ export async function createCheckoutSession(
     metadata: {
       productId: product.id,
     },
-    ...(typeof request.customerEmail === "string" && request.customerEmail
-      ? { customer_email: request.customerEmail }
+    ...(typeof input.customerEmail === "string" && input.customerEmail
+      ? { customer_email: input.customerEmail }
       : {}),
   };
 
