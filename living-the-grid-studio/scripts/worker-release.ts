@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 
 export type ReleaseTarget = "local" | "staging" | "production";
 export type ReleaseIntent = "dry-run" | "deploy";
+type DeploymentPhase = "standard" | "staging-read-only-bootstrap";
 
 export interface ReleaseOptions {
   cwd: string;
@@ -51,6 +52,12 @@ export interface ReleaseResult {
   target: ReleaseTarget;
   intent: ReleaseIntent;
   warnings: readonly string[];
+}
+
+interface ValidatedApproval {
+  adminInternalId: string | null;
+  deploymentPhase: DeploymentPhase;
+  moderatorInternalId: string | null;
 }
 
 export class ReleaseError extends Error {
@@ -167,7 +174,6 @@ const COMMON_CONFIRMATIONS = [
   "secretsConfigured",
   "migrationsApproved",
   "legalPlaceholdersReplaced",
-  "adminModeratorAssigned",
   "pricingApproved",
   "rollbackReady",
   "deployApproved",
@@ -186,6 +192,10 @@ const APPROVAL_CLOCK_SKEW_MS = 60 * 1_000;
 const MAX_CAPTURE_BYTES = 64 * 1_024;
 const MIGRATION_FILE_PATTERN = /^\d{4}_[a-z0-9_]+[.]sql$/u;
 const MIGRATION_LEDGER_QUERY = "SELECT name FROM d1_migrations ORDER BY id";
+const PRIVILEGED_ROLE_COUNT_QUERY =
+  "SELECT COUNT(*) AS count FROM users WHERE role IN ('admin', 'moderator')";
+const PRIVILEGED_ROLE_LIST_QUERY =
+  "SELECT id, role FROM users WHERE role IN ('admin', 'moderator') ORDER BY id";
 const USAGE =
   "Usage: tsx scripts/worker-release.ts --target local|staging|production --intent dry-run|deploy";
 
@@ -847,7 +857,8 @@ function validateAuditedInputs(
   approval: JsonRecord,
   target: "staging" | "production",
   communityMutationsEnabled: boolean,
-): void {
+  deploymentPhase: DeploymentPhase,
+): ValidatedApproval {
   const infrastructure = objectAt(
     approval,
     "infrastructure",
@@ -913,18 +924,43 @@ function validateAuditedInputs(
   );
 
   const owners = objectAt(approval, "owners", "Operational owner inputs");
-  for (const idKey of ["adminInternalId", "moderatorInternalId"] as const) {
-    const value = requireApprovalText(
+  let adminInternalId: string | null = null;
+  let moderatorInternalId: string | null = null;
+  if (deploymentPhase === "staging-read-only-bootstrap") {
+    if (target !== "staging" || communityMutationsEnabled) {
+      throw new ReleaseError(
+        "The bootstrap phase is allowed only for read-only staging.",
+      );
+    }
+    expectExact(owners.adminInternalId, null, "Bootstrap admin internal ID");
+    expectExact(
+      owners.moderatorInternalId,
+      null,
+      "Bootstrap moderator internal ID",
+    );
+  } else {
+    adminInternalId = requireApprovalText(
       owners,
-      idKey,
+      "adminInternalId",
       "Privileged internal-ID input",
     );
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        value,
-      )
-    ) {
+    const internalIdPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!internalIdPattern.test(adminInternalId)) {
       throw new ReleaseError("Privileged internal-ID input is invalid.");
+    }
+    if (owners.moderatorInternalId !== null) {
+      moderatorInternalId = requireApprovalText(
+        owners,
+        "moderatorInternalId",
+        "Privileged internal-ID input",
+      );
+      if (
+        !internalIdPattern.test(moderatorInternalId) ||
+        adminInternalId === moderatorInternalId
+      ) {
+        throw new ReleaseError("Privileged internal-ID input is invalid.");
+      }
     }
   }
   for (const ownerKey of [
@@ -957,6 +993,44 @@ function validateAuditedInputs(
     communityMutationsEnabled,
     "Approved community mutation mode",
   );
+  if (deploymentPhase === "staging-read-only-bootstrap") {
+    expectExact(
+      confirmations.adminModeratorAssigned,
+      false,
+      "Bootstrap privileged-role assignment",
+    );
+    expectExact(
+      confirmations.bootstrapReadOnlyApproved,
+      true,
+      "Bootstrap deployment approval",
+    );
+    expectExact(
+      confirmations.writableCommunityDeployApproved,
+      false,
+      "Bootstrap writable deployment approval",
+    );
+    expectExact(
+      confirmations.stagingAcceptancePassed,
+      false,
+      "Bootstrap staging acceptance state",
+    );
+    expectExact(
+      confirmations.productionCutoverApproved,
+      false,
+      "Bootstrap production cutover state",
+    );
+  } else {
+    expectExact(
+      confirmations.adminModeratorAssigned,
+      true,
+      "Privileged-role assignment confirmation",
+    );
+    expectExact(
+      confirmations.bootstrapReadOnlyApproved,
+      false,
+      "Bootstrap deployment approval",
+    );
+  }
   if (
     communityMutationsEnabled &&
     confirmations.writableCommunityDeployApproved !== true
@@ -965,6 +1039,16 @@ function validateAuditedInputs(
       "Writable community deployment requires explicit approval.",
     );
   }
+  if (
+    !communityMutationsEnabled &&
+    confirmations.writableCommunityDeployApproved !== false
+  ) {
+    throw new ReleaseError(
+      "Read-only deployment approval must explicitly reject writable mode.",
+    );
+  }
+
+  return { adminInternalId, deploymentPhase, moderatorInternalId };
 }
 
 async function validateApproval(
@@ -972,7 +1056,7 @@ async function validateApproval(
   target: "staging" | "production",
   communityMutationsEnabled: boolean,
   dependencies: ReleaseDependencies,
-): Promise<void> {
+): Promise<ValidatedApproval> {
   const relativePath = path.join(".deployment-readiness", `${target}.json`);
   const approvalPath = path.join(cwd, relativePath);
   let raw: string;
@@ -989,9 +1073,24 @@ async function validateApproval(
   }
 
   const approval = parseJson(raw, "Deployment approval");
-  expectExact(approval.schemaVersion, 1, "Deployment approval schema");
+  expectExact(approval.schemaVersion, 2, "Deployment approval schema");
   expectExact(approval.target, target, "Deployment approval target");
   expectExact(approval.intent, "deploy", "Deployment approval intent");
+  const deploymentPhase = approval.deploymentPhase;
+  if (
+    deploymentPhase !== "standard" &&
+    deploymentPhase !== "staging-read-only-bootstrap"
+  ) {
+    throw new ReleaseError("Deployment phase is missing or invalid.");
+  }
+  if (
+    deploymentPhase === "staging-read-only-bootstrap" &&
+    (target !== "staging" || communityMutationsEnabled)
+  ) {
+    throw new ReleaseError(
+      "The bootstrap phase is allowed only for read-only staging.",
+    );
+  }
   if (!isNonPlaceholderApprovalText(approval.approvedBy)) {
     throw new ReleaseError(
       "Deployment approval identity is missing or placeholder text.",
@@ -1035,7 +1134,12 @@ async function validateApproval(
       );
     }
   }
-  validateAuditedInputs(approval, target, communityMutationsEnabled);
+  const validatedApproval = validateAuditedInputs(
+    approval,
+    target,
+    communityMutationsEnabled,
+    deploymentPhase,
+  );
 
   if (!(await dependencies.isPathIgnored(cwd, relativePath))) {
     throw new ReleaseError(
@@ -1057,6 +1161,7 @@ async function validateApproval(
       "Deployment approval is not bound to the current Git commit.",
     );
   }
+  return validatedApproval;
 }
 
 async function validateRemoteMigrationLedger(
@@ -1156,6 +1261,97 @@ async function validateRemoteMigrationLedger(
   }
 }
 
+async function validateRemotePrivilegedRoleState(
+  cwd: string,
+  sourcePath: string,
+  target: "staging" | "production",
+  approval: ValidatedApproval,
+  dependencies: ReleaseDependencies,
+): Promise<void> {
+  const query =
+    approval.deploymentPhase === "staging-read-only-bootstrap"
+      ? PRIVILEGED_ROLE_COUNT_QUERY
+      : PRIVILEGED_ROLE_LIST_QUERY;
+  let result: CommandResult;
+  try {
+    result = await dependencies.runCommand(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "d1",
+        "execute",
+        TARGETS[target].d1Name,
+        "--remote",
+        "--config",
+        sourcePath,
+        "--env",
+        target,
+        "--command",
+        query,
+        "--json",
+      ],
+      { cwd, env: { ...process.env } },
+    );
+  } catch {
+    throw new ReleaseError(
+      "Remote privileged-role state could not be verified.",
+    );
+  }
+  if (result.exitCode !== 0) {
+    throw new ReleaseError(
+      "Remote privileged-role state could not be verified.",
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(result.stdout);
+  } catch {
+    throw new ReleaseError(
+      "Remote privileged-role state could not be verified.",
+    );
+  }
+  if (
+    !Array.isArray(payload) ||
+    payload.length !== 1 ||
+    !isRecord(payload[0]) ||
+    payload[0].success !== true ||
+    !Array.isArray(payload[0].results) ||
+    payload[0].results.some((row) => !isRecord(row))
+  ) {
+    throw new ReleaseError(
+      "Remote privileged-role state could not be verified.",
+    );
+  }
+  const rows = payload[0].results as JsonRecord[];
+
+  if (approval.deploymentPhase === "staging-read-only-bootstrap") {
+    if (rows.length !== 1 || rows[0].count !== 0 || target !== "staging") {
+      throw new ReleaseError(
+        "Staging bootstrap requires an empty privileged-role state.",
+      );
+    }
+    return;
+  }
+
+  const admin = rows.filter(
+    (row) => row.id === approval.adminInternalId && row.role === "admin",
+  );
+  const moderator = rows.filter(
+    (row) =>
+      row.id === approval.moderatorInternalId && row.role === "moderator",
+  );
+  if (
+    admin.length !== 1 ||
+    (approval.moderatorInternalId !== null && moderator.length !== 1)
+  ) {
+    throw new ReleaseError(
+      "Remote privileged-role assignments do not match the approved internal IDs.",
+    );
+  }
+}
+
 async function readSourceConfig(
   sourcePath: string,
   dependencies: ReleaseDependencies,
@@ -1233,7 +1429,7 @@ export async function runRelease(
         "Legal launch markers remain in a required public document.",
       );
     }
-    await validateApproval(
+    const validatedApproval = await validateApproval(
       cwd,
       remoteTarget,
       bindings.communityMutationsEnabled,
@@ -1244,6 +1440,14 @@ export async function runRelease(
       cwd,
       sourcePath,
       remoteTarget,
+      dependencies,
+    );
+    dependencies.log("info", "Verifying remote privileged-role assignments.");
+    await validateRemotePrivilegedRoleState(
+      cwd,
+      sourcePath,
+      remoteTarget,
+      validatedApproval,
       dependencies,
     );
   } else {

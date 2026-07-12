@@ -29,6 +29,12 @@ const migrationNames = [
   "0003_atomic_quota_reservations.sql",
   "0004_preserve_moderation_state.sql",
 ] as const;
+const PRIVILEGED_ROLE_COUNT_QUERY =
+  "SELECT COUNT(*) AS count FROM users WHERE role IN ('admin', 'moderator')";
+const PRIVILEGED_ROLE_LIST_QUERY =
+  "SELECT id, role FROM users WHERE role IN ('admin', 'moderator') ORDER BY id";
+const ADMIN_INTERNAL_ID = "e1a76c08-42a2-4bc2-8abb-7d74f14ed818";
+const MODERATOR_INTERNAL_ID = "c3f97912-8bba-40d5-916d-c771f1cd49af";
 
 function migrationLedgerResult(
   names: readonly string[] = migrationNames,
@@ -38,6 +44,19 @@ function migrationLedgerResult(
     stdout: JSON.stringify([
       { success: true, results: names.map((name) => ({ name })) },
     ]),
+    stderr: "",
+  };
+}
+
+function privilegedRoleResult(
+  rows: readonly Record<string, unknown>[] = [
+    { id: MODERATOR_INTERNAL_ID, role: "moderator" },
+    { id: ADMIN_INTERNAL_ID, role: "admin" },
+  ],
+): CommandResult {
+  return {
+    exitCode: 0,
+    stdout: JSON.stringify([{ success: true, results: rows }]),
     stderr: "",
   };
 }
@@ -262,11 +281,14 @@ function approval(
   target: "staging" | "production",
   communityMutationsEnabled = false,
   overrides: Record<string, unknown> = {},
+  deploymentPhase: "standard" | "staging-read-only-bootstrap" = "standard",
 ) {
+  const bootstrap = deploymentPhase === "staging-read-only-bootstrap";
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     target,
     intent: "deploy",
+    deploymentPhase,
     gitCommit: COMMIT,
     approvedAt: new Date(NOW).toISOString(),
     approvedBy: "Release Owner",
@@ -287,8 +309,8 @@ function approval(
       retentionConfirmation: "Retention schedule reviewed and approved",
     },
     owners: {
-      adminInternalId: "e1a76c08-42a2-4bc2-8abb-7d74f14ed818",
-      moderatorInternalId: "c3f97912-8bba-40d5-916d-c771f1cd49af",
+      adminInternalId: bootstrap ? null : ADMIN_INTERNAL_ID,
+      moderatorInternalId: bootstrap ? null : MODERATOR_INTERNAL_ID,
       legalOwner: "Legal Operations Owner",
       privacyOwner: "Privacy Operations Owner",
       securityOwner: "Security Operations Owner",
@@ -308,15 +330,16 @@ function approval(
       secretsConfigured: true,
       migrationsApproved: true,
       legalPlaceholdersReplaced: true,
-      adminModeratorAssigned: true,
+      adminModeratorAssigned: !bootstrap,
       pricingApproved: true,
       rollbackReady: true,
       deployApproved: true,
       stagingDeployApproved: true,
-      stagingAcceptancePassed: true,
-      productionCutoverApproved: true,
+      stagingAcceptancePassed: !bootstrap,
+      productionCutoverApproved: !bootstrap,
       communityMutationsEnabled,
       writableCommunityDeployApproved: communityMutationsEnabled,
+      bootstrapReadOnlyApproved: bootstrap,
     },
     ...overrides,
   };
@@ -335,6 +358,7 @@ interface Harness {
   logs: string[];
   setCommandResult(result: CommandResult): void;
   setMigrationCommandResult(result: CommandResult): void;
+  setRoleCommandResult(result: CommandResult): void;
   setGitState(state: { commit: string; dirty: boolean }): void;
   setIgnored(value: boolean): void;
 }
@@ -346,6 +370,7 @@ function makeHarness(
     legalMarker?: boolean;
     approval?: boolean;
     remoteWritable?: boolean;
+    bootstrap?: boolean;
   } = {},
 ): Harness {
   const source = sourceConfig(
@@ -373,7 +398,14 @@ function makeHarness(
   if (options.approval !== false && target !== "local") {
     files.set(
       path.join(CWD, ".deployment-readiness", `${target}.json`),
-      JSON.stringify(approval(target, options.remoteWritable === true)),
+      JSON.stringify(
+        approval(
+          target,
+          options.remoteWritable === true,
+          {},
+          options.bootstrap ? "staging-read-only-bootstrap" : "standard",
+        ),
+      ),
     );
   }
 
@@ -381,6 +413,9 @@ function makeHarness(
   const logs: string[] = [];
   let commandResult: CommandResult = { exitCode: 0, stdout: "", stderr: "" };
   let migrationCommandResult = migrationLedgerResult();
+  let roleCommandResult = privilegedRoleResult(
+    options.bootstrap ? [{ count: 0 }] : undefined,
+  );
   let gitState = { commit: COMMIT, dirty: false };
   let ignored = true;
   const dependencies: ReleaseDependencies = {
@@ -400,7 +435,10 @@ function makeHarness(
     async runCommand(command, args, commandOptions) {
       calls.push({ command, args: [...args], options: commandOptions });
       if (args.includes("d1") && args.includes("execute")) {
-        return migrationCommandResult;
+        const query = args[args.indexOf("--command") + 1];
+        return query === "SELECT name FROM d1_migrations ORDER BY id"
+          ? migrationCommandResult
+          : roleCommandResult;
       }
       return commandResult;
     },
@@ -426,6 +464,9 @@ function makeHarness(
     },
     setMigrationCommandResult(result) {
       migrationCommandResult = result;
+    },
+    setRoleCommandResult(result) {
+      roleCommandResult = result;
     },
     setGitState(state) {
       gitState = state;
@@ -640,6 +681,38 @@ describe("runRelease deploy gates", () => {
     expect(harness.calls).toHaveLength(0);
   });
 
+  it("rejects legacy, missing, or unknown deployment phases before commands", async () => {
+    for (const mutate of [
+      (value: Record<string, unknown>) => {
+        value.schemaVersion = 1;
+      },
+      (value: Record<string, unknown>) => {
+        delete value.deploymentPhase;
+      },
+      (value: Record<string, unknown>) => {
+        value.deploymentPhase = "bootstrap";
+      },
+    ]) {
+      const harness = makeHarness("staging");
+      const approvalPath = path.join(
+        CWD,
+        ".deployment-readiness",
+        "staging.json",
+      );
+      const value = JSON.parse(harness.files.get(approvalPath)!);
+      mutate(value);
+      harness.files.set(approvalPath, JSON.stringify(value));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toBeInstanceOf(ReleaseError);
+      expect(harness.calls).toHaveLength(0);
+    }
+  });
+
   it("rejects legal markers without echoing their source text", async () => {
     const harness = makeHarness("production", { legalMarker: true });
     const error = await runRelease(
@@ -781,7 +854,148 @@ describe("runRelease deploy gates", () => {
       { cwd: CWD, target: "staging", intent: "deploy" },
       approvedHarness.dependencies,
     );
-    expect(approvedHarness.calls).toHaveLength(3);
+    expect(approvedHarness.calls).toHaveLength(4);
+  });
+
+  it("permits only an explicit first read-only staging bootstrap with no privileged users", async () => {
+    const harness = makeHarness("staging", { bootstrap: true });
+
+    await runRelease(
+      { cwd: CWD, target: "staging", intent: "deploy" },
+      harness.dependencies,
+    );
+
+    expect(harness.calls).toHaveLength(4);
+    expect(harness.calls[0].args).toContain(
+      "SELECT name FROM d1_migrations ORDER BY id",
+    );
+    expect(harness.calls[1].args).toContain(PRIVILEGED_ROLE_COUNT_QUERY);
+    expect(harness.calls[2].args).toEqual(["build"]);
+    expect(harness.calls[3].args).toEqual([
+      "exec",
+      "wrangler",
+      "deploy",
+      "--config",
+      GENERATED_PATH,
+    ]);
+  });
+
+  it("rejects bootstrap intent outside a first read-only staging deployment", async () => {
+    const production = makeHarness("production", { bootstrap: true });
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        production.dependencies,
+      ),
+    ).rejects.toThrow("allowed only for read-only staging");
+    expect(production.calls).toHaveLength(0);
+
+    const writable = makeHarness("staging", {
+      bootstrap: true,
+      remoteWritable: true,
+    });
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        writable.dependencies,
+      ),
+    ).rejects.toThrow("allowed only for read-only staging");
+    expect(writable.calls).toHaveLength(0);
+
+    const unapproved = makeHarness("staging", { bootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const unapprovedValue = JSON.parse(unapproved.files.get(approvalPath)!);
+    unapprovedValue.confirmations.bootstrapReadOnlyApproved = false;
+    unapproved.files.set(approvalPath, JSON.stringify(unapprovedValue));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        unapproved.dependencies,
+      ),
+    ).rejects.toThrow("Bootstrap deployment approval");
+    expect(unapproved.calls).toHaveLength(0);
+
+    const alreadyAssigned = makeHarness("staging", { bootstrap: true });
+    alreadyAssigned.setRoleCommandResult(privilegedRoleResult([{ count: 1 }]));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        alreadyAssigned.dependencies,
+      ),
+    ).rejects.toThrow("requires an empty privileged-role state");
+    expect(alreadyAssigned.calls).toHaveLength(2);
+  });
+
+  it("requires null bootstrap IDs and exact approved standard role assignments", async () => {
+    const bootstrap = makeHarness("staging", { bootstrap: true });
+    const bootstrapPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const bootstrapApproval = JSON.parse(bootstrap.files.get(bootstrapPath)!);
+    bootstrapApproval.owners.adminInternalId = ADMIN_INTERNAL_ID;
+    bootstrap.files.set(bootstrapPath, JSON.stringify(bootstrapApproval));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        bootstrap.dependencies,
+      ),
+    ).rejects.toThrow("Bootstrap admin internal ID");
+    expect(bootstrap.calls).toHaveLength(0);
+
+    const standard = makeHarness("staging");
+    standard.setRoleCommandResult(
+      privilegedRoleResult([
+        { id: ADMIN_INTERNAL_ID, role: "moderator" },
+        { id: MODERATOR_INTERNAL_ID, role: "admin" },
+      ]),
+    );
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        standard.dependencies,
+      ),
+    ).rejects.toThrow("do not match the approved internal IDs");
+    expect(standard.calls).toHaveLength(2);
+
+    const adminOnly = makeHarness("staging");
+    const standardApproval = JSON.parse(adminOnly.files.get(bootstrapPath)!);
+    standardApproval.owners.moderatorInternalId = null;
+    adminOnly.files.set(bootstrapPath, JSON.stringify(standardApproval));
+    adminOnly.setRoleCommandResult(
+      privilegedRoleResult([{ id: ADMIN_INTERNAL_ID, role: "admin" }]),
+    );
+    await runRelease(
+      { cwd: CWD, target: "staging", intent: "deploy" },
+      adminOnly.dependencies,
+    );
+    expect(adminOnly.calls).toHaveLength(4);
+  });
+
+  it("fails closed when the remote privileged-role check fails without surfacing output", async () => {
+    const harness = makeHarness("staging");
+    harness.setRoleCommandResult({
+      exitCode: 1,
+      stdout: "internal-user-id",
+      stderr: "private provider detail",
+    });
+
+    const error = await runRelease(
+      { cwd: CWD, target: "staging", intent: "deploy" },
+      harness.dependencies,
+    ).catch((caught: unknown) => caught);
+    const surfaced = `${(error as Error).message}\n${harness.logs.join("\n")}`;
+    expect((error as Error).message).toBe(
+      "Remote privileged-role state could not be verified.",
+    );
+    expect(surfaced).not.toContain("internal-user-id");
+    expect(surfaced).not.toContain("private provider detail");
+    expect(harness.calls).toHaveLength(2);
   });
 
   it("rejects a pending tracked migration before build or deploy", async () => {
@@ -860,7 +1074,7 @@ describe("runRelease deploy gates", () => {
         harness.dependencies,
       );
 
-      expect(harness.calls).toHaveLength(3);
+      expect(harness.calls).toHaveLength(4);
       expect(harness.calls[0].args).toEqual([
         "exec",
         "wrangler",
@@ -876,16 +1090,17 @@ describe("runRelease deploy gates", () => {
         "SELECT name FROM d1_migrations ORDER BY id",
         "--json",
       ]);
-      expect(harness.calls[1].options.env.CLOUDFLARE_ENV).toBe(target);
-      expect(harness.calls[2].args).toEqual([
+      expect(harness.calls[1].args).toContain(PRIVILEGED_ROLE_LIST_QUERY);
+      expect(harness.calls[2].options.env.CLOUDFLARE_ENV).toBe(target);
+      expect(harness.calls[3].args).toEqual([
         "exec",
         "wrangler",
         "deploy",
         "--config",
         GENERATED_PATH,
       ]);
-      expect(harness.calls[2].args).not.toContain("--dry-run");
-      expect(harness.calls[2].args).not.toContain("--env");
+      expect(harness.calls[3].args).not.toContain("--dry-run");
+      expect(harness.calls[3].args).not.toContain("--env");
     },
   );
 
@@ -909,6 +1124,6 @@ describe("runRelease deploy gates", () => {
     expect((error as Error).message).toBe(
       "Worker build failed with exit code 23.",
     );
-    expect(harness.calls).toHaveLength(2);
+    expect(harness.calls).toHaveLength(3);
   });
 });

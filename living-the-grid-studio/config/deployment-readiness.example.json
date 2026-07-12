@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "target": "staging",
   "intent": "deploy",
+  "deploymentPhase": "staging-read-only-bootstrap",
   "gitCommit": "replace-with-the-current-40-character-git-commit",
   "approvedAt": "replace-with-a-current-ISO-8601-timestamp",
   "approvedBy": "replace-with-the-approver-identity",
@@ -22,8 +23,8 @@
     "retentionConfirmation": "replace-with-the-approved-retention-check"
   },
   "owners": {
-    "adminInternalId": "replace-with-the-admin-internal-uuid",
-    "moderatorInternalId": "replace-with-the-moderator-internal-uuid",
+    "adminInternalId": null,
+    "moderatorInternalId": null,
     "legalOwner": "replace-with-the-named-legal-owner",
     "privacyOwner": "replace-with-the-named-privacy-owner",
     "securityOwner": "replace-with-the-named-security-owner",
@@ -50,6 +51,7 @@
     "stagingAcceptancePassed": false,
     "productionCutoverApproved": false,
     "communityMutationsEnabled": false,
-    "writableCommunityDeployApproved": false
+    "writableCommunityDeployApproved": false,
+    "bootstrapReadOnlyApproved": false
   }
 }

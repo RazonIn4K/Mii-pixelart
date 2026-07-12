@@ -25,8 +25,9 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 
 - Replace every operator identity, jurisdiction, address/contact, and legal
   placeholder in Terms, Privacy, Cookies, Community Guidelines, and Copyright.
-- Assign at least one accountable admin and moderator. Confirm who monitors
-  `legal@`, `privacy@`, `security@`, `help@`, and the abuse/report queue.
+- Assign at least one accountable admin who owns moderation; a separate
+  moderator is optional. Confirm who monitors `legal@`, `privacy@`, `security@`,
+  `help@`, and the abuse/report queue.
 - Confirm 13+ policy, seven-day deletion grace, 90-day report-text cleanup, and
   two-year minimal moderation retention with the legal operator.
 - Recheck current Workers, D1, R2, and Images pricing and approve any paid Images
@@ -69,12 +70,12 @@ See [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/).
 
 ## Required environment isolation
 
-| Environment | Host | D1 | R2 | KV | Google client | Authentication |
-| --- | --- | --- | --- | --- | --- | --- |
-| Local | `http://localhost:3000` | Local emulator | Local emulator | Local emulator | Localhost-only client | Allowed only on fixed localhost origin |
-| Staging | `https://staging.tomodachi.pw` | Staging database | Staging private bucket | Staging namespace | Staging client | Allowed only on staging host |
-| Production | `https://tomodachi.pw` | Production database | Production private bucket | Production namespace | Production client | Allowed only on canonical host |
-| Random branch preview | Variable | Isolated preview/emulator | Isolated preview/emulator | Isolated preview | None | Disabled |
+| Environment           | Host                           | D1                        | R2                        | KV                   | Google client         | Authentication                         |
+| --------------------- | ------------------------------ | ------------------------- | ------------------------- | -------------------- | --------------------- | -------------------------------------- |
+| Local                 | `http://localhost:3000`        | Local emulator            | Local emulator            | Local emulator       | Localhost-only client | Allowed only on fixed localhost origin |
+| Staging               | `https://staging.tomodachi.pw` | Staging database          | Staging private bucket    | Staging namespace    | Staging client        | Allowed only on staging host           |
+| Production            | `https://tomodachi.pw`         | Production database       | Production private bucket | Production namespace | Production client     | Allowed only on canonical host         |
+| Random branch preview | Variable                       | Isolated preview/emulator | Isolated preview/emulator | Isolated preview     | None                  | Disabled                               |
 
 Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`,
 `AUTH_RATE_LIMITER`, `SAVE_RATE_LIMITER`, `COMMENT_RATE_LIMITER`,
@@ -188,6 +189,20 @@ admin/moderator/inbox, consult-fulfillment, Stripe/tax, rollback, and migration
 owners or decisions. The wrapper validates these fields without logging their
 values. Inspect the flattened output config before every deploy.
 
+Readiness schema version 2 requires an explicit `deploymentPhase`. Use
+`standard` for every production deploy and every writable staging deploy. A
+single bootstrap phase, `staging-read-only-bootstrap`, exists only to break the
+first-account dependency: it requires staging, `COMMUNITY_MUTATIONS_ENABLED=false`,
+null admin/moderator IDs, `adminModeratorAssigned=false`, an explicit
+`bootstrapReadOnlyApproved=true`, and no existing privileged users in remote
+D1. The wrapper verifies that empty role state before it builds. Missing,
+legacy, or contradictory phase fields fail closed. Every `standard` deploy
+requires one real internal UUID already assigned the exact `admin` role. The
+moderator UUID may be null because admins have moderator authority; when a
+separate moderator UUID is supplied, it must be distinct and already assigned
+the exact `moderator` role. The wrapper verifies every supplied assignment in
+remote D1.
+
 ## Staging gate and procedure
 
 After explicit approval for resources and staging deployment:
@@ -210,6 +225,45 @@ After explicit approval for resources and staging deployment:
    read-only; enable community mutations only in a later reviewed artifact used
    for authenticated write acceptance. Do not attach the production hostname or
    route.
+   - For the first deployment only, use readiness schema 2 with
+     `deploymentPhase=staging-read-only-bootstrap`. Keep both privileged IDs
+     null, `adminModeratorAssigned=false`,
+     `writableCommunityDeployApproved=false`, and
+     `bootstrapReadOnlyApproved=true`. Do not use this phase if any admin or
+     moderator already exists.
+   - After the read-only Worker and staging hostname are available, the named
+     admin signs in with the approved Google account. A separately staffed
+     moderator signs in too when one will be assigned. OAuth provisioning
+     remains available in read-only mode; onboarding and all community writes
+     remain blocked. Each person reads their own internal user ID from the
+     authenticated `/api/auth/session` response. Do not copy Google subjects,
+     email addresses, session cookies, or tokens into the change ticket or
+     application logs.
+   - Under a separate, recorded data-change approval, assign the admin ID with a
+     narrowly scoped D1 update that only changes a current `user` role. Assign a
+     distinct moderator ID only when a separate moderator is being staffed:
+
+     ```sql
+     UPDATE users SET role = 'admin', updated_at = <UNIX_MILLISECONDS>
+       WHERE id = '<ADMIN_INTERNAL_UUID>' AND role = 'user';
+     -- Optional: omit this statement when the admin covers moderation.
+     UPDATE users SET role = 'moderator', updated_at = <UNIX_MILLISECONDS>
+       WHERE id = '<MODERATOR_INTERNAL_UUID>' AND role = 'user';
+     ```
+
+     Require exactly one changed row for every statement used, then read back
+     only `id` and `role` for the supplied IDs. Stop if an ID is missing,
+     already privileged, duplicated, or assigned the wrong role.
+
+   - Replace the bootstrap readiness file with a fresh `standard` approval bound
+     to the current clean commit. Record the real admin ID and either the real
+     distinct moderator ID or null, set
+     `adminModeratorAssigned=true` and `bootstrapReadOnlyApproved=false`, keep
+     writable mode false, and redeploy. The wrapper independently verifies the
+     exact remote role assignments. Only a later reviewed artifact and fresh
+     approval may set community mutations and
+     `writableCommunityDeployApproved` to true.
+
 6. Before treating the deployment as backend acceptance, request
    `/api/discover/recent?limit=1` with `Accept: application/json` and require a
    JSON content type plus the standard `{ data, requestId }` envelope. A `200`
