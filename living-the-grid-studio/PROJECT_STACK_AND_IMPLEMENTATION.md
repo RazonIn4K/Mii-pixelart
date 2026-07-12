@@ -778,7 +778,8 @@ the community D1 database does not store these chat transcripts. This means:
 
 The user can choose:
 
-- Model preset or custom OpenRouter model ID.
+- One of the curated free OpenRouter model presets. The picker and the
+  server-side allowlist reject custom, arbitrary, and paid model IDs.
 - Include current grid summary.
 - Include current grid PNG snapshot.
 - Request applyable sketch JSON.

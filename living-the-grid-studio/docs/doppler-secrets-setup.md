@@ -124,6 +124,10 @@ not implicitly approved for `stg` or `prd`.
 
 Replace placeholders with real values. **Warning:** pasting secrets into a terminal can store them in **shell history**; for `prd`, the Doppler dashboard is often safer.
 
+These examples cover the provider values used by the retained Pages rollback
+deployment. They do not configure the standalone Worker's complete eight-secret
+allowlist; use §6.1 and §11 for the Worker path.
+
 This app’s dev server uses **`http://localhost:3000`** (`vite.config.ts`).
 
 **`dev` — test Stripe, local URL**
@@ -181,18 +185,38 @@ doppler secrets set \
 
 ## 6. Which values does this repo actually need?
 
-Doppler (or Cloudflare) only needs variables that **this codebase or Pages Functions read**. Below is an inventory traced from source (not an aspirational list).
+Doppler (or Cloudflare) only needs variables that **this codebase, the Worker,
+or the retained Pages rollback Functions read**. Below is an inventory traced
+from source, not an aspirational list.
 
-### 6.1 Core — put in `dev` / `stg` / `prd` (sync to Cloudflare for deploys)
+### 6.1 Required Worker secrets
 
-| Variable | Used for | MVP? |
+The standalone Worker declares exactly these eight secret names in
+`wrangler.jsonc`. Keep every value environment-specific and configure the
+Worker secret surface separately from the Doppler-to-Pages integration.
+
+| Secret | Used for | Worker requirement |
 | --- | --- | --- |
-| `OPENROUTER_API_KEY` | `/api/ai/*` (Pages Function + local Express), `pnpm compare:models` | **Yes** if you want AI |
-| `STRIPE_SECRET_KEY` | `/api/stripe/*` (Pages Function + local Express) | **Yes** if you want checkout |
-| `PUBLIC_SITE_URL` | OpenRouter + Stripe helpers; Stripe success/cancel URLs | **Yes** for correct redirects and links |
-| `STRIPE_WEBHOOK_SECRET` | `server/stripe.ts` (reserved for future webhooks) | Optional until webhooks exist |
+| `GOOGLE_CLIENT_ID` | Google OIDC discovery, authorization, and callback validation | Required |
+| `GOOGLE_CLIENT_SECRET` | Confidential Google OIDC client authentication | Required |
+| `OIDC_COOKIE_KEY` | AES-GCM protection for the short-lived OIDC transaction cookie; exactly 32 base64url-encoded random bytes | Required |
+| `SESSION_PEPPER` | Independent secret mixed into session-token hashes before D1 persistence | Required |
+| `PSEUDONYM_KEY` | HMAC key for privacy-preserving client, reporter, and moderator pseudonyms | Required |
+| `OPENROUTER_API_KEY` | Curated-free-model `/api/ai/*` routes and `pnpm compare:models` | Required |
+| `STRIPE_SECRET_KEY` | Stripe Checkout creation and session verification | Required |
+| `STRIPE_WEBHOOK_SECRET` | Signature verification for the active `/api/webhooks/stripe` endpoint; must match the exact environment, endpoint, and Stripe mode | Required |
 
-Sources: `functions/api/ai/[[path]].ts`, `functions/api/stripe/[[path]].ts`, `server/openrouter.ts`, `server/stripe.ts`.
+Sources: `wrangler.jsonc`, `worker/auth.ts`, `worker/crypto.ts`,
+`worker/legacy.ts`, `functions/api/ai/[[path]].ts`,
+`functions/api/stripe/[[path]].ts`, `functions/api/webhooks/stripe.ts`,
+`server/openrouter.ts`, and `server/stripe.ts`.
+
+`PUBLIC_SITE_URL`, `GOOGLE_OIDC_REDIRECT_URI`, `TERMS_VERSION`,
+`COMMUNITY_MUTATIONS_ENABLED`, and `ENVIRONMENT` are runtime configuration,
+not secrets. The Worker keeps them in the selected `wrangler.jsonc`
+environment. The retained Pages deployment may continue receiving
+`PUBLIC_SITE_URL` through its Pages environment mapping during the rollback
+soak.
 
 ### 6.2 Build-time (`VITE_*`) — set in Doppler for the **same** config Cloudflare builds with, so they are inlined at `pnpm vite build`
 
@@ -214,9 +238,7 @@ All are **public in the client bundle**. Never put private keys behind `VITE_`.
 
 | Variable | Where |
 | --- | --- |
-| `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` | `vite.config.ts` (production path) |
 | `LTG_COMPARE_*`, `LTG_STUDIO_URL`, `LTG_SMOKE_*`, `CHROME_PATH` | `scripts/*` |
-| `PORT` | `server/index.ts` (defaults to `3000`) |
 
 ### 6.4 Credentials owned by other stacks
 
@@ -291,9 +313,32 @@ doppler run --config stg -- pnpm vite build
 
 ---
 
-## 11. Optional: Workers (not Pages)
+## 11. Workers (not Pages)
 
-For standalone Workers: `scripts/sync-cloudflare-worker-secrets.sh` + [Doppler Workers doc](https://docs.doppler.com/docs/cloudflare-workers). Pages secrets should use the integration in §8.
+The standalone Worker has a separate, approval-gated secret and deployment
+surface. A Doppler-to-Cloudflare Pages integration updates Pages settings only;
+it does not populate Worker secrets or deploy a Worker version.
+
+Follow [`community-deployment-runbook.md`](community-deployment-runbook.md)
+and treat `secrets.required` in `wrangler.jsonc` as the eight-name allowlist. The
+release wrapper validates configuration and packaging but does not write secret
+values. Secret writes remain their own explicitly approved, target-specific
+step through the selected Worker secret manager or Wrangler flow.
+
+Use the current target-specific release paths:
+
+```bash
+pnpm worker:dry-run:staging
+pnpm worker:dry-run:production
+
+# Only after the matching deployment gate is explicitly approved:
+pnpm worker:deploy:staging
+pnpm worker:deploy:production
+```
+
+Before deployment acceptance, list the target Worker's secret names and verify
+that they match the eight-name allowlist without printing values. Never treat a
+Pages secret sync as proof that a Worker version has those bindings.
 
 ---
 

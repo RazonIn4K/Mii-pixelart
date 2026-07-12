@@ -76,11 +76,19 @@ See [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/).
 | Production | `https://tomodachi.pw` | Production database | Production private bucket | Production namespace | Production client | Allowed only on canonical host |
 | Random branch preview | Variable | Isolated preview/emulator | Isolated preview/emulator | Isolated preview | None | Disabled |
 
-Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`, `AUTH_RATE_LIMITER`,
-`SAVE_RATE_LIMITER`, `COMMENT_RATE_LIMITER`, `SOCIAL_RATE_LIMITER`, and
-`DISCOVERY_RATE_LIMITER`. The dedicated comment binding is 10 requests per
-minute per user; do not merge it into the 60-per-minute social lane. Use the
-generated Wrangler `Env` type; do not hand-maintain a parallel binding type.
+Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`,
+`AUTH_RATE_LIMITER`, `SAVE_RATE_LIMITER`, `COMMENT_RATE_LIMITER`,
+`SOCIAL_RATE_LIMITER`, `DISCOVERY_RATE_LIMITER`, `AI_RATE_LIMITER`, and
+`STRIPE_RATE_LIMITER`. The dedicated comment binding is 10 requests per minute
+per user; do not merge it into the 60-per-minute social lane. The AI and Stripe
+bindings independently limit AI chat and Stripe checkout/session to 10 requests
+per minute per privacy-preserving client key.
+
+`pnpm test:preflight` and every target-specific Worker dry run validate all
+seven rate-limit binding names, limits, periods, and environment-isolated
+namespace IDs in both the source and generated Wrangler configurations. Use
+the generated Wrangler `Env` type; do not hand-maintain a parallel binding
+type.
 
 Required secrets are:
 
