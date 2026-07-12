@@ -56,6 +56,13 @@ export interface OpenRouterEnv {
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const ALLOWED_MODEL_IDS = new Set(
+  OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
+);
+
+export function isSupportedOpenRouterModel(modelId: string): boolean {
+  return ALLOWED_MODEL_IDS.has(modelId);
+}
 
 export function getOpenRouterStatus(env?: OpenRouterEnv): ApiResult {
   return {
@@ -116,6 +123,17 @@ export async function sendOpenRouterChat(
   request: AiChatRequest,
   env?: OpenRouterEnv,
 ): Promise<ApiResult> {
+  const normalized = normalizeAiRequest(request);
+  if (!normalized.ok) {
+    return {
+      status: 400,
+      body: {
+        configured: Boolean(getOpenRouterApiKey(env)),
+        reply: normalized.error,
+      },
+    };
+  }
+
   const apiKey = getOpenRouterApiKey(env);
   if (!apiKey) {
     return {
@@ -126,11 +144,6 @@ export async function sendOpenRouterChat(
           "OpenRouter is not configured. Set OPENROUTER_API_KEY in the shell that starts the dev server, then restart pnpm dev.",
       } satisfies AiChatResponse,
     };
-  }
-
-  const normalized = normalizeAiRequest(request);
-  if (!normalized.ok) {
-    return { status: 400, body: { configured: true, reply: normalized.error } };
   }
 
   const messages: OpenRouterMessage[] = [
@@ -248,8 +261,11 @@ function normalizeAiRequest(
   | { messages: OpenRouterMessage[]; model: string; ok: true }
   | { error: string; ok: false } {
   const model = String(request.model ?? "").trim();
-  if (!model || model.length > 160) {
-    return { ok: false, error: "Choose a valid OpenRouter model." };
+  if (!model || model.length > 160 || !isSupportedOpenRouterModel(model)) {
+    return {
+      ok: false,
+      error: "Choose one of the supported free OpenRouter models.",
+    };
   }
 
   if (!Array.isArray(request.messages) || request.messages.length === 0) {
