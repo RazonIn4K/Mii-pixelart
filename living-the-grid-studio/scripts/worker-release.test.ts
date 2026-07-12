@@ -22,6 +22,25 @@ const GENERATED_PATH = path.join(
 );
 const NOW = Date.parse("2026-07-11T18:00:00.000Z");
 const COMMIT = "8f584fe038f7bb99c76bb349c7279e53b10ee113";
+const MIGRATIONS_DIRECTORY = path.join(CWD, "migrations");
+const migrationNames = [
+  "0001_community.sql",
+  "0002_comment_locks.sql",
+  "0003_atomic_quota_reservations.sql",
+  "0004_preserve_moderation_state.sql",
+] as const;
+
+function migrationLedgerResult(
+  names: readonly string[] = migrationNames,
+): CommandResult {
+  return {
+    exitCode: 0,
+    stdout: JSON.stringify([
+      { success: true, results: names.map((name) => ({ name })) },
+    ]),
+    stderr: "",
+  };
+}
 
 const assetRoutes = [
   "/api/*",
@@ -315,6 +334,7 @@ interface Harness {
   calls: Call[];
   logs: string[];
   setCommandResult(result: CommandResult): void;
+  setMigrationCommandResult(result: CommandResult): void;
   setGitState(state: { commit: string; dirty: boolean }): void;
   setIgnored(value: boolean): void;
 }
@@ -360,6 +380,7 @@ function makeHarness(
   const calls: Call[] = [];
   const logs: string[] = [];
   let commandResult: CommandResult = { exitCode: 0, stdout: "", stderr: "" };
+  let migrationCommandResult = migrationLedgerResult();
   let gitState = { commit: COMMIT, dirty: false };
   let ignored = true;
   const dependencies: ReleaseDependencies = {
@@ -368,12 +389,19 @@ function makeHarness(
       if (value === undefined) throw new Error("ENOENT");
       return value;
     },
+    async readDirectory(directoryPath) {
+      if (directoryPath !== MIGRATIONS_DIRECTORY) throw new Error("ENOENT");
+      return migrationNames;
+    },
     async statFile(filePath) {
       if (!files.has(filePath)) throw new Error("ENOENT");
       return { mtimeMs: NOW };
     },
     async runCommand(command, args, commandOptions) {
       calls.push({ command, args: [...args], options: commandOptions });
+      if (args.includes("d1") && args.includes("execute")) {
+        return migrationCommandResult;
+      }
       return commandResult;
     },
     async getGitState() {
@@ -395,6 +423,9 @@ function makeHarness(
     logs,
     setCommandResult(result) {
       commandResult = result;
+    },
+    setMigrationCommandResult(result) {
+      migrationCommandResult = result;
     },
     setGitState(state) {
       gitState = state;
@@ -651,6 +682,14 @@ describe("runRelease deploy gates", () => {
       },
       {
         mutate(harness: Harness) {
+          const file = path.join(CWD, ".deployment-readiness", "staging.json");
+          const value = JSON.parse(harness.files.get(file)!);
+          value.confirmations.migrationsApproved = false;
+          harness.files.set(file, JSON.stringify(value));
+        },
+      },
+      {
+        mutate(harness: Harness) {
           harness.setIgnored(false);
         },
       },
@@ -742,8 +781,75 @@ describe("runRelease deploy gates", () => {
       { cwd: CWD, target: "staging", intent: "deploy" },
       approvedHarness.dependencies,
     );
-    expect(approvedHarness.calls).toHaveLength(2);
+    expect(approvedHarness.calls).toHaveLength(3);
   });
+
+  it("rejects a pending tracked migration before build or deploy", async () => {
+    const harness = makeHarness("staging");
+    harness.setMigrationCommandResult(
+      migrationLedgerResult(migrationNames.slice(0, -1)),
+    );
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(
+      "Remote D1 migration ledger does not match tracked migrations",
+    );
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0].args).toContain(targetValues.staging.d1Name);
+  });
+
+  it("rejects an unexpected remote migration before build or deploy", async () => {
+    const harness = makeHarness("production");
+    harness.setMigrationCommandResult(
+      migrationLedgerResult([...migrationNames, "0005_untracked.sql"]),
+    );
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(
+      "Remote D1 migration ledger does not match tracked migrations",
+    );
+    expect(harness.calls).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      name: "command failure",
+      result: { exitCode: 1, stdout: "", stderr: "private provider output" },
+    },
+    {
+      name: "invalid JSON",
+      result: {
+        exitCode: 0,
+        stdout: "not-json",
+        stderr: "private malformed-response detail",
+      },
+    },
+  ])(
+    "fails closed on remote ledger $name without surfacing child output",
+    async ({ result }) => {
+      const harness = makeHarness("staging");
+      harness.setMigrationCommandResult(result);
+
+      const error = await runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ).catch((caught: unknown) => caught);
+      const surfaced = `${(error as Error).message}\n${harness.logs.join("\n")}`;
+      expect((error as Error).message).toBe(
+        "Remote D1 migration ledger could not be verified.",
+      );
+      expect(surfaced).not.toContain(result.stderr);
+      expect(harness.calls).toHaveLength(1);
+    },
+  );
 
   it.each(["staging", "production"] as const)(
     "runs an approved %s deploy without --dry-run or --env",
@@ -754,17 +860,32 @@ describe("runRelease deploy gates", () => {
         harness.dependencies,
       );
 
-      expect(harness.calls).toHaveLength(2);
-      expect(harness.calls[0].options.env.CLOUDFLARE_ENV).toBe(target);
-      expect(harness.calls[1].args).toEqual([
+      expect(harness.calls).toHaveLength(3);
+      expect(harness.calls[0].args).toEqual([
+        "exec",
+        "wrangler",
+        "d1",
+        "execute",
+        targetValues[target].d1Name,
+        "--remote",
+        "--config",
+        SOURCE_PATH,
+        "--env",
+        target,
+        "--command",
+        "SELECT name FROM d1_migrations ORDER BY id",
+        "--json",
+      ]);
+      expect(harness.calls[1].options.env.CLOUDFLARE_ENV).toBe(target);
+      expect(harness.calls[2].args).toEqual([
         "exec",
         "wrangler",
         "deploy",
         "--config",
         GENERATED_PATH,
       ]);
-      expect(harness.calls[1].args).not.toContain("--dry-run");
-      expect(harness.calls[1].args).not.toContain("--env");
+      expect(harness.calls[2].args).not.toContain("--dry-run");
+      expect(harness.calls[2].args).not.toContain("--env");
     },
   );
 
@@ -788,6 +909,6 @@ describe("runRelease deploy gates", () => {
     expect((error as Error).message).toBe(
       "Worker build failed with exit code 23.",
     );
-    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls).toHaveLength(2);
   });
 });

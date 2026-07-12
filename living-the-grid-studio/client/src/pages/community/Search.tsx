@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Search as SearchIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -25,39 +25,68 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const latestSearchRequest = useRef(0);
 
   const search = useCallback(async (value: string, nextCursor?: string) => {
+    const requestNumber = latestSearchRequest.current + 1;
+    latestSearchRequest.current = requestNumber;
+    const isLatestRequest = () => latestSearchRequest.current === requestNumber;
     const normalized = value.trim();
     if (!normalized) {
       setItems([]);
       setCursor(null);
       setError(null);
+      setLoading(false);
+      setLoadingMore(false);
       return;
     }
-    nextCursor ? setLoadingMore(true) : setLoading(true);
+    if (nextCursor) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setLoadingMore(false);
+    }
     try {
       const result = await communityApi<CreationSummary[]>(`/api/search${queryString({ q: normalized, limit: 24, cursor: nextCursor })}`);
+      if (!isLatestRequest()) return;
       setItems((current) => nextCursor ? [...current, ...result.data] : result.data);
       setCursor(result.meta?.nextCursor ?? null);
       setError(null);
     } catch (searchError) {
+      if (!isLatestRequest()) return;
       setError(messageFromError(searchError));
     } finally {
+      if (!isLatestRequest()) return;
       setLoading(false);
       setLoadingMore(false);
     }
   }, []);
 
-  useEffect(() => {
+  const syncFromUrl = useCallback(() => {
     const next = currentQuery();
     setQuery(next);
     setSubmittedQuery(next);
     void search(next);
-  }, [location, search]);
+  }, [search]);
+
+  useEffect(() => {
+    syncFromUrl();
+  }, [location, syncFromUrl]);
+
+  useEffect(() => {
+    const syncSearchHistory = () => {
+      if (window.location.pathname === "/search") syncFromUrl();
+    };
+    window.addEventListener("popstate", syncSearchHistory);
+    return () => window.removeEventListener("popstate", syncSearchHistory);
+  }, [syncFromUrl]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const next = query.trim();
+    setQuery(next);
+    setSubmittedQuery(next);
+    void search(next);
     navigate(next ? `/search?q=${encodeURIComponent(next)}` : "/search");
   };
 

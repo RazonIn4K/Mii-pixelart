@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -34,6 +34,7 @@ export interface FileStat {
 
 export interface ReleaseDependencies {
   readText(filePath: string): Promise<string>;
+  readDirectory(directoryPath: string): Promise<readonly string[]>;
   statFile(filePath: string): Promise<FileStat>;
   runCommand(
     command: string,
@@ -183,6 +184,8 @@ const TARGET_CONFIRMATIONS: Record<
 const APPROVAL_MAX_AGE_MS = 30 * 60 * 1_000;
 const APPROVAL_CLOCK_SKEW_MS = 60 * 1_000;
 const MAX_CAPTURE_BYTES = 64 * 1_024;
+const MIGRATION_FILE_PATTERN = /^\d{4}_[a-z0-9_]+[.]sql$/u;
+const MIGRATION_LEDGER_QUERY = "SELECT name FROM d1_migrations ORDER BY id";
 const USAGE =
   "Usage: tsx scripts/worker-release.ts --target local|staging|production --intent dry-run|deploy";
 
@@ -1056,6 +1059,103 @@ async function validateApproval(
   }
 }
 
+async function validateRemoteMigrationLedger(
+  cwd: string,
+  sourcePath: string,
+  target: "staging" | "production",
+  dependencies: ReleaseDependencies,
+): Promise<void> {
+  let trackedMigrations: string[];
+  try {
+    const migrationDirectoryEntries = await dependencies.readDirectory(
+      path.join(cwd, "migrations"),
+    );
+    const sqlFiles = migrationDirectoryEntries.filter((name) =>
+      name.endsWith(".sql"),
+    );
+    if (sqlFiles.some((name) => !MIGRATION_FILE_PATTERN.test(name))) {
+      throw new Error("invalid migration filename");
+    }
+    trackedMigrations = [...sqlFiles].sort((left, right) =>
+      left.localeCompare(right),
+    );
+  } catch {
+    throw new ReleaseError("Tracked D1 migrations could not be verified.");
+  }
+  if (
+    trackedMigrations.length === 0 ||
+    new Set(trackedMigrations).size !== trackedMigrations.length
+  ) {
+    throw new ReleaseError("Tracked D1 migrations could not be verified.");
+  }
+
+  let result: CommandResult;
+  try {
+    result = await dependencies.runCommand(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "d1",
+        "execute",
+        TARGETS[target].d1Name,
+        "--remote",
+        "--config",
+        sourcePath,
+        "--env",
+        target,
+        "--command",
+        MIGRATION_LEDGER_QUERY,
+        "--json",
+      ],
+      { cwd, env: { ...process.env } },
+    );
+  } catch {
+    throw new ReleaseError("Remote D1 migration ledger could not be verified.");
+  }
+  if (result.exitCode !== 0) {
+    throw new ReleaseError("Remote D1 migration ledger could not be verified.");
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(result.stdout);
+  } catch {
+    throw new ReleaseError("Remote D1 migration ledger could not be verified.");
+  }
+  if (
+    !Array.isArray(payload) ||
+    payload.length !== 1 ||
+    !isRecord(payload[0]) ||
+    payload[0].success !== true ||
+    !Array.isArray(payload[0].results)
+  ) {
+    throw new ReleaseError("Remote D1 migration ledger could not be verified.");
+  }
+
+  const appliedMigrations: string[] = [];
+  for (const row of payload[0].results) {
+    if (
+      !isRecord(row) ||
+      typeof row.name !== "string" ||
+      !MIGRATION_FILE_PATTERN.test(row.name)
+    ) {
+      throw new ReleaseError(
+        "Remote D1 migration ledger could not be verified.",
+      );
+    }
+    appliedMigrations.push(row.name);
+  }
+  if (new Set(appliedMigrations).size !== appliedMigrations.length) {
+    throw new ReleaseError("Remote D1 migration ledger could not be verified.");
+  }
+  if (JSON.stringify(appliedMigrations) !== JSON.stringify(trackedMigrations)) {
+    throw new ReleaseError(
+      "Remote D1 migration ledger does not match tracked migrations.",
+    );
+  }
+}
+
 async function readSourceConfig(
   sourcePath: string,
   dependencies: ReleaseDependencies,
@@ -1137,6 +1237,13 @@ export async function runRelease(
       cwd,
       remoteTarget,
       bindings.communityMutationsEnabled,
+      dependencies,
+    );
+    dependencies.log("info", "Verifying the remote D1 migration ledger.");
+    await validateRemoteMigrationLedger(
+      cwd,
+      sourcePath,
+      remoteTarget,
       dependencies,
     );
   } else {
@@ -1324,6 +1431,7 @@ async function nodePathIgnored(
 export function createNodeDependencies(): ReleaseDependencies {
   return {
     readText: (filePath) => readFile(filePath, "utf8"),
+    readDirectory: (directoryPath) => readdir(directoryPath),
     statFile: async (filePath) => {
       const result = await stat(filePath);
       return { mtimeMs: result.mtimeMs };
