@@ -165,6 +165,14 @@ describe("Worker HTTP integration", () => {
     });
   });
 
+  it("returns a successful null envelope when random discovery is empty", async () => {
+    const response = await SELF.fetch("http://localhost:3000/api/discover/random");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: null,
+    });
+  });
+
   it("returns the documented not-found envelope for unknown tag feeds", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/tags/not-a-launch-tag");
     expect(response.status).toBe(404);

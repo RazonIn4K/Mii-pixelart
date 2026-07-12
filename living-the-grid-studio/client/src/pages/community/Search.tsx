@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Search as SearchIcon } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CreationCard } from "@/components/community/CreationCard";
@@ -18,6 +18,7 @@ function currentQuery(): string {
 export default function Search() {
   useDocumentTitle("Search community");
   const [location, navigate] = useLocation();
+  const searchParams = useSearch();
   const [query, setQuery] = useState(currentQuery);
   const [submittedQuery, setSubmittedQuery] = useState(currentQuery);
   const [items, setItems] = useState<CreationSummary[]>([]);
@@ -71,7 +72,7 @@ export default function Search() {
 
   useEffect(() => {
     syncFromUrl();
-  }, [location, syncFromUrl]);
+  }, [location, searchParams, syncFromUrl]);
 
   useEffect(() => {
     const syncSearchHistory = () => {
@@ -85,8 +86,11 @@ export default function Search() {
     event.preventDefault();
     const next = query.trim();
     setQuery(next);
-    setSubmittedQuery(next);
-    void search(next);
+    if (next === currentQuery()) {
+      setSubmittedQuery(next);
+      void search(next);
+      return;
+    }
     navigate(next ? `/search?q=${encodeURIComponent(next)}` : "/search");
   };
 
@@ -95,7 +99,7 @@ export default function Search() {
       <section className="community-hero py-14 sm:py-20">
         <div className="container">
           <CommunityPageIntro eyebrow="Search the workshop" title="Look for a spark." description="Search public creation titles, descriptions, creators, and community-curated tags." />
-          <form onSubmit={submit} role="search" className="mt-8 flex max-w-2xl gap-2 rounded-2xl border-2 border-[var(--island-ink)] bg-white p-2 shadow-[5px_5px_0_var(--island-ink)]">
+          <form onSubmit={submit} role="search" aria-label="Search public creations" className="mt-8 flex max-w-2xl gap-2 rounded-2xl border-2 border-[var(--island-ink)] bg-white p-2 shadow-[5px_5px_0_var(--island-ink)]">
             <label htmlFor="community-search" className="sr-only">Search creations</label>
             <Input id="community-search" value={query} onChange={(event) => setQuery(event.target.value.slice(0, 120))} placeholder="Try a color, character type, or creator…" className="h-11 border-0 bg-transparent shadow-none focus-visible:ring-0" />
             <Button type="submit" aria-label="Search community creations" className="h-11 rounded-xl"><SearchIcon /> <span className="hidden sm:inline">Search</span></Button>

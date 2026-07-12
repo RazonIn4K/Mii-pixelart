@@ -439,7 +439,7 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     publishedAt: null,
     revision: 1,
     slug: "private-draft-0001",
-    state: "draft",
+    status: "draft",
     stats: { comments: 0, likes: 0 },
     tags: [],
     title: "Private draft",
@@ -509,7 +509,15 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   await page.route("**/api/creations/*/publish", async (route) => {
     const publishBody = route.request().postDataJSON() as Record<string, unknown>;
     publishBodies.push(publishBody);
-    await fulfillJson(route, { data: { ...creation, ...publishBody, state: "published" }, requestId });
+    await fulfillJson(route, {
+      data: {
+        ...creation,
+        ...publishBody,
+        socialImageUrl: `/api/creations/${creation.id}/media/social`,
+        status: "published",
+      },
+      requestId,
+    });
   });
   await page.route("**/api/creations/*/media/*", (route) => route.fulfill({
     body: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"/>",
@@ -525,37 +533,74 @@ test("project shelf paginates, edits private cards, and uses governed publishing
 
   await page.getByRole("button", { name: "More actions for Private draft" }).click();
   await page.getByRole("button", { name: "Review & publish" }).click();
-  await expect(page.getByRole("dialog", { name: "Review before publishing" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Publish publicly" })).toBeDisabled();
-  await page.getByRole("button", { name: "Retry gallery" }).click();
+  const publishDialog = page.getByRole("dialog", { name: "Review before publishing" });
+  await expect(publishDialog).toBeVisible();
+  await expect(publishDialog.locator('[aria-current="step"]')).toContainText("1. Details");
+  await expect(publishDialog.getByLabel("Live project card preview").getByRole("heading", { name: "Private draft" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await publishDialog.getByLabel("Title").fill("");
+  await publishDialog.getByRole("button", { name: "Continue to showcase" }).click();
+  await expect(publishDialog.getByText("Give your creation a title before continuing.")).toBeVisible();
+  await expect(publishDialog.locator('[aria-current="step"]')).toContainText("1. Details");
+  await publishDialog.getByLabel("Title").fill("Private draft");
+  await publishDialog.getByRole("button", { name: "Portraits" }).click();
+  await publishDialog.getByRole("button", { name: "Continue to showcase" }).click();
+  await expect(publishDialog.locator('[aria-current="step"]')).toContainText("2. Showcase");
+  await publishDialog.getByRole("button", { name: "Retry gallery" }).click();
   await expect.poll(() => galleryLoads).toBe(2);
-  await expect(page.getByRole("button", { name: "Publish publicly" })).toBeEnabled();
-  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
-    buffer: onePixelPng,
-    mimeType: "image/png",
-    name: "portrait.png",
+  await expect(publishDialog.getByRole("button", { name: "Continue to sharing" })).toBeEnabled();
+  await page.evaluate(() => {
+    const trackedWindow = window as Window & { __revokedShowcasePreviews?: string[] };
+    const originalRevoke = URL.revokeObjectURL.bind(URL);
+    trackedWindow.__revokedShowcasePreviews = [];
+    URL.revokeObjectURL = (url: string) => {
+      trackedWindow.__revokedShowcasePreviews?.push(url);
+      originalRevoke(url);
+    };
   });
-  await page.getByLabel("Image description").fill(showcaseImage.altText);
-  await expect(page.getByRole("button", { name: "Add showcase image" })).toBeEnabled();
-  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
+  const dropTarget = publishDialog.getByRole("button", { name: "Drop image here or choose a file" });
+  await dropTarget.evaluate((element, encodedPng) => {
+    const binary = atob(encodedPng);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], "portrait.png", { type: "image/png" }));
+    element.dispatchEvent(new DragEvent("drop", {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: transfer,
+    }));
+  }, onePixelPng.toString("base64"));
+  await expect(publishDialog.getByAltText("Preview of selected portrait.png")).toBeVisible();
+  await publishDialog.getByLabel("Image description").fill(showcaseImage.altText);
+  await expect(publishDialog.getByRole("button", { name: "Add showcase image" })).toBeEnabled();
+  await publishDialog.getByLabel("Choose a photo or screenshot").setInputFiles({
     buffer: Buffer.from("<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
     mimeType: "image/svg+xml",
     name: "unsupported.svg",
   });
-  await expect(page.getByRole("button", { name: "Add showcase image" })).toBeDisabled();
-  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
+  await expect(publishDialog.getByAltText("Preview of selected portrait.png")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __revokedShowcasePreviews?: string[] }
+  ).__revokedShowcasePreviews?.length ?? 0)).toBeGreaterThan(0);
+  await expect(publishDialog.getByRole("button", { name: "Add showcase image" })).toBeDisabled();
+  await publishDialog.getByLabel("Choose a photo or screenshot").setInputFiles({
     buffer: onePixelPng,
     mimeType: "image/png",
     name: "portrait.png",
   });
-  await page.getByRole("button", { name: "Add showcase image" }).click();
-  await expect(page.getByText(showcaseImage.altText)).toBeVisible();
+  await expect(publishDialog.getByAltText("Preview of selected portrait.png")).toBeVisible();
+  await publishDialog.getByRole("button", { name: "Add showcase image" }).click();
+  await expect(publishDialog.getByText(showcaseImage.altText)).toBeVisible();
   expect(rawUploadHeaders?.authorization).toBe("Bearer test-one-use-upload-token-000000000000");
   expect(rawUploadHeaders?.cookie).toBeUndefined();
-  await expect(page.getByRole("switch").first()).toBeChecked();
-  await expect(page.getByRole("switch").nth(1)).not.toBeChecked();
-  await page.getByRole("button", { name: "Portraits" }).click();
-  await page.getByRole("button", { name: "Publish publicly" }).click();
+  await publishDialog.getByRole("button", { name: "Continue to sharing" }).click();
+  await expect(publishDialog.locator('[aria-current="step"]')).toContainText("3. Sharing");
+  await expect(publishDialog.getByText("1 image", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await expect(publishDialog.getByRole("switch").first()).toBeChecked();
+  await expect(publishDialog.getByRole("switch").nth(1)).not.toBeChecked();
+  await publishDialog.getByRole("button", { name: "Publish publicly" }).click();
   await expect.poll(() => publishBodies.length).toBe(1);
   expect(publishBodies[0]).toMatchObject({
     commentsEnabled: true,
@@ -563,14 +608,22 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     tags: ["portraits"],
     visibility: "public",
   });
+  const publishSuccessDialog = page.getByRole("dialog", {
+    name: "Your share page is ready",
+  });
+  await expect(
+    publishSuccessDialog.getByRole("link", { name: "Download social card" }),
+  ).toHaveAttribute("href", `/api/creations/${creation.id}/media/social`);
 
   await page.getByRole("button", { name: "Continue editing" }).click();
 
   await page.getByRole("button", { name: "Edit publishing" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit publishing settings" });
   await expect(editDialog).toBeVisible();
+  await editDialog.getByRole("button", { name: "Continue to showcase" }).click();
   await expect(editDialog.getByText("This gallery is live.")).toBeVisible();
   await expect(editDialog.getByRole("button", { name: "Add showcase image" })).toHaveCount(0);
+  await editDialog.getByRole("button", { name: "Continue to sharing" }).click();
   await editDialog.getByRole("switch").first().click();
   await editDialog.getByRole("switch").nth(1).click();
   await editDialog.getByRole("combobox", { name: "Visibility" }).click();
@@ -610,6 +663,18 @@ test("published creations expose owner editing and the current like state", asyn
         thumbnailUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
         updatedAt: 1_700_000_000_001,
         width: 1,
+      }, {
+        altText: "A close-up of the portrait's coral and mint pixel details",
+        createdAt: 1_700_000_000_002,
+        displayUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+        height: 1,
+        id: "00000000-0000-4000-8000-000000000078",
+        isCover: false,
+        socialImageUrl: "/api/creations/creation/images/image-2/social",
+        sortOrder: 1,
+        thumbnailUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+        updatedAt: 1_700_000_000_002,
+        width: 1,
       }],
       likedByViewer: false,
       owner: currentUser,
@@ -635,11 +700,61 @@ test("published creations expose owner editing and the current like state", asyn
     await fulfillJson(route, { data: { liked: true }, requestId });
   });
 
+  // A 320 CSS-pixel viewport also represents the layout width available when
+  // a 640px browser window is zoomed to 200%.
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/creation/owner-published-01");
   await expect(page.getByRole("heading", { name: "Showcase gallery" })).toBeVisible();
   await expect(page.getByAltText("A framed photo of the finished island portrait")).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Share", exact: true })).toBeVisible();
+  const socialCardDownload = page.getByRole("link", { name: "Download social card" });
+  await expect(socialCardDownload).toHaveAttribute(
+    "href",
+    `/api/creations/${creationId}/media/social`,
+  );
+  await expect(socialCardDownload).toHaveAttribute(
+    "download",
+    "owner-published-project-social-card.jpg",
+  );
+
+  const galleryTrigger = page.getByRole("button", {
+    name: "Open image 1 of 2 in full-screen gallery: A framed photo of the finished island portrait",
+  });
+  await galleryTrigger.click();
+  const galleryDialog = page.getByRole("dialog", {
+    name: "Showcase gallery for Owner published project",
+  });
+  await expect(galleryDialog).toBeVisible();
+  await expect(galleryDialog.getByText("Image 1 of 2")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true);
+
+  await page.keyboard.press("ArrowRight");
+  await expect(galleryDialog.getByText("Image 2 of 2")).toBeVisible();
+  await expect(
+    galleryDialog.getByAltText("A close-up of the portrait's coral and mint pixel details"),
+  ).toBeVisible();
+  await galleryDialog.getByRole("button", { name: "Previous showcase image" }).click();
+  await expect(galleryDialog.getByText("Image 1 of 2")).toBeVisible();
+  await galleryDialog.getByRole("button", {
+    name: "View image 2: A close-up of the portrait's coral and mint pixel details",
+  }).click();
+  await expect(galleryDialog.getByText("Image 2 of 2")).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(galleryDialog.getByText("Image 1 of 2")).toBeVisible();
+
+  for (let step = 0; step < 7; step += 1) {
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true);
+  }
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(galleryDialog).toBeHidden();
+  await expect(galleryTrigger).toBeFocused();
+
   await expect(page.getByRole("link", { name: "Edit in Studio" })).toHaveAttribute(
     "href",
     `/studio?cloud=${creationId}`,

@@ -1,11 +1,14 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type DragEvent, useEffect, useId, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  FileImage,
   ImagePlus,
   Loader2,
   Star,
   Trash2,
+  UploadCloud,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -123,6 +126,9 @@ export function ShowcaseImageManager({
   const fileRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<CreationShowcaseImage[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [altText, setAltText] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,6 +141,18 @@ export function ShowcaseImageManager({
     onBusyChange?.(busy);
     return () => onBusyChange?.(false);
   }, [busy, onBusyChange]);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      setPreviewFailed(false);
+      return;
+    }
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(nextPreviewUrl);
+    setPreviewFailed(false);
+    return () => URL.revokeObjectURL(nextPreviewUrl);
+  }, [file]);
 
   const replaceImages = (next: CreationShowcaseImage[]) => {
     setImages(next);
@@ -178,6 +196,20 @@ export function ShowcaseImageManager({
       return;
     }
     setFile(nextFile);
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setDragging(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    if (uploading) return;
+    if (fileRef.current) fileRef.current.value = "";
+    chooseFile(event.dataTransfer.files.item(0));
   };
 
   const upload = async () => {
@@ -338,18 +370,86 @@ export function ShowcaseImageManager({
         </p>
       ) : images.length < MAX_SHOWCASE_IMAGES ? (
         <div className="space-y-3 rounded-xl border border-[var(--island-blue)]/30 bg-[var(--island-blue-soft)] p-3">
-          <div className="space-y-1.5">
-            <Label htmlFor={`${inputId}-file`}>Choose a photo or screenshot</Label>
+          <div className="space-y-2">
+            <Label htmlFor={`${inputId}-file`} className="sr-only">Choose a photo or screenshot</Label>
             <Input
               ref={fileRef}
               id={`${inputId}-file`}
               type="file"
               accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
               disabled={uploading}
+              className="sr-only"
+              tabIndex={-1}
               onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
             />
-            <p className="text-[0.7rem] leading-4 text-muted-foreground">JPEG, PNG, WebP, HEIC, or HEIF · maximum 8 MiB. Animations are flattened to a still; vector files are not accepted.</p>
+            <button
+              type="button"
+              aria-controls={`${inputId}-file`}
+              aria-describedby={`${inputId}-file-help`}
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (!uploading) setDragging(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                const nextTarget = event.relatedTarget;
+                if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) setDragging(false);
+              }}
+              onDrop={handleDrop}
+              className={`flex min-h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--island-blue)]/35 disabled:cursor-not-allowed disabled:opacity-50 ${
+                dragging
+                  ? "border-[var(--island-blue-dark)] bg-white text-[var(--island-blue-dark)]"
+                  : "border-[var(--island-ink)]/35 bg-white/75 text-[var(--island-ink)]"
+              }`}
+            >
+              <UploadCloud className="h-7 w-7" aria-hidden="true" />
+              <span className="text-sm font-black">
+                {dragging ? "Drop to use this image" : "Drop image here or choose a file"}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Native file picker works with keyboard and touch</span>
+            </button>
+            <p id={`${inputId}-file-help`} className="text-[0.7rem] leading-4 text-muted-foreground">JPEG, PNG, WebP, HEIC, or HEIF · maximum 8 MiB. Animations are flattened to a still; vector files are not accepted.</p>
           </div>
+          {file ? (
+            <figure className="overflow-hidden rounded-xl border-2 border-[var(--island-ink)] bg-white shadow-[3px_3px_0_var(--island-ink)]">
+              <div className="relative aspect-[16/9] bg-[var(--island-paper)]">
+                {previewUrl && !previewFailed ? (
+                  <img
+                    src={previewUrl}
+                    alt={`Preview of selected ${file.name}`}
+                    className="h-full w-full object-contain"
+                    onError={() => setPreviewFailed(true)}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-muted-foreground" role="status">
+                    <FileImage className="h-7 w-7" aria-hidden="true" />
+                    This browser cannot preview this format locally, but it can still be securely optimized after upload.
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="absolute right-2 top-2 bg-white"
+                  onClick={clearFile}
+                  disabled={uploading}
+                  aria-label="Remove selected image"
+                >
+                  <X />
+                </Button>
+              </div>
+              <figcaption className="flex min-w-0 items-center justify-between gap-3 border-t-2 border-[var(--island-ink)] px-3 py-2 text-xs">
+                <span className="truncate font-bold" title={file.name}>{file.name}</span>
+                <span className="shrink-0 font-mono text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MiB</span>
+              </figcaption>
+            </figure>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor={`${inputId}-alt`}>Image description</Label>
             <Input

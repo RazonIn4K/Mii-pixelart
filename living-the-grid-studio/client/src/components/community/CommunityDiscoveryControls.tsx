@@ -46,6 +46,7 @@ export function CommunitySearchBar({
   return (
     <form
       role="search"
+      aria-label={`${label} form`}
       onSubmit={submit}
       className={cn(
         "flex w-full max-w-2xl min-w-0 items-center gap-2 rounded-[1.35rem] border-2 border-[var(--island-ink)] bg-white p-2 shadow-[5px_5px_0_var(--island-ink)]",

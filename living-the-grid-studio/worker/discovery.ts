@@ -13,10 +13,32 @@ export function registerDiscoveryRoutes(router: Router): void {
   router
     .add("GET", "/api/discover/recent", recentCreations)
     .add("GET", "/api/discover/popular", popularCreations)
+    .add("GET", "/api/discover/random", randomCreation)
     .add("GET", "/api/search", searchCreations)
     .add("GET", "/api/tags", listTags)
     .add("GET", "/api/tags/:slug", creationsByTag)
     .add("GET", "/api/tags/:slug/creations", creationsByTag);
+}
+
+async function randomCreation(context: WorkerRequestContext): Promise<Response> {
+  await discoveryLimit(context);
+  const pivot = crypto.randomUUID();
+  const afterPivot = await context.env.DB.prepare(
+    `${CREATION_SELECT}
+     WHERE c.state = 'published' AND c.visibility = 'public' AND c.id >= ?
+     ORDER BY c.id ASC LIMIT 1`,
+  ).bind(pivot).first<CreationRow>();
+  const row = afterPivot ?? await context.env.DB.prepare(
+    `${CREATION_SELECT}
+     WHERE c.state = 'published' AND c.visibility = 'public'
+     ORDER BY c.id ASC LIMIT 1`,
+  ).first<CreationRow>();
+  if (!row) return success(context.requestId, null);
+  const liked = await viewerLikes(context, [row]);
+  return success(context.requestId, {
+    ...creationToApi(row),
+    likedByViewer: liked.has(row.id),
+  });
 }
 
 async function listTags(context: WorkerRequestContext): Promise<Response> {

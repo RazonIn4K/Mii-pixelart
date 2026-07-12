@@ -213,6 +213,18 @@ describe("community Worker integration", () => {
         stats: { comments: 1, likes: 1 },
       }],
     });
+
+    const random = await SELF.fetch(`${ORIGIN}/api/discover/random`, {
+      headers: visitorHeaders,
+    });
+    expect(random.status).toBe(200);
+    await expect(random.json()).resolves.toMatchObject({
+      data: {
+        id: createdBody.data.id,
+        likedByViewer: true,
+        visibility: "public",
+      },
+    });
   });
 
   it("enforces object authorization and comment defaults", async () => {
@@ -279,6 +291,10 @@ describe("community Worker integration", () => {
     ]);
     expect(unlistedProject.status).toBe(200);
     expect(unlistedPreview.status).toBe(200);
+
+    const random = await SELF.fetch(`${ORIGIN}/api/discover/random`);
+    expect(random.status).toBe(200);
+    await expect(random.json()).resolves.toMatchObject({ data: null });
   });
 
   it("keeps author deletion separate from audited moderator comment actions", async () => {

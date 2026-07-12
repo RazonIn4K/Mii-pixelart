@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Download, Heart, Images, MessageCircle, Pencil, Save, Trash2, X } from "lucide-react";
+import { Download, Heart, MessageCircle, Pencil, Save, Trash2, X } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { CommunityError, CommunityLoading } from "@/components/community/Communi
 import { IslandAvatar } from "@/components/community/IslandAvatar";
 import { ReportDialog } from "@/components/community/ReportDialog";
 import { ShareCreationActions } from "@/components/community/ShareCreationActions";
+import { CreationShowcaseGallery } from "@/components/community/CreationShowcaseGallery";
 import { CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -30,7 +31,6 @@ export default function CreationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   useDocumentTitle(creation?.title ?? "Community creation");
 
   const loadComments = useCallback(async (creationId: string, nextCursor?: string) => {
@@ -56,7 +56,6 @@ export default function CreationDetailPage() {
     try {
       const result = await communityApi<CreationDetail>(`/api/public/creations/${encodeURIComponent(slug)}`);
       setCreation(result.data);
-      setSelectedImageId(result.data.images?.find((image) => image.isCover)?.id ?? result.data.images?.[0]?.id ?? null);
       setComments([]);
       setCommentsCursor(null);
       setError(null);
@@ -151,45 +150,12 @@ export default function CreationDetailPage() {
           <>
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:items-start">
               <div className="space-y-3">
-                {(() => {
-                  const selected = creation.images?.find((image) => image.id === selectedImageId)
-                    ?? creation.images?.find((image) => image.isCover)
-                    ?? creation.images?.[0];
-                  const source = selected?.displayUrl ?? creation.primaryImageUrl ?? creation.previewUrl;
-                  const alt = selected?.altText ?? `Pixel-art preview of ${creation.title}`;
-                  return (
-                    <figure className="community-art-frame">
-                      {source ? (
-                        <img src={source} alt={alt} width={1600} height={1600} loading="eager" className="aspect-square w-full object-contain" decoding="async" />
-                      ) : (
-                        <div className="pixel-placeholder aspect-square"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
-                      )}
-                    </figure>
-                  );
-                })()}
-                {creation.images?.length ? (
-                  <section aria-labelledby="showcase-gallery-title" className="rounded-2xl border border-[var(--island-ink)]/10 bg-white/70 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <h2 id="showcase-gallery-title" className="flex items-center gap-2 text-sm font-black"><Images className="h-4 w-4" /> Showcase gallery</h2>
-                      <span className="text-xs font-bold text-[var(--island-ink)]/45">{creation.images.length} image{creation.images.length === 1 ? "" : "s"}</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {creation.images.map((image) => (
-                        <button
-                          key={image.id}
-                          type="button"
-                          aria-label={`Show image: ${image.altText}`}
-                          aria-pressed={selectedImageId === image.id}
-                          onClick={() => setSelectedImageId(image.id)}
-                          className="overflow-hidden rounded-xl border-2 border-transparent bg-[var(--island-paper)] transition data-[selected=true]:border-[var(--island-blue)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
-                          data-selected={selectedImageId === image.id}
-                        >
-                          <img src={image.thumbnailUrl} alt="" width={512} height={512} loading="lazy" decoding="async" className="aspect-square w-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
+                <CreationShowcaseGallery
+                  fallbackAlt={`Pixel-art preview of ${creation.title}`}
+                  fallbackImageUrl={creation.primaryImageUrl ?? creation.previewUrl}
+                  images={creation.images}
+                  title={creation.title}
+                />
               </div>
 
               <aside className="community-detail-panel">
@@ -218,7 +184,12 @@ export default function CreationDetailPage() {
                 </div>
                 <div className="mt-3 rounded-2xl bg-white p-3">
                   <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--island-ink)]/50">Share this creation</p>
-                  <ShareCreationActions path={`/creation/${encodeURIComponent(creation.slug)}`} title={creation.title} showView={false} />
+                  <ShareCreationActions
+                    path={`/creation/${encodeURIComponent(creation.slug)}`}
+                    title={creation.title}
+                    showView={false}
+                    socialCardUrl={creation.socialImageUrl}
+                  />
                 </div>
                 <div className="mt-4 flex justify-end"><ReportDialog targetType="creation" targetId={creation.id} /></div>
               </aside>

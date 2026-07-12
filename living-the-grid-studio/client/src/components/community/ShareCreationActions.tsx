@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink, Share2 } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Share2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -9,18 +9,53 @@ function absoluteShareUrl(path: string): string {
   return new URL(path, window.location.origin).toString();
 }
 
+function safeSocialCardUrl(value?: string | null): string | null {
+  if (!value || typeof window === "undefined") return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    const isSocialCardPath = url.pathname.startsWith("/api/creations/")
+      && (url.pathname.endsWith("/media/social") || url.pathname.endsWith("/social"));
+    if (
+      url.origin !== window.location.origin
+      || !["http:", "https:"].includes(url.protocol)
+      || url.username
+      || url.password
+      || !isSocialCardPath
+    ) {
+      return null;
+    }
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function socialCardFilename(title: string): string {
+  const basename = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${basename || "tomodachi-creation"}-social-card.jpg`;
+}
+
 export function ShareCreationActions({
   path,
   title,
   showView = true,
+  socialCardUrl,
   className,
 }: {
   path: string;
   title: string;
   showView?: boolean;
+  socialCardUrl?: string | null;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const socialCardDownloadUrl = safeSocialCardUrl(socialCardUrl);
 
   const copy = async () => {
     try {
@@ -60,6 +95,13 @@ export function ShareCreationActions({
       <Button type="button" variant="outline" onClick={() => void share()}>
         <Share2 /> Share
       </Button>
+      {socialCardDownloadUrl ? (
+        <Button asChild variant="outline">
+          <a href={socialCardDownloadUrl} download={socialCardFilename(title)}>
+            <Download /> Download social card
+          </a>
+        </Button>
+      ) : null}
     </div>
   );
 }

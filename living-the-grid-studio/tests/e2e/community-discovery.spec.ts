@@ -102,7 +102,9 @@ test("discovery search, feeds, and tags stay URL-backed without mobile overflow"
   await expect(
     page.getByText("Coral tide chart", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("search")).toBeVisible();
+  await expect(
+    page.getByRole("search", { name: "Search public creations form" }),
+  ).toBeVisible();
 
   await openFiltersWhenCollapsed(page, "Open discovery filters");
   expect(
@@ -118,10 +120,13 @@ test("discovery search, feeds, and tags stay URL-backed without mobile overflow"
     page.getByRole("button", { name: "Remove tag filter coral", exact: true }),
   ).toBeVisible();
 
-  await page
+  const discoverySearch = page.getByRole("search", {
+    name: "Search public creations form",
+  });
+  await discoverySearch
     .getByLabel("Search public creations", { exact: true })
     .fill("sunset");
-  await page
+  await discoverySearch
     .getByRole("button", { name: "Search shared creations", exact: true })
     .click();
   await expect(page).toHaveURL(/\/discover\?q=sunset&tag=coral$/);
@@ -136,6 +141,51 @@ test("discovery search, feeds, and tags stay URL-backed without mobile overflow"
 
   await page.getByRole("button", { name: "Clear all", exact: true }).click();
   await expect(page).toHaveURL(/\/discover$/);
+});
+
+test("desktop quick search navigates to current community results", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "The compact header search appears at the desktop breakpoint.");
+  await page.route("**/api/search?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    expect(params.get("q")).toBe("moon lantern");
+    await fulfill(
+      route,
+      [creation({ slug: "moon-lantern", title: "Moon lantern" })],
+      "quick-search-e2e",
+    );
+  });
+
+  await page.goto("/search");
+  const quickSearch = page.getByRole("search", {
+    name: "Community quick search",
+  });
+  await quickSearch.getByLabel("Search public creations").fill("moon lantern");
+  await quickSearch.getByRole("button", { name: "Search community" }).click();
+
+  await expect(page).toHaveURL(/\/search\?q=moon%20lantern$/);
+  await expect(page.getByText("Moon lantern", { exact: true })).toBeVisible();
+});
+
+test("surprise discovery opens a public creation without exposing filtered work", async ({
+  page,
+}) => {
+  await page.route("**/api/tags", (route) => fulfill(route, [], "tags-empty-e2e"));
+  await page.route("**/api/discover/recent?**", (route) =>
+    fulfill(route, [creation()], "recent-surprise-e2e"),
+  );
+  await page.route("**/api/discover/random", (route) =>
+    fulfill(route, creation(), "random-e2e"),
+  );
+  await page.route("**/api/public/creations/coral-tide-chart", (route) =>
+    fulfill(route, creation(), "detail-e2e"),
+  );
+
+  await page.goto("/discover", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Surprise me", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/creation\/coral-tide-chart$/);
 });
 
 test("profile creation filters are reusable, URL-backed, and keep creator links intact", async ({
@@ -198,10 +248,13 @@ test("profile creation filters are reusable, URL-backed, and keep creator links 
   await expect(page.getByText("Coral notebook", { exact: true })).toBeVisible();
   await expect(page.getByText("Mint lantern", { exact: true })).toHaveCount(0);
 
-  await page
+  const profileSearch = page.getByRole("search", {
+    name: "Search Island Maker's creations form",
+  });
+  await profileSearch
     .getByLabel("Search Island Maker's creations", { exact: true })
     .fill("notebook");
-  await page
+  await profileSearch
     .getByRole("button", { name: "Search shared creations", exact: true })
     .click();
   await expect(page).toHaveURL(/\/u\/island-maker\?q=notebook&tag=coral$/);

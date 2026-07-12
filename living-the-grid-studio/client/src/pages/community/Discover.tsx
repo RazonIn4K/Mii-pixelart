@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Dices, Plus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,7 @@ export default function Discover() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [surprising, setSurprising] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const latestRequest = useRef(0);
 
@@ -193,6 +194,23 @@ export default function Discover() {
 
   const clearFilters = () =>
     applyState({ feed: "recent", query: "", tag: null });
+  const surpriseMe = async () => {
+    setSurprising(true);
+    try {
+      const result = await communityApi<CreationSummary | null>(
+        "/api/discover/random",
+      );
+      if (!result.data) {
+        toast.info("No public creations are ready to explore yet.");
+        return;
+      }
+      navigate(`/creation/${encodeURIComponent(result.data.slug)}`);
+    } catch (surpriseError) {
+      toast.error(messageFromError(surpriseError));
+    } finally {
+      setSurprising(false);
+    }
+  };
   const viewLabel = submittedQuery
     ? `Results for “${submittedQuery}”${activeTag ? ` in #${activeTag}` : ""}`
     : activeTag
@@ -211,11 +229,22 @@ export default function Discover() {
               title="Find, filter, and share your next pixel idea."
               description="Search original public grids, browse governed tags, and open the Studio when inspiration strikes. Private drafts never appear here."
               action={
-                <Button asChild className="island-button rounded-full">
-                  <Link href="/studio">
-                    <Plus /> Create &amp; share
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild className="island-button rounded-full">
+                    <Link href="/studio">
+                      <Plus /> Create &amp; share
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full bg-white"
+                    disabled={surprising}
+                    onClick={() => void surpriseMe()}
+                  >
+                    <Dices /> {surprising ? "Finding one…" : "Surprise me"}
+                  </Button>
+                </div>
               }
             />
             <CommunitySearchBar

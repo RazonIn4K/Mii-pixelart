@@ -699,6 +699,22 @@ paths:
         '200': { $ref: '#/components/responses/CreationList' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /api/discover/random:
+    get:
+      operationId: discoverRandom
+      tags: [Discovery]
+      summary: Return one randomly selected public creation, or null when the gallery is empty
+      description: Uses a UUID pivot with wraparound so the Worker does not require a full-table random sort.
+      security: []
+      x-rate-limit: 120 discovery requests per minute per client
+      responses:
+        '200':
+          description: A public published creation, or null when none exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RandomCreationEnvelope' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /api/search:
     get:
       operationId: searchCreations
@@ -1995,6 +2011,16 @@ components:
       required: [data, requestId]
       properties:
         data: { $ref: '#/components/schemas/Creation' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    RandomCreationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          oneOf:
+            - { $ref: '#/components/schemas/Creation' }
+            - { type: 'null' }
         requestId: { $ref: '#/components/schemas/RequestId' }
     OwnedCreationEnvelope:
       type: object

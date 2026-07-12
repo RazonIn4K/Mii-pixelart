@@ -46,6 +46,7 @@ export interface CreationSummary {
   previewUrl?: string | null;
   thumbnailUrl?: string | null;
   primaryImageUrl?: string | null;
+  socialImageUrl?: string | null;
   images?: CreationShowcaseImage[];
   revision: number;
   publishedAt?: number | null;
@@ -75,7 +76,6 @@ export interface CreationShowcaseImage {
 
 export interface CreationDetail extends CreationSummary {
   project?: GridDocument;
-  socialImageUrl?: string | null;
   commentsLocked?: boolean;
   canEdit?: boolean;
   canModerate?: boolean;

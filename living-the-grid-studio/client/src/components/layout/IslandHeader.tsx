@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   ChevronDown,
   LogOut,
@@ -8,9 +8,10 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,15 @@ const PRIMARY_LINKS = [
   { href: "/studio", label: "Studio" },
   { href: "/guides", label: "Guides" },
 ] as const;
+
+function currentSearchQuery(): string {
+  if (typeof window === "undefined" || window.location.pathname !== "/search")
+    return "";
+  return new URLSearchParams(window.location.search)
+    .get("q")
+    ?.trim()
+    .slice(0, 120) ?? "";
+}
 
 function SignInForm({ className }: { className?: string }) {
   const returnTo =
@@ -127,9 +137,21 @@ function AccountMenu() {
 }
 
 export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const search = useSearch();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickQuery, setQuickQuery] = useState(currentSearchQuery);
   const { user, status } = useAuth();
+
+  useEffect(() => {
+    setQuickQuery(currentSearchQuery());
+  }, [location, search]);
+
+  const submitQuickSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = quickQuery.trim().slice(0, 120);
+    navigate(query ? `/search?q=${encodeURIComponent(query)}` : "/search");
+  };
 
   return (
     <header
@@ -174,6 +196,33 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
             </Link>
           ))}
         </nav>
+
+        <form
+          role="search"
+          aria-label="Community quick search"
+          className="hidden min-w-40 max-w-xs flex-1 items-center rounded-full border border-[var(--island-ink)]/15 bg-white/85 p-1 shadow-sm xl:flex"
+          onSubmit={submitQuickSearch}
+        >
+          <label htmlFor="community-quick-search" className="sr-only">
+            Search public creations
+          </label>
+          <Input
+            id="community-quick-search"
+            value={quickQuery}
+            onChange={(event) => setQuickQuery(event.target.value.slice(0, 120))}
+            placeholder="Search creations…"
+            className="h-9 min-w-0 border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
+          />
+          <Button
+            type="submit"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
+            aria-label="Search community"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+        </form>
 
         <div className="flex items-center gap-1">
           <Button
