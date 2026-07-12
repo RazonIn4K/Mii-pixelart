@@ -1,8 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import { AlertCircle, CloudOff, LoaderCircle, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { COMMUNITY_SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/community/api";
 
-export function CommunityLoading({ label = "Loading the island…" }: { label?: string }) {
+export function CommunityLoading({
+  label = "Loading the island…",
+}: {
+  label?: string;
+}) {
   return (
     <div className="community-state" role="status" aria-live="polite">
       <LoaderCircle className="h-7 w-7 animate-spin text-primary" />
@@ -18,20 +24,38 @@ export function CommunityError({
   message: string;
   retry?: () => void;
 }) {
-  const offline = !navigator.onLine || message.toLowerCase().includes("unreachable");
+  const deploymentUnavailable =
+    message === COMMUNITY_SERVICE_UNAVAILABLE_MESSAGE;
+  const offline =
+    !navigator.onLine ||
+    message.toLowerCase().includes("unreachable") ||
+    deploymentUnavailable;
   const Icon = offline ? CloudOff : AlertCircle;
   return (
     <div className="community-state" role="alert">
       <Icon className="h-7 w-7 text-primary" />
       <div>
-        <p className="font-black text-[var(--island-ink)]">Community unavailable</p>
-        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">{message}</p>
+        <h2 className="font-black text-[var(--island-ink)]">
+          {deploymentUnavailable
+            ? "Community features are not connected here yet"
+            : "Community unavailable"}
+        </h2>
+        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">
+          {message}
+        </p>
       </div>
-      {retry ? (
-        <Button type="button" variant="outline" onClick={retry}>
-          Try again
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap justify-center gap-2">
+        {deploymentUnavailable ? (
+          <Button asChild>
+            <Link href="/studio">Use Studio locally</Link>
+          </Button>
+        ) : null}
+        {retry ? (
+          <Button type="button" variant="outline" onClick={retry}>
+            Try again
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -75,7 +99,9 @@ export function CommunityEmpty({
       </span>
       <div>
         <p className="font-black text-[var(--island-ink)]">{title}</p>
-        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">{message}</p>
+        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">
+          {message}
+        </p>
       </div>
       {action}
     </div>

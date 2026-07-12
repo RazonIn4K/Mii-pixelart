@@ -19,6 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import type { GridDocument } from "@/lib/engine/grid";
+import {
+  checkImageSignature,
+  readFileSignature,
+} from "@/lib/engine/file-signature";
 import type {
   BackgroundMode,
   ImageFrameMode,
@@ -31,7 +35,7 @@ interface ImportPanelProps {
   onPreviewImage: (file: File, options?: Partial<ImageImportOptions>) => void;
   onCommitPreview: () => void;
   onCancelPreview: () => void;
-  onImportJson: (json: string) => void;
+  onImportJson: (json: string) => boolean;
   isLoading: boolean;
 }
 
@@ -292,7 +296,12 @@ export default function ImportPanel({
         const reader = new FileReader();
         reader.onload = () => {
           if (typeof reader.result === "string") {
-            onImportJson(reader.result);
+            const imported = onImportJson(reader.result);
+            if (!imported) {
+              setImportError(
+                "That JSON file is not a valid Tomodachi Studio document.",
+              );
+            }
           } else {
             setImportError("Could not read that JSON file.");
           }
@@ -318,6 +327,26 @@ export default function ImportPanel({
 
       setIsInspectingFile(true);
       try {
+        // Content check before any decode work: the extension and MIME type
+        // are attacker-controlled metadata, so verify the actual leading
+        // bytes match a supported raster signature.
+        const signature = checkImageSignature(
+          await readFileSignature(file),
+          file.name,
+          file.type,
+        );
+        if (validationRequestRef.current !== requestNumber) return;
+        if (!signature.ok) {
+          setImportError(
+            signature.reason === "svg"
+              ? "SVG files are not accepted, even when renamed. Export the graphic as PNG and import that instead."
+              : signature.reason === "mismatch"
+                ? "That file's content does not match its extension. Re-export the image as PNG, JPG, or WebP and try again."
+                : "That file is not a recognizable PNG, JPG, GIF, WebP, AVIF, or BMP image.",
+          );
+          return;
+        }
+
         const dimensions = await decodeImageDimensions(file);
         if (validationRequestRef.current !== requestNumber) return;
         const dimensionError = validateDecodedDimensions(dimensions);

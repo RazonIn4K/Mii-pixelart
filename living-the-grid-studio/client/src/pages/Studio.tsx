@@ -45,6 +45,10 @@ import { useGridDocument } from "@/hooks/useGridDocument";
 import CanvasViewer from "@/components/studio/CanvasViewer";
 import type { PaintTool } from "@/components/studio/CreationPanel";
 import {
+  CanvasPaintToolbar,
+  type BrushSize,
+} from "@/components/studio/CanvasPaintToolbar";
+import {
   StudioWorkflowNav,
   type StudioPanel,
 } from "@/components/studio/StudioWorkflowNav";
@@ -57,6 +61,7 @@ import {
   createCreativeTemplateDocument,
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
+import type { GridDocument } from "@/lib/engine/grid";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
 
@@ -93,7 +98,6 @@ export default function Studio() {
     commitImagePreview,
     clearImagePreview,
     importFromJson,
-    paintCell,
     paintCells,
     fillRegion,
     beginStroke,
@@ -110,7 +114,8 @@ export default function Studio() {
   const [showGrid, setShowGrid] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
-  const [paintTool, setPaintTool] = useState<PaintTool>("inspect");
+  const [paintTool, setPaintTool] = useState<PaintTool>("pencil");
+  const [brushSize, setBrushSize] = useState<BrushSize>(1);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
   const imagePickerRequestRef = useRef(0);
@@ -119,18 +124,49 @@ export default function Studio() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
           redo();
         } else {
           undo();
         }
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && key === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+
+      const shortcutTool: Partial<Record<string, PaintTool>> = {
+        e: "eraser",
+        f: "fill",
+        i: "eyedropper",
+        p: "pencil",
+        v: "inspect",
+      };
+      const nextTool = shortcutTool[key];
+      if (nextTool && doc && !imagePreview) {
+        e.preventDefault();
+        setPaintTool(nextTool);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
+  }, [doc, imagePreview, undo, redo]);
 
   // Show errors
   useEffect(() => {
@@ -148,7 +184,9 @@ export default function Studio() {
         }
         setMergeSource(null);
       } else {
-        setHighlightColorId((prev) => (prev === colorId ? null : colorId));
+        setSelectedPaintColorId(colorId);
+        setHighlightColorId(colorId);
+        setPaintTool("pencil");
       }
     },
     [mergeSource, mergeColors],
@@ -180,13 +218,16 @@ export default function Studio() {
       }
 
       if (paintTool === "pencil") {
-        paintCell(x, y, selectedPaintColorId);
+        paintCells(
+          expandBrushCells([{ x, y }], brushSize, doc),
+          selectedPaintColorId,
+        );
         setHighlightColorId(selectedPaintColorId);
         return;
       }
 
       if (paintTool === "eraser") {
-        paintCell(x, y, null);
+        paintCells(expandBrushCells([{ x, y }], brushSize, doc), null);
         return;
       }
 
@@ -212,11 +253,13 @@ export default function Studio() {
     },
     [
       imagePreview,
+      doc,
       mergeSource,
       paintTool,
+      brushSize,
       selectedPaintColorId,
       mergeColors,
-      paintCell,
+      paintCells,
       fillRegion,
     ],
   );
@@ -224,13 +267,14 @@ export default function Studio() {
   const handleCellDrag = useCallback(
     (x: number, y: number) => {
       if (imagePreview || !doc) return;
+      const cells = expandBrushCells([{ x, y }], brushSize, doc);
       if (paintTool === "pencil") {
-        paintCell(x, y, selectedPaintColorId);
+        paintCells(cells, selectedPaintColorId);
       } else if (paintTool === "eraser") {
-        paintCell(x, y, null);
+        paintCells(cells, null);
       }
     },
-    [doc, imagePreview, paintTool, selectedPaintColorId, paintCell],
+    [brushSize, doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
   );
 
   /**
@@ -243,13 +287,14 @@ export default function Studio() {
   const handleCellDragSegment = useCallback(
     (cells: { x: number; y: number }[]) => {
       if (imagePreview || !doc) return;
+      const brushCells = expandBrushCells(cells, brushSize, doc);
       if (paintTool === "pencil") {
-        paintCells(cells, selectedPaintColorId);
+        paintCells(brushCells, selectedPaintColorId);
       } else if (paintTool === "eraser") {
-        paintCells(cells, null);
+        paintCells(brushCells, null);
       }
     },
-    [doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
+    [brushSize, doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
   );
 
   /**
@@ -295,6 +340,15 @@ export default function Studio() {
     });
   }, []);
 
+  const revealCanvasForEditing = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      if (!window.matchMedia("(max-width: 767px)").matches) return;
+      document
+        .querySelector<HTMLCanvasElement>("canvas[data-grid-width]")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
+
   const handleChooseImage = useCallback(() => {
     setActivePanel("import");
     const requestNumber = imagePickerRequestRef.current + 1;
@@ -329,9 +383,11 @@ export default function Studio() {
       setDoc(templateDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
+      setActivePanel("create");
+      revealCanvasForEditing();
       toast.success(`Created ${templateDoc.meta.name}`);
     },
-    [setDoc],
+    [revealCanvasForEditing, setDoc],
   );
 
   const handleApplyAiSketch = useCallback(
@@ -339,7 +395,19 @@ export default function Studio() {
       setDoc(sketchDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
+      setActivePanel("create");
+      revealCanvasForEditing();
       toast.success(`Applied ${sketchDoc.meta.name}`);
+    },
+    [revealCanvasForEditing, setDoc],
+  );
+
+  const handleLoadProjectDocument = useCallback(
+    (projectDoc: NonNullable<typeof doc>) => {
+      setDoc(projectDoc);
+      setHighlightColorId(null);
+      setPaintTool("pencil");
+      setActivePanel("create");
     },
     [setDoc],
   );
@@ -348,8 +416,23 @@ export default function Studio() {
 
   const handleCommitImagePreview = useCallback(() => {
     commitImagePreview();
-    toast.success("Image preview committed");
-  }, [commitImagePreview]);
+    setPaintTool("pencil");
+    setActivePanel("create");
+    revealCanvasForEditing();
+    toast.success("Image committed. Paint tools are ready above the canvas.");
+  }, [commitImagePreview, revealCanvasForEditing]);
+
+  const handleImportJson = useCallback(
+    (json: string): boolean => {
+      const imported = importFromJson(json);
+      if (!imported) return false;
+      setPaintTool("pencil");
+      setActivePanel("create");
+      revealCanvasForEditing();
+      return true;
+    },
+    [importFromJson, revealCanvasForEditing],
+  );
 
   const handleCancelImagePreview = useCallback(() => {
     clearImagePreview();
@@ -409,7 +492,10 @@ export default function Studio() {
         </nav>
 
         <div className="order-last flex w-full min-w-0 items-center justify-end border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0">
-          <CloudProjectControls doc={doc} onLoadDocument={setDoc} />
+          <CloudProjectControls
+            doc={doc}
+            onLoadDocument={handleLoadProjectDocument}
+          />
         </div>
 
         {/* View toggles */}
@@ -507,34 +593,56 @@ export default function Studio() {
       >
         <h1 className="sr-only">Tomodachi Studio pixel editor</h1>
         {/* Canvas Area (full width on mobile, ~65% on desktop) */}
-        <div className="min-h-[52svh] min-w-0 flex-none p-3 sm:min-h-[58svh] md:min-h-0 md:flex-1">
+        <div
+          className={
+            visibleDoc
+              ? "h-[56svh] min-h-[24rem] min-w-0 flex-none p-3 sm:h-[60svh] md:h-auto md:min-h-0 md:flex-1"
+              : "min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
+          }
+        >
           {visibleDoc ? (
-            <div className="relative w-full h-full">
+            <div className="relative flex h-full min-h-0 w-full flex-col gap-2">
+              {!imagePreview && doc ? (
+                <CanvasPaintToolbar
+                  activeTool={paintTool}
+                  brushSize={brushSize}
+                  doc={doc}
+                  selectedColorId={selectedPaintColorId}
+                  onBrushSizeChange={setBrushSize}
+                  onSelectedColorChange={(colorId) => {
+                    setSelectedPaintColorId(colorId);
+                    setHighlightColorId(colorId);
+                  }}
+                  onToolChange={setPaintTool}
+                />
+              ) : null}
               {imagePreview && (
                 <div className="absolute top-3 left-3 z-20 rounded-sm border border-primary/30 bg-background/95 px-2 py-1 text-xs shadow-sm">
                   Preview mode · commit or cancel from Import
                 </div>
               )}
-              <CanvasViewer
-                doc={visibleDoc}
-                highlightColorId={highlightColorId}
-                showGrid={showGrid}
-                showLabels={showLabels}
-                onCellClick={handleCellClick}
-                onCellDrag={
-                  paintTool === "pencil" || paintTool === "eraser"
-                    ? handleCellDrag
-                    : undefined
-                }
-                onCellDragSegment={
-                  paintTool === "pencil" || paintTool === "eraser"
-                    ? handleCellDragSegment
-                    : undefined
-                }
-                onCellHover={handleCellHover}
-                onStrokeBegin={handleStrokeBegin}
-                onStrokeEnd={handleStrokeEnd}
-              />
+              <div className="min-h-0 flex-1">
+                <CanvasViewer
+                  doc={visibleDoc}
+                  highlightColorId={highlightColorId}
+                  showGrid={showGrid}
+                  showLabels={showLabels}
+                  onCellClick={handleCellClick}
+                  onCellDrag={
+                    paintTool === "pencil" || paintTool === "eraser"
+                      ? handleCellDrag
+                      : undefined
+                  }
+                  onCellDragSegment={
+                    paintTool === "pencil" || paintTool === "eraser"
+                      ? handleCellDragSegment
+                      : undefined
+                  }
+                  onCellHover={handleCellHover}
+                  onStrokeBegin={handleStrokeBegin}
+                  onStrokeEnd={handleStrokeEnd}
+                />
+              </div>
             </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-xl border border-border bg-[linear-gradient(to_right,hsl(var(--border)/0.32)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.32)_1px,transparent_1px)] bg-[size:22px_22px] px-4 py-8 sm:px-8">
@@ -649,7 +757,7 @@ export default function Studio() {
                     onPreviewImage={previewFromImage}
                     onCommitPreview={handleCommitImagePreview}
                     onCancelPreview={handleCancelImagePreview}
-                    onImportJson={importFromJson}
+                    onImportJson={handleImportJson}
                     isLoading={isLoading}
                   />
                 </TabsContent>
@@ -682,6 +790,7 @@ export default function Studio() {
                       colorCounts={colorCounts}
                       lockedColors={doc.lockedColors}
                       highlightColorId={highlightColorId}
+                      selectedColorId={selectedPaintColorId}
                       onColorHover={setHighlightColorId}
                       onColorClick={handleColorClick}
                       onToggleLock={toggleColorLock}
@@ -733,6 +842,36 @@ export default function Studio() {
       </main>
     </div>
   );
+}
+
+function expandBrushCells(
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  size: BrushSize,
+  doc: GridDocument | null,
+): { x: number; y: number }[] {
+  if (!doc || cells.length === 0) return [];
+  if (size === 1) return [...cells];
+
+  const start = -Math.floor(size / 2);
+  const end = start + size - 1;
+  const seen = new Set<number>();
+  const expanded: { x: number; y: number }[] = [];
+
+  for (const cell of cells) {
+    for (let offsetY = start; offsetY <= end; offsetY += 1) {
+      for (let offsetX = start; offsetX <= end; offsetX += 1) {
+        const x = cell.x + offsetX;
+        const y = cell.y + offsetY;
+        if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) continue;
+        const index = y * doc.width + x;
+        if (seen.has(index)) continue;
+        seen.add(index);
+        expanded.push({ x, y });
+      }
+    }
+  }
+
+  return expanded;
 }
 
 function PanelLoading() {

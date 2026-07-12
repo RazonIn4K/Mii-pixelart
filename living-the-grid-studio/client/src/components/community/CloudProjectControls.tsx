@@ -1,17 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, LoaderCircle, LogIn, Save, TriangleAlert } from "lucide-react";
+import {
+  Cloud,
+  CloudOff,
+  LoaderCircle,
+  LogIn,
+  Save,
+  TriangleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PublishDialog } from "./PublishDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import type { GridDocument } from "@/lib/engine/grid";
-import { communityApi, CommunityApiError, jsonBody, messageFromError } from "@/lib/community/api";
-import { consumeAuthResumeDraft, markDraftForAuthResume, readLocalDraft, saveLocalDraft } from "@/lib/community/drafts";
+import {
+  communityApi,
+  CommunityApiError,
+  jsonBody,
+  messageFromError,
+} from "@/lib/community/api";
+import {
+  consumeAuthResumeDraft,
+  markDraftForAuthResume,
+  readLocalDraft,
+  saveLocalDraft,
+} from "@/lib/community/drafts";
 import {
   currentStudioReturnTo,
   setupPathForReturnTo,
 } from "@/lib/community/return-to";
-import type { CloudProjectState, CreationDetail, CreationSummary } from "@/lib/community/types";
+import type {
+  CloudProjectState,
+  CreationDetail,
+  CreationSummary,
+} from "@/lib/community/types";
 
 interface SaveResponse {
   id?: string;
@@ -20,7 +41,9 @@ interface SaveResponse {
   revision: number;
 }
 
-function publicationFromCreation(creation: CreationSummary): NonNullable<CloudProjectState["publication"]> {
+function publicationFromCreation(
+  creation: CreationSummary,
+): NonNullable<CloudProjectState["publication"]> {
   return {
     status: creation.status,
     visibility: creation.visibility,
@@ -43,7 +66,7 @@ export function CloudProjectControls({
   doc: GridDocument | null;
   onLoadDocument: (document: GridDocument) => void;
 }) {
-  const { user, status } = useAuth();
+  const { user, status, serviceAvailable, serviceMessage } = useAuth();
   const [cloud, setCloud] = useState<CloudProjectState | null>(null);
   const [cloudSignInRequired, setCloudSignInRequired] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,104 +77,129 @@ export function CloudProjectControls({
   const bootstrappedRef = useRef(false);
   docRef.current = doc;
 
-  const persistLocal = useCallback(async (document: GridDocument, state?: CloudProjectState | null) => {
-    try {
-      await saveLocalDraft({ id: "current", document, updatedAt: Date.now(), cloud: state ?? undefined });
-    } catch {
-      // IndexedDB can be unavailable in hardened/private browser modes. The in-memory editor still works.
-    }
-  }, []);
+  const persistLocal = useCallback(
+    async (document: GridDocument, state?: CloudProjectState | null) => {
+      try {
+        await saveLocalDraft({
+          id: "current",
+          document,
+          updatedAt: Date.now(),
+          cloud: state ?? undefined,
+        });
+      } catch {
+        // IndexedDB can be unavailable in hardened/private browser modes. The in-memory editor still works.
+      }
+    },
+    [],
+  );
 
-  const refreshCloudMetadata = useCallback(async (
-    state: CloudProjectState,
-    showError = false,
-  ): Promise<boolean> => {
-    try {
-      const result = await communityApi<CreationDetail>(
-        `/api/creations/${encodeURIComponent(state.creationId)}`,
-      );
-      setCloud((current) => {
-        if (!current || current.creationId !== state.creationId) return current;
-        const revisionChanged = result.data.revision !== current.revision;
-        return {
-          ...current,
-          slug: result.data.slug,
-          publication: publicationFromCreation(result.data),
-          ...(revisionChanged
-            ? {
-                saveState: "conflict" as const,
-                error: "A newer cloud revision exists.",
-              }
-            : {
-                etag: result.etag ?? quotedRevision(result.data.revision),
-              }),
-        };
-      });
-      return true;
-    } catch (error) {
-      if (showError) toast.error(messageFromError(error));
-      return false;
-    }
-  }, []);
+  const refreshCloudMetadata = useCallback(
+    async (state: CloudProjectState, showError = false): Promise<boolean> => {
+      try {
+        const result = await communityApi<CreationDetail>(
+          `/api/creations/${encodeURIComponent(state.creationId)}`,
+        );
+        setCloud((current) => {
+          if (!current || current.creationId !== state.creationId)
+            return current;
+          const revisionChanged = result.data.revision !== current.revision;
+          return {
+            ...current,
+            slug: result.data.slug,
+            publication: publicationFromCreation(result.data),
+            ...(revisionChanged
+              ? {
+                  saveState: "conflict" as const,
+                  error: "A newer cloud revision exists.",
+                }
+              : {
+                  etag: result.etag ?? quotedRevision(result.data.revision),
+                }),
+          };
+        });
+        return true;
+      } catch (error) {
+        if (showError) toast.error(messageFromError(error));
+        return false;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!doc) return;
-    const timer = window.setTimeout(() => { void persistLocal(doc, cloud); }, 300);
+    const timer = window.setTimeout(() => {
+      void persistLocal(doc, cloud);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [cloud, doc, persistLocal]);
 
-  const firstSave = useCallback(async (document: GridDocument) => {
-    if (!user) return;
-    if (!user.username || user.termsAccepted !== true) {
-      try {
-        await markDraftForAuthResume(document);
-        toast.info("Finish your public profile once before using cloud projects.");
-        window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));
-      } catch {
-        toast.error("This browser could not preserve the draft for profile setup. Export JSON before leaving the page.");
+  const firstSave = useCallback(
+    async (document: GridDocument) => {
+      if (!user) return;
+      if (!user.username || user.termsAccepted !== true) {
+        try {
+          await markDraftForAuthResume(document);
+          toast.info(
+            "Finish your public profile once before using cloud projects.",
+          );
+          window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));
+        } catch {
+          toast.error(
+            "This browser could not preserve the draft for profile setup. Export JSON before leaving the page.",
+          );
+        }
+        return;
       }
-      return;
-    }
-    setBusy(true);
-    savingRef.current = true;
-    try {
-      const result = await communityApi<SaveResponse>("/api/creations", {
-        method: "POST",
-        body: jsonBody({ project: document, title: document.meta.name }),
-      });
-      const creationId = result.data.id ?? result.data.creationId;
-      if (!creationId) throw new Error("The server did not return a project identifier.");
-      const next: CloudProjectState = {
-        userId: user.id,
-        creationId,
-        slug: result.data.slug,
-        revision: result.data.revision,
-        etag: result.etag ?? quotedRevision(result.data.revision),
-        saveState: "saved",
-        lastSavedAt: Date.now(),
-        lastSyncedModifiedAt: document.meta.modifiedAt,
-        publication: {
-          status: "draft",
-          visibility: "private",
-          title: document.meta.name,
-          description: "",
-          tags: [],
-          commentsEnabled: false,
-          downloadEnabled: false,
-        },
-      };
-      lastSavedModifiedRef.current = document.meta.modifiedAt;
-      setCloud(next);
-      await persistLocal(document, next);
-      toast.success("Private cloud save created. Publishing is still separate.");
-    } catch (error) {
-      toast.error(messageFromError(error));
-      setCloud((current) => current ? { ...current, saveState: "error", error: messageFromError(error) } : null);
-    } finally {
-      savingRef.current = false;
-      setBusy(false);
-    }
-  }, [persistLocal, user]);
+      setBusy(true);
+      savingRef.current = true;
+      try {
+        const result = await communityApi<SaveResponse>("/api/creations", {
+          method: "POST",
+          body: jsonBody({ project: document, title: document.meta.name }),
+        });
+        const creationId = result.data.id ?? result.data.creationId;
+        if (!creationId)
+          throw new Error("The server did not return a project identifier.");
+        const next: CloudProjectState = {
+          userId: user.id,
+          creationId,
+          slug: result.data.slug,
+          revision: result.data.revision,
+          etag: result.etag ?? quotedRevision(result.data.revision),
+          saveState: "saved",
+          lastSavedAt: Date.now(),
+          lastSyncedModifiedAt: document.meta.modifiedAt,
+          publication: {
+            status: "draft",
+            visibility: "private",
+            title: document.meta.name,
+            description: "",
+            tags: [],
+            commentsEnabled: false,
+            downloadEnabled: false,
+          },
+        };
+        lastSavedModifiedRef.current = document.meta.modifiedAt;
+        setCloud(next);
+        await persistLocal(document, next);
+        toast.success(
+          "Private cloud save created. Publishing is still separate.",
+        );
+      } catch (error) {
+        toast.error(messageFromError(error));
+        setCloud((current) =>
+          current
+            ? { ...current, saveState: "error", error: messageFromError(error) }
+            : null,
+        );
+      } finally {
+        savingRef.current = false;
+        setBusy(false);
+      }
+    },
+    [persistLocal, user],
+  );
 
   useEffect(() => {
     if (status === "loading" || bootstrappedRef.current) return;
@@ -172,7 +220,9 @@ export function CloudProjectControls({
         setCloudSignInRequired(false);
         setBusy(true);
         try {
-          const result = await communityApi<CreationDetail>(`/api/creations/${encodeURIComponent(cloudId)}`);
+          const result = await communityApi<CreationDetail>(
+            `/api/creations/${encodeURIComponent(cloudId)}`,
+          );
           if (canceled || !result.data.project) return;
           onLoadDocument(result.data.project);
           lastSavedModifiedRef.current = result.data.project.meta.modifiedAt;
@@ -188,7 +238,11 @@ export function CloudProjectControls({
             publication: publicationFromCreation(result.data),
           });
         } catch (error) {
-          if (!canceled && error instanceof CommunityApiError && error.status === 401) {
+          if (
+            !canceled &&
+            error instanceof CommunityApiError &&
+            error.status === 401
+          ) {
             setCloudSignInRequired(true);
           } else if (!canceled) {
             toast.error(messageFromError(error));
@@ -216,13 +270,14 @@ export function CloudProjectControls({
         const syncedModifiedAt = current.cloud.lastSyncedModifiedAt ?? null;
         const dirty = syncedModifiedAt !== current.document.meta.modifiedAt;
         lastSavedModifiedRef.current = syncedModifiedAt;
-        const restoredState = current.cloud.saveState === "conflict"
-          ? "conflict"
-          : current.cloud.saveState === "error"
-            ? "error"
-            : dirty && !navigator.onLine
-              ? "offline"
-              : "saved";
+        const restoredState =
+          current.cloud.saveState === "conflict"
+            ? "conflict"
+            : current.cloud.saveState === "error"
+              ? "error"
+              : dirty && !navigator.onLine
+                ? "offline"
+                : "saved";
         const restoredCloud: CloudProjectState = {
           ...current.cloud,
           saveState: restoredState,
@@ -234,12 +289,18 @@ export function CloudProjectControls({
         setCloud(restoredCloud);
         if (navigator.onLine) await refreshCloudMetadata(restoredCloud);
       }
-      toast.info(user && current.cloud?.userId === user.id ? "Restored your local draft and cloud sync status." : "Restored your local Studio draft.");
+      toast.info(
+        user && current.cloud?.userId === user.id
+          ? "Restored your local draft and cloud sync status."
+          : "Restored your local Studio draft.",
+      );
     })().catch(() => {
       // IndexedDB may be unavailable; the editor remains usable in memory.
     });
 
-    return () => { canceled = true; };
+    return () => {
+      canceled = true;
+    };
   }, [onLoadDocument, refreshCloudMetadata, status, user]);
 
   useEffect(() => {
@@ -253,28 +314,55 @@ export function CloudProjectControls({
     if (!document || !cloud || savingRef.current) return false;
     if (lastSavedModifiedRef.current === document.meta.modifiedAt) return true;
     savingRef.current = true;
-    setCloud((current) => current ? { ...current, saveState: navigator.onLine ? "saving" : "offline" } : current);
+    setCloud((current) =>
+      current
+        ? { ...current, saveState: navigator.onLine ? "saving" : "offline" }
+        : current,
+    );
     if (!navigator.onLine) {
       savingRef.current = false;
       return false;
     }
     try {
-      const result = await communityApi<SaveResponse>(`/api/creations/${cloud.creationId}/project`, {
-        method: "PUT",
-        headers: { "If-Match": cloud.etag },
-        body: jsonBody({ project: document }),
-      });
+      const result = await communityApi<SaveResponse>(
+        `/api/creations/${cloud.creationId}/project`,
+        {
+          method: "PUT",
+          headers: { "If-Match": cloud.etag },
+          body: jsonBody({ project: document }),
+        },
+      );
       const revision = result.data.revision;
-      const next: CloudProjectState = { ...cloud, revision, etag: result.etag ?? quotedRevision(revision), saveState: "saved", lastSavedAt: Date.now(), lastSyncedModifiedAt: document.meta.modifiedAt, error: undefined };
+      const next: CloudProjectState = {
+        ...cloud,
+        revision,
+        etag: result.etag ?? quotedRevision(revision),
+        saveState: "saved",
+        lastSavedAt: Date.now(),
+        lastSyncedModifiedAt: document.meta.modifiedAt,
+        error: undefined,
+      };
       lastSavedModifiedRef.current = document.meta.modifiedAt;
       setCloud(next);
       await persistLocal(document, next);
       return true;
     } catch (error) {
       if (error instanceof CommunityApiError && error.status === 409) {
-        setCloud((current) => current ? { ...current, saveState: "conflict", error: "A newer cloud revision exists." } : current);
+        setCloud((current) =>
+          current
+            ? {
+                ...current,
+                saveState: "conflict",
+                error: "A newer cloud revision exists.",
+              }
+            : current,
+        );
       } else {
-        setCloud((current) => current ? { ...current, saveState: "error", error: messageFromError(error) } : current);
+        setCloud((current) =>
+          current
+            ? { ...current, saveState: "error", error: messageFromError(error) }
+            : current,
+        );
       }
       return false;
     } finally {
@@ -288,14 +376,19 @@ export function CloudProjectControls({
       !cloud ||
       !navigator.onLine ||
       ["conflict", "offline", "saving", "error"].includes(cloud.saveState)
-    ) return;
-    const timer = window.setTimeout(() => { void saveRevision(); }, 1500);
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      void saveRevision();
+    }, 1500);
     return () => window.clearTimeout(timer);
   }, [cloud, doc, saveRevision]);
 
   useEffect(() => {
     if (!cloud) return;
-    const flush = () => { void saveRevision(); };
+    const flush = () => {
+      void saveRevision();
+    };
     const refreshMetadata = () => {
       if (navigator.onLine) void refreshCloudMetadata(cloud);
     };
@@ -332,7 +425,9 @@ export function CloudProjectControls({
         document.body.appendChild(form);
         form.submit();
       } catch {
-        toast.error("This browser could not preserve the draft for sign-in. Export JSON before leaving the page.");
+        toast.error(
+          "This browser could not preserve the draft for sign-in. Export JSON before leaving the page.",
+        );
       }
       return;
     }
@@ -343,8 +438,11 @@ export function CloudProjectControls({
     if (!cloud) return;
     setBusy(true);
     try {
-      const result = await communityApi<CreationDetail>(`/api/creations/${cloud.creationId}`);
-      if (!result.data.project) throw new Error("The cloud project has no document data.");
+      const result = await communityApi<CreationDetail>(
+        `/api/creations/${cloud.creationId}`,
+      );
+      if (!result.data.project)
+        throw new Error("The cloud project has no document data.");
       onLoadDocument(result.data.project);
       lastSavedModifiedRef.current = result.data.project.meta.modifiedAt;
       setCloud({
@@ -359,20 +457,59 @@ export function CloudProjectControls({
         publication: publicationFromCreation(result.data),
       });
       toast.success("Loaded the cloud version");
-    } catch (error) { toast.error(messageFromError(error)); } finally { setBusy(false); }
+    } catch (error) {
+      toast.error(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveCopy = async () => {
     if (!doc) return;
     setCloud(null);
-    await firstSave({ ...doc, meta: { ...doc.meta, name: `${doc.meta.name} (copy)` } });
+    await firstSave({
+      ...doc,
+      meta: { ...doc.meta, name: `${doc.meta.name} (copy)` },
+    });
   };
+
+  if (!serviceAvailable) {
+    const checking = status === "loading";
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-8 rounded-full text-xs"
+        disabled
+        aria-label={
+          checking ? "Checking cloud availability" : "Cloud saving unavailable"
+        }
+        title={serviceMessage ?? "Checking cloud availability"}
+      >
+        {checking ? (
+          <LoaderCircle className="animate-spin motion-reduce:animate-none" />
+        ) : (
+          <CloudOff />
+        )}
+        <span className="hidden sm:inline">
+          {checking ? "Checking cloud…" : "Cloud unavailable"}
+        </span>
+        <span className="sm:hidden">
+          {checking ? "Checking…" : "Local only"}
+        </span>
+      </Button>
+    );
+  }
 
   if (cloudSignInRequired) {
     const returnTo = currentStudioReturnTo();
     return (
       <div className="flex min-w-0 max-w-full items-center justify-end gap-2">
-        <span className="truncate text-[10px] font-bold text-muted-foreground" role="status">
+        <span
+          className="truncate text-[10px] font-bold text-muted-foreground"
+          role="status"
+        >
           Cloud sign-in required
         </span>
         <form action="/api/auth/google/start" method="post">
@@ -391,33 +528,100 @@ export function CloudProjectControls({
     );
   }
 
+  // A cloud-link bootstrap can start without a local document. Keep the
+  // availability/sign-in states above this guard so a fresh browser can open
+  // a shared ?cloud=… destination instead of silently showing an empty Studio.
   if (!doc) return null;
+
   if (!cloud) {
-    return <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={busy} aria-label="Save to account" onClick={() => void requestFirstSave()}>{busy ? <LoaderCircle className="animate-spin" /> : <Save />} <span className="hidden sm:inline">Save to account</span><span className="sm:hidden">Save</span></Button>;
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-8 rounded-full text-xs"
+        disabled={busy}
+        aria-label="Save to account"
+        onClick={() => void requestFirstSave()}
+      >
+        {busy ? <LoaderCircle className="animate-spin" /> : <Save />}{" "}
+        <span className="hidden sm:inline">Save to account</span>
+        <span className="sm:hidden">Save</span>
+      </Button>
+    );
   }
 
-  const hasUnsavedChanges = lastSavedModifiedRef.current !== doc.meta.modifiedAt;
+  const hasUnsavedChanges =
+    lastSavedModifiedRef.current !== doc.meta.modifiedAt;
   const publication = cloud.publication;
-  const canPublish = Boolean(publication)
-    && navigator.onLine
-    && cloud.saveState === "saved"
-    && !hasUnsavedChanges;
+  const canPublish =
+    Boolean(publication) &&
+    navigator.onLine &&
+    cloud.saveState === "saved" &&
+    !hasUnsavedChanges;
 
   return (
     <div className="flex min-w-0 max-w-full items-center justify-end gap-1.5">
-      <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-muted-foreground" role="status" aria-live="polite">
-        {cloud.saveState === "saving" ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : cloud.saveState === "offline" ? <CloudOff className="h-3.5 w-3.5" /> : cloud.saveState === "conflict" ? <TriangleAlert className="h-3.5 w-3.5 text-amber-600" /> : <Cloud className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" />}
-        {cloud.saveState === "saving" ? "Saving…" : cloud.saveState === "offline" ? "Offline" : cloud.saveState === "conflict" ? "Conflict" : cloud.saveState === "error" ? "Save failed" : hasUnsavedChanges ? "Saving soon…" : `Saved · v${cloud.revision}`}
+      <span
+        className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-muted-foreground"
+        role="status"
+        aria-live="polite"
+      >
+        {cloud.saveState === "saving" ? (
+          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+        ) : cloud.saveState === "offline" ? (
+          <CloudOff className="h-3.5 w-3.5" />
+        ) : cloud.saveState === "conflict" ? (
+          <TriangleAlert className="h-3.5 w-3.5 text-amber-600" />
+        ) : (
+          <Cloud className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" />
+        )}
+        {cloud.saveState === "saving"
+          ? "Saving…"
+          : cloud.saveState === "offline"
+            ? "Offline"
+            : cloud.saveState === "conflict"
+              ? "Conflict"
+              : cloud.saveState === "error"
+                ? "Save failed"
+                : hasUnsavedChanges
+                  ? "Saving soon…"
+                  : `Saved · v${cloud.revision}`}
       </span>
       {cloud.saveState === "conflict" ? (
         <>
-          <Button type="button" size="sm" variant="outline" className="px-2 sm:px-3" onClick={() => void reloadCloud()} disabled={busy}>Use cloud</Button>
-          <Button type="button" size="sm" className="px-2 sm:px-3" onClick={() => void saveCopy()} disabled={busy}>Save copy</Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="px-2 sm:px-3"
+            onClick={() => void reloadCloud()}
+            disabled={busy}
+          >
+            Use cloud
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="px-2 sm:px-3"
+            onClick={() => void saveCopy()}
+            disabled={busy}
+          >
+            Save copy
+          </Button>
         </>
       ) : (
         <>
           {cloud.saveState === "error" ? (
-            <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void saveRevision()}>Retry save</Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-full text-xs"
+              onClick={() => void saveRevision()}
+            >
+              Retry save
+            </Button>
           ) : null}
           {!publication ? (
             <Button
@@ -428,7 +632,9 @@ export function CloudProjectControls({
               disabled={busy || !navigator.onLine}
               onClick={() => {
                 setBusy(true);
-                void refreshCloudMetadata(cloud, true).finally(() => setBusy(false));
+                void refreshCloudMetadata(cloud, true).finally(() =>
+                  setBusy(false),
+                );
               }}
               title="Refresh the authoritative publishing settings before sharing"
             >
@@ -441,11 +647,16 @@ export function CloudProjectControls({
               project={doc}
               beforePublish={() => {
                 const currentDocument = docRef.current;
-                const ready = Boolean(currentDocument)
-                  && navigator.onLine
-                  && cloud.saveState === "saved"
-                  && lastSavedModifiedRef.current === currentDocument?.meta.modifiedAt;
-                if (!ready) toast.error("Wait for the private cloud save to finish before publishing.");
+                const ready =
+                  Boolean(currentDocument) &&
+                  navigator.onLine &&
+                  cloud.saveState === "saved" &&
+                  lastSavedModifiedRef.current ===
+                    currentDocument?.meta.modifiedAt;
+                if (!ready)
+                  toast.error(
+                    "Wait for the private cloud save to finish before publishing.",
+                  );
                 return ready;
               }}
               initial={{
@@ -459,16 +670,36 @@ export function CloudProjectControls({
                 slug: cloud.slug,
                 revision: cloud.revision,
               }}
-              onPublished={(creation: CreationSummary) => setCloud((current) => current ? {
-                ...current,
-                slug: creation.slug,
-                publication: publicationFromCreation(creation),
-              } : current)}
-              trigger={(
-                <Button type="button" size="sm" className="h-8 rounded-full text-xs" disabled={!canPublish} title={canPublish ? "Review and share" : "Wait for the private cloud save to finish"}>
-                  {hasUnsavedChanges ? "Saving first…" : publication.status === "published" ? "Share settings" : "Share"}
+              onPublished={(creation: CreationSummary) =>
+                setCloud((current) =>
+                  current
+                    ? {
+                        ...current,
+                        slug: creation.slug,
+                        publication: publicationFromCreation(creation),
+                      }
+                    : current,
+                )
+              }
+              trigger={
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-full text-xs"
+                  disabled={!canPublish}
+                  title={
+                    canPublish
+                      ? "Review and share"
+                      : "Wait for the private cloud save to finish"
+                  }
+                >
+                  {hasUnsavedChanges
+                    ? "Saving first…"
+                    : publication.status === "published"
+                      ? "Share settings"
+                      : "Share"}
                 </Button>
-              )}
+              }
             />
           )}
         </>

@@ -6,14 +6,14 @@ import { useState, useCallback, useRef } from "react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
   createGridDocument,
-  getCell,
-  recomputeUsedColors,
   replaceColor,
   getColorUsageCounts,
   resampleGridNearest,
-  setCell,
-  setCells,
 } from "@/lib/engine/grid";
+import {
+  applyStudioTransaction,
+  type StudioCommand,
+} from "@/lib/engine/studio-commands";
 import {
   optimizeGrid,
   type OptimizerConfig,
@@ -176,7 +176,7 @@ export function useGridDocument() {
   }, []);
 
   const importFromJson = useCallback(
-    (jsonString: string) => {
+    (jsonString: string): GridDocument | null => {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
         // Try native format first, then LTG format
@@ -188,12 +188,14 @@ export function useGridDocument() {
         }
         pushHistory(doc);
         setState((prev) => ({ ...prev, isLoading: false }));
+        return doc;
       } catch (err) {
         setState((prev) => ({
           ...prev,
           isLoading: false,
           error: err instanceof Error ? err.message : "JSON import failed",
         }));
+        return null;
       }
     },
     [pushHistory],
@@ -279,9 +281,21 @@ export function useGridDocument() {
     (x: number, y: number, colorId: string | null) => {
       setState((prev) => {
         if (!prev.doc) return prev;
-        if (getCell(prev.doc, x, y) === colorId) return prev;
-
-        const newDoc = recomputeUsedColors(setCell(prev.doc, x, y, colorId));
+        let newDoc: GridDocument;
+        try {
+          newDoc = applyStudioTransaction(prev.doc, [
+            { type: "paint_cells", cells: [{ x, y }], colorId },
+          ]).doc;
+        } catch (error) {
+          return {
+            ...prev,
+            error:
+              error instanceof Error
+                ? error.message
+                : "The cell could not be painted.",
+          };
+        }
+        if (newDoc === prev.doc) return prev;
 
         // During a stroke, mutate the live doc without appending history —
         // endStroke will promote the final state to one history entry.
@@ -305,13 +319,28 @@ export function useGridDocument() {
    * Honors the stroke transaction the same way paintCell does.
    */
   const paintCells = useCallback(
-    (cells: ReadonlyArray<{ x: number; y: number }>, colorId: string | null) => {
+    (
+      cells: ReadonlyArray<{ x: number; y: number }>,
+      colorId: string | null,
+    ) => {
       if (cells.length === 0) return;
       setState((prev) => {
         if (!prev.doc) return prev;
-        const updated = setCells(prev.doc, cells, colorId);
-        if (updated === prev.doc) return prev;
-        const newDoc = recomputeUsedColors(updated);
+        let newDoc: GridDocument;
+        try {
+          newDoc = applyStudioTransaction(prev.doc, [
+            { type: "paint_cells", cells: [...cells], colorId },
+          ]).doc;
+        } catch (error) {
+          return {
+            ...prev,
+            error:
+              error instanceof Error
+                ? error.message
+                : "The stroke could not be painted.",
+          };
+        }
+        if (newDoc === prev.doc) return prev;
         if (strokeActiveRef.current) {
           return { ...prev, doc: newDoc, imagePreview: null, error: null };
         }
@@ -325,49 +354,45 @@ export function useGridDocument() {
     (x: number, y: number, colorId: string | null) => {
       setState((prev) => {
         if (!prev.doc) return prev;
-        if (x < 0 || x >= prev.doc.width || y < 0 || y >= prev.doc.height)
-          return prev;
-
-        const targetColorId = getCell(prev.doc, x, y);
-        if (targetColorId === colorId) return prev;
-
-        const cells = [...prev.doc.cells];
-        const visited = new Uint8Array(prev.doc.width * prev.doc.height);
-        const queue: [number, number][] = [[x, y]];
-
-        while (queue.length > 0) {
-          const [cx, cy] = queue.shift()!;
-          if (
-            cx < 0 ||
-            cx >= prev.doc.width ||
-            cy < 0 ||
-            cy >= prev.doc.height
-          ) {
-            continue;
-          }
-
-          const index = cy * prev.doc.width + cx;
-          if (visited[index]) continue;
-          visited[index] = 1;
-          if (cells[index] !== targetColorId) continue;
-
-          cells[index] = colorId;
-          queue.push([cx + 1, cy]);
-          queue.push([cx - 1, cy]);
-          queue.push([cx, cy + 1]);
-          queue.push([cx, cy - 1]);
+        let newDoc: GridDocument;
+        try {
+          newDoc = applyStudioTransaction(prev.doc, [
+            { type: "flood_fill", x, y, colorId },
+          ]).doc;
+        } catch (error) {
+          return {
+            ...prev,
+            error:
+              error instanceof Error
+                ? error.message
+                : "The region could not be filled.",
+          };
         }
-
-        const newDoc = recomputeUsedColors({
-          ...prev.doc,
-          cells,
-          meta: { ...prev.doc.meta, modifiedAt: new Date().toISOString() },
-        });
+        if (newDoc === prev.doc) return prev;
         return appendHistory(prev, newDoc);
       });
     },
     [],
   );
+
+  const applyCommands = useCallback((commands: readonly StudioCommand[]) => {
+    setState((prev) => {
+      if (!prev.doc || commands.length === 0) return prev;
+      try {
+        const result = applyStudioTransaction(prev.doc, commands);
+        if (result.doc === prev.doc) return prev;
+        return appendHistory(prev, result.doc);
+      } catch (error) {
+        return {
+          ...prev,
+          error:
+            error instanceof Error
+              ? error.message
+              : "The Studio command transaction could not be applied.",
+        };
+      }
+    });
+  }, []);
 
   const resampleCanvas = useCallback((width: number, height: number) => {
     setState((prev) => {
@@ -419,6 +444,7 @@ export function useGridDocument() {
     paintCell,
     paintCells,
     fillRegion,
+    applyCommands,
     beginStroke,
     endStroke,
     resampleCanvas,

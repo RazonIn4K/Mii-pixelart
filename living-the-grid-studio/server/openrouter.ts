@@ -5,7 +5,12 @@ import type {
   AiGridImage,
   AiGridSketch,
 } from "../shared/ai";
-import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
+import {
+  AI_SKETCH_LIMITS,
+  OPENROUTER_MODEL_PRESETS,
+  PALETTE_COLOR_ID_PATTERN,
+  validateAiGridSketch,
+} from "../shared/ai";
 // Resident Designer prompt retired alongside the Island tab in Pass 19.
 // Keep the shared/residents.ts file for ExportPanel.validateMiiResidentSpec.
 
@@ -66,12 +71,22 @@ interface NormalizedAiRequest {
  */
 export interface OpenRouterEnv {
   OPENROUTER_API_KEY?: string;
+  /**
+   * OpenRouter provider routing policy for prompt/image retention.
+   * "deny" (default) restricts routing to providers that do not retain or
+   * train on inputs. Set to "allow" only if the free-model roster becomes
+   * unavailable under the strict policy and the tradeoff is accepted.
+   */
+  OPENROUTER_DATA_COLLECTION?: string;
   PUBLIC_SITE_URL?: string;
 }
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
-const PALETTE_COLOR_ID_PATTERN = /^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$/;
+// Sketch generation on free models can legitimately take a while (16k-token
+// budgets); chat gets a generous ceiling while the models catalog stays snappy.
+const OPENROUTER_CHAT_TIMEOUT_MS = 90_000;
+const OPENROUTER_MODELS_TIMEOUT_MS = 15_000;
 const ALLOWED_MODEL_IDS = new Set(
   OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
 );
@@ -91,10 +106,13 @@ export function getOpenRouterStatus(env?: OpenRouterEnv): ApiResult {
   };
 }
 
-export async function getOpenRouterModels(env?: OpenRouterEnv): Promise<ApiResult> {
+export async function getOpenRouterModels(
+  env?: OpenRouterEnv,
+): Promise<ApiResult> {
   try {
     const response = await fetch(OPENROUTER_MODELS_URL, {
       headers: getOpenRouterHeaders(false, undefined, env),
+      signal: AbortSignal.timeout(OPENROUTER_MODELS_TIMEOUT_MS),
     });
     if (!response.ok) {
       return {
@@ -174,28 +192,50 @@ export async function sendOpenRouterChat(
     ...normalized.messages,
   ];
 
-  const response = await fetch(OPENROUTER_CHAT_URL, {
-    method: "POST",
-    headers: getOpenRouterHeaders(true, apiKey, env),
-    body: JSON.stringify({
-      // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
-      // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
-      // tokens for rows alone, plus a few hundred tokens of wrapping JSON +
-      // commentary. 3000 was the old budget and it was truncating mid-row,
-      // which is why DeepSeek + Claude both spat out partial/invalid grids.
-      // 16000 fits even 32x32 with room to breathe.
-      max_tokens: normalized.requestSketch ? 16000 : 1200,
-      messages,
-      model: normalized.model,
-      response_format: normalized.requestSketch
-        ? { type: "json_object" }
-        : undefined,
-      session_id: normalized.sessionId,
-      // Lower temperature for sketches — we want deterministic structure, not
-      // creative reinterpretation of the schema. 0.2 keeps it on-grid.
-      temperature: normalized.requestSketch ? 0.2 : 0.7,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_CHAT_URL, {
+      method: "POST",
+      headers: getOpenRouterHeaders(true, apiKey, env),
+      // A hung upstream must not pin the Worker (or the user's request) open
+      // indefinitely; surface a clean, retryable timeout instead.
+      signal: AbortSignal.timeout(OPENROUTER_CHAT_TIMEOUT_MS),
+      body: JSON.stringify({
+        // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
+        // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
+        // tokens for rows alone, plus a few hundred tokens of wrapping JSON +
+        // commentary. 3000 was the old budget and it was truncating mid-row,
+        // which is why DeepSeek + Claude both spat out partial/invalid grids.
+        // 16000 fits even 32x32 with room to breathe.
+        max_tokens: normalized.requestSketch ? 16000 : 1200,
+        messages,
+        model: normalized.model,
+        response_format: normalized.requestSketch
+          ? { type: "json_object" }
+          : undefined,
+        session_id: normalized.sessionId,
+        // Lower temperature for sketches — we want deterministic structure, not
+        // creative reinterpretation of the schema. 0.2 keeps it on-grid.
+        temperature: normalized.requestSketch ? 0.2 : 0.7,
+        // Privacy: constrain OpenRouter routing by data-collection policy. With
+        // "deny" (default), OpenRouter routes only to providers it identifies as
+        // not collecting user data.
+        provider: { data_collection: getOpenRouterDataCollection(env) },
+      }),
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    return {
+      status: 504,
+      body: {
+        configured: true,
+        model: normalized.model,
+        reply: timedOut
+          ? "The AI request timed out. Try again, ask for a smaller sketch, or pick a faster model."
+          : "The AI service could not be reached. Try again in a moment.",
+      } satisfies AiChatResponse,
+    };
+  }
 
   const payload = (await response
     .json()
@@ -251,6 +291,16 @@ function getOpenRouterApiKey(env?: OpenRouterEnv): string {
   return "";
 }
 
+function getOpenRouterDataCollection(env?: OpenRouterEnv): "deny" | "allow" {
+  const raw =
+    env?.OPENROUTER_DATA_COLLECTION ??
+    (typeof process !== "undefined"
+      ? process.env?.OPENROUTER_DATA_COLLECTION
+      : undefined) ??
+    "";
+  return raw.trim().toLowerCase() === "allow" ? "allow" : "deny";
+}
+
 function getOpenRouterReferer(env?: OpenRouterEnv): string {
   const fromEnv = env?.PUBLIC_SITE_URL?.trim();
   if (fromEnv) return fromEnv;
@@ -276,9 +326,7 @@ function getOpenRouterHeaders(
 
 function normalizeAiRequest(
   request: unknown,
-):
-  | (NormalizedAiRequest & { ok: true })
-  | { error: string; ok: false } {
+): (NormalizedAiRequest & { ok: true }) | { error: string; ok: false } {
   if (!isRecord(request)) {
     return {
       ok: false,
@@ -398,6 +446,7 @@ export function buildAiSystemPrompt(requestSketch: boolean): string {
     "You create repaintable Tomodachi Life pixel guides, not generic image prompts.",
     "Prioritize iconic silhouette, readable face/prop details, clean outlines, limited color counts, and shapes a human can recreate in-game without guessing.",
     "If a current-grid image is attached, inspect it visually and improve the actual composition instead of ignoring it.",
+    "When the user asks to edit or improve an attached current grid, preserve its subject and dimensions unless the user explicitly requests a new size. Return the complete revised grid, not only the changed cells.",
     "Return ONLY valid JSON. No markdown fences, no commentary outside the JSON.",
     "DEFAULT to width=16 and height=16 for any request unless the user explicitly asks for a larger size. Only use 24 or 32 if the user asks for it.",
     "Use palette color IDs only. Use null for transparent/empty cells.",
@@ -412,9 +461,7 @@ export function buildAiSystemPrompt(requestSketch: boolean): string {
   ].join(" ");
 }
 
-function isValidGridImage(
-  value: unknown,
-): value is AiGridImage {
+function isValidGridImage(value: unknown): value is AiGridImage {
   if (!isRecord(value)) return false;
   if (
     typeof value.width !== "number" ||
@@ -497,12 +544,24 @@ function parseSketchContent(
       sketch?: unknown;
       notes?: unknown;
     };
+    const reply =
+      typeof data.reply === "string"
+        ? data.reply
+        : "The model returned a sketch.";
+    if (!data.sketch) {
+      return { reply, sketch: null };
+    }
+    // Model output is untrusted: never forward a sketch to clients without
+    // validating dimensions, row shape, and palette IDs. The client re-checks
+    // on apply, but the API must not be the channel that ships garbage.
+    const validated = validateAiGridSketch(data.sketch);
+    if (validated.ok) {
+      return { reply, sketch: validated.sketch };
+    }
     return {
-      reply:
-        typeof data.reply === "string"
-          ? data.reply
-          : "The model returned a sketch.",
-      sketch: data.sketch ? (data.sketch as AiGridSketch) : null,
+      reply,
+      sketch: null,
+      warning: `The model returned an invalid sketch (${validated.error}). Ask it to try again.`,
     };
   } catch {
     /* fall through to salvage */
@@ -516,14 +575,19 @@ function parseSketchContent(
   // text in the reply so they can debug.
   const salvaged = trySalvagePartialSketch(candidate);
   if (salvaged) {
-    return {
-      reply:
-        salvaged.reply ||
-        "Recovered a partial sketch from a truncated response. Some rows may be incomplete.",
-      sketch: salvaged.sketch,
-      warning:
-        "The model response was truncated; the sketch may be missing rows or have incomplete rows filled with nulls.",
-    };
+    // The salvage path builds rows from regex-scraped fragments, so it goes
+    // through the exact same untrusted-output gate as a clean parse.
+    const validated = validateAiGridSketch(salvaged.sketch);
+    if (validated.ok) {
+      return {
+        reply:
+          salvaged.reply ||
+          "Recovered a partial sketch from a truncated response. Some rows may be incomplete.",
+        sketch: validated.sketch,
+        warning:
+          "The model response was truncated; the sketch may be missing rows or have incomplete rows filled with nulls.",
+      };
+    }
   }
 
   return {
@@ -557,7 +621,14 @@ function trySalvagePartialSketch(candidate: string): {
   const width = Number(widthMatch[1]);
   const height = Number(heightMatch[1]);
   if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
-  if (width < 4 || height < 4 || width > 64 || height > 64) return null;
+  if (
+    width < AI_SKETCH_LIMITS.minDimension ||
+    height < AI_SKETCH_LIMITS.minDimension ||
+    width > AI_SKETCH_LIMITS.maxDimension ||
+    height > AI_SKETCH_LIMITS.maxDimension
+  ) {
+    return null;
+  }
 
   // Find the start of the rows array and walk row-by-row
   const rowsStart = candidate.indexOf('"rows"');
@@ -586,7 +657,9 @@ function trySalvagePartialSketch(candidate: string): {
           if (Array.isArray(parsed) && parsed.length === width) {
             rows.push(
               parsed.map((cell) =>
-                typeof cell === "string" ? cell : null,
+                typeof cell === "string" && PALETTE_COLOR_ID_PATTERN.test(cell)
+                  ? cell
+                  : null,
               ) as (string | null)[],
             );
           }

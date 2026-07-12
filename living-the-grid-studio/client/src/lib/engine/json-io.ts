@@ -7,7 +7,7 @@
 
 import type { GridDocument } from "./grid";
 import { createGridDocument, recomputeUsedColors } from "./grid";
-import { GridDocumentV1Schema } from "@shared/community";
+import { COMMUNITY_LIMITS, GridDocumentV1Schema } from "@shared/community";
 import { deltaERgb, findClosestPaletteColor, hexToRgb } from "./color";
 import { TOMODACHI_PALETTE } from "./palette";
 
@@ -42,7 +42,9 @@ export function importGridJson(json: string): GridDocument {
     !Array.isArray(input.cells) ||
     input.cells.length !== width * height
   ) {
-    throw new Error("Invalid GridDocument JSON: unsupported dimensions or cell count");
+    throw new Error(
+      "Invalid GridDocument JSON: unsupported dimensions or cell count",
+    );
   }
   const probeWidth = Math.max(8, width);
   const probeHeight = Math.max(8, height);
@@ -109,6 +111,16 @@ export function importLtgNative(json: string): GridDocument {
     data.palette !== undefined &&
     (data.grid !== undefined || data.pixels !== undefined)
   ) {
+    // Bound dimensions BEFORE any grid allocation. The native import path
+    // enforces the same ceiling through GridDocumentV1Schema; without this
+    // check a hostile LTG file could declare enormous dimensions and force
+    // large allocations during normalization.
+    const maxDimension = COMMUNITY_LIMITS.gridDimensionMaximum;
+    if (data.width > maxDimension || data.height > maxDimension) {
+      throw new Error(
+        `Invalid Living The Grid JSON: dimensions must not exceed ${maxDimension}x${maxDimension}`,
+      );
+    }
     return convertLtgToGrid(data);
   }
 
@@ -119,7 +131,7 @@ export function importLtgNative(json: string): GridDocument {
 
   throw new Error(
     "Unrecognized JSON format. Expected either a GridDocument or Living The Grid native format. " +
-      "Please check docs/json-format-notes.md for supported formats."
+      "Please check docs/json-format-notes.md for supported formats.",
   );
 }
 
@@ -130,7 +142,7 @@ function convertLtgToGrid(data: LtgNativeFormat): GridDocument {
   const grid = normalizeIndexedGrid(data.grid ?? data.pixels, width, height);
   const palette = normalizeLtgPalette(data.palette);
   const paletteMappings = palette.map((hex, sourceIndex) =>
-    mapHexToPaletteId(hex, sourceIndex, warnings)
+    mapHexToPaletteId(hex, sourceIndex, warnings),
   );
 
   const doc = createGridDocument(width, height, getLtgName(data));
@@ -154,7 +166,7 @@ function convertLtgToGrid(data: LtgNativeFormat): GridDocument {
       colorId,
       exact,
       deltaE,
-    })
+    }),
   );
 
   // Map palette indices to palette color IDs
@@ -167,7 +179,9 @@ function convertLtgToGrid(data: LtgNativeFormat): GridDocument {
       } else if (idx >= 0 && idx < paletteMappings.length) {
         cells.push(paletteMappings[idx].colorId);
       } else {
-        warnings.push(`Cell (${x}, ${y}) references missing palette index ${idx}.`);
+        warnings.push(
+          `Cell (${x}, ${y}) references missing palette index ${idx}.`,
+        );
         cells.push(null);
       }
     }
@@ -191,7 +205,7 @@ function getLtgName(data: LtgNativeFormat): string {
 function normalizeIndexedGrid(
   sourceGrid: unknown,
   width: number,
-  height: number
+  height: number,
 ): (number | null)[][] {
   if (!Array.isArray(sourceGrid)) {
     throw new Error("Invalid Living The Grid JSON: grid must be an array");
@@ -201,7 +215,7 @@ function normalizeIndexedGrid(
     return sourceGrid.map((row, y) => {
       if (!Array.isArray(row) || row.length !== width) {
         throw new Error(
-          `Invalid Living The Grid JSON: row ${y} must contain ${width} cells`
+          `Invalid Living The Grid JSON: row ${y} must contain ${width} cells`,
         );
       }
       return row.map((value, x) => normalizePaletteIndex(value, x, y));
@@ -221,27 +235,31 @@ function normalizeIndexedGrid(
   }
 
   throw new Error(
-    `Invalid Living The Grid JSON: expected ${height} rows or ${width * height} flat cells`
+    `Invalid Living The Grid JSON: expected ${height} rows or ${width * height} flat cells`,
   );
 }
 
 function normalizePaletteIndex(
   value: unknown,
   x: number,
-  y: number
+  y: number,
 ): number | null {
   if (value === null || value === undefined || value === -1) return null;
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
     return value;
   }
   throw new Error(
-    `Invalid Living The Grid JSON: cell (${x}, ${y}) must be a palette index or null`
+    `Invalid Living The Grid JSON: cell (${x}, ${y}) must be a palette index or null`,
   );
 }
 
-function normalizeLtgPalette(sourcePalette: unknown): NormalizedLtgPaletteEntry[] {
+function normalizeLtgPalette(
+  sourcePalette: unknown,
+): NormalizedLtgPaletteEntry[] {
   if (!Array.isArray(sourcePalette) || sourcePalette.length === 0) {
-    throw new Error("Invalid Living The Grid JSON: palette must be a non-empty array");
+    throw new Error(
+      "Invalid Living The Grid JSON: palette must be a non-empty array",
+    );
   }
 
   return sourcePalette.map((entry, index) => {
@@ -256,7 +274,7 @@ function normalizeLtgPalette(sourcePalette: unknown): NormalizedLtgPaletteEntry[
 
     if (!hex || !isHexColor(hex)) {
       throw new Error(
-        `Invalid Living The Grid JSON: palette entry ${index} must contain a #RRGGBB color`
+        `Invalid Living The Grid JSON: palette entry ${index} must contain a #RRGGBB color`,
       );
     }
 
@@ -271,7 +289,7 @@ function normalizeLtgPalette(sourcePalette: unknown): NormalizedLtgPaletteEntry[
 function mapHexToPaletteId(
   entry: NormalizedLtgPaletteEntry,
   sourceIndex: number,
-  warnings: string[]
+  warnings: string[],
 ): {
   sourceIndex: number;
   sourceHex: string;
@@ -288,7 +306,7 @@ function mapHexToPaletteId(
   const hex = entry.hex;
   const sourceRgb = hexToRgb(hex);
   const exactMatches = TOMODACHI_PALETTE.filter(
-    (color) => normalizeHex(color.hex) === hex
+    (color) => normalizeHex(color.hex) === hex,
   );
 
   if (exactMatches.length > 0) {
@@ -296,7 +314,7 @@ function mapHexToPaletteId(
       exactMatches.find((color) => !color.isSaturated) ?? exactMatches[0];
     if (exactMatches.length > 1) {
       warnings.push(
-        `Palette index ${sourceIndex} (${hex}) matches multiple game swatches; mapped to ${preferred.id}.`
+        `Palette index ${sourceIndex} (${hex}) matches multiple game swatches; mapped to ${preferred.id}.`,
       );
     }
     return {
@@ -317,7 +335,7 @@ function mapHexToPaletteId(
     b: match.color.rgb[2],
   });
   warnings.push(
-    `Palette index ${sourceIndex} (${hex}) has no exact game swatch; mapped to ${match.color.id} at Delta E ${distance.toFixed(2)}.`
+    `Palette index ${sourceIndex} (${hex}) has no exact game swatch; mapped to ${match.color.id} at Delta E ${distance.toFixed(2)}.`,
   );
 
   return {
@@ -331,11 +349,15 @@ function mapHexToPaletteId(
   };
 }
 
-function normalizeRgbTuple(value: unknown): [number, number, number] | undefined {
+function normalizeRgbTuple(
+  value: unknown,
+): [number, number, number] | undefined {
   if (
     !Array.isArray(value) ||
     value.length !== 3 ||
-    !value.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255)
+    !value.every(
+      (channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255,
+    )
   ) {
     return undefined;
   }
@@ -343,7 +365,7 @@ function normalizeRgbTuple(value: unknown): [number, number, number] | undefined
 }
 
 function normalizePressCounts(
-  value: unknown
+  value: unknown,
 ): { h: number; s: number; b: number } | undefined {
   if (!isRecord(value)) return undefined;
   const { h, s, b } = value;

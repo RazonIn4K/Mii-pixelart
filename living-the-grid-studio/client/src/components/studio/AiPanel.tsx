@@ -46,11 +46,36 @@ interface AiPanelProps {
 }
 
 const AI_SESSION_STORAGE_KEY = "ltg.ai.sessions.v1";
+// One-time, device-scoped acknowledgement that AI requests leave the browser
+// and are processed by OpenRouter (a third party). Required before the first
+// request; remembered so returning users are not re-prompted.
+const AI_CONSENT_STORAGE_KEY = "ltg.ai.consent.v1";
+// Client ceilings sit slightly above the server's upstream timeouts so the
+// server's cleaner error message wins when the provider is slow.
+const AI_CHAT_TIMEOUT_MS = 95_000;
+const AI_METADATA_TIMEOUT_MS = 10_000;
+
+function readStoredAiConsent(): boolean {
+  try {
+    return localStorage.getItem(AI_CONSENT_STORAGE_KEY) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function persistAiConsent(): void {
+  try {
+    localStorage.setItem(AI_CONSENT_STORAGE_KEY, "granted");
+  } catch {
+    /* Private browsing: consent simply re-prompts next session. */
+  }
+}
 // ModelPresetWithAvailability removed — `available?: boolean` now lives on the
 // canonical AiModelPreset type in shared/ai.ts so client + server share one
 // wire shape.
 
 const STARTER_PROMPTS = [
+  "Improve the current canvas while preserving its subject and dimensions. Return a cleaner complete grid.",
   "Draw a 32x32 spooky mascot head with clear eyes and teeth.",
   "Draw a 16x16 mushroom badge using fewer than 8 colors.",
   "Draw a 32x32 bald schoolhouse horror teacher face with glasses and a ruler.",
@@ -79,6 +104,8 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [pendingSketch, setPendingSketch] = useState<AiGridSketch | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasAiConsent, setHasAiConsent] = useState(readStoredAiConsent);
+  const [showConsentPrompt, setShowConsentPrompt] = useState(false);
   const [presets, setPresets] = useState<AiModelPreset[]>(
     OPENROUTER_MODEL_PRESETS,
   );
@@ -87,12 +114,18 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     let active = true;
     const loadPresets = async () => {
       try {
-        const response = await fetch("/api/ai/models");
+        const response = await fetch("/api/ai/models", {
+          signal: AbortSignal.timeout(AI_METADATA_TIMEOUT_MS),
+        });
         if (!response.ok) return;
         const data = (await response.json()) as {
           presets?: AiModelPreset[];
         };
-        if (!active || !Array.isArray(data.presets) || data.presets.length === 0)
+        if (
+          !active ||
+          !Array.isArray(data.presets) ||
+          data.presets.length === 0
+        )
           return;
         setPresets(data.presets);
       } catch {
@@ -116,9 +149,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   }, [modelChoice, presets]);
 
   const selectedModel = modelChoice;
-  const selectedPreset = presets.find(
-    (preset) => preset.id === selectedModel,
-  );
+  const selectedPreset = presets.find((preset) => preset.id === selectedModel);
   const currentSummary = useMemo(
     () => (includeGridSummary ? summarizeDocument(currentDoc) : null),
     [currentDoc, includeGridSummary],
@@ -143,7 +174,9 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
 
   useEffect(() => {
     let canceled = false;
-    fetch("/api/ai/status")
+    fetch("/api/ai/status", {
+      signal: AbortSignal.timeout(AI_METADATA_TIMEOUT_MS),
+    })
       .then((response) => response.json())
       .then((data: { configured?: boolean }) => {
         if (!canceled) setConfigured(Boolean(data.configured));
@@ -230,7 +263,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     setError(null);
   };
 
-  const sendMessage = async () => {
+  const performSend = async () => {
     const trimmed = input.trim();
     if (!trimmed || !selectedModel || isLoading) return;
 
@@ -248,6 +281,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(AI_CHAT_TIMEOUT_MS),
         body: JSON.stringify({
           currentDocument: currentSummary,
           currentGridImage:
@@ -271,16 +305,46 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       if (data.sketch) setPendingSketch(data.sketch);
       if (data.warning) setError(data.warning);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI request failed.");
+      const timedOut =
+        err instanceof Error &&
+        (err.name === "TimeoutError" || err.name === "AbortError");
+      setError(
+        timedOut
+          ? "The AI request timed out. Try again, ask for a smaller sketch, or pick a faster model."
+          : err instanceof Error
+            ? err.message
+            : "AI request failed.",
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const [isAnimatingApply, setIsAnimatingApply] = useState(false);
+  const sendMessage = () => {
+    if (!input.trim() || !selectedModel || isLoading) return;
+    // Explicit, informed consent before anything leaves the browser for a
+    // third-party AI provider. Deterministic import/paint flows never require
+    // this — only the optional AI features do.
+    if (!hasAiConsent) {
+      setShowConsentPrompt(true);
+      return;
+    }
+    void performSend();
+  };
+
+  const acceptAiConsent = () => {
+    persistAiConsent();
+    setHasAiConsent(true);
+    setShowConsentPrompt(false);
+    void performSend();
+  };
+
+  const declineAiConsent = () => {
+    setShowConsentPrompt(false);
+  };
 
   const applySketch = () => {
-    if (!pendingSketch || isAnimatingApply) return;
+    if (!pendingSketch) return;
     let finalDoc;
     try {
       finalDoc = createGridDocumentFromAiSketch(pendingSketch);
@@ -294,40 +358,12 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     }
 
     setError(null);
-    setIsAnimatingApply(true);
-
-    // Live-paint animation: instead of dumping the full sketch onto the canvas
-    // in one frame, walk the cells in row-major order and rebuild the doc with
-    // progressively more cells filled in. Users see the pixels appear like the
-    // AI is actually painting. Total animation runs ~1.5s regardless of grid
-    // size by adjusting the per-tick batch.
-    const totalCells = finalDoc.cells.length;
-    const targetTicks = 60; // ~16ms per tick × 60 = 1.0s minimum smooth
-    const cellsPerTick = Math.max(1, Math.ceil(totalCells / targetTicks));
-
-    // First frame: blank doc with the right dimensions so the canvas resizes
-    // immediately and the user sees an empty grid waiting to be painted.
-    const blankCells: (string | null)[] = new Array(totalCells).fill(null);
-    onApplySketch({ ...finalDoc, cells: blankCells });
-
-    let filled = 0;
-    const tick = () => {
-      filled = Math.min(totalCells, filled + cellsPerTick);
-      const partialCells: (string | null)[] = new Array(totalCells).fill(null);
-      for (let i = 0; i < filled; i += 1) partialCells[i] = finalDoc.cells[i];
-      onApplySketch({ ...finalDoc, cells: partialCells });
-      if (filled < totalCells) {
-        requestAnimationFrame(tick);
-      } else {
-        // Final frame: hand back the doc with its real usedColors so the palette
-        // panel updates correctly. createGridDocumentFromAiSketch already ran
-        // recomputeUsedColors so finalDoc has the right palette metadata.
-        onApplySketch(finalDoc);
-        setPendingSketch(null);
-        setIsAnimatingApply(false);
-      }
-    };
-    requestAnimationFrame(tick);
+    // Commit the validated sketch exactly once. The previous decorative
+    // row-by-row animation pushed dozens of history entries, so Undo landed on
+    // a partial frame. A single structured document commit is deterministic,
+    // accessible to automation, and one-step undoable.
+    onApplySketch(finalDoc);
+    setPendingSketch(null);
   };
 
   return (
@@ -440,12 +476,14 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                 setIncludeGridImage(Boolean(checked))
               }
             />
-            Include visual grid snapshot
+            Include current canvas for editing
           </label>
           {includeGridImage && (
             <p className="pl-6 text-[0.68rem] leading-relaxed text-muted-foreground">
-              Sends a clean PNG of the current grid to OpenRouter. Use an
-              image-capable model for visual critique.
+              Sends a clean PNG of the current grid to OpenRouter, a third-party
+              AI service, so the model can review or revise the actual
+              composition. Your original uploaded photos are never sent — only
+              this palette-grid render. Turn this off for a text-only request.
             </p>
           )}
         </div>
@@ -514,14 +552,54 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                   {pendingSketch.width}x{pendingSketch.height}
                 </p>
               </div>
+              <Button size="sm" className="h-8 text-xs" onClick={applySketch}>
+                <Paintbrush className="mr-2 h-3.5 w-3.5" />
+                Apply once
+              </Button>
+            </div>
+            <p className="text-[0.68rem] leading-relaxed text-muted-foreground">
+              The validated grid is applied as one document change, so it can be
+              reviewed and undone in one step.
+            </p>
+          </div>
+        )}
+
+        {showConsentPrompt && (
+          <div
+            role="alertdialog"
+            aria-label="AI processing consent"
+            className="space-y-2 rounded-sm border border-primary/40 bg-primary/5 p-2"
+          >
+            <p className="text-xs font-semibold">
+              Send this request to a third-party AI service?
+            </p>
+            <p className="text-[0.68rem] leading-relaxed text-muted-foreground">
+              AI Draw sends your prompt text — and, when “Include current
+              canvas” is on, a PNG snapshot of your pixel grid — to OpenRouter,
+              which routes it to external model providers. Requests are limited
+              to providers OpenRouter identifies as not collecting user data,
+              but provider policies can differ, so treat anything you send as
+              leaving this device. Don’t include personal or sensitive
+              information. Deterministic image import never uses AI and stays
+              fully in your browser. This choice is remembered on this device.
+            </p>
+            <div className="flex gap-2">
               <Button
+                type="button"
                 size="sm"
                 className="h-8 text-xs"
-                onClick={applySketch}
-                disabled={isAnimatingApply}
+                onClick={acceptAiConsent}
               >
-                <Paintbrush className="mr-2 h-3.5 w-3.5" />
-                {isAnimatingApply ? "Painting…" : "Apply"}
+                Agree and send
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={declineAiConsent}
+              >
+                Not now
               </Button>
             </div>
           </div>

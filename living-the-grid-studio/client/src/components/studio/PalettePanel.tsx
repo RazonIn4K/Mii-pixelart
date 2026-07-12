@@ -8,13 +8,18 @@
 import { Lock, Unlock, ArrowRightLeft } from "lucide-react";
 import { TOMODACHI_PALETTE, type PaletteColor } from "@/lib/engine/palette";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PalettePanelProps {
   usedColors: string[];
   colorCounts: Map<string, number>;
   lockedColors: string[];
   highlightColorId: string | null;
+  selectedColorId: string;
   onColorHover: (colorId: string | null) => void;
   onColorClick: (colorId: string) => void;
   onToggleLock: (colorId: string) => void;
@@ -26,6 +31,7 @@ export default function PalettePanel({
   colorCounts,
   lockedColors,
   highlightColorId,
+  selectedColorId,
   onColorHover,
   onColorClick,
   onToggleLock,
@@ -33,10 +39,13 @@ export default function PalettePanel({
 }: PalettePanelProps) {
   // Sort used colors by usage count (descending)
   const sortedColors = [...usedColors].sort(
-    (a, b) => (colorCounts.get(b) ?? 0) - (colorCounts.get(a) ?? 0)
+    (a, b) => (colorCounts.get(b) ?? 0) - (colorCounts.get(a) ?? 0),
   );
 
-  const totalCells = Array.from(colorCounts.values()).reduce((a, b) => a + b, 0);
+  const totalCells = Array.from(colorCounts.values()).reduce(
+    (a, b) => a + b,
+    0,
+  );
 
   const getPaletteInfo = (id: string): PaletteColor | undefined =>
     TOMODACHI_PALETTE.find((c) => c.id === id);
@@ -64,7 +73,8 @@ export default function PalettePanel({
           {sortedColors.map((colorId) => {
             const info = getPaletteInfo(colorId);
             const count = colorCounts.get(colorId) ?? 0;
-            const pct = totalCells > 0 ? ((count / totalCells) * 100).toFixed(1) : "0";
+            const pct =
+              totalCells > 0 ? ((count / totalCells) * 100).toFixed(1) : "0";
             const isLocked = lockedColors.includes(colorId);
             const isHighlighted = highlightColorId === colorId;
 
@@ -72,18 +82,24 @@ export default function PalettePanel({
               <div
                 key={colorId}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors ${
-                  isHighlighted
-                    ? "bg-accent"
-                    : "hover:bg-secondary"
+                  isHighlighted ? "bg-accent" : "hover:bg-secondary"
                 }`}
                 onMouseEnter={() => onColorHover(colorId)}
                 onMouseLeave={() => onColorHover(null)}
               >
                 {/* Color swatch */}
                 <button
+                  type="button"
                   onClick={() => onColorClick(colorId)}
-                  className="w-6 h-6 rounded-sm border border-border shrink-0 relative"
+                  className={`relative h-8 w-8 shrink-0 rounded-md border ${
+                    selectedColorId === colorId
+                      ? "border-primary ring-2 ring-primary/25"
+                      : "border-border"
+                  }`}
                   style={{ backgroundColor: info?.hex ?? colorId }}
+                  aria-label={`Select ${colorId} ${info?.name ?? "paint color"}`}
+                  aria-pressed={selectedColorId === colorId}
+                  title={`Select ${colorId} ${info?.name ?? "paint color"}`}
                 >
                   {isHighlighted && (
                     <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary" />
@@ -122,8 +138,10 @@ export default function PalettePanel({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        type="button"
                         onClick={() => onToggleLock(colorId)}
                         className="p-1 rounded-sm hover:bg-accent"
+                        aria-label={`${isLocked ? "Unlock" : "Lock"} ${colorId} ${info?.name ?? "color"}`}
                       >
                         {isLocked ? (
                           <Lock className="w-3 h-3 text-primary" />
@@ -134,7 +152,9 @@ export default function PalettePanel({
                     </TooltipTrigger>
                     <TooltipContent side="left">
                       <p className="text-xs">
-                        {isLocked ? "Unlock color" : "Lock color (protected from optimizer)"}
+                        {isLocked
+                          ? "Unlock color"
+                          : "Lock color (protected from optimizer)"}
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -142,8 +162,10 @@ export default function PalettePanel({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
+                        type="button"
                         onClick={() => onMergeRequest(colorId)}
                         className="p-1 rounded-sm hover:bg-accent"
+                        aria-label={`Merge ${colorId} ${info?.name ?? "color"} into another color`}
                       >
                         <ArrowRightLeft className="w-3 h-3 text-muted-foreground" />
                       </button>
@@ -163,28 +185,36 @@ export default function PalettePanel({
       <div className="border-t border-border px-4 py-3">
         <p className="section-header mb-2">Game Palette Reference</p>
         <div className="grid grid-cols-7 gap-0.5">
-          {TOMODACHI_PALETTE.filter((c) => !c.isSaturated).slice(0, 77).map((c) => (
-            <Tooltip key={c.id}>
-              <TooltipTrigger asChild>
-                <button
-                  className={`w-full aspect-square rounded-sm border ${
-                    usedColors.includes(c.id)
-                      ? "border-foreground/30"
-                      : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: c.hex }}
-                  onClick={() => onColorClick(c.id)}
-                  onMouseEnter={() => onColorHover(c.id)}
-                  onMouseLeave={() => onColorHover(null)}
-                />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs font-mono">
-                  {c.id} · {c.name} · {c.hex}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
+          {TOMODACHI_PALETTE.filter((c) => !c.isSaturated)
+            .slice(0, 77)
+            .map((c) => (
+              <Tooltip key={c.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={`w-full aspect-square rounded-sm border ${
+                      selectedColorId === c.id
+                        ? "border-primary ring-2 ring-primary/25"
+                        : usedColors.includes(c.id)
+                          ? "border-foreground/30"
+                          : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    onClick={() => onColorClick(c.id)}
+                    onMouseEnter={() => onColorHover(c.id)}
+                    onMouseLeave={() => onColorHover(null)}
+                    aria-label={`Select ${c.id} ${c.name}`}
+                    aria-pressed={selectedColorId === c.id}
+                    title={`Select ${c.id} ${c.name}`}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs font-mono">
+                    {c.id} · {c.name} · {c.hex}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
         </div>
         {/* Saturated extras */}
         <div className="grid grid-cols-7 gap-0.5 mt-1">
@@ -192,15 +222,21 @@ export default function PalettePanel({
             <Tooltip key={c.id}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   className={`w-full aspect-square rounded-sm border ${
-                    usedColors.includes(c.id)
-                      ? "border-foreground/30"
-                      : "border-transparent"
+                    selectedColorId === c.id
+                      ? "border-primary ring-2 ring-primary/25"
+                      : usedColors.includes(c.id)
+                        ? "border-foreground/30"
+                        : "border-transparent"
                   }`}
                   style={{ backgroundColor: c.hex }}
                   onClick={() => onColorClick(c.id)}
                   onMouseEnter={() => onColorHover(c.id)}
                   onMouseLeave={() => onColorHover(null)}
+                  aria-label={`Select ${c.id} ${c.name}`}
+                  aria-pressed={selectedColorId === c.id}
+                  title={`Select ${c.id} ${c.name}`}
                 />
               </TooltipTrigger>
               <TooltipContent>

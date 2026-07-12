@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 
 const publicRoutes = [
   "/",
@@ -17,7 +17,9 @@ const publicRoutes = [
 ] as const;
 
 for (const route of publicRoutes) {
-  test(`${route} renders without runtime errors or horizontal overflow`, async ({ page }) => {
+  test(`${route} renders without runtime errors or horizontal overflow`, async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
@@ -30,28 +32,153 @@ for (const route of publicRoutes) {
     });
 
     const response = await page.goto(route, { waitUntil: "networkidle" });
-    expect(response?.ok(), `expected ${route} to return a successful document`).toBe(true);
+    expect(
+      response?.ok(),
+      `expected ${route} to return a successful document`,
+    ).toBe(true);
     await expect(page.locator("main").first()).toBeVisible();
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
     ).toBe(true);
     expect(errors).toEqual([]);
   });
 }
 
-test("mobile navigation exposes community and Studio destinations", async ({ page }) => {
+test("mobile navigation exposes community and Studio destinations", async ({
+  page,
+}) => {
+  const accessibilityWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (
+      message.type() === "warning" &&
+      message.text().includes("Missing \`Description\`")
+    ) {
+      accessibilityWarnings.push(message.text());
+    }
+  });
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/discover");
   await page.getByRole("button", { name: /open navigation/i }).click();
-  const mobileNavigation = page.getByRole("navigation", { name: /mobile navigation/i });
+  const mobileNavigation = page.getByRole("navigation", {
+    name: /mobile navigation/i,
+  });
   await expect(mobileNavigation).toBeVisible();
-  await expect(mobileNavigation.getByRole("link", { name: "Discover", exact: true })).toBeVisible();
-  await expect(mobileNavigation.getByRole("link", { name: "Studio", exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Move between the community gallery, local Studio tools, and your account.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    mobileNavigation.getByRole("link", { name: "Discover", exact: true }),
+  ).toBeVisible();
+  await expect(
+    mobileNavigation.getByRole("link", { name: "Studio", exact: true }),
+  ).toBeVisible();
+  expect(accessibilityWarnings).toEqual([]);
 });
 
-test("the document permits zoom and advertises the original social card", async ({ page }) => {
+test("an unconnected community deployment disables account and cloud actions", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop degraded-deployment check covers the shared service state.",
+  );
+
+  const staticFallback = (route: Route) =>
+    route.fulfill({
+      body: "<!doctype html><title>Tomodachi</title>",
+      contentType: "text/html",
+      status: 200,
+    });
+  await page.route("**/api/auth/session", staticFallback);
+  await page.route("**/api/tags", staticFallback);
+  await page.route("**/api/discover/recent**", staticFallback);
+
+  await page.goto("/discover");
+  await expect(
+    page.getByRole("heading", {
+      name: "Community features are not connected here yet",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Accounts unavailable", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByText(/0 loaded/)).toHaveCount(0);
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Cloud saving unavailable", exact: true }),
+  ).toBeDisabled();
+});
+
+test("Discover actions and avatar captions stay separate at layout edges", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["desktop", "minimum-phone"].includes(testInfo.project.name),
+    "The desktop and 320px layouts cover the collision edges.",
+  );
+
+  const fulfill = (route: Route, data: unknown) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data,
+        meta: { nextCursor: null },
+        requestId: "layout-edge",
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  await page.route("**/api/auth/session", (route) =>
+    fulfill(route, { session: null, user: null }),
+  );
+  await page.route("**/api/tags", (route) => fulfill(route, []));
+  await page.route("**/api/discover/recent**", (route) => fulfill(route, []));
+
+  await page.goto("/discover", { waitUntil: "networkidle" });
+  const createBox = await page
+    .locator("#main-content")
+    .getByRole("link", { name: "Create & share", exact: true })
+    .boundingBox();
+  const artworkBox = await page.locator("main figure").boundingBox();
+  const avatarsBox = await page
+    .getByLabel("Examples of generated Island Workshop avatars", {
+      exact: true,
+    })
+    .boundingBox();
+  const captionBox = await page
+    .getByText("A face for every maker", { exact: true })
+    .boundingBox();
+  expect(createBox).not.toBeNull();
+  expect(artworkBox).not.toBeNull();
+  expect(avatarsBox).not.toBeNull();
+  expect(captionBox).not.toBeNull();
+
+  const overlaps = (
+    left: NonNullable<typeof createBox>,
+    right: NonNullable<typeof createBox>,
+  ) =>
+    left.x < right.x + right.width &&
+    left.x + left.width > right.x &&
+    left.y < right.y + right.height &&
+    left.y + left.height > right.y;
+  expect(overlaps(createBox!, artworkBox!)).toBe(false);
+  expect(overlaps(avatarsBox!, captionBox!)).toBe(false);
+});
+
+test("the document permits zoom and advertises the original social card", async ({
+  page,
+}) => {
   await page.goto("/");
-  const viewport = await page.locator('meta[name="viewport"]').getAttribute("content");
+  const viewport = await page
+    .locator('meta[name="viewport"]')
+    .getAttribute("content");
   expect(viewport).not.toContain("maximum-scale");
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     "content",
@@ -61,15 +188,18 @@ test("the document permits zoom and advertises the original social card", async 
 
 test("the hero image is preloaded only on the homepage", async ({ page }) => {
   await page.goto("/discover", { waitUntil: "networkidle" });
-  await expect(page.locator('link[rel="preload"][as="image"][href="/hero.webp"]')).toHaveCount(
-    0,
-  );
+  await expect(
+    page.locator('link[rel="preload"][as="image"][href="/hero.webp"]'),
+  ).toHaveCount(0);
 
   await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.locator('link[rel="preload"][as="image"][href="/hero.webp"]')).toHaveCount(
-    1,
+  await expect(
+    page.locator('link[rel="preload"][as="image"][href="/hero.webp"]'),
+  ).toHaveCount(1);
+  await expect(page.locator('img[src="/hero.webp"]')).toHaveAttribute(
+    "fetchpriority",
+    "high",
   );
-  await expect(page.locator('img[src="/hero.webp"]')).toHaveAttribute("fetchpriority", "high");
 });
 
 test("original community artwork and generated avatars are wired into public routes", async ({
@@ -103,7 +233,9 @@ test("original community artwork and generated avatars are wired into public rou
   ).toBeVisible();
 });
 
-test("submitting a search requests results without reloading the page", async ({ page }) => {
+test("submitting a search requests results without reloading the page", async ({
+  page,
+}) => {
   let documentRequests = 0;
   let searchRequests = 0;
   page.on("request", (request) => {
@@ -126,16 +258,22 @@ test("submitting a search requests results without reloading the page", async ({
   await page.goto("/search", { waitUntil: "networkidle" });
   const documentRequestsAfterLoad = documentRequests;
 
-  const searchRequest = page.waitForRequest((request) =>
-    request.url().includes("/api/search?") && request.url().includes("q=coral"),
+  const searchRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/api/search?") &&
+      request.url().includes("q=coral"),
   );
   await page.getByLabel("Search creations", { exact: true }).fill("coral");
-  await page.getByRole("button", { name: "Search community creations", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Search community creations", exact: true })
+    .click();
   const request = await searchRequest;
 
   expect(new URL(request.url()).searchParams.get("q")).toBe("coral");
   await expect(page).toHaveURL(/\/search\?q=coral$/);
-  await expect(page.getByText("No public creations matched", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("No public creations matched", { exact: true }),
+  ).toBeVisible();
   expect(documentRequests).toBe(documentRequestsAfterLoad);
   expect(searchRequests).toBe(1);
 });
@@ -195,8 +333,10 @@ test("newer searches win over stale responses and browser history stays in sync"
     exact: true,
   });
 
-  const firstRequest = page.waitForRequest((request) =>
-    request.url().includes("/api/search?") && request.url().includes("q=coral"),
+  const firstRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/api/search?") &&
+      request.url().includes("q=coral"),
   );
   await input.fill("coral");
   await submit.click();
@@ -205,10 +345,14 @@ test("newer searches win over stale responses and browser history stays in sync"
   await input.fill("beach");
   await submit.click();
   await expect(page.getByText("Beach mosaic", { exact: true })).toBeVisible();
-  await expect(page.getByText("Results for “beach”", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Results for “beach”", { exact: true }),
+  ).toBeVisible();
 
-  const staleResponse = page.waitForResponse((response) =>
-    response.url().includes("/api/search?") && response.url().includes("q=coral"),
+  const staleResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/search?") &&
+      response.url().includes("q=coral"),
   );
   releaseCoral?.();
   await staleResponse;
@@ -218,5 +362,7 @@ test("newer searches win over stale responses and browser history stays in sync"
   await page.goBack();
   await expect(page).toHaveURL(/\/search\?q=coral$/);
   await expect(page.getByText("Coral mosaic", { exact: true })).toBeVisible();
-  await expect(page.getByText("Results for “coral”", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Results for “coral”", { exact: true }),
+  ).toBeVisible();
 });

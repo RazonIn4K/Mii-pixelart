@@ -57,7 +57,7 @@ export function StudioWorkflowNav() {
   return (
     <TabsList
       aria-label="Studio workflow"
-      className="grid h-auto w-full grid-cols-2 items-stretch gap-px overflow-visible rounded-none bg-border p-0 lg:grid-cols-4"
+      className="grid h-auto w-full grid-cols-2 items-stretch gap-px overflow-visible rounded-none bg-border p-0"
     >
       {WORKFLOW_GROUPS.map((group) => (
         <div
@@ -68,14 +68,7 @@ export function StudioWorkflowNav() {
           <p className="mb-1.5 px-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-muted-foreground">
             {group.label}
           </p>
-          <div
-            className={`grid min-w-0 gap-1 ${
-              group.tools.length > 1
-                ? "grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
-                : "grid-cols-1"
-            }`}
-            role="presentation"
-          >
+          <div className="grid min-w-0 grid-cols-1 gap-1" role="presentation">
             {group.tools.map(({ icon: Icon, label, value }) => (
               <TabsTrigger
                 key={value}

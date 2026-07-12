@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import {
   ChevronDown,
+  CloudOff,
   LogOut,
   Menu,
   Plus,
@@ -24,6 +25,7 @@ import {
   Sheet,
   SheetClose,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -43,13 +45,22 @@ const PRIMARY_LINKS = [
 function currentSearchQuery(): string {
   if (typeof window === "undefined" || window.location.pathname !== "/search")
     return "";
-  return new URLSearchParams(window.location.search)
-    .get("q")
-    ?.trim()
-    .slice(0, 120) ?? "";
+  return (
+    new URLSearchParams(window.location.search)
+      .get("q")
+      ?.trim()
+      .slice(0, 120) ?? ""
+  );
 }
 
-function SignInForm({ className }: { className?: string }) {
+function SignInForm({
+  className,
+  unavailableMessage,
+}: {
+  className?: string;
+  unavailableMessage?: string | null;
+}) {
+  const unavailableDescriptionId = useId();
   const returnTo =
     typeof window === "undefined"
       ? "/discover"
@@ -60,20 +71,39 @@ function SignInForm({ className }: { className?: string }) {
       <Button
         type="submit"
         className="island-button w-full rounded-full font-bold"
+        disabled={Boolean(unavailableMessage)}
+        aria-describedby={
+          unavailableMessage ? unavailableDescriptionId : undefined
+        }
+        title={unavailableMessage ?? undefined}
       >
-        Sign in with Google
+        {unavailableMessage ? <CloudOff /> : null}
+        {unavailableMessage ? "Accounts unavailable" : "Sign in with Google"}
       </Button>
+      {unavailableMessage ? (
+        <p id={unavailableDescriptionId} className="sr-only">
+          {unavailableMessage}
+        </p>
+      ) : null}
     </form>
   );
 }
 
 function AccountMenu() {
-  const { user, logout } = useAuth();
-  if (!user) return <SignInForm className="hidden sm:block" />;
+  const { user, logout, serviceMessage } = useAuth();
+  if (!user) {
+    return (
+      <SignInForm
+        className="hidden sm:block"
+        unavailableMessage={serviceMessage}
+      />
+    );
+  }
 
-  const profilePath = user.username && user.termsAccepted === true
-    ? `/u/${encodeURIComponent(user.username)}`
-    : "/me/setup";
+  const profilePath =
+    user.username && user.termsAccepted === true
+      ? `/u/${encodeURIComponent(user.username)}`
+      : "/me/setup";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -141,7 +171,7 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
   const search = useSearch();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickQuery, setQuickQuery] = useState(currentSearchQuery);
-  const { user, status } = useAuth();
+  const { user, status, serviceMessage } = useAuth();
 
   useEffect(() => {
     setQuickQuery(currentSearchQuery());
@@ -209,7 +239,9 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
           <Input
             id="community-quick-search"
             value={quickQuery}
-            onChange={(event) => setQuickQuery(event.target.value.slice(0, 120))}
+            onChange={(event) =>
+              setQuickQuery(event.target.value.slice(0, 120))
+            }
             placeholder="Search creations…"
             className="h-9 min-w-0 border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
           />
@@ -268,6 +300,10 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
                 <SheetTitle className="text-left font-black text-[var(--island-ink)]">
                   Island menu
                 </SheetTitle>
+                <SheetDescription className="text-left">
+                  Move between the community gallery, local Studio tools, and
+                  your account.
+                </SheetDescription>
               </SheetHeader>
               <div className="px-4">
                 <SheetClose asChild>
@@ -316,7 +352,10 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
                     </SheetClose>
                   </>
                 ) : (
-                  <SignInForm className="mt-3 sm:hidden" />
+                  <SignInForm
+                    className="mt-3 sm:hidden"
+                    unavailableMessage={serviceMessage}
+                  />
                 )}
               </nav>
             </SheetContent>

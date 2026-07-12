@@ -79,6 +79,7 @@ export default function Discover() {
   const [submittedQuery, setSubmittedQuery] = useState(initialState.query);
   const [activeTag, setActiveTag] = useState<string | null>(initialState.tag);
   const [tags, setTags] = useState<CommunityTagOption[]>([]);
+  const [tagsError, setTagsError] = useState<string | null>(null);
   const [items, setItems] = useState<CreationSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,12 +142,16 @@ export default function Discover() {
 
   useEffect(() => {
     void communityApi<TagResult[]>("/api/tags")
-      .then((result) =>
+      .then((result) => {
         setTags(
           result.data.map((tag) => ({ label: tag.name, slug: tag.slug })),
-        ),
-      )
-      .catch(() => setTags([]));
+        );
+        setTagsError(null);
+      })
+      .catch((tagError) => {
+        setTags([]);
+        setTagsError(messageFromError(tagError));
+      });
   }, []);
 
   useEffect(() => {
@@ -228,25 +233,23 @@ export default function Discover() {
               eyebrow="Community gallery"
               title="Find, filter, and share your next pixel idea."
               description="Search original public grids, browse governed tags, and open the Studio when inspiration strikes. Private drafts never appear here."
-              action={
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild className="island-button rounded-full">
-                    <Link href="/studio">
-                      <Plus /> Create &amp; share
-                    </Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-full bg-white"
-                    disabled={surprising}
-                    onClick={() => void surpriseMe()}
-                  >
-                    <Dices /> {surprising ? "Finding one…" : "Surprise me"}
-                  </Button>
-                </div>
-              }
             />
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Button asChild className="island-button rounded-full">
+                <Link href="/studio">
+                  <Plus /> Create &amp; share
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full bg-white"
+                disabled={surprising}
+                onClick={() => void surpriseMe()}
+              >
+                <Dices /> {surprising ? "Finding one…" : "Surprise me"}
+              </Button>
+            </div>
             <CommunitySearchBar
               className="mt-8"
               label="Search public creations"
@@ -267,7 +270,7 @@ export default function Discover() {
               loading="lazy"
               decoding="async"
             />
-            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-lg backdrop-blur sm:inset-x-5 sm:bottom-5 sm:p-4">
+            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-lg backdrop-blur max-[360px]:flex-col max-[360px]:items-start max-[360px]:gap-2 sm:inset-x-5 sm:bottom-5 sm:p-4">
               <div
                 className="flex -space-x-2"
                 aria-label="Examples of generated Island Workshop avatars"
@@ -286,7 +289,7 @@ export default function Discover() {
                   />
                 ))}
               </div>
-              <div className="text-right">
+              <div className="text-right max-[360px]:text-left">
                 <p className="text-xs font-black text-[var(--island-ink)]">
                   A face for every maker
                 </p>
@@ -300,27 +303,88 @@ export default function Discover() {
       </section>
 
       <section className="container py-10 sm:py-14">
-        <CommunityFilterRail
-          activeTag={activeTag}
-          feed={feed}
-          onClear={clearFilters}
-          onFeedChange={(nextFeed) =>
-            applyState({ feed: nextFeed, query: "", tag: null })
-          }
-          onQueryClear={() =>
-            applyState({ feed: "recent", query: "", tag: activeTag })
-          }
-          onTagChange={(tag) =>
-            applyState({ feed: "recent", query: submittedQuery, tag })
-          }
-          query={submittedQuery}
-          resultLabel={
-            loading
-              ? `Loading ${viewLabel.toLowerCase()}…`
-              : `${viewLabel} · ${items.length} loaded`
-          }
-          tags={tags}
-        />
+        {!error ? (
+          tagsError ? (
+            <div className="min-w-0 rounded-[1.5rem] border-2 border-[var(--island-ink)]/12 bg-white/75 p-4 shadow-sm sm:p-5">
+              <p
+                className="text-sm font-black text-[var(--island-ink)]"
+                aria-live="polite"
+              >
+                {loading
+                  ? `Loading ${viewLabel.toLowerCase()}…`
+                  : `${viewLabel} · ${items.length} loaded`}
+              </p>
+              <p
+                className="mt-2 text-sm font-semibold text-[var(--island-ink)]/60"
+                role="status"
+              >
+                Tag filters could not be loaded. This is a temporary service
+                issue, not an empty tag library.
+                <span className="sr-only"> {tagsError}</span>
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  aria-pressed={
+                    feed === "recent" && !submittedQuery && !activeTag
+                  }
+                  onClick={() =>
+                    applyState({ feed: "recent", query: "", tag: null })
+                  }
+                >
+                  Browse new
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  aria-pressed={
+                    feed === "popular" && !submittedQuery && !activeTag
+                  }
+                  onClick={() =>
+                    applyState({ feed: "popular", query: "", tag: null })
+                  }
+                >
+                  Browse popular
+                </Button>
+                {submittedQuery || activeTag ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="rounded-full"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <CommunityFilterRail
+              activeTag={activeTag}
+              feed={feed}
+              onClear={clearFilters}
+              onFeedChange={(nextFeed) =>
+                applyState({ feed: nextFeed, query: "", tag: null })
+              }
+              onQueryClear={() =>
+                applyState({ feed: "recent", query: "", tag: activeTag })
+              }
+              onTagChange={(tag) =>
+                applyState({ feed: "recent", query: submittedQuery, tag })
+              }
+              query={submittedQuery}
+              resultLabel={
+                loading
+                  ? `Loading ${viewLabel.toLowerCase()}…`
+                  : `${viewLabel} · ${items.length} loaded`
+              }
+              tags={tags}
+            />
+          )
+        ) : null}
 
         <div className="mt-8">
           {loading ? (

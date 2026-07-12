@@ -16,6 +16,7 @@ interface AuthContextValue {
   status: AuthStatus;
   user: CommunityUser | null;
   serviceMessage: string | null;
+  serviceAvailable: boolean;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
@@ -28,7 +29,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function sessionUser(
   value:
     | CommunityUser
-    | { user?: CommunityUser | null; session?: { user?: CommunityUser | null } | null }
+    | {
+        user?: CommunityUser | null;
+        session?: { user?: CommunityUser | null } | null;
+      }
     | null,
 ): CommunityUser | null {
   if (!value) return null;
@@ -48,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await communityApi<
         | CommunityUser
-        | { user?: CommunityUser | null; session?: { user?: CommunityUser | null } | null }
+        | {
+            user?: CommunityUser | null;
+            session?: { user?: CommunityUser | null } | null;
+          }
         | null
       >("/api/auth/session");
       const nextUser = sessionUser(result.data);
@@ -85,12 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getSessions = useCallback(async () => {
-    const result = await communityApi<
-      (SessionInfo & { uaLabel?: string | null; label?: string | null })[]
-    >("/api/me/sessions");
+    const result =
+      await communityApi<
+        (SessionInfo & { uaLabel?: string | null; label?: string | null })[]
+      >("/api/me/sessions");
     return result.data.map((session) => ({
       ...session,
-      userAgentLabel: session.userAgentLabel ?? session.uaLabel ?? session.label ?? null,
+      userAgentLabel:
+        session.userAgentLabel ?? session.uaLabel ?? session.label ?? null,
     }));
   }, []);
 
@@ -99,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user,
       serviceMessage,
+      serviceAvailable: status !== "loading" && serviceMessage === null,
       isAuthenticated: status === "authenticated" && Boolean(user),
       refresh,
       logout,

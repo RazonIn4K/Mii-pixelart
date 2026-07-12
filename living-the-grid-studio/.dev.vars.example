@@ -8,5 +8,10 @@ OIDC_COOKIE_KEY="replace-with-32-byte-base64url-key"
 SESSION_PEPPER="replace-with-random-session-pepper"
 PSEUDONYM_KEY="replace-with-random-hmac-key"
 OPENROUTER_API_KEY=""
+# Optional. AI requests default to OpenRouter's "deny" data-collection policy
+# (route only to providers OpenRouter identifies as not collecting user data).
+# Set to "allow" only if the free-model roster becomes unavailable under
+# "deny" and the privacy tradeoff is accepted.
+# OPENROUTER_DATA_COLLECTION="deny"
 STRIPE_SECRET_KEY=""
 STRIPE_WEBHOOK_SECRET=""

@@ -1,8 +1,7 @@
-import type {
-  ApiEnvelope,
-  ApiErrorEnvelope,
-  CursorMeta,
-} from "./types";
+import type { ApiEnvelope, ApiErrorEnvelope, CursorMeta } from "./types";
+
+export const COMMUNITY_SERVICE_UNAVAILABLE_MESSAGE =
+  "Community accounts, discovery, and sharing are not connected to this deployment yet. Anonymous Studio editing and local exports still work.";
 
 export class CommunityApiError extends Error {
   readonly code: string;
@@ -74,9 +73,26 @@ export async function communityApi<T>(
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const body = contentType.includes("application/json")
-    ? ((await response.json()) as ApiEnvelope<T> | ApiErrorEnvelope)
-    : null;
+  const expectsJson = contentType.toLowerCase().includes("application/json");
+  let body: ApiEnvelope<T> | ApiErrorEnvelope | null = null;
+  if (expectsJson) {
+    try {
+      body = (await response.json()) as ApiEnvelope<T> | ApiErrorEnvelope;
+    } catch {
+      body = null;
+    }
+  }
+
+  // A static SPA fallback commonly answers an unhandled `/api/*` request with
+  // the app document and a misleading 200. Treat that as an unavailable
+  // community deployment instead of pretending the viewer is signed out or
+  // showing a generic request failure.
+  if (response.ok && !body) {
+    throw new CommunityApiError(COMMUNITY_SERVICE_UNAVAILABLE_MESSAGE, {
+      code: "SERVICE_UNAVAILABLE",
+      status: response.status,
+    });
+  }
 
   if (!response.ok || !body || "error" in body) {
     const errorBody = body && "error" in body ? body : null;
@@ -114,7 +130,10 @@ function normalizeCommunityData(value: unknown): unknown {
 
   const input = value as Record<string, unknown>;
   let output = Object.fromEntries(
-    Object.entries(input).map(([key, entry]) => [key, normalizeCommunityData(entry)]),
+    Object.entries(input).map(([key, entry]) => [
+      key,
+      normalizeCommunityData(entry),
+    ]),
   ) as Record<string, unknown>;
 
   if (output.creation && typeof output.creation === "object") {
@@ -131,15 +150,26 @@ function normalizeCommunityData(value: unknown): unknown {
     output.owner &&
     typeof output.owner === "object"
   ) {
-    const stats = output.stats && typeof output.stats === "object"
-      ? output.stats as Record<string, unknown>
-      : {};
+    const stats =
+      output.stats && typeof output.stats === "object"
+        ? (output.stats as Record<string, unknown>)
+        : {};
     output.status = output.state;
-    output.likeCount = Number(output.likeCount ?? stats.likes ?? stats.likeCount ?? 0);
-    output.commentCount = Number(output.commentCount ?? stats.comments ?? stats.commentCount ?? 0);
-    output.isLiked = Boolean(output.likedByViewer ?? output.isLiked ?? output.liked);
-    output.downloadEnabled = Boolean(output.downloadEnabled ?? output.projectDownloadEnabled);
-    output.commentsLocked = Boolean(output.commentsLocked ?? stats.commentsLocked ?? false);
+    output.likeCount = Number(
+      output.likeCount ?? stats.likes ?? stats.likeCount ?? 0,
+    );
+    output.commentCount = Number(
+      output.commentCount ?? stats.comments ?? stats.commentCount ?? 0,
+    );
+    output.isLiked = Boolean(
+      output.likedByViewer ?? output.isLiked ?? output.liked,
+    );
+    output.downloadEnabled = Boolean(
+      output.downloadEnabled ?? output.projectDownloadEnabled,
+    );
+    output.commentsLocked = Boolean(
+      output.commentsLocked ?? stats.commentsLocked ?? false,
+    );
     output.previewUrl = `/api/creations/${encodeURIComponent(output.id)}/media/preview`;
     output.thumbnailUrl = `/api/creations/${encodeURIComponent(output.id)}/media/thumb`;
     output.socialImageUrl = `/api/creations/${encodeURIComponent(output.id)}/media/social`;
@@ -147,7 +177,9 @@ function normalizeCommunityData(value: unknown): unknown {
       ? output.tags.flatMap((tag) =>
           typeof tag === "string"
             ? [tag]
-            : tag && typeof tag === "object" && typeof (tag as Record<string, unknown>).slug === "string"
+            : tag &&
+                typeof tag === "object" &&
+                typeof (tag as Record<string, unknown>).slug === "string"
               ? [(tag as Record<string, unknown>).slug]
               : [],
         )
@@ -161,7 +193,10 @@ function normalizeCommunityData(value: unknown): unknown {
     if (output.followingCount === undefined && output.following !== undefined) {
       output.followingCount = Number(output.following);
     }
-    if (output.isFollowing === undefined && output.followedByViewer !== undefined) {
+    if (
+      output.isFollowing === undefined &&
+      output.followedByViewer !== undefined
+    ) {
       output.isFollowing = Boolean(output.followedByViewer);
     }
   }

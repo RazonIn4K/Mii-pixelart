@@ -160,6 +160,114 @@ test("Studio crop percentages can be adjusted with the keyboard", async ({
   await expect(cropY).toHaveValue("1");
 });
 
+test("image upload moves directly into reliable paint mode after review", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One upload-to-paint transition covers the shared workflow.",
+  );
+  await page.goto("/studio");
+  await page.locator("#ltg-image-input").setInputFiles({
+    buffer: TINY_PNG,
+    mimeType: "image/png",
+    name: "tiny.png",
+  });
+  await expect(page.getByText("Preview ready", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Commit Preview" }).click();
+
+  await expect(page.getByRole("tab", { name: "Create" })).toHaveAttribute(
+    "data-state",
+    "active",
+  );
+  await expect(
+    page.getByRole("region", { name: "Canvas paint controls" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Pencil tool" }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("application", { name: /Editable \d+ by \d+ pixel grid/ }),
+  ).toBeVisible();
+});
+
+test("AI applies one validated document revision that Undo removes in one step", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop AI history run covers the shared document state.",
+  );
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ configured: true }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/models", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ presets: [] }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/chat", (route) => {
+    expect(route.request().postDataJSON().currentGridImage).toBeNull();
+    return route.fulfill({
+      body: JSON.stringify({
+        configured: true,
+        model: "test/free",
+        reply: "A small validated edit.",
+        sketch: {
+          name: "AI edit",
+          width: 8,
+          height: 8,
+          rows: Array.from({ length: 8 }, (_, y) =>
+            Array.from({ length: 8 }, (_, x) => (x === y ? "R10C1" : null)),
+          ),
+        },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential cookies only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "Include current canvas for editing",
+    }),
+  ).not.toBeChecked();
+  await page
+    .getByPlaceholder(/Ask for a 32x32 horror icon/)
+    .fill("Improve this canvas");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  // First AI use requires explicit third-party processing consent; the
+  // request must not fire until it is granted.
+  await expect(
+    page.getByRole("alertdialog", { name: "AI processing consent" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Agree and send" }).click();
+  await expect(page.getByText("AI edit", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Apply once" }).click();
+
+  await expect(page.getByText("8×8 · 1 colors", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(
+    page.getByText("64×64 · 0 colors", { exact: true }),
+  ).toBeVisible();
+});
+
 test("Studio documents its exact local format and resource limits", async ({
   page,
 }) => {
@@ -237,6 +345,31 @@ test("Studio JSON remains compatible with plain-text browser MIME reporting", as
     page.getByText("Sample 4x4 Grid", { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("invalid Studio JSON stays in Import instead of pretending to open a canvas", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One invalid-import state transition run covers the shared workflow.",
+  );
+  await page.goto("/studio");
+  await page.locator("#ltg-json-input").setInputFiles({
+    buffer: Buffer.from('{"version":1,"width":64,"cells":[]}'),
+    mimeType: "application/json",
+    name: "invalid-grid.json",
+  });
+
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Import" })).toHaveAttribute(
+    "data-state",
+    "active",
+  );
+  await expect(page.getByRole("tab", { name: "Create" })).toHaveAttribute(
+    "data-state",
+    "inactive",
+  );
 });
 
 test("Studio checks decoded dimensions and still imports an allowed PNG", async ({
