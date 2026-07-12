@@ -24,13 +24,17 @@ export interface SavedAiSession {
   updatedAt: string;
 }
 
+type StoredAiSession = Omit<SavedAiSession, "includeGridImage"> & {
+  includeGridImage?: boolean;
+};
+
 export function parseSavedAiSessions(raw: string | null): SavedAiSession[] {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter(isSavedAiSession)
+      .filter(isStoredAiSession)
       .map((session) => ({
         ...session,
         includeGridImage: Boolean(session.includeGridImage),
@@ -42,9 +46,9 @@ export function parseSavedAiSessions(raw: string | null): SavedAiSession[] {
   }
 }
 
-function isSavedAiSession(value: unknown): value is SavedAiSession {
+function isStoredAiSession(value: unknown): value is StoredAiSession {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const session = value as Partial<SavedAiSession>;
+  const session = value as Partial<StoredAiSession>;
   return (
     typeof session.createdAt === "string" &&
     typeof session.id === "string" &&
