@@ -1,4 +1,10 @@
-import type { AiChatRequest, AiChatResponse, AiGridSketch } from "../shared/ai";
+import type {
+  AiChatMessage,
+  AiChatResponse,
+  AiDocumentSummary,
+  AiGridImage,
+  AiGridSketch,
+} from "../shared/ai";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 // Resident Designer prompt retired alongside the Island tab in Pass 19.
 // Keep the shared/residents.ts file for ExportPanel.validateMiiResidentSpec.
@@ -43,6 +49,15 @@ export interface ApiResult {
   status: number;
 }
 
+interface NormalizedAiRequest {
+  currentDocument: AiDocumentSummary | null;
+  currentGridImage: AiGridImage | null;
+  messages: OpenRouterMessage[];
+  model: string;
+  requestSketch: boolean;
+  sessionId?: string;
+}
+
 /**
  * Minimal env shape consumed by this module. Both Node (`process.env`) and
  * Cloudflare Workers (`context.env`) can satisfy it. Pass an `env` argument
@@ -56,6 +71,7 @@ export interface OpenRouterEnv {
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const PALETTE_COLOR_ID_PATTERN = /^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$/;
 const ALLOWED_MODEL_IDS = new Set(
   OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
 );
@@ -120,7 +136,7 @@ export async function getOpenRouterModels(env?: OpenRouterEnv): Promise<ApiResul
 }
 
 export async function sendOpenRouterChat(
-  request: AiChatRequest,
+  request: unknown,
   env?: OpenRouterEnv,
 ): Promise<ApiResult> {
   const normalized = normalizeAiRequest(request);
@@ -149,9 +165,12 @@ export async function sendOpenRouterChat(
   const messages: OpenRouterMessage[] = [
     {
       role: "system",
-      content: buildAiSystemPrompt(Boolean(request.requestSketch)),
+      content: buildAiSystemPrompt(normalized.requestSketch),
     },
-    ...buildContextMessages(request),
+    ...buildContextMessages(
+      normalized.currentDocument,
+      normalized.currentGridImage,
+    ),
     ...normalized.messages,
   ];
 
@@ -165,16 +184,16 @@ export async function sendOpenRouterChat(
       // commentary. 3000 was the old budget and it was truncating mid-row,
       // which is why DeepSeek + Claude both spat out partial/invalid grids.
       // 16000 fits even 32x32 with room to breathe.
-      max_tokens: request.requestSketch ? 16000 : 1200,
+      max_tokens: normalized.requestSketch ? 16000 : 1200,
       messages,
       model: normalized.model,
-      response_format: request.requestSketch
+      response_format: normalized.requestSketch
         ? { type: "json_object" }
         : undefined,
-      session_id: normalizeSessionId(request.sessionId),
+      session_id: normalized.sessionId,
       // Lower temperature for sketches — we want deterministic structure, not
       // creative reinterpretation of the schema. 0.2 keeps it on-grid.
-      temperature: request.requestSketch ? 0.2 : 0.7,
+      temperature: normalized.requestSketch ? 0.2 : 0.7,
     }),
   });
 
@@ -196,7 +215,7 @@ export async function sendOpenRouterChat(
   }
 
   const content = payload?.choices?.[0]?.message?.content?.trim() ?? "";
-  const parsed = request.requestSketch ? parseSketchContent(content) : null;
+  const parsed = normalized.requestSketch ? parseSketchContent(content) : null;
   const reply =
     parsed?.reply ??
     content ??
@@ -256,10 +275,17 @@ function getOpenRouterHeaders(
 }
 
 function normalizeAiRequest(
-  request: AiChatRequest,
+  request: unknown,
 ):
-  | { messages: OpenRouterMessage[]; model: string; ok: true }
+  | (NormalizedAiRequest & { ok: true })
   | { error: string; ok: false } {
+  if (!isRecord(request)) {
+    return {
+      ok: false,
+      error: "Choose one of the supported free OpenRouter models.",
+    };
+  }
+
   const model = String(request.model ?? "").trim();
   if (!model || model.length > 160 || !isSupportedOpenRouterModel(model)) {
     return {
@@ -272,12 +298,14 @@ function normalizeAiRequest(
     return { ok: false, error: "Enter a message first." };
   }
 
-  const messages: OpenRouterMessage[] = request.messages
-    .slice(-12)
-    .map((message) => ({
-      role: message.role === "assistant" ? "assistant" : "user",
-      content: String(message.content ?? "").slice(0, 5000),
-    }));
+  const rawMessages = request.messages.slice(-12);
+  if (!rawMessages.every(isAiChatMessage)) {
+    return { ok: false, error: "Enter a message first." };
+  }
+  const messages: OpenRouterMessage[] = rawMessages.map((message) => ({
+    role: message.role,
+    content: message.content.slice(0, 5000),
+  }));
 
   if (
     !messages.some(
@@ -289,18 +317,31 @@ function normalizeAiRequest(
     return { ok: false, error: "Enter a message first." };
   }
 
-  return { ok: true, messages, model };
+  return {
+    currentDocument: normalizeDocumentSummary(request.currentDocument),
+    currentGridImage: isValidGridImage(request.currentGridImage)
+      ? request.currentGridImage
+      : null,
+    messages,
+    model,
+    ok: true,
+    requestSketch: request.requestSketch === true,
+    sessionId: normalizeSessionId(request.sessionId),
+  };
 }
 
-function buildContextMessages(request: AiChatRequest): OpenRouterMessage[] {
-  if (!request.currentDocument) return [];
-  const doc = request.currentDocument;
+function buildContextMessages(
+  currentDocument: AiDocumentSummary | null,
+  currentGridImage: AiGridImage | null,
+): OpenRouterMessage[] {
+  if (!currentDocument) return [];
+  const doc = currentDocument;
   const summaryText = `Current grid summary: ${JSON.stringify({
     name: doc.name,
     size: `${doc.width}x${doc.height}`,
     usedColors: doc.usedColors.slice(0, 24),
   })}`;
-  if (isValidGridImage(request.currentGridImage)) {
+  if (currentGridImage) {
     return [
       {
         role: "user",
@@ -313,7 +354,7 @@ function buildContextMessages(request: AiChatRequest): OpenRouterMessage[] {
             type: "image_url",
             image_url: {
               detail: "low",
-              url: request.currentGridImage.dataUrl,
+              url: currentGridImage.dataUrl,
             },
           },
         ],
@@ -372,10 +413,15 @@ export function buildAiSystemPrompt(requestSketch: boolean): string {
 }
 
 function isValidGridImage(
-  value: AiChatRequest["currentGridImage"],
-): value is NonNullable<AiChatRequest["currentGridImage"]> {
-  if (!value) return false;
-  if (!Number.isFinite(value.width) || !Number.isFinite(value.height)) {
+  value: unknown,
+): value is AiGridImage {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.width !== "number" ||
+    typeof value.height !== "number" ||
+    !Number.isFinite(value.width) ||
+    !Number.isFinite(value.height)
+  ) {
     return false;
   }
   if (
@@ -390,6 +436,47 @@ function isValidGridImage(
     typeof value.dataUrl === "string" &&
     value.dataUrl.startsWith("data:image/png;base64,") &&
     value.dataUrl.length <= 2_000_000
+  );
+}
+
+function normalizeDocumentSummary(value: unknown): AiDocumentSummary | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.name !== "string" ||
+    !Number.isInteger(value.width) ||
+    !Number.isInteger(value.height) ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number" ||
+    value.width < 1 ||
+    value.width > 256 ||
+    value.height < 1 ||
+    value.height > 256 ||
+    !Array.isArray(value.usedColors)
+  ) {
+    return null;
+  }
+  return {
+    height: value.height,
+    name: value.name.slice(0, 200),
+    usedColors: value.usedColors
+      .filter(
+        (color): color is string =>
+          typeof color === "string" && PALETTE_COLOR_ID_PATTERN.test(color),
+      )
+      .slice(0, 24),
+    width: value.width,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isAiChatMessage(value: unknown): value is AiChatMessage {
+  return (
+    isRecord(value) &&
+    (value.role === "user" || value.role === "assistant") &&
+    typeof value.content === "string"
   );
 }
 

@@ -29,6 +29,11 @@
  * 4xx responses.
  */
 
+import {
+  publicRequestError,
+  readBoundedText,
+} from "../../../server/request-body";
+
 interface KVNamespace {
   get(key: string): Promise<string | null>;
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
@@ -49,6 +54,8 @@ const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
 /** TTL on KV idempotency markers — 24h covers Stripe's full retry window. */
 const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
+
+const MAXIMUM_WEBHOOK_BYTES = 1_000_000;
 
 function getSecret(env: StripeWebhookEnv): string {
   const value = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -226,7 +233,25 @@ export const onRequestPost = async (
     );
   }
 
-  const rawBody = await context.request.text();
+  let rawBody: string;
+  try {
+    rawBody = await readBoundedText(
+      context.request,
+      MAXIMUM_WEBHOOK_BYTES,
+    );
+  } catch (error) {
+    const requestError = publicRequestError(
+      error,
+      "Could not read webhook body.",
+    );
+    return new Response(
+      JSON.stringify({ error: requestError.message }),
+      {
+        status: requestError.status,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
   const verification = await verifyStripeSignature(
     rawBody,
     signatureHeader,
