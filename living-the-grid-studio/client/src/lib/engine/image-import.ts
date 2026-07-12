@@ -54,8 +54,6 @@ export interface ImageImportOptions {
   gridHeight: number;
   /** Maximum number of colors to use (0 = no limit) */
   maxColors: number;
-  /** Whether to use only the game palette */
-  useGamePalette: boolean;
   /** How the source image should be framed into the target grid */
   frameMode: ImageFrameMode;
   /** Horizontal focus from 0 left to 100 right */
@@ -90,7 +88,6 @@ export const DEFAULT_IMPORT_OPTIONS: ImageImportOptions = {
   gridWidth: 32,
   gridHeight: 32,
   maxColors: 24,
-  useGamePalette: true,
   frameMode: "cover",
   focusX: 50,
   focusY: 50,
@@ -475,7 +472,6 @@ export async function imageToGridDocument(
       gridWidth: opts.gridWidth,
       gridHeight: opts.gridHeight,
       maxColors: opts.maxColors,
-      useGamePalette: opts.useGamePalette,
       frameMode: opts.frameMode,
       focusX: opts.focusX,
       focusY: opts.focusY,
@@ -498,15 +494,8 @@ export async function imageToGridDocument(
   for (let y = 0; y < opts.gridHeight; y++) {
     for (let x = 0; x < opts.gridWidth; x++) {
       const rgb = pixels[y][x];
-      if (opts.useGamePalette) {
-        const match = findClosestPaletteColor(rgb);
-        cells.push(match.color.id);
-      } else {
-        // Store raw hex for non-palette mode
-        const hex =
-          `#${rgb.r.toString(16).padStart(2, "0")}${rgb.g.toString(16).padStart(2, "0")}${rgb.b.toString(16).padStart(2, "0")}`.toUpperCase();
-        cells.push(hex);
-      }
+      const match = findClosestPaletteColor(rgb);
+      cells.push(match.color.id);
     }
   }
 
@@ -517,7 +506,6 @@ export async function imageToGridDocument(
 
   const imported = recomputeUsedColors(doc);
   if (
-    opts.useGamePalette &&
     opts.maxColors > 0 &&
     imported.usedColors.length > opts.maxColors
   ) {

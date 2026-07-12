@@ -174,7 +174,7 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
   );
 }
 
-function buildReferenceHtml(doc: GridDocument, json: string): string {
+export function buildReferenceHtml(doc: GridDocument, json: string): string {
   const paletteById = new Map(
     TOMODACHI_PALETTE.map((color) => [color.id, color]),
   );
@@ -230,7 +230,7 @@ function buildReferenceHtml(doc: GridDocument, json: string): string {
 </html>`;
 }
 
-function getSafeProjectName(doc: GridDocument): string {
+export function getSafeProjectName(doc: GridDocument): string {
   return doc.meta.name.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 

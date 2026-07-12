@@ -7,25 +7,27 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir, homedir } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 
 const STUDIO_URL = process.env.LTG_STUDIO_URL ?? "http://127.0.0.1:3000/studio";
+const REPOSITORY_IMAGE_FIXTURES = fileURLToPath(
+  new URL("../client/public/", import.meta.url),
+);
 const JPG_FIXTURE =
-  process.env.LTG_SMOKE_JPG ?? path.join(homedir(), "Downloads", "epstein.jpg");
-const AVIF_FIXTURE =
-  process.env.LTG_SMOKE_AVIF ??
-  path.join(homedir(), "Downloads", "epstein02.avif");
+  process.env.LTG_SMOKE_JPG ??
+  path.join(REPOSITORY_IMAGE_FIXTURES, "community-og.jpg");
+const AVIF_FIXTURE = process.env.LTG_SMOKE_AVIF?.trim() || null;
 const CHARACTER_FIXTURE =
   process.env.LTG_SMOKE_CHARACTER ??
-  path.join(homedir(), "Downloads", "freddy-fazbear.png");
+  path.join(REPOSITORY_IMAGE_FIXTURES, "icon-512.png");
 const JPG_PROJECT_NAME = safeProjectName(
   path.basename(JPG_FIXTURE).replace(/\.[^.]+$/, ""),
 );
-const AVIF_FILENAME = path.basename(AVIF_FIXTURE);
+const AVIF_FILENAME = AVIF_FIXTURE ? path.basename(AVIF_FIXTURE) : null;
 const CHARACTER_FILENAME = path.basename(CHARACTER_FIXTURE);
 const CHARACTER_PROJECT_NAME = safeProjectName(
   CHARACTER_FILENAME.replace(/\.[^.]+$/, ""),
@@ -85,7 +87,9 @@ if (!chromePath) {
   );
 }
 
-for (const fixture of [JPG_FIXTURE, AVIF_FIXTURE, CHARACTER_FIXTURE]) {
+for (const fixture of [JPG_FIXTURE, CHARACTER_FIXTURE, AVIF_FIXTURE].filter(
+  (candidate): candidate is string => Boolean(candidate),
+)) {
   if (!existsSync(fixture)) {
     throw new Error(`Missing smoke-test image fixture: ${fixture}`);
   }
@@ -149,11 +153,7 @@ async function main(): Promise<void> {
 
     await installErrorCapture(cdp);
     await verifyCreationTools(cdp);
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyAiPanel(cdp);
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "64×64",
       expectedMaxColors: 22,
@@ -161,10 +161,7 @@ async function main(): Promise<void> {
       filePath: CHARACTER_FIXTURE,
       presetLabel: "Character 64",
       projectName: CHARACTER_PROJECT_NAME,
-      verifyExport: true,
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "128×128",
       expectedMaxColors: 36,
@@ -173,8 +170,6 @@ async function main(): Promise<void> {
       presetLabel: "Character 128",
       projectName: CHARACTER_PROJECT_NAME,
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "256×256",
       expectedMaxColors: 84,
@@ -183,8 +178,6 @@ async function main(): Promise<void> {
       presetLabel: "Pixel 256",
       projectName: CHARACTER_PROJECT_NAME,
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "32×32",
       expectedMaxColors: 16,
@@ -193,8 +186,6 @@ async function main(): Promise<void> {
       presetLabel: "Sprite 32",
       projectName: CHARACTER_PROJECT_NAME,
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "64×64",
       expectedMaxColors: 22,
@@ -203,8 +194,6 @@ async function main(): Promise<void> {
       presetLabel: "Character 64",
       projectName: "smoke-mascot",
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "32×32",
       expectedMaxColors: 16,
@@ -213,8 +202,6 @@ async function main(): Promise<void> {
       presetLabel: "Sprite 32",
       projectName: "smoke-sprite",
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "64×64",
       expectedMaxColors: 12,
@@ -223,8 +210,6 @@ async function main(): Promise<void> {
       presetLabel: "Logo 64",
       projectName: "smoke-emblem",
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "64×64",
       expectedMaxColors: 18,
@@ -233,8 +218,6 @@ async function main(): Promise<void> {
       presetLabel: "Sticker 64",
       projectName: "smoke-mascot",
     });
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
     await verifyPresetImport(cdp, {
       expectedDimensions: "16×16",
       expectedMaxColors: 8,
@@ -242,9 +225,14 @@ async function main(): Promise<void> {
       filePath: ICON_FIXTURE,
       presetLabel: "Icon 16",
       projectName: "smoke-icon",
+      verifyExport: true,
     });
-    await installErrorCapture(cdp);
+    await restoreDownloadCapture(cdp);
 
+    await clickByText(cdp, "Import", "mouse");
+    await waitFor(() =>
+      cdp!.evaluate<boolean>("Boolean(document.querySelector('#ltg-image-input'))"),
+    );
     await uploadFile(cdp, "#ltg-image-input", JPG_FIXTURE);
     await waitFor(() =>
       cdp!.evaluate<boolean>(
@@ -291,6 +279,15 @@ async function main(): Promise<void> {
       cdp!.evaluate<boolean>(
         "!document.body.innerText.includes('Preview mode')",
       ),
+    );
+    const replacementConfirmations = await cdp.evaluate<string[]>(
+      "window.__ltgConfirmations",
+    );
+    assert.ok(
+      replacementConfirmations.some((message) =>
+        message.includes("Replace the current painted canvas"),
+      ),
+      "committing an import over painted work should require confirmation",
     );
 
     await installDownloadCapture(cdp);
@@ -357,19 +354,24 @@ async function main(): Promise<void> {
     );
     assert.ok(zipEntry, "reference pack ZIP blob should be generated");
 
-    // Reset the page before testing more imports; the download capture intentionally
-    // stubs URL.createObjectURL, which image decoding also depends on.
-    await navigateStudio(cdp);
-    await installErrorCapture(cdp);
-
-    await uploadFile(cdp, "#ltg-image-input", AVIF_FIXTURE);
+    await restoreDownloadCapture(cdp);
+    await clickByText(cdp, "Import", "mouse");
     await waitFor(() =>
       cdp!.evaluate<boolean>(
-        `document.body.innerText.includes(${JSON.stringify(
-          AVIF_FILENAME,
-        )}) && document.body.innerText.includes('Preview ready')`,
+        "Boolean(document.querySelector('#ltg-image-input') && document.querySelector('#ltg-json-input'))",
       ),
     );
+
+    if (AVIF_FIXTURE && AVIF_FILENAME) {
+      await uploadFile(cdp, "#ltg-image-input", AVIF_FIXTURE);
+      await waitFor(() =>
+        cdp!.evaluate<boolean>(
+          `document.body.innerText.includes(${JSON.stringify(
+            AVIF_FILENAME,
+          )}) && document.body.innerText.includes('Preview ready')`,
+        ),
+      );
+    }
 
     await uploadFile(cdp, "#ltg-json-input", LTG_FIXTURE_PATH);
     await waitFor(() =>
@@ -386,6 +388,10 @@ async function main(): Promise<void> {
 
     const unsupportedFixture = path.join(tmpdir(), "ltg-unsupported.txt");
     writeFileSync(unsupportedFixture, "not importable");
+    await clickByText(cdp, "Import", "mouse");
+    await waitFor(() =>
+      cdp!.evaluate<boolean>("Boolean(document.querySelector('#ltg-image-input'))"),
+    );
     await uploadFile(cdp, "#ltg-image-input", unsupportedFixture);
     await waitFor(() =>
       cdp!.evaluate<boolean>(
@@ -613,6 +619,16 @@ async function verifyPresetImport(
     verifyExport = false,
   } = smokeCase;
 
+  await clickByText(cdpClient, "Import", "mouse");
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      `[...document.querySelectorAll('button')].some((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 &&
+          candidate.textContent.trim().includes(${JSON.stringify(presetLabel)});
+      })`,
+    ),
+  );
   await clickByText(cdpClient, presetLabel, "js");
   await uploadFile(cdpClient, "#ltg-image-input", filePath);
   await waitFor(() =>
@@ -670,6 +686,7 @@ async function verifyPresetImport(
     ),
     `${presetLabel} clean export should create a PNG download`,
   );
+  await restoreDownloadCapture(cdpClient);
 }
 
 async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
@@ -837,6 +854,14 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
     ),
     "AI model presets should match the curated shared preset list",
   );
+  await cdpClient.send("Input.dispatchKeyEvent", {
+    key: "Escape",
+    type: "keyDown",
+  });
+  await cdpClient.send("Input.dispatchKeyEvent", {
+    key: "Escape",
+    type: "keyUp",
+  });
 }
 
 function spawnChrome(
@@ -970,7 +995,27 @@ async function clickByText(
     };
   })()`);
 
-  assert.ok(details, `Expected clickable control containing text: ${text}`);
+  if (!details) {
+    const pageState = await cdpClient.evaluate<{
+      buttons: string[];
+      text: string;
+      url: string;
+    }>(`({
+      buttons: [...document.querySelectorAll('button,[role="tab"],label')]
+        .filter((candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((candidate) => candidate.textContent.trim())
+        .filter(Boolean)
+        .slice(0, 80),
+      text: document.body.innerText.slice(0, 1200),
+      url: location.href,
+    })`);
+    throw new Error(
+      `Expected clickable control containing text: ${text}. Page state: ${JSON.stringify(pageState)}`,
+    );
+  }
   assert.equal(details.disabled, false, `Control should be enabled: ${text}`);
 
   if (mode === "js") {
@@ -1148,6 +1193,11 @@ async function dispatchMouseClick(
 async function installErrorCapture(cdpClient: CdpClient): Promise<void> {
   await cdpClient.evaluate(`(() => {
     window.__ltgErrors = [];
+    window.__ltgConfirmations = [];
+    window.confirm = (message) => {
+      window.__ltgConfirmations.push(String(message));
+      return true;
+    };
     window.addEventListener('error', (event) => window.__ltgErrors.push(event.message));
     window.addEventListener('unhandledrejection', (event) =>
       window.__ltgErrors.push(String(event.reason))
@@ -1158,6 +1208,9 @@ async function installErrorCapture(cdpClient: CdpClient): Promise<void> {
 async function installDownloadCapture(cdpClient: CdpClient): Promise<void> {
   await cdpClient.evaluate(`(() => {
     window.__ltgDownloads = [];
+    window.__ltgOriginalAnchorClick ??= HTMLAnchorElement.prototype.click;
+    window.__ltgOriginalCreateObjectURL ??= URL.createObjectURL;
+    window.__ltgOriginalRevokeObjectURL ??= URL.revokeObjectURL;
     HTMLAnchorElement.prototype.click = function patchedClick() {
       window.__ltgDownloads.push({
         download: this.download,
@@ -1185,6 +1238,20 @@ async function installDownloadCapture(cdpClient: CdpClient): Promise<void> {
       return id;
     };
     URL.revokeObjectURL = function patchedRevokeObjectURL() {};
+  })()`);
+}
+
+async function restoreDownloadCapture(cdpClient: CdpClient): Promise<void> {
+  await cdpClient.evaluate(`(() => {
+    if (window.__ltgOriginalAnchorClick) {
+      HTMLAnchorElement.prototype.click = window.__ltgOriginalAnchorClick;
+    }
+    if (window.__ltgOriginalCreateObjectURL) {
+      URL.createObjectURL = window.__ltgOriginalCreateObjectURL;
+    }
+    if (window.__ltgOriginalRevokeObjectURL) {
+      URL.revokeObjectURL = window.__ltgOriginalRevokeObjectURL;
+    }
   })()`);
 }
 

@@ -121,6 +121,13 @@ export default function Studio() {
   const imagePickerRequestRef = useRef(0);
   const visibleDoc = imagePreview ?? doc;
 
+  const confirmImportReplacement = useCallback(() => {
+    if (!doc?.cells.some((cell) => cell !== null)) return true;
+    return window.confirm(
+      "Replace the current painted canvas with this import? You can undo the replacement after it is committed.",
+    );
+  }, [doc]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -415,15 +422,17 @@ export default function Studio() {
   // handleAttachResidentSpec removed alongside the Island tab.
 
   const handleCommitImagePreview = useCallback(() => {
+    if (!confirmImportReplacement()) return;
     commitImagePreview();
     setPaintTool("pencil");
     setActivePanel("create");
     revealCanvasForEditing();
     toast.success("Image committed. Paint tools are ready above the canvas.");
-  }, [commitImagePreview, revealCanvasForEditing]);
+  }, [commitImagePreview, confirmImportReplacement, revealCanvasForEditing]);
 
   const handleImportJson = useCallback(
     (json: string): boolean => {
+      if (!confirmImportReplacement()) return false;
       const imported = importFromJson(json);
       if (!imported) return false;
       setPaintTool("pencil");
@@ -431,7 +440,7 @@ export default function Studio() {
       revealCanvasForEditing();
       return true;
     },
-    [importFromJson, revealCanvasForEditing],
+    [confirmImportReplacement, importFromJson, revealCanvasForEditing],
   );
 
   const handleCancelImagePreview = useCallback(() => {

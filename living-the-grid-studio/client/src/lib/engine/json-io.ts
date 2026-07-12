@@ -7,7 +7,11 @@
 
 import type { GridDocument } from "./grid";
 import { createGridDocument, recomputeUsedColors } from "./grid";
-import { COMMUNITY_LIMITS, GridDocumentV1Schema } from "@shared/community";
+import {
+  COMMUNITY_LIMITS,
+  GridDocumentV1Schema,
+  sanitizeSourceMetadata,
+} from "@shared/community";
 import { deltaERgb, findClosestPaletteColor, hexToRgb } from "./color";
 import { TOMODACHI_PALETTE } from "./palette";
 
@@ -25,7 +29,9 @@ export function importGridJson(json: string): GridDocument {
   const height = Number(input.height);
 
   if (width >= 8 && height >= 8) {
-    return recomputeUsedColors(GridDocumentV1Schema.parse(input));
+    return recomputeUsedColors(
+      canonicalizeLocalSourceMetadata(GridDocumentV1Schema.parse(input)),
+    );
   }
 
   // Legacy local files and LTG adapters historically allowed tiny synthetic
@@ -60,7 +66,9 @@ export function importGridJson(json: string): GridDocument {
     height: probeHeight,
     cells: probeCells,
   });
-  return recomputeUsedColors(input as unknown as GridDocument);
+  return recomputeUsedColors(
+    canonicalizeLocalSourceMetadata(input as unknown as GridDocument),
+  );
 }
 
 // ─── Living The Grid Native Format ────────────────────────────
@@ -148,7 +156,10 @@ function convertLtgToGrid(data: LtgNativeFormat): GridDocument {
   const doc = createGridDocument(width, height, getLtgName(data));
   doc.meta.sourceJson = "living-the-grid-native";
   doc.meta.sourceFormat = "living-the-grid:indexed-palette";
-  doc.meta.sourceMetadata = extractLtgMetadata(data);
+  doc.meta.sourceMetadata = sanitizeSourceMetadata(
+    doc.meta.sourceFormat,
+    extractLtgMetadata(data),
+  );
   doc.meta.sourcePaletteMappings = paletteMappings.map(
     ({
       sourceIndex,
@@ -194,6 +205,21 @@ function convertLtgToGrid(data: LtgNativeFormat): GridDocument {
 
 function hasPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function canonicalizeLocalSourceMetadata(doc: GridDocument): GridDocument {
+  const { sourceMetadata: _sourceMetadata, ...meta } = doc.meta;
+  const sourceMetadata = sanitizeSourceMetadata(
+    doc.meta.sourceFormat,
+    doc.meta.sourceMetadata,
+  );
+  return {
+    ...doc,
+    meta: {
+      ...meta,
+      ...(sourceMetadata ? { sourceMetadata } : {}),
+    },
+  };
 }
 
 function getLtgName(data: LtgNativeFormat): string {

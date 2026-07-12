@@ -54,6 +54,7 @@ export default defineConfig({
       "worker/**/*.test.ts",
       "shared/**/*.test.ts",
       "client/src/lib/**/*.test.ts",
+      "client/src/components/**/*.test.ts",
       "server/**/*.test.ts",
     ],
     setupFiles: ["./worker/test-setup.ts"],

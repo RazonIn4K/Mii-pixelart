@@ -198,6 +198,29 @@ test("AI applies one validated document revision that Undo removes in one step",
     testInfo.project.name !== "desktop",
     "One desktop AI history run covers the shared document state.",
   );
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          session: { id: "ai-e2e-session" },
+          user: {
+            avatarSeed: "ai-e2e-user",
+            createdAt: Date.now(),
+            displayName: "AI E2E User",
+            id: "ai-e2e-user",
+            role: "user",
+            status: "active",
+            termsAccepted: true,
+            termsVersion: "2026-07-12",
+            username: "ai-e2e-user",
+          },
+        },
+        requestId: "ai-e2e-session",
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
   await page.route("**/api/ai/status", (route) =>
     route.fulfill({
       body: JSON.stringify({ configured: true }),

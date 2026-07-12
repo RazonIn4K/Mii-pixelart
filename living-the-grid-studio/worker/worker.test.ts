@@ -205,7 +205,7 @@ describe("Worker HTTP integration", () => {
     });
   });
 
-  it("rejects arbitrary paid AI models at the Worker boundary", async () => {
+  it("requires an onboarded session before accepting AI requests", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/ai/chat", {
       body: JSON.stringify({
         messages: [{ content: "Reply with pong.", role: "user" }],
@@ -218,10 +218,9 @@ describe("Worker HTTP integration", () => {
       method: "POST",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({
-      configured: false,
-      reply: "Choose one of the supported free OpenRouter models.",
+      error: { code: "UNAUTHENTICATED" },
     });
   });
 });

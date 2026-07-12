@@ -4,6 +4,7 @@ import {
   UpdateCreationImagesSchema,
 } from "../shared/community";
 import {
+  clientKey,
   enforceRateLimit,
   optionalSession,
   requireOnboardedSession,
@@ -160,6 +161,10 @@ async function createUploadTicket(
 async function uploadCreationImage(
   context: WorkerRequestContext,
 ): Promise<Response> {
+  await enforceRateLimit(
+    context.env.SAVE_RATE_LIMITER,
+    await clientKey(context.env, context.request),
+  );
   const uploadToken = context.request.headers.get("authorization")!.slice("Bearer ".length);
   const tokenHash = await uploadTokenHash(context.env, uploadToken);
   const now = Date.now();

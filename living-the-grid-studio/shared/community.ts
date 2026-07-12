@@ -396,7 +396,7 @@ const LtgMetadataSchema = z
   })
   .strip();
 
-function sanitizeSourceMetadata(
+export function sanitizeSourceMetadata(
   sourceFormat: string | undefined,
   value: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {

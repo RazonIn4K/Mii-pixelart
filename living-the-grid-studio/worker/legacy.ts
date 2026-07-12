@@ -1,4 +1,4 @@
-import type { AiChatRequest } from "../shared/ai";
+import { AI_CHAT_BODY_MAX_BYTES, type AiChatRequest } from "../shared/ai";
 import { formatPrice } from "../shared/products";
 import {
   getOpenRouterModels,
@@ -12,7 +12,11 @@ import {
   verifyCheckoutSession,
   type ApiResult as StripeApiResult,
 } from "../server/stripe";
-import { clientKey, enforceRateLimit } from "./auth";
+import {
+  clientKey,
+  enforceRateLimit,
+  requireOnboardedSession,
+} from "./auth";
 import { HttpError, readJson, readText, type WorkerRequestContext } from "./http";
 import type { Router } from "./router";
 
@@ -49,11 +53,16 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
     return new Response(body, { status: result.status, headers: legacyHeaders("MISS") });
   }
   if (method === "POST" && path === "chat") {
+    const session = await requireOnboardedSession(context);
     await enforceRateLimit(
       context.env.AI_RATE_LIMITER,
       await clientKey(context.env, context.request),
     );
-    const body = await readJson(context.request, 1_000_000);
+    await enforceRateLimit(
+      context.env.AI_RATE_LIMITER,
+      `user:${session.user.id}`,
+    );
+    const body = await readJson(context.request, AI_CHAT_BODY_MAX_BYTES);
     if (!isAiChatRequest(body)) {
       throw new HttpError(400, "invalid_ai_request", "AI request is invalid.");
     }

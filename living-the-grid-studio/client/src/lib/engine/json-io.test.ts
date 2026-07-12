@@ -83,4 +83,35 @@ describe("importLtgNative dimension bounds", () => {
       ),
     ).toThrow();
   });
+
+  it("canonicalizes recognized source metadata and drops hostile extra keys locally", () => {
+    const doc = importGridJson(
+      JSON.stringify({
+        version: 1,
+        meta: {
+          name: "Imported template",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          modifiedAt: "2026-01-01T00:00:00.000Z",
+          sourceFormat: "creative-template",
+          sourceMetadata: {
+            templateId: "heart-sticker",
+            templateCategory: "Marks & Objects",
+            templateName: "Heart Sticker",
+            hostile: "<img src=x onerror=alert(1)>",
+          },
+        },
+        width: 8,
+        height: 8,
+        cells: new Array(64).fill("R1C1"),
+        usedColors: ["R1C1"],
+        lockedColors: [],
+      }),
+    );
+
+    expect(doc.meta.sourceMetadata).toEqual({
+      templateCategory: "Marks & Objects",
+      templateId: "heart-sticker",
+      templateName: "Heart Sticker",
+    });
+  });
 });

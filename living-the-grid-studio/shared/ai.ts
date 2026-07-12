@@ -1,5 +1,12 @@
 export type AiChatRole = "user" | "assistant";
 
+/**
+ * The Worker reads the complete JSON body before the OpenRouter adapter sees
+ * an embedded grid image. Keep the image validator at the same ceiling so it
+ * cannot advertise a payload size that the HTTP boundary will always reject.
+ */
+export const AI_CHAT_BODY_MAX_BYTES = 1_000_000;
+
 export interface AiChatMessage {
   role: AiChatRole;
   content: string;

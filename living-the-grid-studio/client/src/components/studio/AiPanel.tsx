@@ -21,7 +21,9 @@ import type {
 } from "@shared/ai";
 import { OPENROUTER_MODEL_PRESETS } from "@shared/ai";
 import { Button } from "@/components/ui/button";
+import { GoogleSignIn } from "@/components/community/RequireAuth";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -90,6 +92,7 @@ function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset {
 }
 
 export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
+  const { serviceMessage, status: authStatus, user } = useAuth();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<SavedAiSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState("");
@@ -321,6 +324,10 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   };
 
   const sendMessage = () => {
+    if (!user) {
+      setError("Sign in and finish account setup before using AI Draw.");
+      return;
+    }
     if (!input.trim() || !selectedModel || isLoading) return;
     // Explicit, informed consent before anything leaves the browser for a
     // third-party AI provider. Deterministic import/paint flows never require
@@ -611,17 +618,34 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
           </div>
         )}
 
+        {!user && (
+          <div className="space-y-2 rounded-sm border border-sky-200 bg-sky-50 p-3 text-sky-950">
+            <p className="text-xs font-semibold">Sign in to use AI Draw</p>
+            <p className="text-[0.68rem] leading-relaxed">
+              Import, paint, undo, and every export remain available without an
+              account. AI requests require an onboarded account so the shared
+              provider quota cannot be drained anonymously.
+            </p>
+            {authStatus !== "loading" && !serviceMessage ? (
+              <GoogleSignIn returnTo="/studio" />
+            ) : serviceMessage ? (
+              <p className="text-[0.68rem]">{serviceMessage}</p>
+            ) : null}
+          </div>
+        )}
+
         <div className="space-y-2">
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Ask for a 32x32 horror icon, a mascot mask, or a repaint cleanup plan..."
             className="min-h-24 resize-none text-xs"
+            disabled={!user}
           />
           <Button
             type="button"
             className="w-full text-xs"
-            disabled={!input.trim() || !selectedModel || isLoading}
+            disabled={!user || !input.trim() || !selectedModel || isLoading}
             onClick={sendMessage}
           >
             <Send className="mr-2 h-3.5 w-3.5" />

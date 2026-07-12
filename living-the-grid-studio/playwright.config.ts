@@ -16,9 +16,11 @@ Object.assign(process.env, {
   STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
 });
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
 const webServerCommand =
-  process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? "pnpm dev";
+  process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ??
+  "pnpm dev --host 127.0.0.1 --port 4173 --strictPort";
 
 export default defineConfig({
   testDir: "./tests/e2e",

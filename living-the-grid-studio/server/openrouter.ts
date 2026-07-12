@@ -6,6 +6,7 @@ import type {
   AiGridSketch,
 } from "../shared/ai";
 import {
+  AI_CHAT_BODY_MAX_BYTES,
   AI_SKETCH_LIMITS,
   OPENROUTER_MODEL_PRESETS,
   PALETTE_COLOR_ID_PATTERN,
@@ -482,7 +483,7 @@ function isValidGridImage(value: unknown): value is AiGridImage {
   return (
     typeof value.dataUrl === "string" &&
     value.dataUrl.startsWith("data:image/png;base64,") &&
-    value.dataUrl.length <= 2_000_000
+    value.dataUrl.length <= AI_CHAT_BODY_MAX_BYTES
   );
 }
 
