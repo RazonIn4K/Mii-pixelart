@@ -1,16 +1,19 @@
 import { defineConfig, devices } from "@playwright/test";
+import { randomBytes } from "node:crypto";
 
 // Keep automated browser runs isolated from developer/CI credentials while
 // satisfying Wrangler's required-secret declaration for the local Worker.
+const ephemeralCredential = () => randomBytes(32).toString("base64url");
+
 Object.assign(process.env, {
-  GOOGLE_CLIENT_ID: "test-google-client-id",
-  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
-  OIDC_COOKIE_KEY: Buffer.from("test-only-oidc-cookie-key-000001").toString("base64url"),
-  SESSION_PEPPER: "test-only-session-pepper",
-  PSEUDONYM_KEY: "test-only-pseudonym-hmac-key",
-  OPENROUTER_API_KEY: "test-disabled-openrouter-key",
-  STRIPE_SECRET_KEY: "test-disabled-stripe-key",
-  STRIPE_WEBHOOK_SECRET: "test-disabled-stripe-webhook-key",
+  GOOGLE_CLIENT_ID: ephemeralCredential(),
+  GOOGLE_CLIENT_SECRET: ephemeralCredential(),
+  OIDC_COOKIE_KEY: ephemeralCredential(),
+  SESSION_PEPPER: ephemeralCredential(),
+  PSEUDONYM_KEY: ephemeralCredential(),
+  OPENROUTER_API_KEY: ephemeralCredential(),
+  STRIPE_SECRET_KEY: ephemeralCredential(),
+  STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
 });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";

@@ -2,22 +2,27 @@ import {
   cloudflareTest,
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers";
+import { randomBytes } from "node:crypto";
 import { defineConfig } from "vitest/config";
+
+const ephemeralCredential = () => randomBytes(32).toString("base64url");
 
 const testSecretEnvironment = {
   GOOGLE_CLIENT_ID: "test-google-client-id",
-  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+  GOOGLE_CLIENT_SECRET: ephemeralCredential(),
   OIDC_COOKIE_KEY: Buffer.from("test-only-oidc-cookie-key-000001").toString("base64url"),
   SESSION_PEPPER: "test-only-session-pepper",
   PSEUDONYM_KEY: "test-only-pseudonym-hmac-key",
-  OPENROUTER_API_KEY: "test-disabled-openrouter-key",
-  STRIPE_SECRET_KEY: "test-disabled-stripe-key",
-  STRIPE_WEBHOOK_SECRET: "test-disabled-stripe-webhook-key",
+  OPENROUTER_API_KEY: ephemeralCredential(),
+  STRIPE_SECRET_KEY: ephemeralCredential(),
+  STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
 } as const;
 
 // Wrangler validates required secret names before Miniflare applies its test
-// bindings. Populate only this Vitest process with inert values so local/CI
-// output stays deterministic and never inherits a developer's real secrets.
+// bindings. Populate only this Vitest process with isolated test values so
+// local/CI runs never inherit a developer's real secrets. Session-related
+// fixtures stay deterministic because integration tests precompute their
+// hashes; unused provider credentials are generated per run.
 Object.assign(process.env, testSecretEnvironment);
 
 export default defineConfig({
