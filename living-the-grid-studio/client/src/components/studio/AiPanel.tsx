@@ -22,7 +22,6 @@ import type {
 import { OPENROUTER_MODEL_PRESETS } from "@shared/ai";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -35,13 +34,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { GridDocument } from "@/lib/engine/grid";
 import { createGridDocumentFromAiSketch } from "@/lib/engine/ai-sketch";
 import { exportGridAsPng } from "@/lib/engine/canvas-renderer";
+import { normalizeOpenRouterModelChoice } from "@/lib/ai-models";
 
 interface AiPanelProps {
   currentDoc: GridDocument | null;
   onApplySketch: (doc: GridDocument) => void;
 }
 
-const CUSTOM_MODEL_VALUE = "__custom__";
 const AI_SESSION_STORAGE_KEY = "ltg.ai.sessions.v1";
 // ModelPresetWithAvailability removed — `available?: boolean` now lives on the
 // canonical AiModelPreset type in shared/ai.ts so client + server share one
@@ -56,7 +55,6 @@ const STARTER_PROMPTS = [
 
 interface SavedAiSession {
   createdAt: string;
-  customModel: string;
   id: string;
   includeGridImage: boolean;
   includeGridSummary: boolean;
@@ -81,7 +79,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [modelChoice, setModelChoice] = useState(
     OPENROUTER_MODEL_PRESETS[0].id,
   );
-  const [customModel, setCustomModel] = useState("");
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [includeGridImage, setIncludeGridImage] = useState(false);
@@ -119,7 +116,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   }, []);
 
   useEffect(() => {
-    if (modelChoice === CUSTOM_MODEL_VALUE) return;
     const preset = presets.find((entry) => entry.id === modelChoice);
     if (!preset || preset.available === false) {
       const fallback = getFallbackPreset(presets);
@@ -127,8 +123,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     }
   }, [modelChoice, presets]);
 
-  const selectedModel =
-    modelChoice === CUSTOM_MODEL_VALUE ? customModel.trim() : modelChoice;
+  const selectedModel = modelChoice;
   const selectedPreset = presets.find(
     (preset) => preset.id === selectedModel,
   );
@@ -138,11 +133,10 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   );
 
   const hydrateSession = (session: SavedAiSession) => {
-    setCustomModel(session.customModel);
     setIncludeGridImage(Boolean(session.includeGridImage));
     setIncludeGridSummary(session.includeGridSummary);
     setMessages(session.messages);
-    setModelChoice(session.modelChoice);
+    setModelChoice(normalizeOpenRouterModelChoice(session.modelChoice));
     setRequestSketch(session.requestSketch);
   };
 
@@ -177,7 +171,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       const session = {
         createdAt:
           prev.find((entry) => entry.id === activeSessionId)?.createdAt ?? now,
-        customModel,
         id: activeSessionId,
         includeGridImage,
         includeGridSummary,
@@ -198,7 +191,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     });
   }, [
     activeSessionId,
-    customModel,
     includeGridImage,
     includeGridSummary,
     messages,
@@ -417,7 +409,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                   {preset.available === false ? " (unavailable)" : ""}
                 </SelectItem>
               ))}
-              <SelectItem value={CUSTOM_MODEL_VALUE}>Custom model</SelectItem>
             </SelectContent>
           </Select>
           {selectedPreset && (
@@ -426,14 +417,6 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               {selectedPreset.pricingPrompt}, out{" "}
               {selectedPreset.pricingCompletion}.
             </p>
-          )}
-          {modelChoice === CUSTOM_MODEL_VALUE && (
-            <Input
-              value={customModel}
-              onChange={(event) => setCustomModel(event.target.value)}
-              placeholder="provider/model-id"
-              className="h-8 text-xs"
-            />
           )}
         </div>
 
@@ -594,7 +577,6 @@ function createEmptySession(): SavedAiSession {
   const now = new Date().toISOString();
   return {
     createdAt: now,
-    customModel: "",
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
@@ -646,6 +628,7 @@ function readAiSessions(): SavedAiSession[] {
       .map((session) => ({
         ...session,
         includeGridImage: Boolean(session.includeGridImage),
+        modelChoice: normalizeOpenRouterModelChoice(session.modelChoice),
       }))
       .slice(0, 20);
   } catch {
