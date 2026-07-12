@@ -200,6 +200,11 @@ describe("database-authoritative rolling report limit", () => {
     expect(responses.map((response) => response.status).sort()).toEqual([
       201, 201, 201, 201, 201, 429,
     ]);
+    expect(
+      responses
+        .find((response) => response.status === 429)
+        ?.headers.get("retry-after"),
+    ).toBe("86400");
     await expect(
       env.DB.prepare(
         "SELECT COUNT(*) AS count FROM reports WHERE reporter_user_id = ?",

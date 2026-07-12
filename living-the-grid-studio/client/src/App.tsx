@@ -1,11 +1,15 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense } from "react";
-import { Route, Switch } from "wouter";
+import { lazy, Suspense, type ReactNode } from "react";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CookieConsent from "./components/CookieConsent";
 import { AnalyticsLoader } from "./components/AnalyticsLoader";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import {
+  currentRelativeReturnTo,
+  setupPathForReturnTo,
+} from "./lib/community/return-to";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
@@ -34,6 +38,18 @@ const CommunityGuidelines = lazy(() => import("./pages/community/CommunityGuidel
 const Copyright = lazy(() => import("./pages/community/Copyright"));
 const Security = lazy(() => import("./pages/community/Security"));
 
+function OnboardedAccountRoute({ children }: { children: ReactNode }) {
+  const { status, user } = useAuth();
+  if (status === "authenticated" && user && !user.username) {
+    return (
+      <Redirect
+        to={setupPathForReturnTo(currentRelativeReturnTo())}
+        replace
+      />
+    );
+  }
+  return <>{children}</>;
+}
 
 function Router() {
   return (
@@ -45,10 +61,18 @@ function Router() {
       <Route path={"/u/:username"} component={UserProfile} />
       <Route path={"/creation/:slug"} component={CreationDetail} />
       <Route path={"/me/setup"} component={Setup} />
-      <Route path={"/me/projects"} component={Projects} />
-      <Route path={"/me/settings"} component={Settings} />
-      <Route path={"/me"} component={Me} />
-      <Route path={"/moderation"} component={Moderation} />
+      <Route path={"/me/projects"}>
+        <OnboardedAccountRoute><Projects /></OnboardedAccountRoute>
+      </Route>
+      <Route path={"/me/settings"}>
+        <OnboardedAccountRoute><Settings /></OnboardedAccountRoute>
+      </Route>
+      <Route path={"/me"}>
+        <OnboardedAccountRoute><Me /></OnboardedAccountRoute>
+      </Route>
+      <Route path={"/moderation"}>
+        <OnboardedAccountRoute><Moderation /></OnboardedAccountRoute>
+      </Route>
       <Route path={"/community-guidelines"} component={CommunityGuidelines} />
       <Route path={"/copyright"} component={Copyright} />
       <Route path={"/security"} component={Security} />

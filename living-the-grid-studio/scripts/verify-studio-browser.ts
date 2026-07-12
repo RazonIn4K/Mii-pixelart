@@ -765,6 +765,42 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
   );
   assert.equal(hasAiTab, true, "AI tab should be present");
 
+  await clickByText(cdpClient, "AI", "mouse");
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      "document.body.textContent.includes('AI Draw')",
+    ),
+  );
+  const openedModelPicker = await cdpClient.evaluate<boolean>(`(() => {
+    const label = [...document.querySelectorAll('label')]
+      .find((candidate) => candidate.textContent.trim() === 'Model');
+    const trigger = label?.parentElement?.querySelector('[role="combobox"]');
+    if (!(trigger instanceof HTMLElement)) return false;
+    trigger.click();
+    return true;
+  })()`);
+  assert.equal(openedModelPicker, true, "AI model picker should open");
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      `document.querySelectorAll('[role="option"]').length >= ${OPENROUTER_MODEL_PRESETS.length}`,
+    ),
+  );
+  const modelOptions = await cdpClient.evaluate<string[]>(
+    `[...document.querySelectorAll('[role="option"]')]
+      .map((option) => option.textContent.trim())`,
+  );
+  assert.equal(
+    modelOptions.some((option) => option.includes("Custom model")),
+    false,
+    "AI model picker should not expose arbitrary custom models",
+  );
+  for (const preset of OPENROUTER_MODEL_PRESETS) {
+    assert.ok(
+      modelOptions.some((option) => option.includes(preset.label)),
+      `AI model picker should retain free preset: ${preset.label}`,
+    );
+  }
+
   const status = await cdpClient.evaluate<{
     configured?: boolean;
     envVar?: string;

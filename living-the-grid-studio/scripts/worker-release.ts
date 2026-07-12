@@ -102,6 +102,8 @@ const EXPECTED_RATE_LIMITS = [
   { name: "SOCIAL_RATE_LIMITER", limit: 60, period: 60 },
   { name: "DISCOVERY_RATE_LIMITER", limit: 120, period: 60 },
   { name: "COMMENT_RATE_LIMITER", limit: 10, period: 60 },
+  { name: "AI_RATE_LIMITER", limit: 10, period: 60 },
+  { name: "STRIPE_RATE_LIMITER", limit: 10, period: 60 },
 ] as const;
 
 const REQUIRED_ASSET_ROUTES = [

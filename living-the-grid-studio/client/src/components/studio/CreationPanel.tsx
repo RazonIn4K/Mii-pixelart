@@ -212,6 +212,7 @@ export default function CreationPanel({
               variant={fillColorId === null ? "default" : "outline"}
               size="sm"
               className="h-7 px-2 text-[0.7rem]"
+              aria-pressed={fillColorId === null}
               onClick={() => setFillColorId(null)}
             >
               Empty
@@ -221,6 +222,7 @@ export default function CreationPanel({
               variant={fillColorId === "R10C7" ? "default" : "outline"}
               size="sm"
               className="h-7 px-2 text-[0.7rem]"
+              aria-pressed={fillColorId === "R10C7"}
               onClick={() => setFillColorId("R10C7")}
             >
               White
@@ -258,7 +260,11 @@ export default function CreationPanel({
 
       <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <Label className="text-xs font-semibold">Tools</Label>
-        <div className="grid grid-cols-5 gap-2">
+        <div
+          className="grid grid-cols-5 gap-2"
+          role="toolbar"
+          aria-label="Paint tools"
+        >
           {TOOL_BUTTONS.map(({ icon: Icon, label, tool }) => (
             <Tooltip key={tool}>
               <TooltipTrigger asChild>
@@ -270,6 +276,7 @@ export default function CreationPanel({
                       : "border-border text-muted-foreground hover:text-foreground"
                   }`}
                   aria-label={label}
+                  aria-pressed={activeTool === tool}
                   title={label}
                   onClick={() => onActiveToolChange(tool)}
                 >
@@ -388,6 +395,7 @@ function PaletteGrid({
               }`}
               style={{ backgroundColor: color.hex }}
               aria-label={`Select ${color.id} ${color.name}`}
+              aria-pressed={selectedColorId === color.id}
               title={`${color.id} ${color.name}`}
               onClick={() => onSelectColor(color.id)}
             />

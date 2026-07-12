@@ -125,6 +125,16 @@ function rateLimits(prefix: string) {
       namespace_id: `${prefix}05`,
       simple: { limit: 10, period: 60 },
     },
+    {
+      name: "AI_RATE_LIMITER",
+      namespace_id: `${prefix}06`,
+      simple: { limit: 10, period: 60 },
+    },
+    {
+      name: "STRIPE_RATE_LIMITER",
+      namespace_id: `${prefix}07`,
+      simple: { limit: 10, period: 60 },
+    },
   ];
 }
 
@@ -450,6 +460,26 @@ describe("parseJsonc", () => {
 });
 
 describe("runRelease dry-run", () => {
+  it.each(["AI_RATE_LIMITER", "STRIPE_RATE_LIMITER"])(
+    "rejects a missing %s binding before build",
+    async (bindingName) => {
+      const harness = makeHarness("local");
+      const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+      source.ratelimits = source.ratelimits.filter(
+        (binding: { name: string }) => binding.name !== bindingName,
+      );
+      harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "local", intent: "dry-run" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("Rate-limit bindings");
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
+
   it("builds the explicit local selection and always invokes Wrangler with --dry-run", async () => {
     const harness = makeHarness("local");
     const result = await runRelease(

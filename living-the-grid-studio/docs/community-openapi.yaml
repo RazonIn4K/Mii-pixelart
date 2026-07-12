@@ -10,10 +10,13 @@ info:
     Studio does not call these routes unless the user explicitly signs in and
     saves. All JSON successes use `{data, meta?, requestId}` and all JSON errors
     use `{error:{code,message,fields?}, requestId}`. Account export and binary
-    project/media downloads are the documented streaming exceptions. Unsafe
-    community mutations can return the shared `503 ServiceUnavailable`
-    response while the fail-closed incident switch is disabled; documented
-    authentication, deletion, AI, Stripe, and webhook controls are exempt.
+    project/media downloads are the documented streaming exceptions. Legacy
+    `/api/ai/*`, `/api/stripe/*`, and `/api/webhooks/stripe` parity routes are
+    intentionally outside this community contract and retain their preexisting
+    response shapes rather than the community JSON envelope. Unsafe community
+    mutations can return the shared `503 ServiceUnavailable` response while the
+    fail-closed incident switch is disabled; documented authentication,
+    deletion, AI, Stripe, and webhook controls are exempt.
 servers:
   - url: https://tomodachi.pw
     description: Production (not authorized for deployment by this contract)

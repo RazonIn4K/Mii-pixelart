@@ -213,7 +213,14 @@ async function createReport(context: WorkerRequestContext): Promise<Response> {
     ).run();
   } catch (error) {
     if (error instanceof Error && /report_daily_quota_exceeded/iu.test(error.message)) {
-      throw new HttpError(429, "report_rate_limited", "Daily report limit reached.");
+      throw new HttpError(
+        429,
+        "report_rate_limited",
+        "Daily report limit reached.",
+        undefined,
+        undefined,
+        { "Retry-After": "86400" },
+      );
     }
     if (error instanceof Error && /unique constraint/iu.test(error.message)) {
       throw new HttpError(409, "duplicate_report", "You already have an open report for this item.");

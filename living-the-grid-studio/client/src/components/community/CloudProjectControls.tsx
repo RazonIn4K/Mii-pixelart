@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, LoaderCircle, Save, TriangleAlert } from "lucide-react";
+import { Cloud, CloudOff, LoaderCircle, LogIn, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PublishDialog } from "./PublishDialog";
@@ -7,6 +7,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { GridDocument } from "@/lib/engine/grid";
 import { communityApi, CommunityApiError, jsonBody, messageFromError } from "@/lib/community/api";
 import { consumeAuthResumeDraft, markDraftForAuthResume, readLocalDraft, saveLocalDraft } from "@/lib/community/drafts";
+import {
+  currentStudioReturnTo,
+  setupPathForReturnTo,
+} from "@/lib/community/return-to";
 import type { CloudProjectState, CreationDetail, CreationSummary } from "@/lib/community/types";
 
 interface SaveResponse {
@@ -29,6 +33,7 @@ export function CloudProjectControls({
 }) {
   const { user, status } = useAuth();
   const [cloud, setCloud] = useState<CloudProjectState | null>(null);
+  const [cloudSignInRequired, setCloudSignInRequired] = useState(false);
   const [busy, setBusy] = useState(false);
   const docRef = useRef(doc);
   const savingRef = useRef(false);
@@ -54,8 +59,13 @@ export function CloudProjectControls({
   const firstSave = useCallback(async (document: GridDocument) => {
     if (!user) return;
     if (!user.username) {
-      toast.info("Finish your public profile once before using cloud projects.");
-      window.location.assign("/me/setup");
+      try {
+        await markDraftForAuthResume(document);
+        toast.info("Finish your public profile once before using cloud projects.");
+        window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));
+      } catch {
+        toast.error("This browser could not preserve the draft for profile setup. Export JSON before leaving the page.");
+      }
       return;
     }
     setBusy(true);
@@ -99,9 +109,14 @@ export function CloudProjectControls({
       const cloudId = new URLSearchParams(window.location.search).get("cloud");
       if (cloudId) {
         if (!user) {
-          toast.info("Sign in to open this private cloud project. Your current local draft was left untouched.");
+          setCloudSignInRequired(true);
           return;
         }
+        if (!user.username) {
+          window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));
+          return;
+        }
+        setCloudSignInRequired(false);
         setBusy(true);
         try {
           const result = await communityApi<CreationDetail>(`/api/creations/${encodeURIComponent(cloudId)}`);
@@ -119,7 +134,11 @@ export function CloudProjectControls({
             lastSyncedModifiedAt: result.data.project.meta.modifiedAt,
           });
         } catch (error) {
-          if (!canceled) toast.error(messageFromError(error));
+          if (!canceled && error instanceof CommunityApiError && error.status === 401) {
+            setCloudSignInRequired(true);
+          } else if (!canceled) {
+            toast.error(messageFromError(error));
+          }
         } finally {
           if (!canceled) setBusy(false);
         }
@@ -236,13 +255,14 @@ export function CloudProjectControls({
     if (status !== "authenticated" || !user) {
       try {
         await markDraftForAuthResume(doc);
+        const returnTo = currentStudioReturnTo();
         const form = document.createElement("form");
         form.method = "post";
         form.action = "/api/auth/google/start";
         const input = document.createElement("input");
         input.type = "hidden";
         input.name = "returnTo";
-        input.value = "/studio";
+        input.value = returnTo;
         form.appendChild(input);
         document.body.appendChild(form);
         form.submit();
@@ -273,21 +293,44 @@ export function CloudProjectControls({
     await firstSave({ ...doc, meta: { ...doc.meta, name: `${doc.meta.name} (copy)` } });
   };
 
+  if (cloudSignInRequired) {
+    const returnTo = currentStudioReturnTo();
+    return (
+      <div className="flex min-w-0 max-w-full items-center justify-end gap-2">
+        <span className="truncate text-[10px] font-bold text-muted-foreground" role="status">
+          Cloud sign-in required
+        </span>
+        <form action="/api/auth/google/start" method="post">
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 rounded-full px-2 text-xs sm:px-3"
+            aria-label="Sign in to open cloud project"
+          >
+            <LogIn /> Sign in
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
   if (!doc) return null;
   if (!cloud) {
-    return <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={busy} onClick={() => void requestFirstSave()}>{busy ? <LoaderCircle className="animate-spin" /> : <Save />} <span className="hidden sm:inline">Save to account</span><span className="sm:hidden">Save</span></Button>;
+    return <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" disabled={busy} aria-label="Save to account" onClick={() => void requestFirstSave()}>{busy ? <LoaderCircle className="animate-spin" /> : <Save />} <span className="hidden sm:inline">Save to account</span><span className="sm:hidden">Save</span></Button>;
   }
 
   const hasUnsavedChanges = lastSavedModifiedRef.current !== doc.meta.modifiedAt;
   const canPublish = navigator.onLine && cloud.saveState === "saved" && !hasUnsavedChanges;
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex min-w-0 max-w-full items-center justify-end gap-1.5">
       <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-muted-foreground" role="status" aria-live="polite">
         {cloud.saveState === "saving" ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : cloud.saveState === "offline" ? <CloudOff className="h-3.5 w-3.5" /> : cloud.saveState === "conflict" ? <TriangleAlert className="h-3.5 w-3.5 text-amber-600" /> : <Cloud className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" />}
         {cloud.saveState === "saving" ? "Saving…" : cloud.saveState === "offline" ? "Offline" : cloud.saveState === "conflict" ? "Conflict" : cloud.saveState === "error" ? "Save failed" : hasUnsavedChanges ? "Saving soon…" : `Saved · v${cloud.revision}`}
       </span>
-      {cloud.saveState === "conflict" ? <><Button type="button" size="sm" variant="outline" onClick={() => void reloadCloud()} disabled={busy}>Use cloud</Button><Button type="button" size="sm" onClick={() => void saveCopy()} disabled={busy}>Save copy</Button></> : (
+      {cloud.saveState === "conflict" ? <><Button type="button" size="sm" variant="outline" className="px-2 sm:px-3" onClick={() => void reloadCloud()} disabled={busy}>Use cloud</Button><Button type="button" size="sm" className="px-2 sm:px-3" onClick={() => void saveCopy()} disabled={busy}>Save copy</Button></> : (
         <>{cloud.saveState === "error" ? <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void saveRevision()}>Retry save</Button> : null}<PublishDialog creationId={cloud.creationId} project={doc} beforePublish={() => {
           const currentDocument = docRef.current;
           const ready = Boolean(currentDocument)

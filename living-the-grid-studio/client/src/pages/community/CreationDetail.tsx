@@ -176,7 +176,15 @@ export default function CreationDetailPage() {
                 </Link>
                 <p className="mt-4 text-xs font-bold text-[var(--island-ink)]/45">Published {formatCommunityDate(creation.publishedAt)}</p>
                 <div className="mt-6 grid grid-cols-2 gap-2">
-                  <Button type="button" variant={creation.isLiked ? "default" : "outline"} onClick={toggleLike}><Heart className={creation.isLiked ? "fill-current" : ""} /> {formatCount(creation.likeCount)}</Button>
+                  <Button
+                    type="button"
+                    variant={creation.isLiked ? "default" : "outline"}
+                    aria-label={`${creation.isLiked ? "Unlike" : "Like"} ${creation.title}`}
+                    aria-pressed={Boolean(creation.isLiked)}
+                    onClick={toggleLike}
+                  >
+                    <Heart className={creation.isLiked ? "fill-current" : ""} /> {formatCount(creation.likeCount)}
+                  </Button>
                   <Button type="button" variant="outline" onClick={share}><Share2 /> Share</Button>
                   {creation.downloadEnabled ? <Button asChild variant="outline"><a href={`/api/creations/${creation.id}/media/project`} download><Download /> Project</a></Button> : null}
                   {creation.canEdit ? <Button asChild><Link href={`/studio?cloud=${creation.id}`}>Edit in Studio</Link></Button> : null}

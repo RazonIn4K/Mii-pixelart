@@ -2,7 +2,7 @@ import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { canonicalizeGridDocument } from "../shared/community";
-import { clientKey } from "./auth";
+import { clientKey, enforceRateLimit } from "./auth";
 import { isCommunityMutationBlocked } from "./community-mode";
 import {
   isStrongRuntimeSecret,
@@ -11,7 +11,7 @@ import {
   secretKey,
   sha256,
 } from "./crypto";
-import { applySecurityHeaders, failure, readJson } from "./http";
+import { applySecurityHeaders, errorResponse, failure, readJson } from "./http";
 import { renderGridSvg } from "./media";
 
 describe("Worker security primitives", () => {
@@ -78,6 +78,23 @@ describe("Worker security primitives", () => {
     });
     expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
     expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
+  });
+
+  it("returns a Retry-After hint when a binding rejects a request", async () => {
+    const limiter: RateLimit = {
+      limit: async () => ({ success: false }),
+    };
+    const error = await enforceRateLimit(limiter, "pseudonymous-client").catch(
+      (caught: unknown) => caught,
+    );
+    const response = errorResponse(error, "request-rate-limited");
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "RATE_LIMITED" },
+      requestId: "request-rate-limited",
+    });
   });
 
   it("fails closed for community mutations while preserving operational controls", () => {
@@ -148,6 +165,14 @@ describe("Worker HTTP integration", () => {
     });
   });
 
+  it("returns the documented not-found envelope for unknown tag feeds", async () => {
+    const response = await SELF.fetch("http://localhost:3000/api/tags/not-a-launch-tag");
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "NOT_FOUND" },
+    });
+  });
+
   it("rejects unsafe cross-origin mutations before route handling", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/auth/logout", {
       body: "{}",
@@ -169,6 +194,26 @@ describe("Worker HTTP integration", () => {
     expect(response.status).toBe(415);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "BAD_REQUEST" },
+    });
+  });
+
+  it("rejects arbitrary paid AI models at the Worker boundary", async () => {
+    const response = await SELF.fetch("http://localhost:3000/api/ai/chat", {
+      body: JSON.stringify({
+        messages: [{ content: "Reply with pong.", role: "user" }],
+        model: "anthropic/claude-opus-4.1",
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost:3000",
+      },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      configured: false,
+      reply: "Choose one of the supported free OpenRouter models.",
     });
   });
 });

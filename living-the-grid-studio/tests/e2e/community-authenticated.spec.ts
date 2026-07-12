@@ -88,6 +88,207 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
   });
 });
 
+test("an anonymous cloud link keeps its validated destination through sign-in and onboarding", async ({ page }) => {
+  const creationId = "00000000-0000-4000-8000-000000000040";
+  const returnTo = `/studio?cloud=${creationId}`;
+  let authenticated = false;
+  let configured = false;
+  let postedReturnTo: string | null = null;
+  const currentUser = () => user({
+    displayName: "New Cloud Islander",
+    username: configured ? "new-cloud-islander" : null,
+  });
+
+  await page.route("**/api/auth/session", (route) => fulfillJson(route, {
+    data: authenticated ? {
+      session: { createdAt: Date.now(), current: true, expiresAt: Date.now() + 86_400_000, id: "session-1", lastSeenAt: Date.now() },
+      user: currentUser(),
+    } : { session: null, user: null },
+    requestId,
+  }));
+  await page.route("**/api/auth/google/start", async (route) => {
+    postedReturnTo = new URLSearchParams(route.request().postData() ?? "").get("returnTo");
+    authenticated = true;
+    await route.fulfill({
+      body: "",
+      headers: { Location: `/me/setup?returnTo=${encodeURIComponent(postedReturnTo ?? "/me")}` },
+      status: 303,
+    });
+  });
+  await page.route("**/api/me/setup", async (route) => {
+    configured = true;
+    await fulfillJson(route, { data: currentUser(), requestId });
+  });
+  await page.route(`**/api/creations/${creationId}`, (route) => fulfillJson(route, {
+    data: {
+      id: creationId,
+      project: {
+        cells: ["R1C1", ...Array.from({ length: 63 }, () => null)],
+        height: 8,
+        lockedColors: [],
+        meta: {
+          createdAt: "2026-07-10T12:00:00.000Z",
+          modifiedAt: "2026-07-10T12:00:00.000Z",
+          name: "Cloud link project",
+        },
+        usedColors: ["R1C1"],
+        version: 1,
+        width: 8,
+      },
+      revision: 1,
+      slug: "cloud-link-project-01",
+    },
+    requestId,
+  }, 200, { ETag: '"rev-1"' }));
+
+  await page.goto(returnTo);
+  await expect(page.getByText("Cloud sign-in required")).toBeVisible();
+  const signIn = page.getByRole("button", { name: "Sign in to open cloud project" });
+  await expect(signIn).toBeVisible();
+  await expect(page.locator('input[name="returnTo"]')).toHaveValue(returnTo);
+  await signIn.click();
+
+  await expect(page).toHaveURL(new RegExp(`/me/setup\\?returnTo=${encodeURIComponent(returnTo)}`));
+  expect(postedReturnTo).toBe(returnTo);
+  await page.getByLabel("Username").fill("new-cloud-islander");
+  await page.getByLabel("Display name").fill("New Cloud Islander");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/studio\\?cloud=${creationId}$`));
+  await expect(page.getByText("Cloud link project", { exact: true })).toBeVisible();
+});
+
+test("the deliberate first cloud save still resumes its local draft after onboarding", async ({ page }) => {
+  let authenticated = false;
+  let configured = false;
+  let createCalls = 0;
+  const currentUser = () => user({
+    displayName: "Draft Islander",
+    username: configured ? "draft-islander" : null,
+  });
+
+  await page.route("**/api/auth/session", (route) => fulfillJson(route, {
+    data: authenticated ? {
+      session: { createdAt: Date.now(), current: true, expiresAt: Date.now() + 86_400_000, id: "session-1", lastSeenAt: Date.now() },
+      user: currentUser(),
+    } : { session: null, user: null },
+    requestId,
+  }));
+  await page.route("**/api/auth/google/start", async (route) => {
+    const returnTo = new URLSearchParams(route.request().postData() ?? "").get("returnTo");
+    expect(returnTo).toBe("/studio");
+    authenticated = true;
+    await route.fulfill({
+      body: "",
+      headers: { Location: `/me/setup?returnTo=${encodeURIComponent(returnTo ?? "/me")}` },
+      status: 303,
+    });
+  });
+  await page.route("**/api/me/setup", async (route) => {
+    configured = true;
+    await fulfillJson(route, { data: currentUser(), requestId });
+  });
+  await page.route("**/api/creations", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    createCalls += 1;
+    await fulfillJson(route, {
+      data: {
+        id: "00000000-0000-4000-8000-000000000042",
+        revision: 1,
+        slug: "resumed-local-draft-01",
+      },
+      requestId,
+    }, 201, { ETag: '"rev-1"' });
+  });
+
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const timestamp = "2026-07-10T12:00:00.000Z";
+    const draft = {
+      document: {
+        cells: ["R1C1", ...Array.from({ length: 63 }, () => null)],
+        height: 8,
+        lockedColors: [],
+        meta: { createdAt: timestamp, modifiedAt: timestamp, name: "Resumed local draft" },
+        usedColors: ["R1C1"],
+        version: 1,
+        width: 8,
+      },
+      id: "current",
+      updatedAt: Date.now(),
+    };
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("tomodachi-studio", 1);
+      open.onupgradeneeded = () => {
+        if (!open.result.objectStoreNames.contains("drafts")) {
+          open.result.createObjectStore("drafts", { keyPath: "id" });
+        }
+      };
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const transaction = open.result.transaction("drafts", "readwrite");
+        transaction.objectStore("drafts").put(draft);
+        transaction.oncomplete = () => { open.result.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
+  });
+
+  await page.goto("/studio");
+  await expect(page.getByText("Resumed local draft", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save to account" }).click();
+  await expect(page).toHaveURL(/\/me\/setup\?returnTo=%2Fstudio$/);
+  await page.getByLabel("Username").fill("draft-islander");
+  await page.getByLabel("Display name").fill("Draft Islander");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+
+  await expect(page).toHaveURL(/\/studio$/);
+  await expect(page.getByText("Resumed local draft", { exact: true })).toBeVisible();
+  await expect.poll(() => createCalls).toBe(1);
+  await expect(page.getByText("Saved · v1")).toBeVisible();
+});
+
+test("an expired cloud-link session offers sign-in with the current destination", async ({ page }) => {
+  const creationId = "00000000-0000-4000-8000-000000000041";
+  const returnTo = `/studio?cloud=${creationId}`;
+  await mockSession(page, user());
+  await page.route(`**/api/creations/${creationId}`, (route) => fulfillJson(route, {
+    error: { code: "authentication_required", message: "Sign in is required." },
+    requestId,
+  }, 401));
+
+  await page.goto(returnTo);
+  await expect(page.getByText("Cloud sign-in required")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in to open cloud project" })).toBeVisible();
+  await expect(page.locator('input[name="returnTo"]')).toHaveValue(returnTo);
+});
+
+test("authenticated users finish onboarding before entering account routes", async ({ page }) => {
+  await mockSession(page, user({ username: null }));
+  let protectedRequests = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (
+      pathname === "/api/creations" ||
+      pathname === "/api/me/sessions" ||
+      pathname.startsWith("/api/moderation/")
+    ) {
+      protectedRequests += 1;
+    }
+  });
+
+  for (const accountRoute of ["/me", "/me/projects", "/me/settings", "/moderation"]) {
+    await page.goto(accountRoute);
+    await expect(page).toHaveURL(/\/me\/setup\?returnTo=/);
+    expect(new URL(page.url()).searchParams.get("returnTo")).toBe(accountRoute);
+    await expect(page.getByRole("heading", { name: "Choose your island identity." })).toBeVisible();
+  }
+
+  expect(protectedRequests).toBe(0);
+});
+
 test("project shelf paginates, edits private cards, and uses governed publishing defaults", async ({ page }) => {
   await mockSession(page, user());
   const creation = {
@@ -171,7 +372,7 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   });
 });
 
-test("owners can open a published creation in Studio from its public page", async ({ page }) => {
+test("published creations expose owner editing and the current like state", async ({ page }) => {
   const currentUser = user();
   const creationId = "00000000-0000-4000-8000-000000000012";
   await mockSession(page, currentUser);
@@ -199,12 +400,117 @@ test("owners can open a published creation in Studio from its public page", asyn
   await page.route(`**/api/creations/${creationId}/comments**`, (route) => fulfillJson(route, {
     data: [], meta: { nextCursor: null }, requestId,
   }));
+  let likeMethod: string | null = null;
+  await page.route(`**/api/creations/${creationId}/like`, async (route) => {
+    likeMethod = route.request().method();
+    await fulfillJson(route, { data: { liked: true }, requestId });
+  });
 
   await page.goto("/creation/owner-published-01");
   await expect(page.getByRole("link", { name: "Edit in Studio" })).toHaveAttribute(
     "href",
     `/studio?cloud=${creationId}`,
   );
+  const likeButton = page.getByRole("button", { name: "Like Owner published project" });
+  await expect(likeButton).toHaveAttribute("aria-pressed", "false");
+  await likeButton.click();
+  await expect(page.getByRole("button", { name: "Unlike Owner published project" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(likeMethod).toBe("POST");
+});
+
+test("Studio selection controls expose their current state", async ({ page }) => {
+  await mockSession(page, null);
+  await page.goto("/studio");
+
+  const gridToggle = page.getByRole("button", { name: "Toggle grid lines" });
+  const labelToggle = page.getByRole("button", { name: "Toggle paint-by-numbers labels" });
+  await expect(gridToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(labelToggle).toHaveAttribute("aria-pressed", "false");
+  await gridToggle.click();
+  await labelToggle.click();
+  await expect(gridToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(labelToggle).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("tab", { name: "Create" }).click();
+  const inspectTool = page.getByRole("button", { name: "Inspect tool" });
+  const pencilTool = page.getByRole("button", { name: "Pencil tool" });
+  await expect(inspectTool).toHaveAttribute("aria-pressed", "true");
+  await expect(pencilTool).toHaveAttribute("aria-pressed", "false");
+  await pencilTool.click();
+  await expect(inspectTool).toHaveAttribute("aria-pressed", "false");
+  await expect(pencilTool).toHaveAttribute("aria-pressed", "true");
+
+  const black = page.getByRole("button", { name: "Select R10C1 Black" });
+  const darkRed = page.getByRole("button", { name: "Select R1C1 Dark Red" });
+  await expect(black).toHaveAttribute("aria-pressed", "true");
+  await expect(darkRed).toHaveAttribute("aria-pressed", "false");
+  await darkRed.click();
+  await expect(black).toHaveAttribute("aria-pressed", "false");
+  await expect(darkRed).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a loaded conflict state fits the minimum supported Studio width", async ({ page }) => {
+  const currentUser = user();
+  await mockSession(page, currentUser);
+  await page.setViewportSize({ width: 320, height: 760 });
+
+  await page.goto("/");
+  await page.evaluate(async ({ userId }) => {
+    const timestamp = "2026-07-10T12:01:00.000Z";
+    const draft = {
+      cloud: {
+        creationId: "00000000-0000-4000-8000-000000000019",
+        error: "A newer cloud revision exists.",
+        etag: '"rev-1"',
+        lastSyncedModifiedAt: "2026-07-10T12:00:00.000Z",
+        revision: 1,
+        saveState: "conflict",
+        slug: "conflicted-draft-01",
+        userId,
+      },
+      document: {
+        cells: ["R1C1", ...Array.from({ length: 63 }, () => null)],
+        height: 8,
+        lockedColors: [],
+        meta: {
+          createdAt: "2026-07-10T12:00:00.000Z",
+          modifiedAt: timestamp,
+          name: "A very long restored conflict project title for mobile",
+        },
+        usedColors: ["R1C1"],
+        version: 1,
+        width: 8,
+      },
+      id: "current",
+      updatedAt: Date.now(),
+    };
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("tomodachi-studio", 1);
+      open.onupgradeneeded = () => {
+        if (!open.result.objectStoreNames.contains("drafts")) {
+          open.result.createObjectStore("drafts", { keyPath: "id" });
+        }
+      };
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const transaction = open.result.transaction("drafts", "readwrite");
+        transaction.objectStore("drafts").put(draft);
+        transaction.oncomplete = () => { open.result.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
+  }, { userId: currentUser.id });
+
+  await page.goto("/studio");
+  await expect(page.getByText("Conflict", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use cloud" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save copy" })).toBeVisible();
+  expect(await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  )).toBe(true);
 });
 
 test("a dirty restored cloud draft autosaves before publishing becomes available", async ({ page }) => {

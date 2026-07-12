@@ -15,6 +15,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CommunityApiError, communityApi, jsonBody, messageFromError } from "@/lib/community/api";
 import { hasAuthResumeDraft } from "@/lib/community/drafts";
 import { normalizeUsername } from "@/lib/community/format";
+import { setupCompletionReturnTo } from "@/lib/community/return-to";
 import type { CommunityUser } from "@/lib/community/types";
 
 export default function Setup() {
@@ -65,7 +66,8 @@ export default function Setup() {
       });
       await refresh();
       toast.success("Your island profile is ready");
-      navigate((await hasAuthResumeDraft()) ? "/studio" : "/me/projects");
+      const hasResumeDraft = await hasAuthResumeDraft();
+      navigate(setupCompletionReturnTo() ?? (hasResumeDraft ? "/studio" : "/me/projects"));
     } catch (error) {
       if (error instanceof CommunityApiError) {
         const suggestions = error.fields?.usernameSuggestions

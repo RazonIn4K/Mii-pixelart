@@ -119,6 +119,10 @@ async function searchCreations(context: WorkerRequestContext): Promise<Response>
 
 async function creationsByTag(context: WorkerRequestContext): Promise<Response> {
   await discoveryLimit(context);
+  const tag = await context.env.DB.prepare(
+    "SELECT 1 AS found FROM tags WHERE slug = ? AND is_active = 1",
+  ).bind(context.params.slug).first<{ found: number }>();
+  if (!tag) throw new HttpError(404, "tag_not_found", "Tag was not found.");
   const pagination = parsePagination(context);
   const cursor = parseCursor(pagination.cursor);
   const values: unknown[] = [context.params.slug];

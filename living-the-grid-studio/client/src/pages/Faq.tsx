@@ -111,7 +111,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Which AI models does the assistant use?",
         answer:
-          "Free OpenRouter models only. The default is DeepSeek V4 Flash; the picker also offers GPT-OSS 120B, GLM 4.5 Air, and Nemotron 3 Super 120B. You can also type any OpenRouter model ID directly if you want a paid model — that uses your OpenRouter key, not ours.",
+          "Free OpenRouter models only. The default is DeepSeek V4 Flash; the picker also offers GPT-OSS 120B, GLM 4.5 Air, and Nemotron 3 Super 120B. The server accepts only these curated free presets and does not expose arbitrary paid-model access.",
       },
       {
         question: "How can I support the project?",

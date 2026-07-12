@@ -65,8 +65,8 @@ export interface AiModelPreset {
 export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [
   // FREE-ONLY curated list, verified against OpenRouter on 2026-05-16.
   // The free tier rate-limits these (≈20 req/min per IP, 200/day per account)
-  // but the user pays nothing. Listed best-balance-first; users can override
-  // by typing any other OpenRouter model ID into the picker.
+  // but the user pays nothing. This list is also the server-side allowlist;
+  // requests cannot select arbitrary or paid models with the shared site key.
   //
   // We intentionally keep this short because OpenRouter's free-tier roster
   // rotates — every entry here was smoke-tested live before commit.

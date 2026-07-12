@@ -1,20 +1,27 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.0  
-**Last Updated:** 2026-05-15
+**Version:** 2.1
 
-> **Community expansion note (2026-07-10):** This document describes the
-> anonymous local-first Studio and the pre-migration Pages runtime. Anonymous
-> editing/export remains local. The opt-in account/community architecture is
-> defined by [ADR 0001](adr/0001-workers-community-platform.md), the
-> [data-flow document](community-data-flow.md), and the
-> [threat model](community-threat-model.md).
+**Last Updated:** 2026-07-11
+
+> **Deployment status (2026-07-11):** The target architecture on this branch is
+> one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
+> Images, and scheduled handlers. Production `tomodachi.pw` still runs the
+> rollback-safe Cloudflare Pages deployment from commit `654df95`; references
+> below to Pages Functions or Express describe that legacy compatibility
+> surface, not the branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
+> for the decision and the [community deployment runbook](community-deployment-runbook.md)
+> for gated staging, cutover, and rollback operations.
 
 ---
 
 ## Overview
 
-The studio is a **client-side single-page application** built with React 19 and TypeScript. All processing happens in the browser — no server, no uploads, no accounts. This architecture was chosen to match the privacy-first approach of the original Living The Grid tool and to ensure zero-latency interaction with the pixel grid.
+The studio is a **local-first single-page application** built with React 19 and
+TypeScript. Anonymous editing, import, and JSON/PNG/ZIP export stay in the
+browser. Account-backed cloud save and community features are explicit opt-ins
+served by the unified Worker; authentication alone never uploads or publishes a
+local project.
 
 ---
 
@@ -41,19 +48,21 @@ Mii-pixelart/
     │       ├── lib/
     │       │   └── engine/        ← Pure TS engine (no React deps)
     │       └── pages/             ← Route-level page components
-    ├── server/                    ← Thin Express server (dev only)
+    ├── server/                    ← Shared AI/Stripe helpers retained for parity
     │   ├── index.ts
     │   ├── openrouter.ts
     │   └── stripe.ts
-    ├── functions/                 ← Cloudflare Pages Functions (edge)
+    ├── functions/                 ← Legacy Pages rollback Functions
     │   └── api/
+    ├── worker/                    ← Unified Worker routes, policy, jobs, and documents
+    ├── migrations/                ← Forward-only D1 migrations
     ├── shared/                    ← Shared types/constants
     ├── fixtures/                  ← Test fixtures and creative templates
     ├── scripts/                   ← Verification and utility scripts
     ├── patches/                   ← pnpm patches (wouter)
     ├── package.json
     ├── vite.config.ts
-    ├── wrangler.toml
+    ├── wrangler.jsonc
     └── doppler.yaml
 ```
 
@@ -64,14 +73,16 @@ Mii-pixelart/
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
 | Framework | React 19 + TypeScript | Type safety for complex grid operations |
-| Build | Vite 7 + esbuild | Fast HMR, native ESM; esbuild bundles the server |
+| Build | Vite 7 + Cloudflare Vite plugin | Fast HMR, SPA assets, and one Worker deploy artifact |
 | Styling | Tailwind CSS 4 + shadcn/ui | Utility-first with accessible Radix primitives |
 | Routing | Wouter | Lightweight client-side routing |
 | State | React hooks (`useState`, `useCallback`) | No external state library needed |
 | Canvas | HTML5 Canvas API | Direct pixel rendering for grid display |
 | Color Science | Custom CIELAB + Delta E (CIE76) | Perceptual color matching |
 | Package manager | pnpm | Required; lockfile committed |
-| Deploy | Cloudflare Pages + Functions | Edge-hosted SPA + serverless API routes |
+| Target deploy | Cloudflare Worker + Static Assets | One runtime for SPA, APIs, dynamic documents, and scheduled jobs |
+| Production rollback | Cloudflare Pages commit `654df95` | Preserved until the approved Worker cutover and soak complete |
+| Data | D1 + private R2 + KV + Images | Relational authority, immutable projects/media, bounded cache, and generated previews |
 | Secrets | Doppler | Runtime injection; no `.env` files committed |
 
 ---
@@ -80,7 +91,7 @@ Mii-pixelart/
 
 ```mermaid
 graph TB
-    subgraph Browser["Browser (all processing here)"]
+    subgraph Browser["Browser (local editor and exports)"]
         SPA["React SPA<br/>/studio"]
         Engine["Engine Modules<br/>(pure TypeScript)"]
         Canvas["HTML5 Canvas API"]
@@ -93,10 +104,12 @@ graph TB
         SPA -->|"persists"| LS
     end
 
-    subgraph Edge["Cloudflare Pages (Edge)"]
-        Static["Static Assets<br/>dist/public/"]
-        Fn_AI["Function: /api/ai/*"]
-        Fn_Stripe["Function: /api/stripe/*"]
+    subgraph Edge["Target branch: Cloudflare Worker"]
+        Worker["Hono Worker<br/>auth + API + dynamic documents"]
+        Static["Worker Static Assets<br/>dist/client/"]
+        Data["D1 + private R2 + KV + Images"]
+        Worker --> Static
+        Worker --> Data
     end
 
     subgraph External["External Services"]
@@ -104,11 +117,9 @@ graph TB
         Stripe["Stripe API<br/>(payments)"]
     end
 
-    Browser -->|"GET /"| Static
-    Browser -->|"POST /api/ai/chat"| Fn_AI
-    Browser -->|"POST /api/stripe/checkout"| Fn_Stripe
-    Fn_AI -->|"OPENROUTER_API_KEY"| OR
-    Fn_Stripe -->|"STRIPE_SECRET_KEY"| Stripe
+    Browser -->|"assets, APIs, public documents"| Worker
+    Worker -->|"OPENROUTER_API_KEY"| OR
+    Worker -->|"STRIPE_SECRET_KEY"| Stripe
 
     style Browser fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -429,7 +440,8 @@ sequenceDiagram
 
 ## File I/O Model
 
-All file operations use browser-native APIs. **No files ever leave the user's browser.**
+Anonymous file operations use browser-native APIs. **No project leaves the
+browser unless the user explicitly chooses the first private cloud save.**
 
 ```mermaid
 flowchart LR
@@ -460,37 +472,36 @@ flowchart LR
 
 ## API Routes
 
-The same API logic runs in two environments: the Vite dev server (Express middleware) and Cloudflare Pages Functions (edge).
+The branch runs local development and deployed requests through the same Worker
+entry point. Existing AI, Stripe, webhook, and crawler behavior is ported into
+that Worker; the old Express/Pages paths remain only as compatibility and
+rollback references.
 
 ```mermaid
 graph LR
-    subgraph Dev["Dev: vite.config.ts middleware"]
-        D1["GET /api/ai/status"]
-        D2["GET /api/ai/models"]
-        D3["POST /api/ai/chat"]
-        D4["GET /api/stripe/products"]
-        D5["POST /api/stripe/checkout"]
-        D6["GET /api/stripe/session"]
+    subgraph Runtime["worker/index.ts + router.ts"]
+        Legacy["Legacy parity<br/>/api/ai/* + /api/stripe/* + webhook"]
+        Auth["Auth + account<br/>/api/auth/* + /api/me/*"]
+        Creations["Projects + publishing<br/>/api/creations/*"]
+        Discovery["Public discovery<br/>search + tags + profiles"]
+        Social["Likes + comments + follows + reports"]
+        Moderation["Role-gated moderation"]
     end
 
-    subgraph Edge["Prod: functions/api/"]
-        E1["ai/[[path]].ts"]
-        E2["stripe/[[path]].ts"]
+    subgraph Bindings["Worker bindings"]
+        DB["D1"]
+        Objects["Private R2"]
+        Cache["KV"]
+        Images["Images"]
     end
 
-    subgraph Shared["Shared logic: server/"]
-        OR["openrouter.ts\ngetOpenRouterStatus()\ngetOpenRouterModels()\nsendOpenRouterChat()"]
-        ST["stripe.ts\nlistPublicProducts()\ncreateCheckoutSession()\nverifyCheckoutSession()"]
-    end
+    Legacy --> Cache
+    Auth & Creations & Discovery & Social & Moderation --> DB
+    Creations & Discovery --> Objects
+    Creations --> Images
 
-    D1 & D2 & D3 --> OR
-    D4 & D5 & D6 --> ST
-    E1 --> OR
-    E2 --> ST
-
-    style Dev fill:#faf8f5,stroke:#d4c9b8
-    style Edge fill:#f0f4ff,stroke:#b8c4d4
-    style Shared fill:#f5f0fa,stroke:#c4b8d4
+    style Runtime fill:#faf8f5,stroke:#d4c9b8
+    style Bindings fill:#f0f4ff,stroke:#b8c4d4
 ```
 
 ---
@@ -500,7 +511,7 @@ graph LR
 ```mermaid
 graph TB
     subgraph Repo["GitHub: RazonIn4K/Mii-pixelart"]
-        Code["Source code\n(main branch)"]
+        Code["Source code\ncodex/island-workshop-community"]
     end
 
     subgraph Doppler["Doppler: tomodachi-platform"]
@@ -509,25 +520,36 @@ graph TB
         Prd_cfg["config: prd\n(production)"]
     end
 
-    subgraph CF["Cloudflare Pages: tomodachi-studio"]
-        Build["Build step\npnpm install --frozen-lockfile\npnpm vite build\nRoot: living-the-grid-studio\nOutput: dist/public"]
-        Preview["Preview deployment\n*.pages.dev"]
-        Production["Production deployment\ntomodachi.pw"]
-        Fns["Pages Functions\n/api/ai/*\n/api/stripe/*"]
+    subgraph Target["Target branch artifact"]
+        Build["Cloudflare Vite build\nStatic Assets + Worker bundle"]
+        Staging["Isolated staging Worker\nstaging.tomodachi.pw"]
+        ProductionWorker["Production Worker\ntomodachi.pw after approval"]
+        Bindings["Environment-isolated\nD1 + private R2 + KV + Images"]
+    end
+
+    subgraph Rollback["Current production and rollback surface"]
+        Pages["Cloudflare Pages project: mii-pixelart\ncommit 654df95"]
+        Production["tomodachi.pw"]
     end
 
     Code -->|"git push → triggers build"| Build
-    Doppler -->|"Doppler → CF Pages integration\nstg → Preview env vars"| Preview
-    Doppler -->|"prd → Production env vars"| Production
-    Build --> Preview
-    Build --> Production
-    Production --> Fns
-    Preview --> Fns
+    Build -.->|"approved staging gate"| Staging
+    Build -.->|"approved production gate"| ProductionWorker
+    Doppler -->|"target-specific secrets"| Staging
+    Doppler -->|"target-specific secrets"| ProductionWorker
+    Staging & ProductionWorker --> Bindings
+    Pages --> Production
 
     style Repo fill:#faf8f5,stroke:#d4c9b8
     style Doppler fill:#f5f0fa,stroke:#c4b8d4
-    style CF fill:#f0f4ff,stroke:#b8c4d4
+    style Target fill:#f0f4ff,stroke:#b8c4d4
+    style Rollback fill:#fff7ed,stroke:#d97706
 ```
+
+Worker provisioning, migration, deployment, domain cutover, and rollback are
+approval-gated. The operational source of truth is the
+[community deployment runbook](community-deployment-runbook.md); do not infer
+authorization from this diagram.
 
 ---
 

@@ -12,6 +12,7 @@ import {
   verifyCheckoutSession,
   type ApiResult as StripeApiResult,
 } from "../server/stripe";
+import { clientKey, enforceRateLimit } from "./auth";
 import { HttpError, readJson, readText, type WorkerRequestContext } from "./http";
 import type { Router } from "./router";
 
@@ -48,6 +49,10 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
     return new Response(body, { status: result.status, headers: legacyHeaders("MISS") });
   }
   if (method === "POST" && path === "chat") {
+    await enforceRateLimit(
+      context.env.AI_RATE_LIMITER,
+      await clientKey(context.env, context.request),
+    );
     const body = await readJson(context.request, 1_000_000);
     if (!isAiChatRequest(body)) {
       throw new HttpError(400, "invalid_ai_request", "AI request is invalid.");
@@ -76,15 +81,26 @@ async function handleStripe(context: WorkerRequestContext): Promise<Response> {
     return legacyJson({ body: { products }, status: 200 });
   }
   if (method === "POST" && path === "checkout") {
+    await enforceStripeRateLimit(context);
     const body = await readJson(context.request, 100_000);
     return legacyJson(await createCheckoutSession(toRecord(body), context.env));
   }
   if (method === "GET" && path === "session") {
+    await enforceStripeRateLimit(context);
     return legacyJson(
       await verifyCheckoutSession(context.url.searchParams.get("session_id") ?? "", context.env),
     );
   }
   throw new HttpError(404, "stripe_route_not_found", "Stripe route was not found.");
+}
+
+async function enforceStripeRateLimit(
+  context: WorkerRequestContext,
+): Promise<void> {
+  await enforceRateLimit(
+    context.env.STRIPE_RATE_LIMITER,
+    await clientKey(context.env, context.request),
+  );
 }
 
 async function handleStripeWebhook(context: WorkerRequestContext): Promise<Response> {

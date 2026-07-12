@@ -225,6 +225,16 @@ describe("moderation state transitions", () => {
       ),
     ]);
     await expectActionCount("creation", discussion.id, "unlock_comments", 1);
+    await expect(
+      env.DB.prepare(
+        "SELECT comments_enabled, comments_locked FROM creations WHERE id = ?",
+      )
+        .bind(discussion.id)
+        .first(),
+    ).resolves.toEqual({
+      comments_enabled: 1,
+      comments_locked: 0,
+    });
   });
 
   it("cursor-paginates report action history with the standard envelope and limits", async () => {

@@ -85,7 +85,9 @@
     { "name": "SAVE_RATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } },
     { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } },
     { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1004", "simple": { "limit": 120, "period": 60 } },
-    { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1005", "simple": { "limit": 10, "period": 60 } }
+    { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1005", "simple": { "limit": 10, "period": 60 } },
+    { "name": "AI_RATE_LIMITER", "namespace_id": "1006", "simple": { "limit": 10, "period": 60 } },
+    { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1007", "simple": { "limit": 10, "period": 60 } }
   ],
   "triggers": {
     "crons": ["0 * * * *"]
@@ -132,7 +134,9 @@
         { "name": "SAVE_RATE_LIMITER", "namespace_id": "1102", "simple": { "limit": 30, "period": 60 } },
         { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1103", "simple": { "limit": 60, "period": 60 } },
         { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1104", "simple": { "limit": 120, "period": 60 } },
-        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1105", "simple": { "limit": 10, "period": 60 } }
+        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1105", "simple": { "limit": 10, "period": 60 } },
+        { "name": "AI_RATE_LIMITER", "namespace_id": "1106", "simple": { "limit": 10, "period": 60 } },
+        { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1107", "simple": { "limit": 10, "period": 60 } }
       ]
     },
     "production": {
@@ -171,7 +175,9 @@
         { "name": "SAVE_RATE_LIMITER", "namespace_id": "1202", "simple": { "limit": 30, "period": 60 } },
         { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1203", "simple": { "limit": 60, "period": 60 } },
         { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1204", "simple": { "limit": 120, "period": 60 } },
-        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1205", "simple": { "limit": 10, "period": 60 } }
+        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1205", "simple": { "limit": 10, "period": 60 } },
+        { "name": "AI_RATE_LIMITER", "namespace_id": "1206", "simple": { "limit": 10, "period": 60 } },
+        { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1207", "simple": { "limit": 10, "period": 60 } }
       ]
     }
   }

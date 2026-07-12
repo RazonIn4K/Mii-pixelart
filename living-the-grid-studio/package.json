@@ -4,12 +4,12 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite",
     "build": "vite build",
     "build:staging": "CLOUDFLARE_ENV=staging vite build",
     "build:production": "CLOUDFLARE_ENV=production vite build",
-    "start": "vite preview --host",
-    "preview": "vite preview --host",
+    "start": "vite preview --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
     "check": "tsc --noEmit && tsc -p worker/tsconfig.json --noEmit",
     "worker:types": "wrangler types worker/env.d.ts --env-file .dev.vars.example",
     "db:migrate:local": "wrangler d1 migrations apply tomodachi-studio-local --local",
@@ -22,7 +22,9 @@
     "worker:dry-run:production": "tsx scripts/worker-release.ts --target production --intent dry-run",
     "worker:deploy:staging": "tsx scripts/worker-release.ts --target staging --intent deploy",
     "worker:deploy:production": "tsx scripts/worker-release.ts --target production --intent deploy",
-    "verify": "pnpm check && pnpm verify:ltg && pnpm verify:image-import && pnpm verify:templates && pnpm verify:ai-sketch && pnpm verify:residents",
+    "verify": "pnpm check && pnpm verify:openapi && pnpm verify:migrations && pnpm verify:ltg && pnpm verify:image-import && pnpm verify:templates && pnpm verify:ai-sketch && pnpm verify:residents",
+    "verify:openapi": "tsx scripts/verify-openapi-routes.ts",
+    "verify:migrations": "tsx scripts/verify-migrations.ts",
     "verify:ltg": "tsx scripts/verify-ltg-import.ts",
     "verify:image-import": "tsx scripts/verify-image-import.ts",
     "verify:templates": "tsx scripts/verify-creative-templates.ts",
@@ -113,7 +115,8 @@
     "typescript": "5.6.3",
     "vite": "^7.3.6",
     "vitest": "^4.1.10",
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.110.0",
+    "yaml": "2.9.0"
   },
   "packageManager": "pnpm@10.34.5",
   "pnpm": {

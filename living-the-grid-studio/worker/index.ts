@@ -14,6 +14,7 @@ import {
   type WorkerRequestContext,
 } from "./http";
 import { registerLegacyRoutes } from "./legacy";
+import { formatRequestLog } from "./logging";
 import { registerModerationRoutes } from "./moderation";
 import { Router } from "./router";
 import { runScheduledMaintenance } from "./scheduled";
@@ -81,38 +82,13 @@ async function handleRequest(
     statusText: response.statusText,
   });
   response = applySecurityHeaders(response, requestId);
-  console.log(JSON.stringify({
+  console.log(formatRequestLog(request, {
     duration: Date.now() - startedAt,
     environment: env.ENVIRONMENT,
-    event: "request_complete",
-    method: request.method,
     requestId,
-    routeGroup: routeGroup(url.pathname),
     status: response.status,
   }));
   return response;
-}
-
-function routeGroup(pathname: string): string {
-  if (!pathname.startsWith("/api/")) return "document_or_asset";
-  const group = pathname.split("/")[2] ?? "api";
-  const allowlisted = new Set([
-    "ai",
-    "auth",
-    "comments",
-    "creations",
-    "discover",
-    "me",
-    "moderation",
-    "public",
-    "reports",
-    "search",
-    "stripe",
-    "tags",
-    "users",
-    "webhooks",
-  ]);
-  return allowlisted.has(group) ? group : "api_other";
 }
 
 async function assetOrSpa(request: Request, env: Env): Promise<Response> {
@@ -164,13 +140,10 @@ function malformedApiPath(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const response = failure(requestId, 400, "invalid_path", "Request path encoding is invalid.");
   response.headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
-  console.log(JSON.stringify({
+  console.log(formatRequestLog(request, {
     duration: 0,
     environment: env.ENVIRONMENT,
-    event: "request_complete",
-    method: request.method,
     requestId,
-    routeGroup: routeGroup(url.pathname),
     status: 400,
   }));
   return Promise.resolve(applySecurityHeaders(response, requestId));

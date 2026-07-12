@@ -578,14 +578,14 @@ async function lockComments(context: WorkerRequestContext): Promise<Response> {
   );
   const results = await context.env.DB.batch([
     context.env.DB.prepare(
-      `UPDATE creations SET comments_enabled = 0, comments_locked = 1, updated_at = ?
+      `UPDATE creations SET comments_locked = 1, updated_at = ?
        WHERE id = ? AND comments_locked = 0`,
     ).bind(now, creation.id),
     audit.statement,
   ]);
   assertTransitionAudited(results, commentsLockConflict(true));
   return success(context.requestId, {
-    commentsEnabled: false,
+    commentsEnabled: Boolean(creation.comments_enabled),
     commentsLocked: true,
     id: creation.id,
   });

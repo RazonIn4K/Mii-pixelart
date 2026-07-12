@@ -350,14 +350,22 @@ async function requestDeletion(context: WorkerRequestContext): Promise<Response>
   const dueAt = now + 7 * 24 * 60 * 60 * 1_000;
   await context.env.DB.batch([
     context.env.DB.prepare(
-      `UPDATE users SET status = 'deletion_pending', deletion_requested_at = ?,
+      `UPDATE users SET deletion_previous_status = status,
+       status = 'deletion_pending', deletion_requested_at = ?,
        deletion_due_at = ?, updated_at = ?
        WHERE id = ? AND status IN ('active', 'suspended')`,
     ).bind(now, dueAt, now, session.user.id),
     context.env.DB.prepare(
-      `UPDATE creations SET state = 'draft', visibility = 'private',
+      `UPDATE creations SET
+       state = CASE WHEN state = 'hidden' THEN 'hidden' ELSE 'draft' END,
+       visibility = 'private',
        published_at = NULL, updated_at = ? WHERE owner_user_id = ? AND state != 'deleted'`,
     ).bind(now, session.user.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_search WHERE creation_id IN (
+         SELECT id FROM creations WHERE owner_user_id = ?
+       )`,
+    ).bind(session.user.id),
     context.env.DB.prepare(
       "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
     ).bind(now, session.user.id),
@@ -377,7 +385,12 @@ async function cancelDeletion(context: WorkerRequestContext): Promise<Response> 
   const session = await requireFreshSession(context);
   const now = Date.now();
   const result = await context.env.DB.prepare(
-    `UPDATE users SET status = 'active', deletion_requested_at = NULL,
+    `UPDATE users SET
+     status = CASE
+       WHEN deletion_previous_status = 'suspended' THEN 'suspended'
+       ELSE 'active'
+     END,
+     deletion_previous_status = NULL, deletion_requested_at = NULL,
      deletion_due_at = NULL, updated_at = ?
      WHERE id = ? AND status = 'deletion_pending' AND deletion_due_at > ?`,
   ).bind(now, session.user.id, now).run();

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { currentRelativeReturnTo } from "@/lib/community/return-to";
 import { CommunityError, CommunityLoading } from "./CommunityState";
 
 export function GoogleSignIn({ returnTo }: { returnTo?: string }) {
-  const destination = returnTo ?? (typeof window === "undefined" ? "/me" : window.location.pathname);
+  const destination = returnTo ?? currentRelativeReturnTo();
   return (
     <form action="/api/auth/google/start" method="post">
       <input type="hidden" name="returnTo" value={destination} />

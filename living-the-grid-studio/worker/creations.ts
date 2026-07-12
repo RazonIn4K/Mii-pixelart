@@ -53,6 +53,7 @@ export function registerCreationRoutes(router: Router): void {
     .add("GET", "/api/creations/:id", getCreation)
     .add("PATCH", "/api/creations/:id", updateCreation)
     .add("DELETE", "/api/creations/:id", deleteCreation)
+    .add("GET", "/api/creations/:id/media/project", downloadProject)
     .add("GET", "/api/creations/:id/project", downloadProject)
     .add("PUT", "/api/creations/:id/project", saveProject)
     .add("POST", "/api/creations/:id/publish", publishCreation)
@@ -155,7 +156,7 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
   const currentRevision = creation.revision_number;
   assertRevisionMatch(context.request, currentRevision);
 
-  const revisionNumber = (currentRevision ?? 0) + 1;
+  const revisionNumber = await nextRevisionNumber(context.env, creation.id, currentRevision);
   const revisionId = crypto.randomUUID();
   const now = Date.now();
   const canonicalJson = JSON.stringify(input.project);
@@ -176,7 +177,8 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
     ]);
   } catch (error) {
     if (error instanceof Error && /unique constraint/iu.test(error.message)) {
-      throw new HttpError(409, "revision_conflict", "The cloud project has a newer revision.");
+      const latest = await getCreationById(context.env, creation.id);
+      throw revisionConflict(latest?.revision_number ?? currentRevision ?? 1);
     }
     throw quotaHttpError(error) ?? error;
   }
@@ -331,6 +333,7 @@ async function updateCreation(context: WorkerRequestContext): Promise<Response> 
 async function publishCreation(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
+  assertNotModerationHidden(creation);
   if (!creation.current_revision_id) {
     throw new HttpError(409, "project_required", "Save the project before publishing.");
   }
@@ -349,7 +352,7 @@ async function publishCreation(context: WorkerRequestContext): Promise<Response>
       `UPDATE creations SET title = ?, description = ?, state = 'published',
        visibility = ?, comments_enabled = ?, project_download_enabled = ?,
        published_at = COALESCE(published_at, ?), hidden_at = NULL, updated_at = ?
-       WHERE id = ? AND owner_user_id = ?`,
+       WHERE id = ? AND owner_user_id = ? AND state IN ('draft', 'published')`,
     ).bind(
       input.title,
       input.description,
@@ -361,31 +364,55 @@ async function publishCreation(context: WorkerRequestContext): Promise<Response>
       creation.id,
       session.user.id,
     ),
-    context.env.DB.prepare("DELETE FROM creation_tags WHERE creation_id = ?").bind(creation.id),
-    context.env.DB.prepare("DELETE FROM creation_search WHERE creation_id = ?").bind(creation.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_tags WHERE creation_id = ?
+       AND EXISTS (
+         SELECT 1 FROM creations
+         WHERE id = ? AND owner_user_id = ? AND state = 'published'
+       )`,
+    ).bind(creation.id, creation.id, session.user.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_search WHERE creation_id = ?
+       AND EXISTS (
+         SELECT 1 FROM creations
+         WHERE id = ? AND owner_user_id = ? AND state = 'published'
+       )`,
+    ).bind(creation.id, creation.id, session.user.id),
   ];
   for (const tag of tags) {
     statements.push(
       context.env.DB.prepare(
-        "INSERT INTO creation_tags (creation_id, tag_id, created_at) VALUES (?, ?, ?)",
-      ).bind(creation.id, tag.id, now),
+        `INSERT INTO creation_tags (creation_id, tag_id, created_at)
+         SELECT ?, ?, ? WHERE EXISTS (
+           SELECT 1 FROM creations
+           WHERE id = ? AND owner_user_id = ? AND state = 'published'
+         )`,
+      ).bind(creation.id, tag.id, now, creation.id, session.user.id),
     );
   }
   if (input.visibility === "public") {
     statements.push(
       context.env.DB.prepare(
         `INSERT INTO creation_search (creation_id, title, description, username, tags)
-         VALUES (?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ? WHERE EXISTS (
+           SELECT 1 FROM creations
+           WHERE id = ? AND owner_user_id = ? AND state = 'published'
+         )`,
       ).bind(
         creation.id,
         input.title,
         input.description,
         session.user.username ?? "",
         tags.map((tag) => tag.slug).join(" "),
+        creation.id,
+        session.user.id,
       ),
     );
   }
-  await context.env.DB.batch(statements);
+  const results = await context.env.DB.batch(statements);
+  if ((results[0]?.meta.changes ?? 0) !== 1) {
+    throw moderationHoldConflict();
+  }
   return success(
     context.requestId,
     creationToApi((await getCreationById(context.env, creation.id))!),
@@ -395,15 +422,32 @@ async function publishCreation(context: WorkerRequestContext): Promise<Response>
 async function unpublishCreation(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
+  assertNotModerationHidden(creation);
   const now = Date.now();
-  await context.env.DB.batch([
+  const results = await context.env.DB.batch([
     context.env.DB.prepare(
       `UPDATE creations SET state = 'draft', visibility = 'private',
-       comments_enabled = 0, published_at = NULL, updated_at = ? WHERE id = ?`,
-    ).bind(now, creation.id),
-    context.env.DB.prepare("DELETE FROM creation_tags WHERE creation_id = ?").bind(creation.id),
-    context.env.DB.prepare("DELETE FROM creation_search WHERE creation_id = ?").bind(creation.id),
+       comments_enabled = 0, published_at = NULL, updated_at = ?
+       WHERE id = ? AND owner_user_id = ? AND state IN ('draft', 'published')`,
+    ).bind(now, creation.id, session.user.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_tags WHERE creation_id = ?
+       AND EXISTS (
+         SELECT 1 FROM creations
+         WHERE id = ? AND owner_user_id = ? AND state = 'draft'
+       )`,
+    ).bind(creation.id, creation.id, session.user.id),
+    context.env.DB.prepare(
+      `DELETE FROM creation_search WHERE creation_id = ?
+       AND EXISTS (
+         SELECT 1 FROM creations
+         WHERE id = ? AND owner_user_id = ? AND state = 'draft'
+       )`,
+    ).bind(creation.id, creation.id, session.user.id),
   ]);
+  if ((results[0]?.meta.changes ?? 0) !== 1) {
+    throw moderationHoldConflict();
+  }
   return success(context.requestId, creationToApi((await getCreationById(context.env, creation.id))!));
 }
 
@@ -558,12 +602,53 @@ function assertRevisionMatch(request: Request, currentRevision: number | null): 
   if (currentRevision === null) return;
   const provided = request.headers.get("if-match");
   if (provided !== revisionEtag(currentRevision)) {
-    throw new HttpError(409, "revision_conflict", "The cloud project has a newer revision.");
+    throw revisionConflict(currentRevision);
   }
+}
+
+async function nextRevisionNumber(
+  env: Env,
+  creationId: string,
+  currentRevision: number | null,
+): Promise<number> {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(MAX(revision_number), 0) AS max_revision,
+      COALESCE(SUM(CASE WHEN status = 'uploading' THEN 1 ELSE 0 END), 0) AS uploading_count
+     FROM creation_revisions WHERE creation_id = ?`,
+  ).bind(creationId).first<{ max_revision: number; uploading_count: number }>();
+  if ((row?.uploading_count ?? 0) > 0) {
+    throw revisionConflict(currentRevision ?? 1);
+  }
+  return (row?.max_revision ?? currentRevision ?? 0) + 1;
+}
+
+function revisionConflict(currentRevision: number): HttpError {
+  return new HttpError(
+    409,
+    "revision_conflict",
+    "The cloud project has a newer revision.",
+    undefined,
+    {
+      currentEtag: revisionEtag(currentRevision),
+      currentRevision,
+    },
+  );
 }
 
 function revisionEtag(revision: number): string {
   return `"rev-${revision}"`;
+}
+
+function assertNotModerationHidden(creation: CreationRow): void {
+  if (creation.state === "hidden") throw moderationHoldConflict();
+}
+
+function moderationHoldConflict(): HttpError {
+  return new HttpError(
+    409,
+    "creation_moderation_hold",
+    "A moderator must restore this creation before it can be published again.",
+  );
 }
 
 async function commitRevision(

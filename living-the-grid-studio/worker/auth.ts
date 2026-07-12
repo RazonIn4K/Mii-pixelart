@@ -180,7 +180,9 @@ async function finishGoogleLogin(context: WorkerRequestContext): Promise<Respons
   });
   const session = await createSession(context, userId);
   const user = await loadUser(context.env, userId);
-  const destination = user?.username ? transaction.returnTo : "/me/setup";
+  const destination = user?.username
+    ? transaction.returnTo
+    : `/me/setup?returnTo=${encodeURIComponent(transaction.returnTo)}`;
 
   const headers = new Headers({ Location: destination });
   headers.append("Set-Cookie", sessionCookie(context.env, session.token));
@@ -329,7 +331,14 @@ export async function requireModerator(
 export async function enforceRateLimit(limiter: RateLimit, key: string): Promise<void> {
   const outcome = await limiter.limit({ key });
   if (!outcome.success) {
-    throw new HttpError(429, "rate_limited", "Too many requests. Try again later.");
+    throw new HttpError(
+      429,
+      "rate_limited",
+      "Too many requests. Try again later.",
+      undefined,
+      undefined,
+      { "Retry-After": "60" },
+    );
   }
 }
 

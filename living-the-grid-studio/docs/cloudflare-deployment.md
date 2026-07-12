@@ -104,7 +104,10 @@ pnpm vite build
 npx wrangler pages dev dist/public --compatibility-flag=nodejs_compat
 ```
 
-You can keep using `pnpm dev` for normal day-to-day work (the Vite middleware in `vite.config.ts` proxies `/api/ai/*` for the dev server). Wrangler is only needed when you want to test the edge runtime locally.
+Use `pnpm dev` for normal day-to-day work. The Cloudflare Vite plugin runs the
+same unified Worker and local bindings used by the target deployment, so there
+is no separate Node API middleware. Direct Wrangler commands remain useful for
+migrations, generated binding types, and release preflight operations.
 
 ## 4. Custom domain: tomodachi.pw (standard DNS)
 

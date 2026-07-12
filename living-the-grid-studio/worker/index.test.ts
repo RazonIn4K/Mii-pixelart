@@ -76,6 +76,16 @@ describe("community Worker integration", () => {
       meta: { name: "First project" },
       version: 1,
     });
+    const mediaProjectDownload = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/media/project`,
+      { headers },
+    );
+    expect(mediaProjectDownload.status).toBe(200);
+    expect(mediaProjectDownload.headers.get("etag")).toBe('"rev-1"');
+    await expect(mediaProjectDownload.json()).resolves.toMatchObject({
+      meta: { name: "First project" },
+      version: 1,
+    });
 
     const conflict = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/project`, {
       body: JSON.stringify({ project: project("Conflicting project") }),
@@ -83,7 +93,39 @@ describe("community Worker integration", () => {
       method: "PUT",
     });
     expect(conflict.status).toBe(409);
-    await expect(conflict.json()).resolves.toMatchObject({ error: { code: "REVISION_CONFLICT" } });
+    await expect(conflict.json()).resolves.toMatchObject({
+      error: {
+        code: "REVISION_CONFLICT",
+        currentEtag: '"rev-1"',
+        currentRevision: 1,
+      },
+    });
+
+    const competingRevisionId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO creation_revisions
+       (id, creation_id, revision_number, status, project_bytes, created_at)
+       VALUES (?, ?, 2, 'uploading', 0, ?)`,
+    ).bind(competingRevisionId, createdBody.data.id, Date.now()).run();
+    const raceConflict = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/project`,
+      {
+        body: JSON.stringify({ project: project("Racing project") }),
+        headers: { ...headers, "If-Match": '"rev-1"' },
+        method: "PUT",
+      },
+    );
+    expect(raceConflict.status).toBe(409);
+    await expect(raceConflict.json()).resolves.toMatchObject({
+      error: {
+        code: "REVISION_CONFLICT",
+        currentEtag: '"rev-1"',
+        currentRevision: 1,
+      },
+    });
+    await env.DB.prepare(
+      "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
+    ).bind(competingRevisionId).run();
 
     const saved = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/project`, {
       body: JSON.stringify({ project: project("Second revision") }),
@@ -91,9 +133,9 @@ describe("community Worker integration", () => {
       method: "PUT",
     });
     expect(saved.status).toBe(200);
-    expect(saved.headers.get("etag")).toBe('"rev-2"');
+    expect(saved.headers.get("etag")).toBe('"rev-3"');
     await expect(saved.json()).resolves.toMatchObject({
-      data: { id: createdBody.data.id, revision: 2, state: "draft" },
+      data: { id: createdBody.data.id, revision: 3, state: "draft" },
     });
 
     const published = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/publish`, {
@@ -409,6 +451,245 @@ describe("community Worker integration", () => {
     await expect(wrongTag.json()).resolves.toMatchObject({ data: [] });
   });
 
+  it("removes public search rows during deletion and keeps them absent after cancellation", async () => {
+    const owner = await seedUser("deletion-search-owner");
+    const headers = authenticatedHeaders(await seedSession(owner.id, "deletion-search-token"));
+    const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        project: project("Deletion search project"),
+        title: "Deletion search project",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(created.status).toBe(201);
+    const creation = (await created.json() as { data: { id: string } }).data;
+    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
+      body: JSON.stringify({
+        commentsEnabled: true,
+        description: "Public text that must leave the search index.",
+        projectDownloadEnabled: false,
+        tags: ["portraits"],
+        title: "Deletion search project",
+        visibility: "public",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(published.status).toBe(200);
+    await expect(env.DB.prepare(
+      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+    ).bind(creation.id).first()).resolves.toEqual({ creation_id: creation.id });
+
+    const deletion = await SELF.fetch(`${ORIGIN}/api/me`, {
+      body: "{}",
+      headers,
+      method: "DELETE",
+    });
+    expect(deletion.status).toBe(202);
+    await expect(env.DB.prepare(
+      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+    ).bind(creation.id).first()).resolves.toBeNull();
+    await expect(env.DB.prepare(
+      "SELECT state, visibility FROM creations WHERE id = ?",
+    ).bind(creation.id).first()).resolves.toEqual({
+      state: "draft",
+      visibility: "private",
+    });
+
+    const cancellationHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "deletion-cancel-token"),
+    );
+    const cancellation = await SELF.fetch(`${ORIGIN}/api/me/deletion/cancel`, {
+      body: "{}",
+      headers: cancellationHeaders,
+      method: "POST",
+    });
+    expect(cancellation.status).toBe(200);
+    await expect(cancellation.json()).resolves.toMatchObject({
+      data: { id: owner.id, status: "active" },
+    });
+    await expect(env.DB.prepare(
+      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+    ).bind(creation.id).first()).resolves.toBeNull();
+    const search = await SELF.fetch(`${ORIGIN}/api/search?q=deletion&limit=10`);
+    expect(search.status).toBe(200);
+    await expect(search.json()).resolves.toMatchObject({ data: [] });
+  });
+
+  it("keeps moderator-hidden creations under moderator-only restore authority", async () => {
+    const owner = await seedUser("moderation-hold-owner");
+    const moderator = await seedUser("moderation-hold-mod", "moderator");
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "moderation-hold-owner-token"),
+    );
+    const moderatorHeaders = authenticatedHeaders(
+      await seedSession(moderator.id, "moderation-hold-moderator-token"),
+    );
+    const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({ project: project("Moderation hold") }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(created.status).toBe(201);
+    const creation = (await created.json() as { data: { id: string } }).data;
+    const publishBody = JSON.stringify({
+      commentsEnabled: true,
+      description: "A creation placed under a moderation hold.",
+      projectDownloadEnabled: false,
+      tags: [],
+      title: "Moderation hold",
+      visibility: "public",
+    });
+    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
+      body: publishBody,
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(published.status).toBe(200);
+
+    const hidden = await SELF.fetch(
+      `${ORIGIN}/api/moderation/creations/${creation.id}/hide`,
+      {
+        body: JSON.stringify({ action: "hide_creation", reason: "Focused safety review" }),
+        headers: moderatorHeaders,
+        method: "POST",
+      },
+    );
+    expect(hidden.status).toBe(200);
+
+    for (const action of [
+      { body: publishBody, path: "publish" },
+      { body: "{}", path: "unpublish" },
+    ]) {
+      const bypass = await SELF.fetch(
+        `${ORIGIN}/api/creations/${creation.id}/${action.path}`,
+        { body: action.body, headers: ownerHeaders, method: "POST" },
+      );
+      expect(bypass.status).toBe(409);
+      await expect(bypass.json()).resolves.toMatchObject({
+        error: {
+          code: "CONFLICT",
+          message: "A moderator must restore this creation before it can be published again.",
+        },
+      });
+    }
+    await expect(
+      env.DB.prepare("SELECT state, visibility FROM creations WHERE id = ?")
+        .bind(creation.id)
+        .first(),
+    ).resolves.toEqual({ state: "hidden", visibility: "private" });
+
+    const restored = await SELF.fetch(
+      `${ORIGIN}/api/moderation/creations/${creation.id}/restore`,
+      {
+        body: JSON.stringify({ action: "restore_creation", reason: "Review complete" }),
+        headers: moderatorHeaders,
+        method: "POST",
+      },
+    );
+    expect(restored.status).toBe(200);
+    const republished = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
+      body: publishBody,
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(republished.status).toBe(200);
+  });
+
+  it("restores a canceled deletion to suspension without clearing hidden creations", async () => {
+    const owner = await seedUser("suspended-deletion-owner");
+    const moderator = await seedUser("suspension-mod", "moderator");
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "suspended-deletion-owner-token"),
+    );
+    const moderatorHeaders = authenticatedHeaders(
+      await seedSession(moderator.id, "suspended-deletion-moderator-token"),
+    );
+    const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({ project: project("Suspended deletion") }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(created.status).toBe(201);
+    const creation = (await created.json() as { data: { id: string } }).data;
+    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
+      body: JSON.stringify({
+        commentsEnabled: true,
+        description: "Must remain hidden after deletion cancellation.",
+        projectDownloadEnabled: false,
+        tags: [],
+        title: "Suspended deletion",
+        visibility: "public",
+      }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(published.status).toBe(200);
+    const suspended = await SELF.fetch(
+      `${ORIGIN}/api/moderation/users/${owner.id}/suspend`,
+      {
+        body: JSON.stringify({ action: "suspend_user", reason: "Safety suspension" }),
+        headers: moderatorHeaders,
+        method: "POST",
+      },
+    );
+    expect(suspended.status).toBe(200);
+
+    const deletionHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "suspended-deletion-reauth-token"),
+    );
+    const deletion = await SELF.fetch(`${ORIGIN}/api/me`, {
+      body: "{}",
+      headers: deletionHeaders,
+      method: "DELETE",
+    });
+    expect(deletion.status).toBe(202);
+    await expect(
+      env.DB.prepare(
+        "SELECT status, deletion_previous_status FROM users WHERE id = ?",
+      ).bind(owner.id).first(),
+    ).resolves.toEqual({
+      deletion_previous_status: "suspended",
+      status: "deletion_pending",
+    });
+    await expect(
+      env.DB.prepare("SELECT state, visibility FROM creations WHERE id = ?")
+        .bind(creation.id)
+        .first(),
+    ).resolves.toEqual({ state: "hidden", visibility: "private" });
+
+    const cancellationHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "suspended-deletion-cancel-token"),
+    );
+    const cancellation = await SELF.fetch(`${ORIGIN}/api/me/deletion/cancel`, {
+      body: "{}",
+      headers: cancellationHeaders,
+      method: "POST",
+    });
+    expect(cancellation.status).toBe(200);
+    await expect(cancellation.json()).resolves.toMatchObject({
+      data: { id: owner.id, status: "suspended" },
+    });
+    await expect(
+      env.DB.prepare(
+        "SELECT status, deletion_previous_status FROM users WHERE id = ?",
+      ).bind(owner.id).first(),
+    ).resolves.toEqual({ deletion_previous_status: null, status: "suspended" });
+    await expect(
+      env.DB.prepare("SELECT state, visibility FROM creations WHERE id = ?")
+        .bind(creation.id)
+        .first(),
+    ).resolves.toEqual({ state: "hidden", visibility: "private" });
+
+    const blocked = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({ project: project("Still suspended") }),
+      headers: cancellationHeaders,
+      method: "POST",
+    });
+    expect(blocked.status).toBe(403);
+  });
+
   it("lets suspended sessions reach account controls but blocks community mutations", async () => {
     const user = await seedUser("suspended-user");
     const token = await seedSession(user.id, "suspended-token");
@@ -598,7 +879,7 @@ describe("community Worker integration", () => {
     );
     expect(locked.status).toBe(200);
     await expect(locked.json()).resolves.toMatchObject({
-      data: { commentsEnabled: false, commentsLocked: true },
+      data: { commentsEnabled: true, commentsLocked: true },
     });
     const reportContext = await SELF.fetch(
       `${ORIGIN}/api/moderation/reports/${report.id}`,
@@ -624,11 +905,30 @@ describe("community Worker integration", () => {
     });
 
     const ownerBypass = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}`, {
-      body: JSON.stringify({ commentsEnabled: true }),
+      body: JSON.stringify({ commentsEnabled: false }),
       headers: ownerHeaders,
       method: "PATCH",
     });
     expect(ownerBypass.status).toBe(409);
+
+    const unlocked = await SELF.fetch(
+      `${ORIGIN}/api/moderation/creations/${creation.id}/unlock-comments`,
+      {
+        body: JSON.stringify({ action: "unlock_comments", reason: "Moderation review complete" }),
+        headers: moderatorHeaders,
+        method: "POST",
+      },
+    );
+    expect(unlocked.status).toBe(200);
+    await expect(unlocked.json()).resolves.toMatchObject({
+      data: { commentsEnabled: true, commentsLocked: false },
+    });
+    const resumedComment = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/comments`, {
+      body: JSON.stringify({ body: "The owner's enabled setting applies again." }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(resumedComment.status).toBe(201);
 
     const hierarchyDenied = await SELF.fetch(
       `${ORIGIN}/api/moderation/users/${peerModerator.id}/suspend`,

@@ -20,9 +20,16 @@ export interface ApiMeta {
   nextCursor?: string | null;
 }
 
+export interface HttpErrorDetails {
+  currentEtag?: string;
+  currentRevision?: number;
+}
+
 export class HttpError extends Error {
   readonly code: string;
+  readonly details?: HttpErrorDetails;
   readonly fields?: Record<string, string[]>;
+  readonly headers?: HeadersInit;
   readonly status: number;
 
   constructor(
@@ -30,12 +37,16 @@ export class HttpError extends Error {
     code: string,
     message: string,
     fields?: Record<string, string[]>,
+    details?: HttpErrorDetails,
+    headers?: HeadersInit,
   ) {
     super(message);
     this.name = "HttpError";
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.details = details;
+    this.headers = headers;
   }
 }
 
@@ -66,6 +77,7 @@ export function failure(
   code: string,
   message: string,
   fields?: Record<string, string[]>,
+  details?: HttpErrorDetails,
   headers?: HeadersInit,
 ): Response {
   return Response.json(
@@ -73,6 +85,7 @@ export function failure(
       error: {
         code: publicErrorCode(status, code),
         message,
+        ...details,
         ...(fields
           ? { fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value.join(" ")])) }
           : {}),
@@ -109,6 +122,8 @@ export function errorResponse(error: unknown, requestId: string): Response {
       error.code,
       error.message,
       error.fields,
+      error.details,
+      error.headers,
     );
   }
 

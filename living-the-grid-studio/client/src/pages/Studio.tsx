@@ -293,28 +293,32 @@ export default function Studio() {
   );
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex h-screen min-w-0 flex-col">
       {/* Top Bar */}
-      <header className="h-11 border-b border-border bg-background flex items-center px-4 gap-3 shrink-0">
+      <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-border bg-background px-2 sm:h-11 sm:flex-nowrap sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
           <Link href="/" aria-label="Go home" title="Go home">
             <Home className="w-3.5 h-3.5" />
           </Link>
         </Button>
 
-        <div className="flex items-center gap-1.5">
-          <div className="red-dot-sm" />
-          <span className="text-xs font-medium tracking-wide">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="red-dot-sm shrink-0" />
+          <span className="block truncate text-xs font-medium tracking-wide">
             {doc?.meta.name ?? "Tomodachi Studio"}
           </span>
         </div>
 
-        <div className="flex-1" />
-
-        <CloudProjectControls doc={doc} onLoadDocument={setDoc} />
+        <div className="order-last flex w-full min-w-0 items-center justify-end border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0">
+          <CloudProjectControls doc={doc} onLoadDocument={setDoc} />
+        </div>
 
         {/* View toggles */}
-        <div className="flex items-center gap-1">
+        <div
+          className="flex shrink-0 items-center gap-1"
+          role="toolbar"
+          aria-label="Canvas view options"
+        >
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -325,6 +329,7 @@ export default function Studio() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 aria-label="Toggle grid lines"
+                aria-pressed={showGrid}
                 title="Toggle grid lines"
               >
                 <Grid3X3 className="w-3.5 h-3.5" />
@@ -345,6 +350,7 @@ export default function Studio() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 aria-label="Toggle paint-by-numbers labels"
+                aria-pressed={showLabels}
                 title="Toggle paint-by-numbers labels"
               >
                 <Hash className="w-3.5 h-3.5" />
@@ -357,7 +363,7 @@ export default function Studio() {
         </div>
 
         {/* Undo/Redo */}
-        <div className="flex items-center gap-0.5 border-l border-border pl-3">
+        <div className="flex shrink-0 items-center gap-0.5 border-l border-border pl-1 sm:pl-3">
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -453,7 +459,7 @@ export default function Studio() {
         </div>
 
         {/* Right Panel (full width on mobile below canvas, ~320px / 384px on md/lg) */}
-        <div className="w-full md:w-80 lg:w-96 max-h-[50vh] md:max-h-none border-t md:border-t-0 md:border-l border-border bg-background shrink-0 flex flex-col overflow-hidden">
+        <div className="flex max-h-[50vh] w-full min-w-0 shrink-0 flex-col overflow-hidden border-t border-border bg-background md:max-h-none md:w-80 md:border-l md:border-t-0 lg:w-96">
           {mergeSource && (
             <div className="px-4 py-2 bg-accent border-b border-border">
               <p className="text-xs">
@@ -486,9 +492,9 @@ export default function Studio() {
 
           <Tabs
             defaultValue="import"
-            className="flex-1 flex flex-col overflow-hidden"
+            className="min-w-0 flex-1 flex-col overflow-hidden"
           >
-            <TabsList className="w-full rounded-none border-b border-border bg-transparent h-9 px-2">
+            <TabsList className="h-9 w-full max-w-full overflow-x-auto rounded-none border-b border-border bg-transparent px-2">
               <TabsTrigger
                 value="import"
                 className="text-xs data-[state=active]:bg-accent rounded-sm"
