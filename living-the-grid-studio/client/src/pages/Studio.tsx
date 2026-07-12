@@ -458,7 +458,7 @@ export default function Studio() {
   return (
     <div className="flex min-h-svh min-w-0 flex-col md:h-screen md:min-h-0">
       {/* Top Bar */}
-      <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-border bg-background px-2 sm:h-11 sm:flex-nowrap sm:gap-3 sm:px-4">
+      <header className="grid min-h-11 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-1 border-b border-border bg-background px-2 sm:flex sm:h-11 sm:flex-nowrap sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
           <Link href="/" aria-label="Go home" title="Go home">
             <Home className="w-3.5 h-3.5" />
@@ -474,7 +474,7 @@ export default function Studio() {
 
         <nav
           aria-label="Studio destinations"
-          className="order-last flex w-full min-w-0 items-center gap-1 border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0"
+          className="col-span-2 col-start-1 row-start-2 flex min-w-0 items-center gap-1 border-t border-border/60 py-1 sm:order-none sm:col-auto sm:row-auto sm:w-auto sm:border-0 sm:py-0"
         >
           <Button
             asChild
@@ -500,7 +500,7 @@ export default function Studio() {
           </Button>
         </nav>
 
-        <div className="order-last flex w-full min-w-0 items-center justify-end border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0">
+        <div className="col-span-2 col-start-3 row-start-2 flex min-w-0 items-center justify-end border-t border-border/60 py-1 sm:order-none sm:col-auto sm:row-auto sm:w-auto sm:border-0 sm:py-0">
           <CloudProjectControls
             doc={doc}
             onLoadDocument={handleLoadProjectDocument}
@@ -509,7 +509,7 @@ export default function Studio() {
 
         {/* View toggles */}
         <div
-          className="flex shrink-0 items-center gap-1"
+          className="col-start-3 row-start-1 flex shrink-0 items-center gap-1 sm:col-auto sm:row-auto"
           role="toolbar"
           aria-label="Canvas view options"
         >
@@ -557,7 +557,7 @@ export default function Studio() {
         </div>
 
         {/* Undo/Redo */}
-        <div className="flex shrink-0 items-center gap-0.5 border-l border-border pl-1 sm:pl-3">
+        <div className="col-start-4 row-start-1 flex shrink-0 items-center gap-0.5 border-l border-border pl-1 sm:col-auto sm:row-auto sm:pl-3">
           <Tooltip>
             <TooltipTrigger asChild>
               <button
