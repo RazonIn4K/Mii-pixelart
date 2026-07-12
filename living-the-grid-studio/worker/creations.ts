@@ -435,6 +435,7 @@ async function getPublishedCreation(context: WorkerRequestContext): Promise<Resp
   }
   return success(context.requestId, {
     ...creationToApi(creation),
+    canEdit: Boolean(viewer && viewer.user.id === creation.owner_user_id),
     likedByViewer: liked,
     socialImageUrl: `/api/creations/${creation.id}/media/social`,
   });

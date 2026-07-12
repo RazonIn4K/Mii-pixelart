@@ -122,7 +122,16 @@ describe("community Worker integration", () => {
     );
     expect(publicDetail.status).toBe(200);
     await expect(publicDetail.json()).resolves.toMatchObject({
-      data: { id: createdBody.data.id, state: "published" },
+      data: { canEdit: false, id: createdBody.data.id, state: "published" },
+    });
+
+    const ownerPublicDetail = await SELF.fetch(
+      `${ORIGIN}/api/public/creations/${createdBody.data.slug}`,
+      { headers },
+    );
+    expect(ownerPublicDetail.status).toBe(200);
+    await expect(ownerPublicDetail.json()).resolves.toMatchObject({
+      data: { canEdit: true, id: createdBody.data.id },
     });
 
     const visitor = await seedUser("visitor-one");

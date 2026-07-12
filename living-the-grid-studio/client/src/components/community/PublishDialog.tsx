@@ -158,7 +158,9 @@ export function PublishDialog({
         }),
       });
       onPublished?.(result.data);
-      toast.success(visibility === "public" ? "Published to Discover" : "Unlisted share link is ready");
+      toast.success(firstPublish
+        ? visibility === "public" ? "Published to Discover" : "Unlisted share link is ready"
+        : "Publishing settings updated");
       setOpen(false);
     } catch (error) {
       toast.error(messageFromError(error));
@@ -174,9 +176,11 @@ export function PublishDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Review before publishing</DialogTitle>
+          <DialogTitle>{firstPublish ? "Review before publishing" : "Edit publishing settings"}</DialogTitle>
           <DialogDescription>
-            Saving is private. Publishing is a separate action and always uses the choices below.
+            {firstPublish
+              ? "Saving is private. Publishing is a separate action and always uses the choices below."
+              : "Update how this creation appears and which community features are available."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
@@ -262,8 +266,14 @@ export function PublishDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Keep private</Button>
-          <Button type="button" onClick={publish} disabled={submitting}>{submitting ? "Publishing…" : visibility === "public" ? "Publish publicly" : "Create unlisted link"}</Button>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>{firstPublish ? "Keep private" : "Cancel"}</Button>
+          <Button type="button" onClick={publish} disabled={submitting}>
+            {submitting
+              ? firstPublish ? "Publishing…" : "Saving…"
+              : firstPublish
+                ? visibility === "public" ? "Publish publicly" : "Create unlisted link"
+                : "Save publishing settings"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

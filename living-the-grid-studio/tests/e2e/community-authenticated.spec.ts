@@ -110,7 +110,7 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     visibility: "private",
   };
   const second = { ...creation, id: "00000000-0000-4000-8000-000000000011", slug: "private-draft-0002", title: "Second draft" };
-  let publishBody: Record<string, unknown> | null = null;
+  const publishBodies: Record<string, unknown>[] = [];
   await page.route("**/api/creations?**", async (route) => {
     const url = new URL(route.request().url());
     const isSecondPage = Boolean(url.searchParams.get("cursor"));
@@ -124,8 +124,9 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     data: [{ description: "Portrait work", name: "Portraits", slug: "portraits" }], requestId,
   }));
   await page.route("**/api/creations/*/publish", async (route) => {
-    publishBody = route.request().postDataJSON() as Record<string, unknown>;
-    await fulfillJson(route, { data: { ...creation, ...publishBody, state: "published", visibility: "public" }, requestId });
+    const publishBody = route.request().postDataJSON() as Record<string, unknown>;
+    publishBodies.push(publishBody);
+    await fulfillJson(route, { data: { ...creation, ...publishBody, state: "published" }, requestId });
   });
   await page.route("**/api/creations/*/media/*", (route) => route.fulfill({
     body: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"/>",
@@ -146,13 +147,64 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   await expect(page.getByRole("switch").nth(1)).not.toBeChecked();
   await page.getByRole("button", { name: "Portraits" }).click();
   await page.getByRole("button", { name: "Publish publicly" }).click();
-  await expect.poll(() => publishBody).not.toBeNull();
-  expect(publishBody).toMatchObject({
+  await expect.poll(() => publishBodies.length).toBe(1);
+  expect(publishBodies[0]).toMatchObject({
     commentsEnabled: true,
     projectDownloadEnabled: false,
     tags: ["portraits"],
     visibility: "public",
   });
+
+  await page.getByRole("button", { name: "Edit publishing" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit publishing settings" });
+  await expect(editDialog).toBeVisible();
+  await editDialog.getByRole("switch").first().click();
+  await editDialog.getByRole("switch").nth(1).click();
+  await editDialog.getByRole("combobox", { name: "Visibility" }).click();
+  await page.getByRole("option", { name: /Unlisted/ }).click();
+  await editDialog.getByRole("button", { name: "Save publishing settings" }).click();
+  await expect.poll(() => publishBodies.length).toBe(2);
+  expect(publishBodies[1]).toMatchObject({
+    commentsEnabled: false,
+    projectDownloadEnabled: true,
+    visibility: "unlisted",
+  });
+});
+
+test("owners can open a published creation in Studio from its public page", async ({ page }) => {
+  const currentUser = user();
+  const creationId = "00000000-0000-4000-8000-000000000012";
+  await mockSession(page, currentUser);
+  await page.route("**/api/public/creations/owner-published-01", (route) => fulfillJson(route, {
+    data: {
+      canEdit: true,
+      commentsEnabled: true,
+      description: "A published owner project.",
+      id: creationId,
+      likedByViewer: false,
+      owner: currentUser,
+      projectDownloadEnabled: false,
+      publishedAt: 1_700_000_000_000,
+      revision: 1,
+      slug: "owner-published-01",
+      state: "published",
+      stats: { comments: 0, likes: 0 },
+      tags: [],
+      title: "Owner published project",
+      updatedAt: 1_700_000_000_000,
+      visibility: "public",
+    },
+    requestId,
+  }));
+  await page.route(`**/api/creations/${creationId}/comments**`, (route) => fulfillJson(route, {
+    data: [], meta: { nextCursor: null }, requestId,
+  }));
+
+  await page.goto("/creation/owner-published-01");
+  await expect(page.getByRole("link", { name: "Edit in Studio" })).toHaveAttribute(
+    "href",
+    `/studio?cloud=${creationId}`,
+  );
 });
 
 test("a dirty restored cloud draft autosaves before publishing becomes available", async ({ page }) => {

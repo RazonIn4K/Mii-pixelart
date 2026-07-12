@@ -1666,6 +1666,7 @@ components:
             likes: { type: integer, minimum: 0 }
             comments: { type: integer, minimum: 0 }
         likedByViewer: { type: boolean, description: False for an anonymous viewer. }
+        canEdit: { type: boolean, description: True only when the authenticated viewer owns this creation. Present on public creation detail responses. }
         socialImageUrl: { type: string, pattern: '^/api/creations/' }
         publishedAt: { type: [integer, 'null'] }
         createdAt: { type: integer }

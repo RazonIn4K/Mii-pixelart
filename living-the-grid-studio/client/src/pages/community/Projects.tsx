@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { EyeOff, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { EyeOff, MoreHorizontal, Plus, Settings2, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -89,11 +89,20 @@ export default function Projects() {
                     {selected === creation.id ? (
                       <div id={`project-actions-${creation.id}`} className="absolute right-3 top-12 z-20 w-48 rounded-xl border bg-white p-2 shadow-lg" aria-label={`Actions for ${creation.title}`}>
                         <Button asChild variant="ghost" className="w-full justify-start"><Link href={`/studio?cloud=${creation.id}`}>Edit in Studio</Link></Button>
+                        <PublishDialog
+                          creationId={creation.id}
+                          initial={creation}
+                          onPublished={(published) => setItems((current) => current.map((item) => item.id === published.id ? published : item))}
+                          trigger={(
+                            <Button type="button" variant="ghost" className="w-full justify-start">
+                              {creation.status === "published" ? <Settings2 /> : <MoreHorizontal />}
+                              {creation.status === "published" ? "Edit publishing" : "Review & publish"}
+                            </Button>
+                          )}
+                        />
                         {creation.status === "published" ? (
                           <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => void unpublish(creation)}><EyeOff /> Unpublish</Button>
-                        ) : (
-                          <PublishDialog creationId={creation.id} initial={creation} onPublished={(published) => setItems((current) => current.map((item) => item.id === published.id ? published : item))} trigger={<Button type="button" variant="ghost" className="w-full justify-start"><MoreHorizontal /> Review & publish</Button>} />
-                        )}
+                        ) : null}
                         <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => void remove(creation)}><Trash2 /> Delete</Button>
                       </div>
                     ) : null}
