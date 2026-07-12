@@ -34,6 +34,29 @@ describe("bounded request bodies", () => {
     });
   });
 
+  it("cancels and unlocks a streamed body after it crosses the limit", async () => {
+    let canceled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        canceled = true;
+      },
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2]));
+      },
+    });
+    const request = new Request("https://example.test", {
+      body,
+      duplex: "half",
+      method: "POST",
+    } as RequestInit);
+
+    await expect(readBoundedText(request, 1)).rejects.toBeInstanceOf(
+      RequestInputError,
+    );
+    expect(canceled).toBe(true);
+    expect(request.body?.locked).toBe(false);
+  });
+
   it("rejects an oversized declared Content-Length before reading", async () => {
     const request = new Request("https://example.test", {
       body: "small",
