@@ -21,7 +21,6 @@
  *   POST /api/ai/chat
  */
 
-import type { AiChatRequest } from "../../../shared/ai";
 import {
   getOpenRouterModels,
   getOpenRouterStatus,
@@ -29,6 +28,11 @@ import {
   type ApiResult,
   type OpenRouterEnv,
 } from "../../../server/openrouter";
+import {
+  RequestInputError,
+  publicRequestError,
+  readBoundedText,
+} from "../../../server/request-body";
 
 // KV namespace binding shape — present when EDGE_CACHE is wired up.
 interface KVNamespace {
@@ -69,15 +73,12 @@ function resolveSubpath(params: PagesContext["params"]): string {
 
 async function readJsonBody(request: Request): Promise<unknown> {
   if (request.method !== "POST") return {};
-  const text = await request.text();
+  const text = await readBoundedText(request, 1_000_000);
   if (!text) return {};
-  if (text.length > 1_000_000) {
-    throw new Error("Request body is too large.");
-  }
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error("Invalid JSON request body.");
+    throw new RequestInputError(400, "Invalid JSON request body.");
   }
 }
 
@@ -149,7 +150,7 @@ export const onRequest = async (
       return handleModels(env);
     }
     if (method === "POST" && subpath === "chat") {
-      const body = (await readJsonBody(context.request)) as AiChatRequest;
+      const body = await readJsonBody(context.request);
       return jsonResponse(await sendOpenRouterChat(body, env));
     }
 
@@ -164,16 +165,17 @@ export const onRequest = async (
       },
     );
   } catch (error) {
+    const requestError = publicRequestError(
+      error,
+      "AI request failed at the edge.",
+    );
     return new Response(
       JSON.stringify({
         configured: true,
-        reply:
-          error instanceof Error
-            ? error.message
-            : "AI request failed at the edge.",
+        reply: requestError.message,
       }),
       {
-        status: 500,
+        status: requestError.status,
         headers: { "Content-Type": "application/json; charset=utf-8" },
       },
     );

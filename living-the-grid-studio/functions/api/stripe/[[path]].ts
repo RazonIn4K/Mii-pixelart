@@ -17,6 +17,11 @@ import {
   type ApiResult,
   type StripeEnv,
 } from "../../../server/stripe";
+import {
+  RequestInputError,
+  publicRequestError,
+  readBoundedText,
+} from "../../../server/request-body";
 import { formatPrice } from "../../../shared/products";
 
 interface PagesContext<EnvT = StripeEnv> {
@@ -42,17 +47,14 @@ function resolveSubpath(params: PagesContext["params"]): string {
   return String(raw);
 }
 
-async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
+async function readJsonBody(request: Request): Promise<unknown> {
   if (request.method !== "POST") return {};
-  const text = await request.text();
+  const text = await readBoundedText(request, 100_000);
   if (!text) return {};
-  if (text.length > 100_000) {
-    throw new Error("Request body is too large.");
-  }
   try {
-    return JSON.parse(text) as Record<string, unknown>;
+    return JSON.parse(text) as unknown;
   } catch {
-    throw new Error("Invalid JSON request body.");
+    throw new RequestInputError(400, "Invalid JSON request body.");
   }
 }
 
@@ -108,16 +110,17 @@ export const onRequest = async (
       },
     );
   } catch (error) {
+    const requestError = publicRequestError(
+      error,
+      "Stripe request failed at the edge.",
+    );
     return new Response(
       JSON.stringify({
         configured: true,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Stripe request failed at the edge.",
+        error: requestError.message,
       }),
       {
-        status: 500,
+        status: requestError.status,
         headers: { "Content-Type": "application/json; charset=utf-8" },
       },
     );
