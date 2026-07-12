@@ -4,10 +4,12 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CreationCard } from "@/components/community/CreationCard";
 import { CommunityEmpty, CommunityError, CommunityLoading } from "@/components/community/CommunityState";
 import { PublishDialog } from "@/components/community/PublishDialog";
 import { RequireAuth } from "@/components/community/RequireAuth";
+import { ShareCreationActions } from "@/components/community/ShareCreationActions";
 import { CommunityPageIntro, CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -21,7 +23,6 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const { status, user } = useAuth();
 
   const load = useCallback(async (nextCursor?: string) => {
@@ -42,14 +43,6 @@ export default function Projects() {
     if (user) void load();
     else if (status === "anonymous") setLoading(false);
   }, [load, status, user]);
-  useEffect(() => {
-    if (!selected) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selected]);
 
   const unpublish = async (creation: CreationSummary) => {
     try {
@@ -85,9 +78,21 @@ export default function Projects() {
                 {items.map((creation) => (
                   <div key={creation.id} className="relative">
                     <div className="absolute left-3 top-3 z-10 flex gap-1"><Badge className="border border-black/10 bg-white/90 text-[var(--island-ink)]">{creation.visibility}</Badge><Badge variant="secondary">v{creation.revision}</Badge></div>
-                    <CreationCard creation={creation} href={`/studio?cloud=${encodeURIComponent(creation.id)}`} menuOpen={selected === creation.id} onMenu={() => setSelected(selected === creation.id ? null : creation.id)} />
-                    {selected === creation.id ? (
-                      <div id={`project-actions-${creation.id}`} className="absolute right-3 top-12 z-20 w-48 rounded-xl border bg-white p-2 shadow-lg" aria-label={`Actions for ${creation.title}`}>
+                    <CreationCard
+                      creation={creation}
+                      href={`/studio?cloud=${encodeURIComponent(creation.id)}`}
+                      actions={(
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="rounded-full p-2 text-[var(--island-ink)]/45 hover:bg-[var(--island-paper)] hover:text-[var(--island-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                              aria-label={`More actions for ${creation.title}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-52 p-2" aria-label={`Actions for ${creation.title}`}>
                         <Button asChild variant="ghost" className="w-full justify-start"><Link href={`/studio?cloud=${creation.id}`}>Edit in Studio</Link></Button>
                         <PublishDialog
                           creationId={creation.id}
@@ -101,11 +106,20 @@ export default function Projects() {
                           )}
                         />
                         {creation.status === "published" ? (
-                          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => void unpublish(creation)}><EyeOff /> Unpublish</Button>
+                          <>
+                            <ShareCreationActions
+                              path={`/creation/${encodeURIComponent(creation.slug)}`}
+                              title={creation.title}
+                              className="grid gap-1 border-y py-2 [&_a]:w-full [&_a]:justify-start [&_button]:w-full [&_button]:justify-start"
+                            />
+                            <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => void unpublish(creation)}><EyeOff /> Unpublish</Button>
+                          </>
                         ) : null}
                         <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => void remove(creation)}><Trash2 /> Delete</Button>
-                      </div>
-                    ) : null}
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    />
                   </div>
                 ))}
               </div>

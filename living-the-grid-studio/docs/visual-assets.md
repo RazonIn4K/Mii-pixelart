@@ -6,9 +6,10 @@ Tomodachi uses three deliberately separate image paths:
 
 1. **Profile avatars** are deterministic inline SVG assembled from a server-generated `avatar_seed`. They require no upload, model call, storage object, or moderation queue. The seed is a stable visual identifier, not an authentication secret.
 2. **Creation previews** are rendered only from validated `GridDocumentV1` data. The Worker builds safe SVG, transcodes it through Cloudflare Images, and stores immutable WebP/JPEG objects in private R2.
-3. **Marketing and empty-state artwork** is generated during development, reviewed for originality and franchise safety, optimized locally, and committed as a static asset.
+3. **Creation showcase images** are optional owner-selected photos/screenshots attached to an existing grid creation. The Worker retains only bounded, metadata-free WebP/JPEG variants; the local import source is never uploaded automatically.
+4. **Marketing and empty-state artwork** is generated during development, reviewed for originality and franchise safety, optimized locally, and committed as a static asset.
 
-End users cannot submit arbitrary markup or request prompt-to-image generation. Adding that surface would introduce cost, abuse, moderation, and storage requirements outside the approved platform scope.
+End users cannot submit arbitrary markup, avatar files, image-only posts, or prompt-to-image requests. Showcase images are a narrow reviewed attachment surface, not a general file host.
 
 ## Deterministic avatars
 
@@ -46,4 +47,4 @@ The source prompts require original characters, no text or logos, and explicitly
 
 ## Cloudflare production path
 
-Static illustrations ship with Worker Static Assets. User creation media continues through the authorization-aware `/api/creations/:id/media/:variant` routes. Cloudflare Images is a transform/transcode boundary, not a general user-upload or prompt-to-image service.
+Static illustrations ship with Worker Static Assets. Generated media and optional normalized showcase variants remain in private R2 behind authorization-aware Worker routes. Cloudflare Images is the mandatory decode/transform/transcode boundary, not a public bucket or prompt-to-image service.

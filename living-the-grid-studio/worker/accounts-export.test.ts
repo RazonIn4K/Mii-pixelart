@@ -9,18 +9,25 @@ const SESSION_PEPPER = "test-only-session-pepper";
 describe("account export streaming", () => {
   beforeEach(async () => {
     await env.DB.exec(`
+      DELETE FROM creation_showcase_objects;
+      DELETE FROM creation_showcase_images;
       DELETE FROM comments;
       DELETE FROM creations;
       DELETE FROM sessions;
       DELETE FROM external_identities;
       DELETE FROM users;
     `);
+    const objects = await env.PROJECTS.list({ limit: 1_000 });
+    if (objects.objects.length) {
+      await env.PROJECTS.delete(objects.objects.map((object) => object.key));
+    }
   });
 
   it("pages large collections without dropping equal-timestamp rows", async () => {
     const now = Date.now();
     const userId = crypto.randomUUID();
     const creationId = crypto.randomUUID();
+    const imageId = crypto.randomUUID();
     const token = "export-session-token";
 
     await env.DB.batch([
@@ -29,7 +36,7 @@ describe("account export streaming", () => {
          (id, username, display_name, bio, role, status, avatar_seed,
           terms_version, terms_accepted_at, created_at, updated_at)
          VALUES (?, 'exporter', 'Exporter', '', 'user', 'active', ?,
-          '2026-07-10', ?, ?, ?)`,
+          '2026-07-12', ?, ?, ?)`,
       ).bind(userId, userId, now, now, now),
       env.DB.prepare(
         `INSERT INTO external_identities
@@ -76,6 +83,37 @@ describe("account export streaming", () => {
     await env.DB.batch(comments.slice(0, 75));
     await env.DB.batch(comments.slice(75));
 
+    const imageKey = `private/creations/${creationId}/showcase/${imageId}/display.webp`;
+    const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    await env.PROJECTS.put(imageKey, imageBytes, {
+      httpMetadata: { contentType: "image/webp" },
+    });
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO creation_showcase_images
+         (id, creation_id, owner_user_id, upload_token_hash,
+          expected_content_type, expected_byte_size, detected_content_type,
+          source_byte_size, source_width, source_height, alt_text, sort_order,
+          is_cover, status, expires_at, created_at, updated_at, ready_at)
+         VALUES (?, ?, ?, NULL, 'image/png', 4, 'image/png', 4, 16, 16,
+          'Exported showcase image', 0, 1, 'ready', ?, ?, ?, ?)`,
+      ).bind(imageId, creationId, userId, now + 60_000, now, now, now),
+      env.DB.prepare(
+        `INSERT INTO creation_showcase_objects
+         (id, image_id, creation_id, kind, object_key, content_type,
+          byte_size, sha256, status, created_at, updated_at)
+         VALUES (?, ?, ?, 'display', ?, 'image/webp', 4, ?, 'ready', ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        imageId,
+        creationId,
+        imageKey,
+        "0".repeat(64),
+        now,
+        now,
+      ),
+    ]);
+
     const response = await SELF.fetch(`${ORIGIN}/api/me/export`, {
       headers: { Cookie: `tomodachi.sid=${token}` },
     });
@@ -101,6 +139,37 @@ describe("account export streaming", () => {
     expect(records.filter((record) => record.type === "creation")).toHaveLength(
       1,
     );
+    expect(records.filter((record) => record.type === "creation_image")).toEqual([
+      expect.objectContaining({
+        creationId,
+        data: expect.objectContaining({
+          altText: "Exported showcase image",
+          id: imageId,
+          isCover: true,
+          sortOrder: 0,
+        }),
+      }),
+    ]);
+    expect(records.filter((record) => record.type === "creation_image_object")).toEqual([
+      expect.objectContaining({
+        creationId,
+        imageId,
+        data: expect.objectContaining({
+          byteSize: 4,
+          contentType: "image/webp",
+          kind: "display",
+        }),
+      }),
+    ]);
+    expect(records.filter((record) => record.type === "creation_image_object_chunk")).toEqual([
+      expect.objectContaining({
+        creationId,
+        dataBase64: "AQIDBA==",
+        imageId,
+        kind: "display",
+        sequence: 0,
+      }),
+    ]);
     const exportedComments = records.filter(
       (record) => record.type === "comment",
     );

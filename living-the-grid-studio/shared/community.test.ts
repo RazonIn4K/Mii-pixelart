@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   CanonicalGridDocumentSchema,
+  CreateCreationImageUploadSchema,
   GridDocumentV1Schema,
+  UpdateCreationImagesSchema,
   UsernameSchema,
   decodeCursor,
   encodeCursor,
@@ -71,6 +73,73 @@ describe("GridDocumentV1Schema", () => {
 });
 
 describe("community helpers", () => {
+  it("accepts only bounded raster showcase upload tickets", () => {
+    const valid = {
+      altText: "A painted island flag displayed in the town square.",
+      byteSize: 8 * 1024 * 1024,
+      contentType: "image/png",
+    };
+    expect(CreateCreationImageUploadSchema.parse(valid)).toEqual(valid);
+    for (const contentType of [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ]) {
+      expect(CreateCreationImageUploadSchema.safeParse({
+        ...valid,
+        contentType,
+      }).success).toBe(true);
+    }
+    for (const contentType of [
+      "image/svg+xml",
+      "image/gif",
+      "image/avif",
+      "image/bmp",
+    ]) {
+      expect(CreateCreationImageUploadSchema.safeParse({
+        ...valid,
+        contentType,
+      }).success).toBe(false);
+    }
+    expect(
+      CreateCreationImageUploadSchema.safeParse({
+        ...valid,
+        byteSize: valid.byteSize + 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      CreateCreationImageUploadSchema.safeParse({
+        ...valid,
+        altText: "   ",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a unique ordered showcase list containing its cover", () => {
+    const first = "00000000-0000-4000-8000-000000000001";
+    const second = "00000000-0000-4000-8000-000000000002";
+    expect(
+      UpdateCreationImagesSchema.parse({
+        coverImageId: second,
+        orderedImageIds: [first, second],
+      }),
+    ).toEqual({ coverImageId: second, orderedImageIds: [first, second] });
+    expect(
+      UpdateCreationImagesSchema.safeParse({
+        coverImageId: second,
+        orderedImageIds: [first, first],
+      }).success,
+    ).toBe(false);
+    expect(
+      UpdateCreationImagesSchema.safeParse({
+        coverImageId: second,
+        orderedImageIds: [first],
+      }).success,
+    ).toBe(false);
+  });
+
   it("normalizes valid usernames and rejects reserved or ambiguous names", () => {
     expect(UsernameSchema.parse("  Pixel-Friend ")).toBe("pixel-friend");
     expect(UsernameSchema.safeParse("admin").success).toBe(false);

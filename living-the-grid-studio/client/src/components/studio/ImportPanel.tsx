@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import type { GridDocument } from "@/lib/engine/grid";
@@ -59,6 +60,29 @@ interface PreviewImageBox {
   height: number;
 }
 
+const LOCAL_IMAGE_LIMITS = {
+  bytes: 15 * 1024 * 1024,
+  dimension: 8_192,
+  pixels: 40_000_000,
+} as const;
+
+const IMAGE_INPUT_ACCEPT = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+  "image/x-ms-bmp",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".bmp",
+].join(",");
+
 export default function ImportPanel({
   previewDoc,
   onPreviewImage,
@@ -71,6 +95,7 @@ export default function ImportPanel({
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const sourcePreviewRef = useRef<HTMLDivElement>(null);
   const cropDragRef = useRef<CropDragState | null>(null);
+  const validationRequestRef = useRef(0);
   const [gridWidth, setGridWidth] = useState(32);
   const [gridHeight, setGridHeight] = useState(32);
   const [frameMode, setFrameMode] = useState<ImageFrameMode>("cover");
@@ -95,6 +120,7 @@ export default function ImportPanel({
     useState<Partial<ImageImportOptions> | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [isInspectingFile, setIsInspectingFile] = useState(false);
 
   const imageOptions = useMemo<Partial<ImageImportOptions>>(
     () => ({
@@ -253,11 +279,14 @@ export default function ImportPanel({
   );
 
   const processFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
+      const requestNumber = validationRequestRef.current + 1;
+      validationRequestRef.current = requestNumber;
       setImportError(null);
       const fileKind = getImportFileKind(file);
 
       if (fileKind === "json") {
+        setIsInspectingFile(false);
         setLastImageFile(null);
         setLastAppliedOptions(null);
         const reader = new FileReader();
@@ -270,14 +299,44 @@ export default function ImportPanel({
         };
         reader.onerror = () => setImportError("Could not read that JSON file.");
         reader.readAsText(file);
-      } else if (fileKind === "image") {
+        return;
+      }
+
+      if (fileKind === "unsupported") {
+        setIsInspectingFile(false);
+        setImportError(
+          "Unsupported file. Choose PNG, JPG, GIF, WebP, AVIF, BMP, or Studio JSON. SVG, HEIC, and TIFF are not accepted.",
+        );
+        return;
+      }
+
+      if (file.size > LOCAL_IMAGE_LIMITS.bytes) {
+        setIsInspectingFile(false);
+        setImportError("That image is larger than the 15 MB local limit.");
+        return;
+      }
+
+      setIsInspectingFile(true);
+      try {
+        const dimensions = await decodeImageDimensions(file);
+        if (validationRequestRef.current !== requestNumber) return;
+        const dimensionError = validateDecodedDimensions(dimensions);
+        if (dimensionError) {
+          setImportError(dimensionError);
+          return;
+        }
         setLastImageFile(file);
         setLastAppliedOptions(imageOptions);
         onPreviewImage(file, imageOptions);
-      } else {
+      } catch {
+        if (validationRequestRef.current !== requestNumber) return;
         setImportError(
-          "Unsupported file. Use PNG, JPG, GIF, WebP, AVIF, BMP, or JSON.",
+          "This browser could not decode that image. Try PNG, JPG, or WebP, or convert the file before importing.",
         );
+      } finally {
+        if (validationRequestRef.current === requestNumber) {
+          setIsInspectingFile(false);
+        }
       }
     },
     [imageOptions, onPreviewImage, onImportJson],
@@ -289,7 +348,7 @@ export default function ImportPanel({
       setIsDragOver(false);
       const file = e.dataTransfer.files[0];
       if (!file) return;
-      processFile(file);
+      void processFile(file);
     },
     [processFile],
   );
@@ -308,7 +367,7 @@ export default function ImportPanel({
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) processFile(file);
+      if (file) void processFile(file);
       e.currentTarget.value = "";
     },
     [processFile],
@@ -516,7 +575,7 @@ export default function ImportPanel({
       <div>
         <p className="section-header mb-1">Import</p>
         <p className="text-xs text-muted-foreground">
-          Drop a character, face, logo, meme, or JSON file to begin.
+          Drop a character, face, logo, meme, or Studio JSON file to begin.
         </p>
       </div>
 
@@ -538,37 +597,36 @@ export default function ImportPanel({
         <p className="text-xs text-muted-foreground mb-3">Drag & drop here</p>
         <div className="flex items-center justify-center gap-2">
           <Button
-            asChild
+            type="button"
             variant="outline"
             size="sm"
-            className={`cursor-pointer text-xs ${
-              isLoading ? "pointer-events-none opacity-50" : ""
-            }`}
+            className="text-xs"
+            disabled={isLoading || isInspectingFile}
+            aria-describedby="studio-supported-formats"
+            onClick={() => fileInputRef.current?.click()}
           >
-            <label htmlFor="ltg-image-input" aria-disabled={isLoading}>
-              <ImageIcon className="w-3 h-3 mr-1" />
-              Image
-            </label>
+            <ImageIcon className="w-3 h-3 mr-1" />
+            Image
           </Button>
           <Button
-            asChild
+            type="button"
             variant="outline"
             size="sm"
-            className={`cursor-pointer text-xs ${
-              isLoading ? "pointer-events-none opacity-50" : ""
-            }`}
+            className="text-xs"
+            disabled={isLoading || isInspectingFile}
+            onClick={() => jsonInputRef.current?.click()}
           >
-            <label htmlFor="ltg-json-input" aria-disabled={isLoading}>
-              <FileJson className="w-3 h-3 mr-1" />
-              JSON
-            </label>
+            <FileJson className="w-3 h-3 mr-1" />
+            JSON
           </Button>
         </div>
         <input
           id="ltg-image-input"
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp"
+          accept={IMAGE_INPUT_ACCEPT}
+          aria-hidden="true"
+          tabIndex={-1}
           className="sr-only"
           onChange={handleFileSelect}
         />
@@ -577,13 +635,38 @@ export default function ImportPanel({
           ref={jsonInputRef}
           type="file"
           accept=".json"
+          aria-hidden="true"
+          tabIndex={-1}
           className="sr-only"
           onChange={handleFileSelect}
         />
+        <p
+          id="studio-supported-formats"
+          className="mt-3 text-[0.68rem] font-medium leading-5 text-muted-foreground"
+        >
+          PNG, JPG, GIF (first frame), WebP, AVIF, or BMP · up to 15 MB, 8192px
+          per side, and 40 megapixels.
+        </p>
+        <p className="mt-1 text-[0.65rem] leading-4 text-muted-foreground">
+          SVG, HEIC, and TIFF are not supported. Source images stay in this
+          browser; only the converted grid is saved if you opt into cloud sync.
+        </p>
       </div>
 
+      {isInspectingFile ? (
+        <p
+          className="rounded-sm border border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground"
+          role="status"
+        >
+          Checking image format and dimensions…
+        </p>
+      ) : null}
+
       {importError && (
-        <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-3">
+        <div
+          className="rounded-sm border border-destructive/30 bg-destructive/10 p-3"
+          role="alert"
+        >
           <p className="text-xs leading-relaxed text-destructive">
             {importError}
           </p>
@@ -716,6 +799,57 @@ export default function ImportPanel({
                   Head
                 </Button>
               </div>
+              <fieldset className="rounded-sm border border-border/80 p-2.5">
+                <legend className="px-1 text-xs font-semibold">
+                  Crop values
+                </legend>
+                <p
+                  id="crop-keyboard-help"
+                  className="mb-2 text-[0.68rem] leading-4 text-muted-foreground"
+                >
+                  Enter percentages or use the arrow keys for precise framing.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <CropNumberControl
+                    id="studio-crop-x"
+                    label="Crop X"
+                    value={cropX}
+                    max={100 - cropWidth}
+                    onChange={(value) =>
+                      setCropValues(value, cropY, cropWidth, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-y"
+                    label="Crop Y"
+                    value={cropY}
+                    max={100 - cropHeight}
+                    onChange={(value) =>
+                      setCropValues(cropX, value, cropWidth, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-width"
+                    label="Crop width"
+                    value={cropWidth}
+                    min={8}
+                    max={100 - cropX}
+                    onChange={(value) =>
+                      setCropValues(cropX, cropY, value, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-height"
+                    label="Crop height"
+                    value={cropHeight}
+                    min={8}
+                    max={100 - cropY}
+                    onChange={(value) =>
+                      setCropValues(cropX, cropY, cropWidth, value)
+                    }
+                  />
+                </div>
+              </fieldset>
             </div>
           )}
           <Button
@@ -724,7 +858,7 @@ export default function ImportPanel({
             className="w-full justify-start text-xs"
             variant={hasPendingImageChanges ? "default" : "outline"}
             onClick={handleReprocessImage}
-            disabled={isLoading}
+            disabled={isLoading || isInspectingFile}
             aria-label="Update preview using the same source file"
           >
             <RefreshCw className="w-3.5 h-3.5 mr-2" />
@@ -738,7 +872,7 @@ export default function ImportPanel({
                 size="sm"
                 className="text-xs"
                 onClick={onCommitPreview}
-                disabled={isLoading || !hasCurrentPreview}
+                disabled={isLoading || isInspectingFile || !hasCurrentPreview}
               >
                 Commit Preview
               </Button>
@@ -748,7 +882,7 @@ export default function ImportPanel({
                 className="text-xs"
                 variant="outline"
                 onClick={handleCancelPreview}
-                disabled={isLoading}
+                disabled={isLoading || isInspectingFile}
               >
                 Cancel
               </Button>
@@ -1084,6 +1218,53 @@ export default function ImportPanel({
   );
 }
 
+function CropNumberControl({
+  id,
+  label,
+  value,
+  min = 0,
+  max,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min?: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <Label htmlFor={id} className="text-[0.68rem] text-muted-foreground">
+        {label}
+      </Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          step={1}
+          value={value}
+          aria-describedby="crop-keyboard-help"
+          className="h-8 pr-7 font-mono text-xs"
+          onChange={(event) => {
+            const nextValue = event.currentTarget.valueAsNumber;
+            if (Number.isFinite(nextValue)) onChange(nextValue);
+          }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[0.65rem] text-muted-foreground"
+        >
+          %
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function areImageOptionsEqual(
   a: Partial<ImageImportOptions>,
   b: Partial<ImageImportOptions> | null,
@@ -1231,20 +1412,114 @@ function getSourceSquareCrop(
 
 type ImportFileKind = "image" | "json" | "unsupported";
 
-const IMAGE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "avif",
-  "bmp",
+const IMAGE_TYPES_BY_EXTENSION = new Map<string, ReadonlySet<string>>([
+  ["png", new Set(["image/png"])],
+  ["jpg", new Set(["image/jpeg"])],
+  ["jpeg", new Set(["image/jpeg"])],
+  ["gif", new Set(["image/gif"])],
+  ["webp", new Set(["image/webp"])],
+  ["avif", new Set(["image/avif"])],
+  ["bmp", new Set(["image/bmp", "image/x-ms-bmp"])],
+]);
+
+const ALLOWED_IMAGE_MIME_TYPES = new Set(
+  Array.from(IMAGE_TYPES_BY_EXTENSION.values()).flatMap((types) =>
+    Array.from(types),
+  ),
+);
+
+const ALLOWED_JSON_MIME_TYPES = new Set([
+  "application/json",
+  "text/json",
+  "text/plain",
 ]);
 
 function getImportFileKind(file: File): ImportFileKind {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (extension === "json" || file.type === "application/json") return "json";
-  if (file.type.startsWith("image/") || IMAGE_EXTENSIONS.has(extension))
-    return "image";
+  const mimeType = file.type.trim().toLowerCase();
+  if (
+    (extension === "json" &&
+      (!mimeType || ALLOWED_JSON_MIME_TYPES.has(mimeType))) ||
+    (!extension && mimeType === "application/json")
+  ) {
+    return "json";
+  }
+
+  const allowedForExtension = IMAGE_TYPES_BY_EXTENSION.get(extension);
+  if (allowedForExtension) {
+    return !mimeType || allowedForExtension.has(mimeType)
+      ? "image"
+      : "unsupported";
+  }
+
+  if (!extension && ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) return "image";
   return "unsupported";
+}
+
+interface DecodedImageDimensions {
+  height: number;
+  width: number;
+}
+
+async function decodeImageDimensions(
+  file: File,
+): Promise<DecodedImageDimensions> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const dimensions = { height: bitmap.height, width: bitmap.width };
+      bitmap.close();
+      return dimensions;
+    } catch {
+      // Some browsers can display a format that createImageBitmap cannot
+      // decode. The HTML image fallback keeps support capability-based.
+    }
+  }
+
+  return await new Promise<DecodedImageDimensions>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    const finish = () => {
+      image.onload = null;
+      image.onerror = null;
+      URL.revokeObjectURL(objectUrl);
+    };
+    image.onload = () => {
+      const dimensions = {
+        height: image.naturalHeight,
+        width: image.naturalWidth,
+      };
+      finish();
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      finish();
+      reject(new Error("Image decoding failed"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function validateDecodedDimensions({
+  height,
+  width,
+}: DecodedImageDimensions): string | null {
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1
+  ) {
+    return "That image does not have valid pixel dimensions.";
+  }
+  if (
+    width > LOCAL_IMAGE_LIMITS.dimension ||
+    height > LOCAL_IMAGE_LIMITS.dimension
+  ) {
+    return "Image dimensions must not exceed 8192×8192 pixels.";
+  }
+  if (width * height > LOCAL_IMAGE_LIMITS.pixels) {
+    return "That image contains more than the 40 megapixel local limit.";
+  }
+  return null;
 }

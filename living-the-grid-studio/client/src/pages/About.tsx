@@ -115,9 +115,10 @@ export default function About() {
             <ShieldCheck className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Privacy on principle</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Photos never leave the browser. The password check uses k-anonymity
-              against Have I Been Pwned. No accounts, no tracking until you opt
-              in via the cookie banner.
+              Studio imports stay in the browser. Cloud saving, publishing, and
+              showcase-image uploads are separate choices. The password check
+              uses k-anonymity against Have I Been Pwned, and non-essential
+              analytics waits for your cookie choice.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">

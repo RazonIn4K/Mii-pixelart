@@ -2,6 +2,7 @@
 
 This document complements
 [`ADR 0001`](adr/0001-workers-community-platform.md) and the
+[`showcase-image decision`](adr/0002-creation-showcase-images.md), plus the
 [`threat model`](community-threat-model.md). D1 is authoritative for identity,
 ownership, visibility, and object manifests. R2 never decides access.
 
@@ -24,7 +25,7 @@ flowchart LR
   Worker <-->|"authorization code OIDC"| Google
   Worker <-->|"binding"| D1
   Worker <-->|"binding"| R2
-  Worker -->|"generated pixels only"| Images
+  Worker -->|"generated pixels or bounded showcase input"| Images
   Images -->|"transcoded bytes"| Worker
   Worker <-->|"binding"| KV
   Scheduler --> D1
@@ -125,6 +126,36 @@ private media is `Cache-Control: private, no-store`. Project JSON is downloadabl
 by the owner, or by a viewer only when the published creation explicitly enables
 downloads.
 
+## Optional showcase-image flow
+
+```mermaid
+sequenceDiagram
+  participant B as Owner browser
+  participant W as Worker
+  participant D as D1
+  participant X as Images
+  participant R as Private R2
+
+  B->>W: POST image ticket JSON with cookie
+  W->>W: Authenticate owner, exact Origin, limits and quota
+  W->>D: Store hash of ten-minute one-use ticket
+  W-->>B: Bearer ticket + same-origin upload URL
+  B->>W: PUT raw bytes (credentials omit, Bearer ticket)
+  W->>D: Atomically consume ticket and reserve image slot
+  W->>X: Decode, inspect, resize; animation disabled
+  X-->>W: display.webp + thumb.webp + social.jpg
+  W->>R: PUT generated variants under generated keys
+  W->>D: Commit ready manifest, sizes, order, cover
+  W-->>B: Normalized image record and gallery
+  Note over W,R: Raw bytes, filename, and metadata are never persisted
+```
+
+The showcase gallery is optional and belongs to an existing grid creation. It
+does not upload the Studio import source automatically and does not create an
+image-only post. Public, unlisted, and private reads always derive access from
+the parent creation in D1. A failed Images/R2/D1 step cleans generated objects
+without changing the current project revision.
+
 ## Reports, moderation, and deletion
 
 ```mermaid
@@ -158,9 +189,15 @@ sequenceDiagram
   `private/creations/{creationId}/{revisionId}/{kind.ext}`.
 - `creation_objects` records kind, key, content type, byte size, SHA-256, and
   state for every R2 object.
+- `creation_showcase_images` records decoded dimensions, plain-text alt text,
+  order, cover, ticket state, and lifecycle state. `creation_showcase_objects`
+  records each generated variant key, hash, content type, and byte size. Raw
+  source objects do not exist.
 - A user may own at most 100 creations and 50 MiB across all manifested cloud
   objects; a single canonical project JSON is at most 2 MiB.
 - The Worker streams account NDJSON export records and never buffers the full
   account quota.
 - Generated avatars derive from `avatar_seed` and the original Island Workshop
-  palette. No user image/avatar upload exists in v1.
+  palette. Profile-image uploads remain unsupported. Optional showcase images
+  are explicit attachments to an existing cloud creation, not avatar or
+  general-purpose file uploads.

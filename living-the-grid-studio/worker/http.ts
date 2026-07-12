@@ -173,6 +173,17 @@ export async function readText(request: Request, maxBytes: number): Promise<stri
   return new TextDecoder().decode(await readBoundedBody(request, maxBytes));
 }
 
+export async function readBytes(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new HttpError(413, "payload_too_large", "Request body is too large.");
+  }
+  return readBoundedBody(request, maxBytes);
+}
+
 export async function parseJson<TSchema extends z.ZodType>(
   request: Request,
   schema: TSchema,
@@ -235,6 +246,35 @@ export function assertSafeOrigin(context: WorkerRequestContext): void {
   const contentType = context.request.headers.get("content-type")?.toLowerCase() ?? "";
   const isOidcFormStart = context.url.pathname === "/api/auth/google/start"
     && contentType.startsWith("application/x-www-form-urlencoded");
+  const isRawCreationImageUpload = context.request.method === "PUT"
+    && /^\/api\/creation-image-uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/content\/?$/iu
+      .test(context.url.pathname);
+  if (isRawCreationImageUpload) {
+    if (context.request.headers.has("cookie")) {
+      throw new HttpError(
+        403,
+        "upload_cookie_rejected",
+        "Image upload requests must not include browser credentials.",
+      );
+    }
+    if (!/^Bearer [A-Za-z0-9_-]{43}$/u.test(context.request.headers.get("authorization") ?? "")) {
+      throw new HttpError(401, "invalid_upload_ticket", "Image upload ticket is invalid or expired.");
+    }
+    if (![
+      "image/heic",
+      "image/heif",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ].includes(contentType)) {
+      throw new HttpError(
+        415,
+        "unsupported_image_type",
+        "Use a JPEG, PNG, WebP, HEIC, or HEIF image.",
+      );
+    }
+    return;
+  }
   if (!isOidcFormStart && !contentType.startsWith("application/json")) {
     throw new HttpError(415, "unsupported_media_type", "Unsafe requests must use application/json.");
   }

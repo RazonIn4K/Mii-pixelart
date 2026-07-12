@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, Send } from "lucide-react";
+import { CheckCircle2, Eye, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,8 @@ import { communityApi, jsonBody, messageFromError } from "@/lib/community/api";
 import type { GridDocument } from "@/lib/engine/grid";
 import { TOMODACHI_PALETTE } from "@/lib/engine/palette";
 import type { CreationSummary, CreationVisibility, PublishInput } from "@/lib/community/types";
+import { ShareCreationActions } from "./ShareCreationActions";
+import { ShowcaseImageManager } from "./ShowcaseImageManager";
 
 const PALETTE_HEX = new Map(TOMODACHI_PALETTE.map((color) => [color.id, color.hex]));
 
@@ -96,6 +98,8 @@ export function PublishDialog({
   const [downloadEnabled, setDownloadEnabled] = useState(initial?.downloadEnabled ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [publishedResult, setPublishedResult] = useState<CreationSummary | null>(null);
+  const [showcaseBusy, setShowcaseBusy] = useState(true);
 
   useEffect(() => {
     if (firstPublish && !commentsTouched) setCommentsEnabled(visibility === "public");
@@ -131,6 +135,10 @@ export function PublishDialog({
   const previewSource = previewDataUrl ?? initial?.previewUrl ?? initial?.thumbnailUrl;
 
   const publish = async () => {
+    if (showcaseBusy) {
+      toast.error("Wait for the showcase image change to finish before publishing.");
+      return;
+    }
     const payload: PublishInput = {
       title: title.trim(),
       description: description.trim(),
@@ -158,10 +166,10 @@ export function PublishDialog({
         }),
       });
       onPublished?.(result.data);
+      setPublishedResult(result.data);
       toast.success(firstPublish
         ? visibility === "public" ? "Published to Discover" : "Unlisted share link is ready"
         : "Publishing settings updated");
-      setOpen(false);
     } catch (error) {
       toast.error(messageFromError(error));
     } finally {
@@ -170,11 +178,46 @@ export function PublishDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) setShowcaseBusy(true);
+        else setPublishedResult(null);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger ?? <Button type="button"><Send /> Review & publish</Button>}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        {publishedResult ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="text-[var(--island-mint-dark)]" /> Your share page is ready</DialogTitle>
+              <DialogDescription>
+                {publishedResult.visibility === "public"
+                  ? "It can now appear in Discover, search, and your creator profile."
+                  : "It stays out of search and profiles, but anyone with the link can view it."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-2xl border-2 border-[var(--island-ink)] bg-[var(--island-blue-soft)] p-5 shadow-[4px_4px_0_var(--island-ink)]">
+              <p className="island-kicker">Published successfully</p>
+              <h3 className="mt-2 text-2xl font-black text-[var(--island-ink)]">{publishedResult.title}</h3>
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--island-ink)]/65">Open the creation page, copy its stable link, or use your device share sheet.</p>
+              <div className="mt-5">
+                <ShareCreationActions
+                  path={`/creation/${encodeURIComponent(publishedResult.slug)}`}
+                  title={publishedResult.title}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setPublishedResult(null); setOpen(false); }}>Continue editing</Button>
+              <Button type="button" onClick={() => { setShowcaseBusy(true); setPublishedResult(null); }}>Edit publishing settings</Button>
+            </DialogFooter>
+          </>
+        ) : (
+        <>
         <DialogHeader>
           <DialogTitle>{firstPublish ? "Review before publishing" : "Edit publishing settings"}</DialogTitle>
           <DialogDescription>
@@ -201,6 +244,11 @@ export function PublishDialog({
               </figcaption>
             </figure>
           ) : null}
+          <ShowcaseImageManager
+            creationId={creationId}
+            readOnly={initial?.status === "published"}
+            onBusyChange={setShowcaseBusy}
+          />
           <div className="space-y-2">
             <Label htmlFor={`publish-title-${creationId}`}>Title</Label>
             <Input id={`publish-title-${creationId}`} value={title} onChange={(event) => setTitle(event.target.value.slice(0, 80))} maxLength={80} />
@@ -267,7 +315,7 @@ export function PublishDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>{firstPublish ? "Keep private" : "Cancel"}</Button>
-          <Button type="button" onClick={publish} disabled={submitting}>
+          <Button type="button" onClick={publish} disabled={submitting || showcaseBusy}>
             {submitting
               ? firstPublish ? "Publishing…" : "Saving…"
               : firstPublish
@@ -275,6 +323,8 @@ export function PublishDialog({
                 : "Save publishing settings"}
           </Button>
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -7,14 +7,34 @@
  * Thin top bar with project name and minimal controls.
  */
 
-import { lazy, Suspense, useState, useCallback, useEffect } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "wouter";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
-import { AlertTriangle, Undo2, Redo2, Grid3X3, Hash, Home } from "lucide-react";
+import {
+  AlertTriangle,
+  Compass,
+  FolderOpen,
+  Grid2x2Plus,
+  Grid3X3,
+  Hash,
+  Home,
+  ImageUp,
+  Redo2,
+  ShieldCheck,
+  Sparkles,
+  Undo2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +44,10 @@ import { toast } from "sonner";
 import { useGridDocument } from "@/hooks/useGridDocument";
 import CanvasViewer from "@/components/studio/CanvasViewer";
 import type { PaintTool } from "@/components/studio/CreationPanel";
+import {
+  StudioWorkflowNav,
+  type StudioPanel,
+} from "@/components/studio/StudioWorkflowNav";
 import { CloudProjectControls } from "@/components/community/CloudProjectControls";
 // ResidentPanel + Island tab removed — feature wasn't being used and the
 // ResidentSpec sidecar lived only in the AI tab's "validate JSON" path which
@@ -49,7 +73,12 @@ export default function Studio() {
     "Studio",
     "Browser-first Mii pixel-art editor. Import a photo or character art, reduce colors to a paintable palette, and export a paint-by-numbers reference.",
   );
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Studio", href: "/studio" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Studio", href: "/studio" },
+    ]),
+  ]);
   const {
     doc,
     imagePreview,
@@ -83,6 +112,8 @@ export default function Studio() {
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [paintTool, setPaintTool] = useState<PaintTool>("inspect");
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
+  const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const imagePickerRequestRef = useRef(0);
   const visibleDoc = imagePreview ?? doc;
 
   // Keyboard shortcuts
@@ -252,6 +283,46 @@ export default function Studio() {
     [createNew],
   );
 
+  const revealPanel = useCallback((panel: StudioPanel) => {
+    setActivePanel(panel);
+    window.requestAnimationFrame(() => {
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        document.getElementById("studio-tools")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    });
+  }, []);
+
+  const handleChooseImage = useCallback(() => {
+    setActivePanel("import");
+    const requestNumber = imagePickerRequestRef.current + 1;
+    imagePickerRequestRef.current = requestNumber;
+    const openWhenReady = (attempt: number) => {
+      if (imagePickerRequestRef.current !== requestNumber) return;
+      const input = document.getElementById("ltg-image-input");
+      if (input) {
+        input.click();
+        return;
+      }
+      if (attempt >= 200) {
+        toast.error(
+          "The import tools are still opening. Try Upload an image again.",
+        );
+        return;
+      }
+      window.setTimeout(() => openWhenReady(attempt + 1), 25);
+    };
+    openWhenReady(0);
+  }, []);
+
+  const handleStartBlank = useCallback(() => {
+    handleCreateCanvas(64, 64, "Untitled Canvas", null);
+    setPaintTool("pencil");
+    setActivePanel("create");
+  }, [handleCreateCanvas]);
+
   const handleCreateTemplate = useCallback(
     (templateId: CreativeTemplateId) => {
       const templateDoc = createCreativeTemplateDocument(templateId);
@@ -293,7 +364,7 @@ export default function Studio() {
   );
 
   return (
-    <div className="flex h-screen min-w-0 flex-col">
+    <div className="flex min-h-svh min-w-0 flex-col md:h-screen md:min-h-0">
       {/* Top Bar */}
       <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-border bg-background px-2 sm:h-11 sm:flex-nowrap sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
@@ -308,6 +379,34 @@ export default function Studio() {
             {doc?.meta.name ?? "Tomodachi Studio"}
           </span>
         </div>
+
+        <nav
+          aria-label="Studio destinations"
+          className="order-last flex w-full min-w-0 items-center gap-1 border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0"
+        >
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 min-w-0 flex-1 px-2 text-xs sm:size-8 sm:flex-none sm:px-0 lg:h-8 lg:w-auto lg:px-2.5"
+          >
+            <Link href="/discover" aria-label="Explore community">
+              <Compass className="size-3.5" />
+              <span className="sm:hidden lg:inline">Community</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 min-w-0 flex-1 px-2 text-xs sm:size-8 sm:flex-none sm:px-0 lg:h-8 lg:w-auto lg:px-2.5"
+          >
+            <Link href="/me/projects" aria-label="Open my projects">
+              <FolderOpen className="size-3.5" />
+              <span className="sm:hidden lg:inline">My Projects</span>
+            </Link>
+          </Button>
+        </nav>
 
         <div className="order-last flex w-full min-w-0 items-center justify-end border-t border-border/60 py-1 sm:order-none sm:w-auto sm:border-0 sm:py-0">
           <CloudProjectControls doc={doc} onLoadDocument={setDoc} />
@@ -402,10 +501,13 @@ export default function Studio() {
 
       {/* Main Content — stacks vertically on mobile (<768px) so the
           right panel doesn't push the canvas off-screen. Side-by-side on md+. */}
-      <main id="main-content" className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <main
+        id="main-content"
+        className="flex min-w-0 flex-1 flex-col md:min-h-0 md:flex-row md:overflow-hidden"
+      >
         <h1 className="sr-only">Tomodachi Studio pixel editor</h1>
         {/* Canvas Area (full width on mobile, ~65% on desktop) */}
-        <div className="flex-1 min-w-0 p-3 min-h-[60vh] md:min-h-0">
+        <div className="min-h-[52svh] min-w-0 flex-none p-3 sm:min-h-[58svh] md:min-h-0 md:flex-1">
           {visibleDoc ? (
             <div className="relative w-full h-full">
               {imagePreview && (
@@ -435,31 +537,73 @@ export default function Studio() {
               />
             </div>
           ) : (
-            <div className="w-full h-full graph-paper-fine rounded-sm border border-border flex items-center justify-center">
-              <div className="text-center max-w-xs">
+            <div className="flex h-full w-full items-center justify-center rounded-xl border border-border bg-[linear-gradient(to_right,hsl(var(--border)/0.32)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.32)_1px,transparent_1px)] bg-[size:22px_22px] px-4 py-8 sm:px-8">
+              <section
+                className="w-full max-w-2xl rounded-[1.5rem] border border-border bg-background/95 p-5 text-center shadow-lg backdrop-blur sm:p-8"
+                aria-labelledby="studio-start-title"
+              >
                 <img
                   src={EMPTY_STATE_IMG}
-                  alt="Empty graph paper"
-                  className="w-48 h-auto mx-auto mb-4 rounded-sm opacity-60"
+                  alt="An empty sheet of graph paper ready for a new pixel creation"
+                  className="mx-auto mb-4 h-24 w-24 rounded-2xl object-cover opacity-70 sm:h-28 sm:w-28"
                   width={1434}
                   height={1920}
                   loading="lazy"
                   decoding="async"
                 />
-                <p className="text-sm text-muted-foreground mb-1">
-                  No project open
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-primary">
+                  New local project
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Import an image or JSON file from the panel on the right to
-                  get started.
+                <h2
+                  id="studio-start-title"
+                  className="mt-2 text-2xl font-black tracking-[-0.035em] sm:text-3xl"
+                >
+                  What would you like to make?
+                </h2>
+                <p className="mx-auto mt-2 max-w-lg text-xs leading-5 text-muted-foreground sm:text-sm">
+                  Turn an image into a paintable grid, begin with a clean 64×64
+                  canvas, or choose a starter design.
                 </p>
-              </div>
+                <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                  <Button
+                    type="button"
+                    className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
+                    onClick={handleChooseImage}
+                  >
+                    <ImageUp /> Upload an image
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
+                    onClick={handleStartBlank}
+                  >
+                    <Grid2x2Plus /> Start blank
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
+                    onClick={() => revealPanel("create")}
+                  >
+                    <Sparkles /> Browse starters
+                  </Button>
+                </div>
+                <p className="mt-5 inline-flex items-center gap-1.5 text-[0.68rem] font-semibold text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  Source images stay on this device. Anonymous editing and
+                  export remain available.
+                </p>
+              </section>
             </div>
           )}
         </div>
 
         {/* Right Panel (full width on mobile below canvas, ~320px / 384px on md/lg) */}
-        <div className="flex max-h-[50vh] w-full min-w-0 shrink-0 flex-col overflow-hidden border-t border-border bg-background md:max-h-none md:w-80 md:border-l md:border-t-0 lg:w-96">
+        <div
+          id="studio-tools"
+          className="flex min-h-[34rem] w-full min-w-0 shrink-0 scroll-mt-2 flex-col overflow-hidden border-t border-border bg-background md:min-h-0 md:w-80 md:border-l md:border-t-0 lg:w-96"
+        >
           {mergeSource && (
             <div className="px-4 py-2 bg-accent border-b border-border">
               <p className="text-xs">
@@ -491,133 +635,97 @@ export default function Studio() {
           ) : null}
 
           <Tabs
-            defaultValue="import"
+            value={activePanel}
+            onValueChange={(value) => setActivePanel(value as StudioPanel)}
             className="min-w-0 flex-1 flex-col overflow-hidden"
           >
-            <TabsList className="h-9 w-full max-w-full overflow-x-auto rounded-none border-b border-border bg-transparent px-2">
-              <TabsTrigger
-                value="import"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Import
-              </TabsTrigger>
-              <TabsTrigger
-                value="create"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Create
-              </TabsTrigger>
-              <TabsTrigger
-                value="palette"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Palette
-              </TabsTrigger>
-              <TabsTrigger
-                value="optimize"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Optimize
-              </TabsTrigger>
-              <TabsTrigger
-                value="ai"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                AI
-              </TabsTrigger>
-              <TabsTrigger
-                value="export"
-                className="text-xs data-[state=active]:bg-accent rounded-sm"
-              >
-                Export
-              </TabsTrigger>
-            </TabsList>
+            <StudioWorkflowNav />
 
             <div className="flex-1 overflow-auto">
               <Suspense fallback={<PanelLoading />}>
-              <TabsContent value="import" className="mt-0">
-                <ImportPanel
-                  previewDoc={imagePreview}
-                  onPreviewImage={previewFromImage}
-                  onCommitPreview={handleCommitImagePreview}
-                  onCancelPreview={handleCancelImagePreview}
-                  onImportJson={importFromJson}
-                  isLoading={isLoading}
-                />
-              </TabsContent>
-
-              <TabsContent value="create" className="mt-0">
-                {imagePreview ? (
-                  <PreviewBlockedPanel title="Create" />
-                ) : (
-                  <CreationPanel
-                    activeTool={paintTool}
-                    currentDoc={doc}
-                    selectedColorId={selectedPaintColorId}
-                    onActiveToolChange={setPaintTool}
-                    onCreateCanvas={handleCreateCanvas}
-                    onCreateTemplate={handleCreateTemplate}
-                    onResampleCanvas={resampleCanvas}
-                    onSelectedColorChange={setSelectedPaintColorId}
+                <TabsContent value="import" className="mt-0">
+                  <ImportPanel
+                    previewDoc={imagePreview}
+                    onPreviewImage={previewFromImage}
+                    onCommitPreview={handleCommitImagePreview}
+                    onCancelPreview={handleCancelImagePreview}
+                    onImportJson={importFromJson}
+                    isLoading={isLoading}
                   />
-                )}
-              </TabsContent>
+                </TabsContent>
 
-              {/* Island tab removed in Pass 19. */}
+                <TabsContent value="create" className="mt-0">
+                  {imagePreview ? (
+                    <PreviewBlockedPanel title="Create" />
+                  ) : (
+                    <CreationPanel
+                      activeTool={paintTool}
+                      currentDoc={doc}
+                      selectedColorId={selectedPaintColorId}
+                      onActiveToolChange={setPaintTool}
+                      onCreateCanvas={handleCreateCanvas}
+                      onCreateTemplate={handleCreateTemplate}
+                      onResampleCanvas={resampleCanvas}
+                      onSelectedColorChange={setSelectedPaintColorId}
+                    />
+                  )}
+                </TabsContent>
 
-              <TabsContent value="palette" className="mt-0 h-full">
-                {imagePreview ? (
-                  <PreviewBlockedPanel title="Palette" />
-                ) : doc ? (
-                  <PalettePanel
-                    usedColors={doc.usedColors}
-                    colorCounts={colorCounts}
-                    lockedColors={doc.lockedColors}
-                    highlightColorId={highlightColorId}
-                    onColorHover={setHighlightColorId}
-                    onColorClick={handleColorClick}
-                    onToggleLock={toggleColorLock}
-                    onMergeRequest={handleMergeRequest}
+                {/* Island tab removed in Pass 19. */}
+
+                <TabsContent value="palette" className="mt-0 h-full">
+                  {imagePreview ? (
+                    <PreviewBlockedPanel title="Palette" />
+                  ) : doc ? (
+                    <PalettePanel
+                      usedColors={doc.usedColors}
+                      colorCounts={colorCounts}
+                      lockedColors={doc.lockedColors}
+                      highlightColorId={highlightColorId}
+                      onColorHover={setHighlightColorId}
+                      onColorClick={handleColorClick}
+                      onToggleLock={toggleColorLock}
+                      onMergeRequest={handleMergeRequest}
+                    />
+                  ) : (
+                    <div className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        Import a file to see the palette.
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="optimize" className="mt-0">
+                  <OptimizerPanel
+                    currentColorCount={doc?.usedColors.length ?? 0}
+                    onRunOptimizer={runOptimizer}
+                    disabled={!doc || !!imagePreview}
                   />
-                ) : (
-                  <div className="p-4 text-center">
-                    <p className="text-xs text-muted-foreground">
-                      Import a file to see the palette.
-                    </p>
-                  </div>
-                )}
-              </TabsContent>
+                  {imagePreview && <PreviewBlockedPanel title="Optimizer" />}
+                </TabsContent>
 
-              <TabsContent value="optimize" className="mt-0">
-                <OptimizerPanel
-                  currentColorCount={doc?.usedColors.length ?? 0}
-                  onRunOptimizer={runOptimizer}
-                  disabled={!doc || !!imagePreview}
-                />
-                {imagePreview && <PreviewBlockedPanel title="Optimizer" />}
-              </TabsContent>
+                <TabsContent value="ai" className="mt-0">
+                  {imagePreview ? (
+                    <PreviewBlockedPanel title="AI Draw" />
+                  ) : (
+                    <AiPanel
+                      currentDoc={doc}
+                      onApplySketch={handleApplyAiSketch}
+                    />
+                  )}
+                </TabsContent>
 
-              <TabsContent value="ai" className="mt-0">
-                {imagePreview ? (
-                  <PreviewBlockedPanel title="AI Draw" />
-                ) : (
-                  <AiPanel
-                    currentDoc={doc}
-                    onApplySketch={handleApplyAiSketch}
+                <TabsContent value="export" className="mt-0">
+                  <ExportPanel
+                    doc={imagePreview ? null : doc}
+                    disabledReason={
+                      imagePreview
+                        ? "Commit or cancel the image preview before exporting."
+                        : undefined
+                    }
                   />
-                )}
-              </TabsContent>
-
-              <TabsContent value="export" className="mt-0">
-                <ExportPanel
-                  doc={imagePreview ? null : doc}
-                  disabledReason={
-                    imagePreview
-                      ? "Commit or cancel the image preview before exporting."
-                      : undefined
-                  }
-                />
-              </TabsContent>
+                </TabsContent>
               </Suspense>
             </div>
           </Tabs>
@@ -628,7 +736,14 @@ export default function Studio() {
 }
 
 function PanelLoading() {
-  return <div className="p-4 text-xs font-medium text-muted-foreground" role="status">Opening tools…</div>;
+  return (
+    <div
+      className="p-4 text-xs font-medium text-muted-foreground"
+      role="status"
+    >
+      Opening tools…
+    </div>
+  );
 }
 
 function PreviewBlockedPanel({ title }: { title: string }) {

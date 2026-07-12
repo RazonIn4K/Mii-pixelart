@@ -20,6 +20,18 @@ interface SaveResponse {
   revision: number;
 }
 
+function publicationFromCreation(creation: CreationSummary): NonNullable<CloudProjectState["publication"]> {
+  return {
+    status: creation.status,
+    visibility: creation.visibility,
+    title: creation.title,
+    description: creation.description ?? "",
+    tags: creation.tags,
+    commentsEnabled: Boolean(creation.commentsEnabled),
+    downloadEnabled: Boolean(creation.downloadEnabled),
+  };
+}
+
 function quotedRevision(revision: number): string {
   return `"rev-${revision}"`;
 }
@@ -50,6 +62,38 @@ export function CloudProjectControls({
     }
   }, []);
 
+  const refreshCloudMetadata = useCallback(async (
+    state: CloudProjectState,
+    showError = false,
+  ): Promise<boolean> => {
+    try {
+      const result = await communityApi<CreationDetail>(
+        `/api/creations/${encodeURIComponent(state.creationId)}`,
+      );
+      setCloud((current) => {
+        if (!current || current.creationId !== state.creationId) return current;
+        const revisionChanged = result.data.revision !== current.revision;
+        return {
+          ...current,
+          slug: result.data.slug,
+          publication: publicationFromCreation(result.data),
+          ...(revisionChanged
+            ? {
+                saveState: "conflict" as const,
+                error: "A newer cloud revision exists.",
+              }
+            : {
+                etag: result.etag ?? quotedRevision(result.data.revision),
+              }),
+        };
+      });
+      return true;
+    } catch (error) {
+      if (showError) toast.error(messageFromError(error));
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (!doc) return;
     const timer = window.setTimeout(() => { void persistLocal(doc, cloud); }, 300);
@@ -58,7 +102,7 @@ export function CloudProjectControls({
 
   const firstSave = useCallback(async (document: GridDocument) => {
     if (!user) return;
-    if (!user.username) {
+    if (!user.username || user.termsAccepted !== true) {
       try {
         await markDraftForAuthResume(document);
         toast.info("Finish your public profile once before using cloud projects.");
@@ -86,6 +130,15 @@ export function CloudProjectControls({
         saveState: "saved",
         lastSavedAt: Date.now(),
         lastSyncedModifiedAt: document.meta.modifiedAt,
+        publication: {
+          status: "draft",
+          visibility: "private",
+          title: document.meta.name,
+          description: "",
+          tags: [],
+          commentsEnabled: false,
+          downloadEnabled: false,
+        },
       };
       lastSavedModifiedRef.current = document.meta.modifiedAt;
       setCloud(next);
@@ -112,7 +165,7 @@ export function CloudProjectControls({
           setCloudSignInRequired(true);
           return;
         }
-        if (!user.username) {
+        if (!user.username || user.termsAccepted !== true) {
           window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));
           return;
         }
@@ -132,6 +185,7 @@ export function CloudProjectControls({
             saveState: "saved",
             lastSavedAt: Date.now(),
             lastSyncedModifiedAt: result.data.project.meta.modifiedAt,
+            publication: publicationFromCreation(result.data),
           });
         } catch (error) {
           if (!canceled && error instanceof CommunityApiError && error.status === 401) {
@@ -169,11 +223,16 @@ export function CloudProjectControls({
             : dirty && !navigator.onLine
               ? "offline"
               : "saved";
-        setCloud({
+        const restoredCloud: CloudProjectState = {
           ...current.cloud,
           saveState: restoredState,
           error: restoredState === "saved" ? undefined : current.cloud.error,
-        });
+          // Always re-fetch publication metadata. Older IndexedDB records do
+          // not contain it, and settings may have changed on another route.
+          publication: undefined,
+        };
+        setCloud(restoredCloud);
+        if (navigator.onLine) await refreshCloudMetadata(restoredCloud);
       }
       toast.info(user && current.cloud?.userId === user.id ? "Restored your local draft and cloud sync status." : "Restored your local Studio draft.");
     })().catch(() => {
@@ -181,7 +240,7 @@ export function CloudProjectControls({
     });
 
     return () => { canceled = true; };
-  }, [onLoadDocument, status, user]);
+  }, [onLoadDocument, refreshCloudMetadata, status, user]);
 
   useEffect(() => {
     if (!resumeSaveRef.current || !doc || !user || cloud) return;
@@ -237,18 +296,24 @@ export function CloudProjectControls({
   useEffect(() => {
     if (!cloud) return;
     const flush = () => { void saveRevision(); };
+    const refreshMetadata = () => {
+      if (navigator.onLine) void refreshCloudMetadata(cloud);
+    };
     const flushWhenHidden = () => {
       if (document.visibilityState === "hidden") void saveRevision();
+      else refreshMetadata();
     };
     window.addEventListener("blur", flush);
+    window.addEventListener("focus", refreshMetadata);
     window.addEventListener("online", flush);
     document.addEventListener("visibilitychange", flushWhenHidden);
     return () => {
       window.removeEventListener("blur", flush);
+      window.removeEventListener("focus", refreshMetadata);
       window.removeEventListener("online", flush);
       document.removeEventListener("visibilitychange", flushWhenHidden);
     };
-  }, [cloud, saveRevision]);
+  }, [cloud, refreshCloudMetadata, saveRevision]);
 
   const requestFirstSave = async () => {
     if (!doc) return;
@@ -282,7 +347,17 @@ export function CloudProjectControls({
       if (!result.data.project) throw new Error("The cloud project has no document data.");
       onLoadDocument(result.data.project);
       lastSavedModifiedRef.current = result.data.project.meta.modifiedAt;
-      setCloud({ ...cloud, revision: result.data.revision, etag: result.etag ?? quotedRevision(result.data.revision), saveState: "saved", lastSavedAt: Date.now(), lastSyncedModifiedAt: result.data.project.meta.modifiedAt, error: undefined });
+      setCloud({
+        ...cloud,
+        revision: result.data.revision,
+        etag: result.etag ?? quotedRevision(result.data.revision),
+        saveState: "saved",
+        lastSavedAt: Date.now(),
+        lastSyncedModifiedAt: result.data.project.meta.modifiedAt,
+        error: undefined,
+        slug: result.data.slug,
+        publication: publicationFromCreation(result.data),
+      });
       toast.success("Loaded the cloud version");
     } catch (error) { toast.error(messageFromError(error)); } finally { setBusy(false); }
   };
@@ -322,7 +397,11 @@ export function CloudProjectControls({
   }
 
   const hasUnsavedChanges = lastSavedModifiedRef.current !== doc.meta.modifiedAt;
-  const canPublish = navigator.onLine && cloud.saveState === "saved" && !hasUnsavedChanges;
+  const publication = cloud.publication;
+  const canPublish = Boolean(publication)
+    && navigator.onLine
+    && cloud.saveState === "saved"
+    && !hasUnsavedChanges;
 
   return (
     <div className="flex min-w-0 max-w-full items-center justify-end gap-1.5">
@@ -330,16 +409,69 @@ export function CloudProjectControls({
         {cloud.saveState === "saving" ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : cloud.saveState === "offline" ? <CloudOff className="h-3.5 w-3.5" /> : cloud.saveState === "conflict" ? <TriangleAlert className="h-3.5 w-3.5 text-amber-600" /> : <Cloud className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" />}
         {cloud.saveState === "saving" ? "Saving…" : cloud.saveState === "offline" ? "Offline" : cloud.saveState === "conflict" ? "Conflict" : cloud.saveState === "error" ? "Save failed" : hasUnsavedChanges ? "Saving soon…" : `Saved · v${cloud.revision}`}
       </span>
-      {cloud.saveState === "conflict" ? <><Button type="button" size="sm" variant="outline" className="px-2 sm:px-3" onClick={() => void reloadCloud()} disabled={busy}>Use cloud</Button><Button type="button" size="sm" className="px-2 sm:px-3" onClick={() => void saveCopy()} disabled={busy}>Save copy</Button></> : (
-        <>{cloud.saveState === "error" ? <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void saveRevision()}>Retry save</Button> : null}<PublishDialog creationId={cloud.creationId} project={doc} beforePublish={() => {
-          const currentDocument = docRef.current;
-          const ready = Boolean(currentDocument)
-            && navigator.onLine
-            && cloud.saveState === "saved"
-            && lastSavedModifiedRef.current === currentDocument?.meta.modifiedAt;
-          if (!ready) toast.error("Wait for the private cloud save to finish before publishing.");
-          return ready;
-        }} initial={{ title: doc.meta.name, slug: cloud.slug, revision: cloud.revision }} onPublished={(creation: CreationSummary) => setCloud((current) => current ? { ...current, slug: creation.slug } : current)} trigger={<Button type="button" size="sm" className="h-8 rounded-full text-xs" disabled={!canPublish} title={canPublish ? "Review and publish" : "Wait for the private cloud save to finish"}>{hasUnsavedChanges ? "Saving first…" : "Publish"}</Button>} /></>
+      {cloud.saveState === "conflict" ? (
+        <>
+          <Button type="button" size="sm" variant="outline" className="px-2 sm:px-3" onClick={() => void reloadCloud()} disabled={busy}>Use cloud</Button>
+          <Button type="button" size="sm" className="px-2 sm:px-3" onClick={() => void saveCopy()} disabled={busy}>Save copy</Button>
+        </>
+      ) : (
+        <>
+          {cloud.saveState === "error" ? (
+            <Button type="button" size="sm" variant="outline" className="h-8 rounded-full text-xs" onClick={() => void saveRevision()}>Retry save</Button>
+          ) : null}
+          {!publication ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-full text-xs"
+              disabled={busy || !navigator.onLine}
+              onClick={() => {
+                setBusy(true);
+                void refreshCloudMetadata(cloud, true).finally(() => setBusy(false));
+              }}
+              title="Refresh the authoritative publishing settings before sharing"
+            >
+              {busy ? <LoaderCircle className="animate-spin" /> : <Cloud />}
+              Sync sharing
+            </Button>
+          ) : (
+            <PublishDialog
+              creationId={cloud.creationId}
+              project={doc}
+              beforePublish={() => {
+                const currentDocument = docRef.current;
+                const ready = Boolean(currentDocument)
+                  && navigator.onLine
+                  && cloud.saveState === "saved"
+                  && lastSavedModifiedRef.current === currentDocument?.meta.modifiedAt;
+                if (!ready) toast.error("Wait for the private cloud save to finish before publishing.");
+                return ready;
+              }}
+              initial={{
+                title: publication.title,
+                description: publication.description,
+                tags: publication.tags,
+                status: publication.status,
+                visibility: publication.visibility,
+                commentsEnabled: publication.commentsEnabled,
+                downloadEnabled: publication.downloadEnabled,
+                slug: cloud.slug,
+                revision: cloud.revision,
+              }}
+              onPublished={(creation: CreationSummary) => setCloud((current) => current ? {
+                ...current,
+                slug: creation.slug,
+                publication: publicationFromCreation(creation),
+              } : current)}
+              trigger={(
+                <Button type="button" size="sm" className="h-8 rounded-full text-xs" disabled={!canPublish} title={canPublish ? "Review and share" : "Wait for the private cloud save to finish"}>
+                  {hasUnsavedChanges ? "Saving first…" : publication.status === "published" ? "Share settings" : "Share"}
+                </Button>
+              )}
+            />
+          )}
+        </>
       )}
     </div>
   );

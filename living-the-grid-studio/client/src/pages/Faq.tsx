@@ -105,7 +105,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Do you store my photos or my password?",
         answer:
-          "No. The Studio runs entirely in your browser; uploaded images never leave the page. The password breach check uses k-anonymity, so we only see a five-character SHA-1 prefix that can't be reversed. The AI recovery assistant does send your typed prompt to OpenRouter, which we tell you in the UI — that's the one feature that talks to a remote model.",
+          "Studio image imports stay in your browser and are never included in a cloud save automatically. If you separately attach a photo or screenshot as a showcase image, we discard the raw file and metadata after creating optimized display copies for that creation. We never receive your password: the breach check uses k-anonymity, so only a five-character SHA-1 prefix goes directly to Have I Been Pwned. The AI assistant sends prompts to OpenRouter only when you use it.",
         links: [{ label: "Privacy Policy", href: "/privacy" }],
       },
       {

@@ -64,6 +64,25 @@ interface ExportCreationRow extends Record<string, unknown> {
   object_key: string | null;
 }
 
+interface ExportShowcaseImageRow {
+  alt_text: string;
+  created_at: number;
+  id: string;
+  is_cover: number;
+  sort_order: number;
+  source_height: number;
+  source_width: number;
+  updated_at: number;
+}
+
+interface ExportShowcaseObjectRow {
+  byte_size: number;
+  content_type: string;
+  kind: string;
+  object_key: string;
+  sha256: string;
+}
+
 interface ExportQuery {
   idColumn: string;
   predicate: string;
@@ -97,12 +116,16 @@ async function setupProfile(context: WorkerRequestContext): Promise<Response> {
   if (input.termsVersion !== context.env.TERMS_VERSION) {
     throw new HttpError(409, "terms_version_changed", "Review the current Terms before continuing.");
   }
+  if (session.user.username && session.user.username !== input.username) {
+    throw new HttpError(409, "username_immutable", "Your username cannot be changed.");
+  }
   const now = Date.now();
   try {
     const result = await context.env.DB.prepare(
       `UPDATE users SET username = ?, display_name = ?, bio = ?, terms_version = ?,
        terms_accepted_at = ?, updated_at = ?
-       WHERE id = ? AND username IS NULL AND status = 'active'`,
+       WHERE id = ? AND status = 'active'
+         AND (username IS NULL OR username = ? COLLATE NOCASE)`,
     ).bind(
       input.username,
       input.displayName,
@@ -111,6 +134,7 @@ async function setupProfile(context: WorkerRequestContext): Promise<Response> {
       now,
       now,
       session.user.id,
+      input.username,
     ).run();
     if ((result.meta.changes ?? 0) !== 1) {
       throw new HttpError(409, "profile_already_configured", "This profile is already configured.");
@@ -215,6 +239,12 @@ async function exportAccount(context: WorkerRequestContext): Promise<Response> {
         { type: "following", table: "follows", predicate: "follower_user_id", idColumn: "followed_user_id" },
         { type: "follower", table: "follows", predicate: "followed_user_id", idColumn: "follower_user_id" },
         { type: "report", table: "reports", predicate: "reporter_user_id", idColumn: "id" },
+        {
+          type: "creation_image_upload_attempt",
+          table: "creation_showcase_upload_attempts",
+          predicate: "user_id",
+          idColumn: "id",
+        },
       ] satisfies ExportQuery[]) {
         await writePagedRows(
           context.env.DB,
@@ -287,12 +317,88 @@ async function writeCreationExport(
           });
         }
       }
+      await writeShowcaseImageExport(
+        context,
+        metadata.id as string,
+        writer,
+        encoder,
+      );
     }
 
     const last: ExportCreationRow | undefined = creations.results.at(-1);
     if (!last || creations.results.length < EXPORT_PAGE_SIZE) return;
     cursorCreatedAt = last.created_at;
     cursorId = last.id;
+  }
+}
+
+async function writeShowcaseImageExport(
+  context: WorkerRequestContext,
+  creationId: string,
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  encoder: TextEncoder,
+): Promise<void> {
+  const images = await context.env.DB.prepare(
+    `SELECT id, alt_text, sort_order, is_cover, source_width, source_height,
+      created_at, updated_at
+     FROM creation_showcase_images
+     WHERE creation_id = ? AND status = 'ready'
+     ORDER BY sort_order ASC, id ASC`,
+  ).bind(creationId).all<ExportShowcaseImageRow>();
+  for (const image of images.results) {
+    await writeNdjson(writer, encoder, {
+      type: "creation_image",
+      creationId,
+      data: {
+        altText: image.alt_text,
+        createdAt: image.created_at,
+        height: image.source_height,
+        id: image.id,
+        isCover: Boolean(image.is_cover),
+        sortOrder: image.sort_order,
+        updatedAt: image.updated_at,
+        width: image.source_width,
+      },
+    });
+    const objects = await context.env.DB.prepare(
+      `SELECT kind, object_key, content_type, byte_size, sha256
+       FROM creation_showcase_objects
+       WHERE image_id = ? AND status = 'ready' ORDER BY kind ASC`,
+    ).bind(image.id).all<ExportShowcaseObjectRow>();
+    for (const objectRow of objects.results) {
+      await writeNdjson(writer, encoder, {
+        type: "creation_image_object",
+        creationId,
+        imageId: image.id,
+        data: {
+          byteSize: objectRow.byte_size,
+          contentType: objectRow.content_type,
+          kind: objectRow.kind,
+          sha256: objectRow.sha256,
+        },
+      });
+      const object = await context.env.PROJECTS.get(objectRow.object_key);
+      if (!object) continue;
+      const reader = object.body.getReader();
+      let sequence = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          await writeNdjson(writer, encoder, {
+            type: "creation_image_object_chunk",
+            creationId,
+            imageId: image.id,
+            kind: objectRow.kind,
+            sequence,
+            dataBase64: bytesToBase64(value),
+          });
+          sequence += 1;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
   }
 }
 
@@ -342,6 +448,14 @@ function writeNdjson(
   value: unknown,
 ): Promise<void> {
   return writer.write(encoder.encode(`${JSON.stringify(value)}\n`));
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.byteLength; offset += 8_192) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8_192));
+  }
+  return btoa(binary);
 }
 
 async function requestDeletion(context: WorkerRequestContext): Promise<Response> {

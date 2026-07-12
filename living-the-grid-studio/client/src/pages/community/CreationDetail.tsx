@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Download, Heart, MessageCircle, Pencil, Save, Share2, Trash2, X } from "lucide-react";
+import { Download, Heart, Images, MessageCircle, Pencil, Save, Trash2, X } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { CommunityError, CommunityLoading } from "@/components/community/CommunityState";
 import { IslandAvatar } from "@/components/community/IslandAvatar";
 import { ReportDialog } from "@/components/community/ReportDialog";
+import { ShareCreationActions } from "@/components/community/ShareCreationActions";
 import { CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { communityApi, jsonBody, messageFromError } from "@/lib/community/api";
 import { formatCommunityDate, formatCount } from "@/lib/community/format";
+import { ensureCommunityMutationReady } from "@/lib/community/onboarding";
 import type { CommunityComment, CreationDetail } from "@/lib/community/types";
 
 export default function CreationDetailPage() {
@@ -28,6 +30,7 @@ export default function CreationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   useDocumentTitle(creation?.title ?? "Community creation");
 
   const loadComments = useCallback(async (creationId: string, nextCursor?: string) => {
@@ -53,6 +56,7 @@ export default function CreationDetailPage() {
     try {
       const result = await communityApi<CreationDetail>(`/api/public/creations/${encodeURIComponent(slug)}`);
       setCreation(result.data);
+      setSelectedImageId(result.data.images?.find((image) => image.isCover)?.id ?? result.data.images?.[0]?.id ?? null);
       setComments([]);
       setCommentsCursor(null);
       setError(null);
@@ -72,6 +76,7 @@ export default function CreationDetailPage() {
       toast.info("Sign in when you want to like a creation.");
       return;
     }
+    if (!ensureCommunityMutationReady(user)) return;
     const liked = !creation.isLiked;
     setCreation({ ...creation, isLiked: liked, likeCount: Math.max(0, creation.likeCount + (liked ? 1 : -1)) });
     try {
@@ -85,6 +90,7 @@ export default function CreationDetailPage() {
   const addComment = async (event: FormEvent) => {
     event.preventDefault();
     if (!creation || !body.trim()) return;
+    if (user && !ensureCommunityMutationReady(user)) return;
     setSubmitting(true);
     try {
       const result = await communityApi<CommunityComment>(`/api/creations/${creation.id}/comments`, {
@@ -104,6 +110,7 @@ export default function CreationDetailPage() {
   const saveCommentEdit = async (comment: CommunityComment) => {
     const nextBody = editBody.trim();
     if (!nextBody) return;
+    if (user && !ensureCommunityMutationReady(user)) return;
     setSubmitting(true);
     try {
       const result = await communityApi<CommunityComment>(`/api/comments/${comment.id}`, {
@@ -122,6 +129,7 @@ export default function CreationDetailPage() {
   };
 
   const deleteComment = async (comment: CommunityComment) => {
+    if (user && !ensureCommunityMutationReady(user)) return;
     if (!window.confirm("Delete your comment? This cannot be undone.")) return;
     try {
       await communityApi(`/api/comments/${comment.id}`, {
@@ -136,33 +144,53 @@ export default function CreationDetailPage() {
     }
   };
 
-  const share = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) await navigator.share({ title: creation?.title, url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast.success("Share link copied");
-      }
-    } catch (shareError) {
-      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
-      toast.error("The share link could not be copied.");
-    }
-  };
-
   return (
     <CommunityShell>
       <div className="container py-10 sm:py-16">
         {loading ? <CommunityLoading label="Opening this creation…" /> : error || !creation ? <CommunityError message={error ?? "Creation not found"} retry={() => void load()} /> : (
           <>
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:items-start">
-              <figure className="community-art-frame">
-                {creation.previewUrl ? (
-                  <img src={creation.previewUrl} alt={`Pixel-art preview of ${creation.title}`} width={1200} height={1200} loading="lazy" className="aspect-square w-full object-contain" decoding="async" />
-                ) : (
-                  <div className="pixel-placeholder aspect-square"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
-                )}
-              </figure>
+              <div className="space-y-3">
+                {(() => {
+                  const selected = creation.images?.find((image) => image.id === selectedImageId)
+                    ?? creation.images?.find((image) => image.isCover)
+                    ?? creation.images?.[0];
+                  const source = selected?.displayUrl ?? creation.primaryImageUrl ?? creation.previewUrl;
+                  const alt = selected?.altText ?? `Pixel-art preview of ${creation.title}`;
+                  return (
+                    <figure className="community-art-frame">
+                      {source ? (
+                        <img src={source} alt={alt} width={1600} height={1600} loading="eager" className="aspect-square w-full object-contain" decoding="async" />
+                      ) : (
+                        <div className="pixel-placeholder aspect-square"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
+                      )}
+                    </figure>
+                  );
+                })()}
+                {creation.images?.length ? (
+                  <section aria-labelledby="showcase-gallery-title" className="rounded-2xl border border-[var(--island-ink)]/10 bg-white/70 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h2 id="showcase-gallery-title" className="flex items-center gap-2 text-sm font-black"><Images className="h-4 w-4" /> Showcase gallery</h2>
+                      <span className="text-xs font-bold text-[var(--island-ink)]/45">{creation.images.length} image{creation.images.length === 1 ? "" : "s"}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {creation.images.map((image) => (
+                        <button
+                          key={image.id}
+                          type="button"
+                          aria-label={`Show image: ${image.altText}`}
+                          aria-pressed={selectedImageId === image.id}
+                          onClick={() => setSelectedImageId(image.id)}
+                          className="overflow-hidden rounded-xl border-2 border-transparent bg-[var(--island-paper)] transition data-[selected=true]:border-[var(--island-blue)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+                          data-selected={selectedImageId === image.id}
+                        >
+                          <img src={image.thumbnailUrl} alt="" width={512} height={512} loading="lazy" decoding="async" className="aspect-square w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
 
               <aside className="community-detail-panel">
                 <div className="flex flex-wrap items-center gap-2">
@@ -185,9 +213,12 @@ export default function CreationDetailPage() {
                   >
                     <Heart className={creation.isLiked ? "fill-current" : ""} /> {formatCount(creation.likeCount)}
                   </Button>
-                  <Button type="button" variant="outline" onClick={share}><Share2 /> Share</Button>
                   {creation.downloadEnabled ? <Button asChild variant="outline"><a href={`/api/creations/${creation.id}/media/project`} download><Download /> Project</a></Button> : null}
                   {creation.canEdit ? <Button asChild><Link href={`/studio?cloud=${creation.id}`}>Edit in Studio</Link></Button> : null}
+                </div>
+                <div className="mt-3 rounded-2xl bg-white p-3">
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--island-ink)]/50">Share this creation</p>
+                  <ShareCreationActions path={`/creation/${encodeURIComponent(creation.slug)}`} title={creation.title} showView={false} />
                 </div>
                 <div className="mt-4 flex justify-end"><ReportDialog targetType="creation" targetId={creation.id} /></div>
               </aside>

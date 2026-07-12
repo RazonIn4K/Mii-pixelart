@@ -11,6 +11,8 @@ function user(overrides: Record<string, unknown> = {}) {
     id: "00000000-0000-4000-8000-000000000001",
     role: "user",
     status: "active",
+    termsAccepted: true,
+    termsVersion: "2026-07-12",
     username: "test-islander",
     ...overrides,
   };
@@ -83,9 +85,143 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
     bio: "Tiny portraits and paint guides.",
     confirmsAge13OrOlder: true,
     displayName: "Tiny Islander",
-    termsVersion: "2026-07-10",
+    termsVersion: "2026-07-12",
     username: "tiny-islander",
   });
+});
+
+test("an existing username reviews newer terms without changing identity", async ({ page }) => {
+  let accepted = false;
+  const returningUser = () => user({
+    displayName: "Returning Islander",
+    termsAccepted: accepted,
+    termsVersion: accepted ? "2026-07-12" : "2026-07-10",
+    username: "returning-islander",
+  });
+  await page.route("**/api/auth/session", (route) => fulfillJson(route, {
+    data: {
+      session: { createdAt: Date.now(), current: true, expiresAt: Date.now() + 86_400_000, id: "session-1", lastSeenAt: Date.now() },
+      user: returningUser(),
+    },
+    requestId,
+  }));
+  await page.route("**/api/me/setup", async (route) => {
+    const submitted = route.request().postDataJSON() as Record<string, unknown>;
+    expect(submitted.username).toBe("returning-islander");
+    expect(submitted.termsVersion).toBe("2026-07-12");
+    accepted = true;
+    await fulfillJson(route, { data: returningUser(), requestId });
+  });
+  await page.route("**/api/creations?**", (route) => fulfillJson(route, {
+    data: [], meta: { nextCursor: null }, requestId,
+  }));
+
+  await page.goto("/me/projects");
+  await expect(page).toHaveURL(/\/me\/setup\?returnTo=%2Fme%2Fprojects$/);
+  await expect(page.getByLabel("Username")).toHaveValue("returning-islander");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Accept current terms" }).click();
+  await expect(page).toHaveURL(/\/me\/projects$/);
+});
+
+test("stale Terms consent redirects public social and report actions before mutation", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One focused onboarding-preflight run is sufficient.",
+  );
+
+  const currentUser = user({
+    termsAccepted: false,
+    termsVersion: "2026-07-10",
+    username: "returning-islander",
+  });
+  const creator = user({
+    displayName: "Gallery Creator",
+    id: "00000000-0000-4000-8000-000000000031",
+    username: "gallery-creator",
+  });
+  const creation = {
+    commentsEnabled: true,
+    commentsLocked: false,
+    createdAt: 1_700_000_000_000,
+    description: "A public creation used to verify onboarding preflights.",
+    id: "00000000-0000-4000-8000-000000000032",
+    likedByViewer: false,
+    owner: creator,
+    projectDownloadEnabled: false,
+    publishedAt: 1_700_000_000_000,
+    revision: 1,
+    slug: "terms-preflight-creation",
+    state: "published",
+    stats: { comments: 0, likes: 0 },
+    tags: [],
+    title: "Terms preflight creation",
+    updatedAt: 1_700_000_000_000,
+    visibility: "public",
+  };
+  const attemptedMutations: string[] = [];
+
+  await mockSession(page, currentUser);
+  await page.route("**/api/tags", (route) => fulfillJson(route, {
+    data: [], requestId,
+  }));
+  await page.route("**/api/discover/recent**", (route) => fulfillJson(route, {
+    data: [creation], meta: { nextCursor: null }, requestId,
+  }));
+  await page.route("**/api/users/gallery-creator/creations**", (route) => fulfillJson(route, {
+    data: [creation], meta: { nextCursor: null }, requestId,
+  }));
+  await page.route("**/api/users/gallery-creator", (route) => fulfillJson(route, {
+    data: { creations: [creation], user: creator }, requestId,
+  }));
+  await page.route("**/api/public/creations/terms-preflight-creation", (route) => fulfillJson(route, {
+    data: creation, requestId,
+  }));
+  await page.route(`**/api/creations/${creation.id}/comments**`, (route) => fulfillJson(route, {
+    data: [], meta: { nextCursor: null }, requestId,
+  }));
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (
+      request.method() !== "GET"
+      && (
+        pathname.endsWith("/like")
+        || pathname.endsWith("/follow")
+        || pathname.endsWith("/comments")
+        || pathname === "/api/reports"
+      )
+    ) {
+      attemptedMutations.push(`${request.method()} ${pathname}`);
+    }
+  });
+
+  const expectSetupRedirect = async (returnTo: string) => {
+    await expect(page).toHaveURL(/\/me\/setup\?returnTo=/);
+    expect(new URL(page.url()).searchParams.get("returnTo")).toBe(returnTo);
+    await expect(
+      page.getByRole("heading", { name: "Review the current community terms." }),
+    ).toBeVisible();
+    expect(attemptedMutations).toEqual([]);
+  };
+
+  await page.goto("/discover");
+  await page.getByRole("button", { name: "Like Terms preflight creation" }).click();
+  await expectSetupRedirect("/discover");
+
+  await page.goto("/u/gallery-creator");
+  await page.getByRole("button", { name: "Follow", exact: true }).click();
+  await expectSetupRedirect("/u/gallery-creator");
+
+  await page.goto("/creation/terms-preflight-creation");
+  await page.getByLabel("Join the conversation").fill("A kind comment.");
+  await page.getByRole("button", { name: "Post comment" }).click();
+  await expectSetupRedirect("/creation/terms-preflight-creation");
+
+  await page.goto("/creation/terms-preflight-creation");
+  await page.getByRole("button", { name: "Report", exact: true }).click();
+  await expectSetupRedirect("/creation/terms-preflight-creation");
 });
 
 test("an anonymous cloud link keeps its validated destination through sign-in and onboarding", async ({ page }) => {
@@ -312,6 +448,22 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   };
   const second = { ...creation, id: "00000000-0000-4000-8000-000000000011", slug: "private-draft-0002", title: "Second draft" };
   const publishBodies: Record<string, unknown>[] = [];
+  const onePixelPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=", "base64");
+  const showcaseImage = {
+    altText: "A photographed island portrait in a blue frame",
+    createdAt: 1_700_000_000_001,
+    displayUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+    height: 1,
+    id: "00000000-0000-4000-8000-000000000099",
+    isCover: true,
+    socialImageUrl: "/api/creations/creation/images/image/social",
+    sortOrder: 0,
+    thumbnailUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+    updatedAt: 1_700_000_000_001,
+    width: 1,
+  };
+  let rawUploadHeaders: Record<string, string> | null = null;
+  let galleryLoads = 0;
   await page.route("**/api/creations?**", async (route) => {
     const url = new URL(route.request().url());
     const isSecondPage = Boolean(url.searchParams.get("cursor"));
@@ -324,6 +476,36 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   await page.route("**/api/tags", (route) => fulfillJson(route, {
     data: [{ description: "Portrait work", name: "Portraits", slug: "portraits" }], requestId,
   }));
+  await page.route("**/api/creations/*/images/uploads", (route) => fulfillJson(route, {
+    data: {
+      expiresAt: Date.now() + 600_000,
+      maximumBytes: 8_388_608,
+      uploadId: "00000000-0000-4000-8000-000000000098",
+      uploadToken: "test-one-use-upload-token-000000000000",
+      uploadUrl: "/api/creation-image-uploads/00000000-0000-4000-8000-000000000098/content",
+    },
+    requestId,
+  }, 201));
+  await page.route("**/api/creation-image-uploads/*/content", async (route) => {
+    rawUploadHeaders = route.request().headers();
+    expect(route.request().postDataBuffer()).toEqual(onePixelPng);
+    await fulfillJson(route, { data: { image: showcaseImage, images: [showcaseImage] }, requestId }, 201);
+  });
+  await page.route("**/api/creations/*/images", async (route) => {
+    if (route.request().method() === "GET") {
+      galleryLoads += 1;
+      if (galleryLoads === 1) {
+        await fulfillJson(route, {
+          error: { code: "SERVICE_UNAVAILABLE", message: "Gallery temporarily unavailable" },
+          requestId,
+        }, 503);
+        return;
+      }
+      await fulfillJson(route, { data: [], requestId });
+      return;
+    }
+    await route.fallback();
+  });
   await page.route("**/api/creations/*/publish", async (route) => {
     const publishBody = route.request().postDataJSON() as Record<string, unknown>;
     publishBodies.push(publishBody);
@@ -344,6 +526,32 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   await page.getByRole("button", { name: "More actions for Private draft" }).click();
   await page.getByRole("button", { name: "Review & publish" }).click();
   await expect(page.getByRole("dialog", { name: "Review before publishing" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Publish publicly" })).toBeDisabled();
+  await page.getByRole("button", { name: "Retry gallery" }).click();
+  await expect.poll(() => galleryLoads).toBe(2);
+  await expect(page.getByRole("button", { name: "Publish publicly" })).toBeEnabled();
+  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
+    buffer: onePixelPng,
+    mimeType: "image/png",
+    name: "portrait.png",
+  });
+  await page.getByLabel("Image description").fill(showcaseImage.altText);
+  await expect(page.getByRole("button", { name: "Add showcase image" })).toBeEnabled();
+  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
+    buffer: Buffer.from("<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+    mimeType: "image/svg+xml",
+    name: "unsupported.svg",
+  });
+  await expect(page.getByRole("button", { name: "Add showcase image" })).toBeDisabled();
+  await page.getByLabel("Choose a photo or screenshot").setInputFiles({
+    buffer: onePixelPng,
+    mimeType: "image/png",
+    name: "portrait.png",
+  });
+  await page.getByRole("button", { name: "Add showcase image" }).click();
+  await expect(page.getByText(showcaseImage.altText)).toBeVisible();
+  expect(rawUploadHeaders?.authorization).toBe("Bearer test-one-use-upload-token-000000000000");
+  expect(rawUploadHeaders?.cookie).toBeUndefined();
   await expect(page.getByRole("switch").first()).toBeChecked();
   await expect(page.getByRole("switch").nth(1)).not.toBeChecked();
   await page.getByRole("button", { name: "Portraits" }).click();
@@ -356,9 +564,13 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     visibility: "public",
   });
 
+  await page.getByRole("button", { name: "Continue editing" }).click();
+
   await page.getByRole("button", { name: "Edit publishing" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit publishing settings" });
   await expect(editDialog).toBeVisible();
+  await expect(editDialog.getByText("This gallery is live.")).toBeVisible();
+  await expect(editDialog.getByRole("button", { name: "Add showcase image" })).toHaveCount(0);
   await editDialog.getByRole("switch").first().click();
   await editDialog.getByRole("switch").nth(1).click();
   await editDialog.getByRole("combobox", { name: "Visibility" }).click();
@@ -370,6 +582,10 @@ test("project shelf paginates, edits private cards, and uses governed publishing
     projectDownloadEnabled: true,
     visibility: "unlisted",
   });
+  await expect(page.getByRole("heading", { name: "Your share page is ready" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Edit publishing" }).click();
+  await expect(page.getByRole("dialog", { name: "Edit publishing settings" })).toBeVisible();
 });
 
 test("published creations expose owner editing and the current like state", async ({ page }) => {
@@ -382,6 +598,19 @@ test("published creations expose owner editing and the current like state", asyn
       commentsEnabled: true,
       description: "A published owner project.",
       id: creationId,
+      images: [{
+        altText: "A framed photo of the finished island portrait",
+        createdAt: 1_700_000_000_001,
+        displayUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+        height: 1,
+        id: "00000000-0000-4000-8000-000000000077",
+        isCover: true,
+        socialImageUrl: "/api/creations/creation/images/image/social",
+        sortOrder: 0,
+        thumbnailUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl20AAAAASUVORK5CYII=",
+        updatedAt: 1_700_000_000_001,
+        width: 1,
+      }],
       likedByViewer: false,
       owner: currentUser,
       projectDownloadEnabled: false,
@@ -407,6 +636,10 @@ test("published creations expose owner editing and the current like state", asyn
   });
 
   await page.goto("/creation/owner-published-01");
+  await expect(page.getByRole("heading", { name: "Showcase gallery" })).toBeVisible();
+  await expect(page.getByAltText("A framed photo of the finished island portrait")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Edit in Studio" })).toHaveAttribute(
     "href",
     `/studio?cloud=${creationId}`,
@@ -515,8 +748,27 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
 
 test("a dirty restored cloud draft autosaves before publishing becomes available", async ({ page }) => {
   const currentUser = user();
+  const creationId = "00000000-0000-4000-8000-000000000020";
   await mockSession(page, currentUser);
   let saveCalls = 0;
+  await page.route(`**/api/creations/${creationId}`, (route) => fulfillJson(route, {
+    data: {
+      commentsEnabled: false,
+      description: "Authoritative draft description",
+      id: creationId,
+      owner: currentUser,
+      projectDownloadEnabled: false,
+      revision: 1,
+      slug: "restored-draft-01",
+      state: "draft",
+      stats: { comments: 0, likes: 0 },
+      tags: ["portraits"],
+      title: "Authoritative draft title",
+      updatedAt: 1_700_000_000_000,
+      visibility: "private",
+    },
+    requestId,
+  }, 200, { ETag: '"rev-1"' }));
   await page.route("**/api/creations/*/project", async (route) => {
     saveCalls += 1;
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -571,7 +823,11 @@ test("a dirty restored cloud draft autosaves before publishing becomes available
   await expect(page.getByRole("button", { name: "Saving first…" })).toBeDisabled();
   await expect.poll(() => saveCalls, { timeout: 6_000 }).toBe(1);
   await expect(page.getByText("Saved · v2")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Publish" })).toBeEnabled();
+  const shareButton = page.getByRole("button", { name: "Share" });
+  await expect(shareButton).toBeEnabled();
+  await shareButton.click();
+  await expect(page.getByLabel("Title")).toHaveValue("Authoritative draft title");
+  await expect(page.getByLabel("Description", { exact: true })).toHaveValue("Authoritative draft description");
 });
 
 test("moderation actions remain disabled until target context and history are reviewed", async ({ page }) => {

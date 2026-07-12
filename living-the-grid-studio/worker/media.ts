@@ -12,6 +12,18 @@ export interface StoredCreationObject {
   sha256: string;
 }
 
+export type ShowcaseObjectKind = "display" | "social" | "thumb";
+
+export interface StoredShowcaseObject {
+  byteSize: number;
+  contentType: "image/jpeg" | "image/webp";
+  key: string;
+  kind: ShowcaseObjectKind;
+  sha256: string;
+}
+
+const SHOWCASE_OUTPUT_LIMIT = 8 * 1024 * 1024;
+
 interface ImageVariant {
   format: "image/jpeg" | "image/webp";
   height: number;
@@ -112,6 +124,123 @@ export async function storeRevisionObjects(
     await env.PROJECTS.delete(allKeys);
     throw error;
   }
+}
+
+/**
+ * Decode user-provided raster bytes through Images, then persist only bounded,
+ * metadata-free derivatives. The original source is deliberately never written
+ * to R2. Secondary variants are derived from the canonical WebP so EXIF/GPS
+ * metadata cannot survive into the JPEG social card.
+ */
+export async function storeShowcaseObjects(
+  env: Env,
+  creationId: string,
+  imageId: string,
+  sourceBytes: Uint8Array,
+  sourceContentType: string,
+): Promise<StoredShowcaseObject[]> {
+  const prefix = `private/creations/${creationId}/showcase/${imageId}`;
+  const keys = {
+    display: `${prefix}/display.webp`,
+    thumb: `${prefix}/thumb.webp`,
+    social: `${prefix}/social.jpg`,
+  } as const;
+
+  try {
+    const source = blobFromBytes(sourceBytes, sourceContentType);
+    const displayBytes = await transformImage(env, source, {
+      background: undefined,
+      fit: "scale-down",
+      format: "image/webp",
+      height: 1_600,
+      quality: 82,
+      width: 1_600,
+    });
+    const canonical = blobFromBytes(displayBytes, "image/webp");
+    const [thumbBytes, socialBytes] = await Promise.all([
+      transformImage(env, canonical, {
+        background: "#fffaf0",
+        fit: "pad",
+        format: "image/webp",
+        height: 512,
+        quality: 78,
+        width: 512,
+      }),
+      transformImage(env, canonical, {
+        background: "#fffaf0",
+        fit: "pad",
+        format: "image/jpeg",
+        height: 630,
+        quality: 84,
+        width: 1_200,
+      }),
+    ]);
+    const outputs = [
+      { bytes: displayBytes, contentType: "image/webp", key: keys.display, kind: "display" },
+      { bytes: thumbBytes, contentType: "image/webp", key: keys.thumb, kind: "thumb" },
+      { bytes: socialBytes, contentType: "image/jpeg", key: keys.social, kind: "social" },
+    ] as const;
+    const totalBytes = outputs.reduce((total, output) => total + output.bytes.byteLength, 0);
+    if (totalBytes > SHOWCASE_OUTPUT_LIMIT) {
+      throw new Error("showcase_output_limit_exceeded");
+    }
+
+    const stored: StoredShowcaseObject[] = [];
+    for (const output of outputs) {
+      await env.PROJECTS.put(output.key, output.bytes, {
+        httpMetadata: { contentType: output.contentType },
+        customMetadata: { creationId, imageId, kind: output.kind },
+      });
+      stored.push({
+        byteSize: output.bytes.byteLength,
+        contentType: output.contentType,
+        key: output.key,
+        kind: output.kind,
+        sha256: await sha256(output.bytes),
+      });
+    }
+    return stored;
+  } catch (error) {
+    await env.PROJECTS.delete(Object.values(keys));
+    throw error;
+  }
+}
+
+async function transformImage(
+  env: Env,
+  source: Blob,
+  options: {
+    background: string | undefined;
+    fit: "contain" | "pad" | "scale-down";
+    format: "image/jpeg" | "image/webp";
+    height: number;
+    quality: number;
+    width: number;
+  },
+): Promise<Uint8Array> {
+  const transformed = await env.IMAGES.input(source.stream())
+    .transform({
+      background: options.background,
+      fit: options.fit,
+      height: options.height,
+      width: options.width,
+    })
+    // Accepted animated WebP input is intentionally flattened to a still. The
+    // community gallery stores bounded static derivatives, never animation.
+    .output({ anim: false, format: options.format, quality: options.quality });
+  const response = transformed.response();
+  if (!response.ok) throw new Error("showcase_image_transform_failed");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > SHOWCASE_OUTPUT_LIMIT) {
+    throw new Error("showcase_output_limit_exceeded");
+  }
+  return bytes;
+}
+
+function blobFromBytes(bytes: Uint8Array, type: string): Blob {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new Blob([copy.buffer], { type });
 }
 
 export function renderGridSvg(project: CanonicalGridDocument): string {

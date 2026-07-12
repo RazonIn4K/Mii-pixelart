@@ -8,6 +8,13 @@ export const COMMUNITY_LIMITS = {
   commentCharacters: 1_000,
   creationsPerUser: 100,
   creationDescriptionCharacters: 2_000,
+  creationImageAltTextCharacters: 200,
+  creationImageDimensionMaximum: 8_192,
+  creationImageInputBytes: 8 * 1024 * 1024,
+  creationImageMaximumPixels: 25_000_000,
+  creationImageOutputBytes: 8 * 1024 * 1024,
+  creationImagesPerCreation: 4,
+  creationImageUploadsPerDay: 10,
   creationTitleCharacters: 80,
   displayNameCharacters: 50,
   gridDimensionMaximum: 256,
@@ -111,6 +118,10 @@ export const CreationTitleSchema = normalizedPlainText(
 export const CreationDescriptionSchema = normalizedPlainText(
   COMMUNITY_LIMITS.creationDescriptionCharacters,
 );
+export const CreationImageAltTextSchema = normalizedPlainText(
+  COMMUNITY_LIMITS.creationImageAltTextCharacters,
+  1,
+);
 export const CommentBodySchema = normalizedPlainText(
   COMMUNITY_LIMITS.commentCharacters,
   1,
@@ -149,6 +160,13 @@ export const CreationObjectKindSchema = z.enum([
   "preview",
   "thumb",
   "social",
+]);
+export const CreationImageContentTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ]);
 export const CommentStatusSchema = z.enum(["active", "hidden", "deleted"]);
 export const ReportReasonSchema = z.enum([
@@ -497,6 +515,45 @@ export const CreateCreationSchema = z
 export const SaveProjectSchema = z
   .object({ project: CanonicalGridDocumentSchema })
   .strict();
+
+export const CreateCreationImageUploadSchema = z
+  .object({
+    altText: CreationImageAltTextSchema,
+    byteSize: z
+      .number()
+      .int()
+      .min(1)
+      .max(COMMUNITY_LIMITS.creationImageInputBytes),
+    contentType: CreationImageContentTypeSchema,
+    replaceImageId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const UpdateCreationImagesSchema = z
+  .object({
+    coverImageId: z.string().uuid(),
+    orderedImageIds: z
+      .array(z.string().uuid())
+      .min(1)
+      .max(COMMUNITY_LIMITS.creationImagesPerCreation),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.orderedImageIds).size !== value.orderedImageIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Image IDs must be unique",
+        path: ["orderedImageIds"],
+      });
+    }
+    if (!value.orderedImageIds.includes(value.coverImageId)) {
+      context.addIssue({
+        code: "custom",
+        message: "The cover image must be included in the ordered images",
+        path: ["coverImageId"],
+      });
+    }
+  });
 
 export const UpdateCreationSchema = z
   .object({

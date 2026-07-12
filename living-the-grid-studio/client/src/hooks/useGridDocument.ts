@@ -51,11 +51,13 @@ function appendHistory(
     imagePreview: null,
     history: newHistory,
     historyIndex: newHistory.length - 1,
+    isLoading: false,
     error: null,
   };
 }
 
 export function useGridDocument() {
+  const previewRequestRef = useRef(0);
   const [state, setState] = useState<GridDocumentState>({
     doc: null,
     imagePreview: null,
@@ -66,6 +68,7 @@ export function useGridDocument() {
   });
 
   const pushHistory = useCallback((doc: GridDocument) => {
+    previewRequestRef.current += 1;
     setState((prev) => appendHistory(prev, doc));
   }, []);
 
@@ -133,9 +136,12 @@ export function useGridDocument() {
 
   const previewFromImage = useCallback(
     async (file: File, options?: Partial<ImageImportOptions>) => {
+      const requestNumber = previewRequestRef.current + 1;
+      previewRequestRef.current = requestNumber;
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
         const doc = await imageToGridDocument(file, options);
+        if (previewRequestRef.current !== requestNumber) return;
         setState((prev) => ({
           ...prev,
           imagePreview: doc,
@@ -143,6 +149,7 @@ export function useGridDocument() {
           error: null,
         }));
       } catch (err) {
+        if (previewRequestRef.current !== requestNumber) return;
         setState((prev) => ({
           ...prev,
           imagePreview: null,
@@ -160,7 +167,12 @@ export function useGridDocument() {
   }, [pushHistory, state.imagePreview]);
 
   const clearImagePreview = useCallback(() => {
-    setState((prev) => ({ ...prev, imagePreview: null }));
+    previewRequestRef.current += 1;
+    setState((prev) => ({
+      ...prev,
+      imagePreview: null,
+      isLoading: false,
+    }));
   }, []);
 
   const importFromJson = useCallback(

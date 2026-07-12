@@ -28,6 +28,7 @@ const migrationNames = [
   "0002_comment_locks.sql",
   "0003_atomic_quota_reservations.sql",
   "0004_preserve_moderation_state.sql",
+  "0005_creation_showcase_images.sql",
 ] as const;
 const PRIVILEGED_ROLE_COUNT_QUERY =
   "SELECT COUNT(*) AS count FROM users WHERE role IN ('admin', 'moderator')";
@@ -188,7 +189,7 @@ function environmentConfig(
       ENVIRONMENT: target,
       PUBLIC_SITE_URL: values.site,
       GOOGLE_OIDC_REDIRECT_URI: values.redirect,
-      TERMS_VERSION: "2026-07-10",
+      TERMS_VERSION: "2026-07-12",
       COMMUNITY_MUTATIONS_ENABLED:
         target === "local" || remoteWritable ? "true" : "false",
     },
@@ -1019,7 +1020,7 @@ describe("runRelease deploy gates", () => {
   it("rejects an unexpected remote migration before build or deploy", async () => {
     const harness = makeHarness("production");
     harness.setMigrationCommandResult(
-      migrationLedgerResult([...migrationNames, "0005_untracked.sql"]),
+      migrationLedgerResult([...migrationNames, "0006_untracked.sql"]),
     );
 
     await expect(

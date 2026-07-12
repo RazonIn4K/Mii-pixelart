@@ -28,6 +28,7 @@ export default function Setup() {
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+  const reviewingUpdatedTerms = Boolean(user?.username && user.termsAccepted !== true);
 
   useEffect(() => {
     if (!user) return;
@@ -59,7 +60,7 @@ export default function Setup() {
           username: normalized,
           displayName: displayName.trim(),
           bio: bio.trim(),
-          termsVersion: "2026-07-10",
+          termsVersion: "2026-07-12",
           acceptsTerms: true,
           confirmsAge13OrOlder: true,
         }),
@@ -93,13 +94,13 @@ export default function Setup() {
               <p className="mt-2 text-xs leading-5 text-[var(--island-ink)]/55">Every profile gets an original, deterministic Island Workshop avatar. No photo upload is needed.</p>
             </aside>
             <form onSubmit={submit} className="community-detail-panel">
-              <p className="island-kicker">One-time setup</p>
-              <h1 className="mt-3 text-4xl font-black tracking-[-0.045em]">Choose your island identity.</h1>
-              <p className="mt-3 text-sm leading-6 text-[var(--island-ink)]/60">Your email remains private. The username, display name, bio, and generated avatar are public when you publish.</p>
+              <p className="island-kicker">{reviewingUpdatedTerms ? "Terms update" : "One-time setup"}</p>
+              <h1 className="mt-3 text-4xl font-black tracking-[-0.045em]">{reviewingUpdatedTerms ? "Review the current community terms." : "Choose your island identity."}</h1>
+              <p className="mt-3 text-sm leading-6 text-[var(--island-ink)]/60">{reviewingUpdatedTerms ? "Your username stays the same. Review and accept the current Terms before returning to cloud projects and community actions." : "Your email remains private. The username, display name, bio, and generated avatar are public when you publish."}</p>
               <div className="mt-8 space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="profile-username">Username</Label>
-                  <div className="relative"><span className="pointer-events-none absolute left-3 top-2.5 font-mono text-sm text-muted-foreground">@</span><Input id="profile-username" value={username} onChange={(event) => { setUsername(normalizeUsername(event.target.value)); setUsernameSuggestions([]); }} className="pl-7" minLength={3} maxLength={24} required aria-describedby="username-help username-suggestions" /></div>
+                  <div className="relative"><span className="pointer-events-none absolute left-3 top-2.5 font-mono text-sm text-muted-foreground">@</span><Input id="profile-username" value={username} onChange={(event) => { setUsername(normalizeUsername(event.target.value)); setUsernameSuggestions([]); }} className="pl-7" minLength={3} maxLength={24} required readOnly={reviewingUpdatedTerms} aria-describedby="username-help username-suggestions" /></div>
                   <p id="username-help" className="text-xs text-muted-foreground">3–24 lowercase letters, numbers, hyphens, or underscores. Usernames cannot be changed in this release.</p>
                   <div id="username-suggestions" aria-live="polite">
                     {usernameSuggestions.length ? (
@@ -120,7 +121,7 @@ export default function Setup() {
                 <div className="space-y-2"><Label htmlFor="profile-bio">Bio (optional)</Label><Textarea id="profile-bio" value={bio} onChange={(event) => setBio(event.target.value.slice(0, 500))} maxLength={500} rows={4} /><p className="text-right text-xs text-muted-foreground">{bio.length}/500</p></div>
                 <label className="flex items-start gap-3 rounded-xl bg-muted/60 p-4 text-sm leading-6"><Checkbox checked={accepted} onCheckedChange={(checked) => setAccepted(checked === true)} className="mt-1" /><span>I am at least 13 years old and agree to the <a href="/terms" className="font-bold underline">Terms</a> and <a href="/community-guidelines" className="font-bold underline">Community Guidelines</a>.</span></label>
               </div>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center"><Button type="submit" disabled={submitting}><Check /> {submitting ? "Saving…" : "Finish setup"}</Button><span className="inline-flex items-center gap-1.5 text-xs text-[var(--island-ink)]/50"><ShieldCheck className="h-4 w-4" /> Google email is never displayed</span></div>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center"><Button type="submit" disabled={submitting}><Check /> {submitting ? "Saving…" : reviewingUpdatedTerms ? "Accept current terms" : "Finish setup"}</Button><span className="inline-flex items-center gap-1.5 text-xs text-[var(--island-ink)]/50"><ShieldCheck className="h-4 w-4" /> Google email is never displayed</span></div>
             </form>
           </div>
         </div>

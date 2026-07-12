@@ -1,4 +1,11 @@
+import { deleteShowcaseImageObjects } from "./creation-images";
+
 interface RevisionCleanupRow {
+  creation_id: string;
+  id: string;
+}
+
+interface ShowcaseCleanupRow {
   creation_id: string;
   id: string;
 }
@@ -10,6 +17,10 @@ export async function runScheduledMaintenance(
   const now = controller.scheduledTime || Date.now();
   const hourAgo = now - 60 * 60 * 1_000;
   const dayAgo = now - 24 * 60 * 60 * 1_000;
+
+  const purgedShowcaseAttempts = await env.DB.prepare(
+    "DELETE FROM creation_showcase_upload_attempts WHERE created_at < ?",
+  ).bind(dayAgo).run();
 
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ? OR revoked_at <= ?")
     .bind(now, dayAgo)
@@ -23,6 +34,33 @@ export async function runScheduledMaintenance(
     await env.DB.prepare(
       "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
     ).bind(revision.id).run();
+  }
+
+  const staleShowcaseUploads = await env.DB.prepare(
+    `SELECT id, creation_id FROM creation_showcase_images
+     WHERE status IN ('reserved', 'processing') AND expires_at <= ? LIMIT 100`,
+  ).bind(now).all<ShowcaseCleanupRow>();
+  let claimedStaleShowcaseUploads = 0;
+  for (const image of staleShowcaseUploads.results) {
+    if (await cleanupExpiredShowcaseUpload(env, image, now)) {
+      claimedStaleShowcaseUploads += 1;
+    }
+  }
+
+  const failedShowcaseUploads = await env.DB.prepare(
+    `SELECT id, creation_id FROM creation_showcase_images
+     WHERE status = 'failed' AND updated_at <= ? LIMIT 100`,
+  ).bind(dayAgo).all<ShowcaseCleanupRow>();
+  for (const image of failedShowcaseUploads.results) {
+    await deleteShowcaseImageObjects(env, image.creation_id, image.id);
+  }
+
+  const deletingShowcaseImages = await env.DB.prepare(
+    `SELECT id, creation_id FROM creation_showcase_images
+     WHERE status = 'deleting' LIMIT 100`,
+  ).all<ShowcaseCleanupRow>();
+  for (const image of deletingShowcaseImages.results) {
+    await deleteShowcaseImageObjects(env, image.creation_id, image.id);
   }
 
   const obsolete = await env.DB.prepare(
@@ -95,8 +133,33 @@ export async function runScheduledMaintenance(
     deletedCreations: deletedCreations.results.length,
     message: "scheduled_maintenance_complete",
     obsoleteRevisions: obsolete.results.length,
+    purgedShowcaseAttempts: purgedShowcaseAttempts.meta.changes ?? 0,
+    showcaseDeletes: deletingShowcaseImages.results.length,
+    showcaseFailedUploads: failedShowcaseUploads.results.length,
+    showcaseStaleUploads: claimedStaleShowcaseUploads,
     staleUploads: staleUploads.results.length,
   }));
+}
+
+/**
+ * Claim a stale upload before touching R2. The SELECT that built the cleanup
+ * page is only a snapshot: a foreground request may promote the image before
+ * this guarded UPDATE runs. In that case the zero-change result is authoritative
+ * and the ready image and all of its objects must be left untouched.
+ */
+export async function cleanupExpiredShowcaseUpload(
+  env: Env,
+  image: { creation_id: string; id: string },
+  now: number,
+): Promise<boolean> {
+  const claimed = await env.DB.prepare(
+    `UPDATE creation_showcase_images SET status = 'failed',
+     upload_token_hash = NULL, failure_code = 'upload_expired', updated_at = ?
+     WHERE id = ? AND status IN ('reserved', 'processing') AND expires_at <= ?`,
+  ).bind(now, image.id, now).run();
+  if ((claimed.meta.changes ?? 0) !== 1) return false;
+  await deleteShowcaseImageObjects(env, image.creation_id, image.id);
+  return true;
 }
 
 async function deleteRevisionObjects(

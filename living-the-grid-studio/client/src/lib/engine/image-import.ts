@@ -113,9 +113,21 @@ export const DEFAULT_IMPORT_OPTIONS: ImageImportOptions = {
 export function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    const finish = () => {
+      img.onload = null;
+      img.onerror = null;
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.onload = () => {
+      finish();
+      resolve(img);
+    };
+    img.onerror = () => {
+      finish();
+      reject(new Error("Failed to load image"));
+    };
+    img.src = objectUrl;
   });
 }
 

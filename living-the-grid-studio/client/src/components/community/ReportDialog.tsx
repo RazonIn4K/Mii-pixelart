@@ -14,7 +14,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { communityApi, jsonBody, messageFromError } from "@/lib/community/api";
+import { ensureCommunityMutationReady } from "@/lib/community/onboarding";
 
 const REASONS = [
   ["spam", "Spam or misleading"],
@@ -35,12 +37,14 @@ export function ReportDialog({
   targetId: string;
   label?: string;
 }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
+    if (user && !ensureCommunityMutationReady(user)) return;
     setSubmitting(true);
     try {
       await communityApi("/api/reports", {
@@ -58,7 +62,13 @@ export function ReportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen && user && !ensureCommunityMutationReady(user)) return;
+        setOpen(nextOpen);
+      }}
+    >
       <DialogTrigger asChild>
         <Button type="button" variant="ghost" size="sm" aria-label={label === "" ? `Report this ${targetType}` : undefined}>
           <Flag className="h-4 w-4" /> {label ?? "Report"}

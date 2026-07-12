@@ -40,7 +40,11 @@ const Security = lazy(() => import("./pages/community/Security"));
 
 function OnboardedAccountRoute({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
-  if (status === "authenticated" && user && !user.username) {
+  if (
+    status === "authenticated"
+    && user
+    && (!user.username || user.termsAccepted !== true)
+  ) {
     return (
       <Redirect
         to={setupPathForReturnTo(currentRelativeReturnTo())}

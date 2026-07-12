@@ -19,6 +19,8 @@ export interface CommunityUser {
   status: UserStatus;
   avatarSeed: string;
   createdAt: number;
+  termsAccepted?: boolean;
+  termsVersion?: string | null;
   followerCount?: number;
   followingCount?: number;
   creationCount?: number;
@@ -43,8 +45,8 @@ export interface CreationSummary {
   visibility: CreationVisibility;
   previewUrl?: string | null;
   thumbnailUrl?: string | null;
-  width?: number;
-  height?: number;
+  primaryImageUrl?: string | null;
+  images?: CreationShowcaseImage[];
   revision: number;
   publishedAt?: number | null;
   updatedAt: number;
@@ -55,6 +57,20 @@ export interface CreationSummary {
   isLiked?: boolean;
   commentsEnabled?: boolean;
   downloadEnabled?: boolean;
+}
+
+export interface CreationShowcaseImage {
+  id: string;
+  altText: string;
+  sortOrder: number;
+  isCover: boolean;
+  width: number;
+  height: number;
+  createdAt: number;
+  updatedAt: number;
+  displayUrl: string;
+  thumbnailUrl: string;
+  socialImageUrl: string;
 }
 
 export interface CreationDetail extends CreationSummary {
@@ -118,6 +134,15 @@ export interface CloudProjectState {
   lastSavedAt?: number;
   lastSyncedModifiedAt?: string;
   error?: string;
+  publication?: {
+    status: CreationStatus;
+    visibility: CreationVisibility;
+    title: string;
+    description: string;
+    tags: string[];
+    commentsEnabled: boolean;
+    downloadEnabled: boolean;
+  };
 }
 
 export interface PublishInput {

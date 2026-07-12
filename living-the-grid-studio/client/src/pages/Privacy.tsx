@@ -20,7 +20,7 @@ export default function Privacy() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      lastUpdated="July 10, 2026"
+      lastUpdated="July 12, 2026"
       intro="Tomodachi is a local-first pixel-art workshop with an optional account and community layer. Local editing and export do not require an account; cloud saving and publishing are deliberate choices."
     >
       <h2>1. Who we are</h2>
@@ -44,7 +44,8 @@ export default function Privacy() {
         </li>
         <li>
           Your username, display name, bio, private cloud projects, publication
-          choices, comments, likes, follows, and reports.
+          choices, optional showcase images and their descriptions, comments,
+          likes, follows, and reports.
         </li>
         <li>
           Text prompts and grid JSON you deliberately send through an AI
@@ -83,9 +84,11 @@ export default function Privacy() {
       <ul>
         <li>
           Source images used for imports stay in your browser and are not sent
-          to Tomodachi or included in cloud saves. Project metadata is
-          sanitized before persistence, and profile-image uploads are not
-          supported.
+          to Tomodachi or included in cloud saves automatically. If you
+          separately choose a photo or screenshot as a showcase image, we
+          remove its filename and metadata, retain only optimized WebP/JPEG
+          variants, and associate them with that cloud creation. Profile-image
+          uploads are not supported.
         </li>
         <li>
           Tomodachi never receives your password, its hash, or its prefix. The
@@ -129,7 +132,7 @@ export default function Privacy() {
         <li>
           <strong>Cloudflare</strong> for Workers hosting, DNS/CDN, D1 account
           and community records, private R2 project/media objects, and image
-          transformations for generated previews.
+          transformations for generated previews and optional showcase images.
         </li>
         <li>
           <strong>Google</strong> for optional OpenID Connect sign-in. We ask
@@ -160,7 +163,10 @@ export default function Privacy() {
         Cloud saves begin private. Public creations appear in discovery,
         search, and profiles. Unlisted creations stay out of those surfaces but
         can be viewed by anyone with the link. Session records expire after 30
-        days. Account deletion hides content and revokes sessions immediately,
+        days. Optional showcase variants follow the visibility and deletion of
+        their parent creation and count toward the account storage quota. Raw
+        image uploads are discarded after transformation. Account deletion
+        hides content and revokes sessions immediately,
         provides a seven-day cancellation window, and then removes account and
         project data. Resolved report free-text is purged after 90 days; minimal
         pseudonymized moderation records may be kept for two years.

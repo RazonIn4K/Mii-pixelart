@@ -347,7 +347,7 @@ describe("community Worker integration", () => {
         acceptsTerms: true,
         confirmsAge13OrOlder: true,
         displayName: "New Islander",
-        termsVersion: "2026-07-10",
+        termsVersion: "2026-07-12",
         username: "taken-name",
       }),
       headers,
@@ -371,7 +371,7 @@ describe("community Worker integration", () => {
         bio: "Building tiny island portraits.",
         confirmsAge13OrOlder: true,
         displayName: "Atomic Islander",
-        termsVersion: "2026-07-10",
+        termsVersion: "2026-07-12",
         username: "atomic-islander",
       }),
       headers,
@@ -381,7 +381,7 @@ describe("community Worker integration", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         bio: "Building tiny island portraits.",
-        termsVersion: "2026-07-10",
+        termsVersion: "2026-07-12",
         username: "atomic-islander",
       },
     });
@@ -389,8 +389,58 @@ describe("community Worker integration", () => {
       "SELECT username, bio, terms_version FROM users WHERE id = ?",
     ).bind(newcomer.id).first()).resolves.toMatchObject({
       bio: "Building tiny island portraits.",
-      terms_version: "2026-07-10",
+      terms_version: "2026-07-12",
       username: "atomic-islander",
+    });
+  });
+
+  it("lets an existing username accept a newer Terms version without changing identity", async () => {
+    const returning = await seedUser("returning-islander");
+    await env.DB.prepare(
+      "UPDATE users SET terms_version = '2026-07-10' WHERE id = ?",
+    ).bind(returning.id).run();
+    const headers = authenticatedHeaders(
+      await seedSession(returning.id, "returning-terms-token"),
+    );
+
+    const session = await SELF.fetch(`${ORIGIN}/api/auth/session`, { headers });
+    await expect(session.json()).resolves.toMatchObject({
+      data: { user: { termsAccepted: false, username: "returning-islander" } },
+    });
+
+    const changedUsername = await SELF.fetch(`${ORIGIN}/api/me/setup`, {
+      body: JSON.stringify({
+        acceptsTerms: true,
+        confirmsAge13OrOlder: true,
+        displayName: "Returning Islander",
+        termsVersion: "2026-07-12",
+        username: "different-islander",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(changedUsername.status).toBe(409);
+
+    const accepted = await SELF.fetch(`${ORIGIN}/api/me/setup`, {
+      body: JSON.stringify({
+        acceptsTerms: true,
+        bio: "Still making tiny portraits.",
+        confirmsAge13OrOlder: true,
+        displayName: "Returning Islander",
+        termsVersion: "2026-07-12",
+        username: "returning-islander",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(accepted.status).toBe(200);
+    await expect(
+      env.DB.prepare("SELECT username, terms_version FROM users WHERE id = ?")
+        .bind(returning.id)
+        .first(),
+    ).resolves.toMatchObject({
+      terms_version: "2026-07-12",
+      username: "returning-islander",
     });
   });
 
@@ -1067,7 +1117,7 @@ async function seedUser(
     `INSERT INTO users
      (id, username, display_name, bio, role, status, avatar_seed,
       terms_version, terms_accepted_at, created_at, updated_at)
-     VALUES (?, ?, ?, '', ?, 'active', ?, '2026-07-10', ?, ?, ?)`,
+     VALUES (?, ?, ?, '', ?, 'active', ?, '2026-07-12', ?, ?, ?)`,
   ).bind(id, username, username, role, id, now, now, now).run();
   await env.DB.prepare(
     `INSERT INTO external_identities

@@ -29,6 +29,7 @@ import {
   success,
   type WorkerRequestContext,
 } from "./http";
+import { getPreferredShowcaseObject } from "./creation-images";
 import {
   renderGridSvg,
   storeRevisionObjects,
@@ -538,7 +539,15 @@ async function serveCreationMedia(context: WorkerRequestContext): Promise<Respon
   }
   if (!creation.current_revision_id) throw new HttpError(404, "media_not_found", "Media was not found.");
 
-  const row = await context.env.DB.prepare(
+  const showcaseKind = kind === "preview"
+    ? "display"
+    : kind === "thumb" || kind === "social"
+      ? kind
+      : null;
+  let row: ObjectRow | null = showcaseKind
+    ? await getPreferredShowcaseObject(context.env, creation.id, showcaseKind)
+    : null;
+  row ??= await context.env.DB.prepare(
     `SELECT object_key, content_type FROM creation_objects
      WHERE revision_id = ? AND kind = ? AND status = 'ready' LIMIT 1`,
   ).bind(creation.current_revision_id, kind).first<ObjectRow>();

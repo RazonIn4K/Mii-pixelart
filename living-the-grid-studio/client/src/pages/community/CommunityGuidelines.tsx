@@ -4,9 +4,10 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 export default function CommunityGuidelines() {
   useDocumentTitle("Community Guidelines");
   return (
-    <LegalLayout title="Community Guidelines" lastUpdated="July 10, 2026" intro="Tomodachi is a fan-made workshop for original, constructive pixel art. These rules apply to public and unlisted creations, profiles, comments, and interactions.">
+    <LegalLayout title="Community Guidelines" lastUpdated="July 12, 2026" intro="Tomodachi is a fan-made workshop for original, constructive pixel art. These rules apply to public and unlisted creations, showcase images, profiles, comments, and interactions.">
       <h2>Share work you have the right to share</h2>
       <p>Post original work, licensed material, or material you are otherwise permitted to use. Do not upload game assets, private photos, personal information, or copyrighted work merely because it is available online.</p>
+      <p>Before attaching a photo or screenshot, remove personal details and make sure every identifiable person has agreed to appear. Showcase images must relate to the creation and may not be used as general-purpose image hosting.</p>
       <h2>Keep the workshop safe</h2>
       <ul><li>No harassment, threats, hate, sexual exploitation, graphic violence, impersonation, spam, or malicious links.</li><li>Do not expose another person&apos;s private information or use the service to coordinate abuse.</li><li>Tomodachi is for people aged 13 and older. Content must remain appropriate for a general creative community.</li></ul>
       <h2>Be constructive</h2>

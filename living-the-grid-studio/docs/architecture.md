@@ -82,7 +82,7 @@ Mii-pixelart/
 | Package manager | pnpm | Required; lockfile committed |
 | Target deploy | Cloudflare Worker + Static Assets | One runtime for SPA, APIs, dynamic documents, and scheduled jobs |
 | Production rollback | Cloudflare Pages commit `654df95` | Preserved until the approved Worker cutover and soak complete |
-| Data | D1 + private R2 + KV + Images | Relational authority, immutable projects/media, bounded cache, and generated previews |
+| Data | D1 + private R2 + KV + Images | Relational authority, immutable projects/media, bounded cache, generated previews, and normalized optional showcase variants |
 | Secrets | Doppler | Runtime injection; no `.env` files committed |
 
 ---

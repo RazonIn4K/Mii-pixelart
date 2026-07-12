@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Tomodachi Studio Community API
-  version: 1.0.0
+  version: 1.1.0
   license:
     name: MIT
     identifier: MIT
@@ -527,6 +527,148 @@ paths:
             image/jpeg:
               schema: { type: string, contentEncoding: binary }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/creations/{creationId}/images/uploads:
+    post:
+      operationId: createShowcaseImageUpload
+      tags: [Creations]
+      summary: Reserve a one-use showcase-image upload ticket
+      description: Requires the creation owner, exact Origin, and JSON. The returned Bearer token expires after ten minutes and is bound to the declared type, byte length, alt text, owner, and creation.
+      parameters:
+        - $ref: '#/components/parameters/CreationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShowcaseUploadTicketInput' }
+      responses:
+        '201':
+          description: One-use upload ticket reserved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowcaseUploadTicketEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/creation-image-uploads/{uploadId}/content:
+    put:
+      operationId: uploadShowcaseImageContent
+      tags: [Creations]
+      summary: Consume a one-use ticket and normalize raw image bytes
+      description: The browser must omit credentials/cookies and present only the upload Bearer token. Exact Origin and Content-Type are required, and the actual bounded byte count must equal the length reserved in the ticket. Raw bytes, filename, and metadata are discarded after decoding; only normalized generated variants are retained.
+      security:
+        - imageUploadTicket: []
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { type: string, contentEncoding: binary }
+          image/png:
+            schema: { type: string, contentEncoding: binary }
+          image/webp:
+            schema: { type: string, contentEncoding: binary }
+          image/heic:
+            schema: { type: string, contentEncoding: binary }
+          image/heif:
+            schema: { type: string, contentEncoding: binary }
+      responses:
+        '201':
+          description: Image decoded and normalized variants committed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowcaseUploadResultEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/BadRequest' }
+
+  /api/creations/{creationId}/images:
+    parameters:
+      - $ref: '#/components/parameters/CreationId'
+    get:
+      operationId: listCreationShowcaseImages
+      tags: [Creations]
+      summary: List an authorized creation's ready showcase images
+      security:
+        - cookieAuth: []
+        - {}
+      responses:
+        '200':
+          description: Ordered showcase gallery
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowcaseImageListEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateCreationShowcaseImages
+      tags: [Creations]
+      summary: Reorder ready images and choose the cover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShowcaseGalleryUpdateInput' }
+      responses:
+        '200':
+          description: Updated showcase order and cover
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowcaseGalleryMutationEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/creations/{creationId}/images/{imageId}:
+    delete:
+      operationId: deleteCreationShowcaseImage
+      tags: [Creations]
+      summary: Delete a normalized showcase image and its generated variants
+      parameters:
+        - $ref: '#/components/parameters/CreationId'
+        - $ref: '#/components/parameters/ImageId'
+      requestBody:
+        $ref: '#/components/requestBodies/EmptyJson'
+      responses:
+        '200':
+          description: Showcase image deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShowcaseImageDeletionEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/creations/{creationId}/images/{imageId}/{imageVariant}:
+    get:
+      operationId: getCreationShowcaseImage
+      tags: [Creations]
+      summary: Stream an authorized normalized showcase-image variant
+      security:
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/CreationId'
+        - $ref: '#/components/parameters/ImageId'
+        - name: imageVariant
+          in: path
+          required: true
+          schema: { type: string, enum: [display, thumb, social] }
+      responses:
+        '200':
+          description: Normalized WebP or JPEG variant; cache policy follows the parent creation visibility
+          content:
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+            image/jpeg:
+              schema: { type: string, contentEncoding: binary }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /api/discover/recent:
@@ -1085,10 +1227,25 @@ components:
       type: apiKey
       in: cookie
       name: __Host-tomodachi.sid
+    imageUploadTicket:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-one-use-ticket
+      description: Ten-minute, single-use token bound to one owner, creation, type, byte length, and alt text. Cookies must be omitted.
 
   parameters:
     CreationId:
       name: creationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ImageId:
+      name: imageId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UploadId:
+      name: uploadId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1203,7 +1360,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     PayloadTooLarge:
-      description: Body or canonical project exceeds 2 MiB
+      description: Body exceeds the route-specific cap (2 MiB canonical project or 8 MiB showcase input)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
@@ -1647,7 +1804,7 @@ components:
     Creation:
       type: object
       additionalProperties: false
-      required: [id, slug, owner, title, description, state, visibility, commentsEnabled, commentsLocked, projectDownloadEnabled, revision, tags, stats, likedByViewer, createdAt, updatedAt]
+      required: [id, slug, owner, title, description, state, visibility, commentsEnabled, commentsLocked, projectDownloadEnabled, revision, tags, stats, likedByViewer, images, mediaSource, primaryImageUrl, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         slug: { type: string, minLength: 18, maxLength: 18 }
@@ -1671,9 +1828,134 @@ components:
         likedByViewer: { type: boolean, description: False for an anonymous viewer. }
         canEdit: { type: boolean, description: True only when the authenticated viewer owns this creation. Present on public creation detail responses. }
         socialImageUrl: { type: string, pattern: '^/api/creations/' }
+        primaryImageUrl:
+          type: string
+          pattern: '^/api/creations/'
+          description: Selected showcase cover display URL, or the deterministic grid preview URL when no showcase image is ready.
+        images:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+        mediaSource:
+          type: string
+          enum: [generated, showcase]
+          description: Identifies whether the primary image uses the deterministic grid preview or the selected showcase cover.
         publishedAt: { type: [integer, 'null'] }
         createdAt: { type: integer }
         updatedAt: { type: integer }
+    ShowcaseContentType:
+      type: string
+      enum: [image/jpeg, image/png, image/webp, image/heic, image/heif]
+    CreationShowcaseImage:
+      type: object
+      additionalProperties: false
+      required: [id, altText, sortOrder, isCover, width, height, createdAt, updatedAt, displayUrl, thumbnailUrl, socialImageUrl]
+      properties:
+        id: { type: string, format: uuid }
+        altText: { type: string, minLength: 1, maxLength: 200 }
+        sortOrder: { type: integer, minimum: 0, maximum: 3 }
+        isCover: { type: boolean }
+        width: { type: integer, minimum: 1, maximum: 8192 }
+        height: { type: integer, minimum: 1, maximum: 8192 }
+        createdAt: { type: integer }
+        updatedAt: { type: integer }
+        displayUrl: { type: string, pattern: '^/api/creations/' }
+        thumbnailUrl: { type: string, pattern: '^/api/creations/' }
+        socialImageUrl: { type: string, pattern: '^/api/creations/' }
+    ShowcaseUploadTicketInput:
+      type: object
+      additionalProperties: false
+      required: [contentType, byteSize, altText]
+      properties:
+        contentType: { $ref: '#/components/schemas/ShowcaseContentType' }
+        byteSize: { type: integer, minimum: 1, maximum: 8388608 }
+        altText: { type: string, minLength: 1, maxLength: 200 }
+        replaceImageId: { type: string, format: uuid }
+    ShowcaseUploadTicketEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [uploadId, uploadToken, uploadUrl, expiresAt, maximumBytes]
+          properties:
+            uploadId: { type: string, format: uuid }
+            uploadToken: { type: string, minLength: 32 }
+            uploadUrl: { type: string, pattern: '^/api/creation-image-uploads/' }
+            expiresAt: { type: integer }
+            maximumBytes: { type: integer, const: 8388608 }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ShowcaseImageListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ShowcaseUploadResultEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [image, images]
+          properties:
+            image: { $ref: '#/components/schemas/CreationShowcaseImage' }
+            images:
+              type: array
+              maxItems: 4
+              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ShowcaseGalleryUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [orderedImageIds, coverImageId]
+      properties:
+        orderedImageIds:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        coverImageId: { type: string, format: uuid }
+    ShowcaseGalleryMutationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [images]
+          properties:
+            images:
+              type: array
+              maxItems: 4
+              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ShowcaseImageDeletionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [deletedImageId, images]
+          properties:
+            deletedImageId: { type: string, format: uuid }
+            images:
+              type: array
+              maxItems: 4
+              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
     CreateCreationInput:
       type: object
       additionalProperties: false

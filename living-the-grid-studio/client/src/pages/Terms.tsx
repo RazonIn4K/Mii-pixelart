@@ -17,7 +17,7 @@ export default function Terms() {
   return (
     <LegalLayout
       title="Terms of Service"
-      lastUpdated="July 10, 2026"
+      lastUpdated="July 12, 2026"
       intro="These Terms govern your use of Tomodachi. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
@@ -55,15 +55,20 @@ export default function Terms() {
         does not upload or publish your local work. The first cloud save is an
         explicit private action, and publishing requires a separate review of
         the title, description, tags, visibility, comments, and download
-        permission. Unlisted links are not secret access controls.
+        permission. You may separately attach up to four showcase images to a
+        cloud creation; doing so is an explicit upload and is never inferred
+        from a local Studio import. Unlisted links are not secret access
+        controls.
       </p>
 
       <h2>4. Community content and moderation</h2>
       <p>
         You keep ownership of content you create. You grant us a limited,
         non-exclusive license to store, transform into previews, display, and
-        distribute content only as needed to operate the visibility and sharing
-        choices you make. We may hide content, lock comments, or suspend
+        distribute project content and selected showcase images only as needed
+        to operate the visibility and sharing choices you make. You represent
+        that you have permission to share every person and work depicted. We
+        may hide content, lock comments, or suspend
         accounts to enforce these Terms and the Community Guidelines. Reports
         and copyright notices must be made in good faith.
       </p>
