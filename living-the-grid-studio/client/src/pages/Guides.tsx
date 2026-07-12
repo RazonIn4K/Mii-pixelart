@@ -537,7 +537,7 @@ const GUIDES_STRUCTURED_DATA = [
       "Step-by-step process for designing recognizable custom Miis: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants in Mii Maker before they're locked into the game save.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#mii-creation",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     totalTime: "PT15M",
     step: [
       {
@@ -575,13 +575,13 @@ const GUIDES_STRUCTURED_DATA = [
       "Beginner walkthrough of the core daily loop in Tomodachi Life — what to check each day, how to read food reactions, how friendship and crush gating actually works, and how to keep an island interesting past 40 Miis.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#gameplay-basics",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
     publisher: {
       "@type": "Organization",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/icon-512.png" },
     },
   },
   {
@@ -593,13 +593,13 @@ const GUIDES_STRUCTURED_DATA = [
       "Hour-by-hour breach recovery plan for Tomodachishare users: which password to change first, which 2FA method to pick, how to assess Nintendo Network ID exposure, and a 30-day monitoring rhythm.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#breach-recovery",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
     publisher: {
       "@type": "Organization",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/icon-512.png" },
     },
   },
   {
@@ -610,7 +610,7 @@ const GUIDES_STRUCTURED_DATA = [
       "How to export Miis as QR codes from a 3DS or Wii U, scan QR codes from the wider community into Tomodachi Life, and back up a Tomodachi Life save before the hardware dies.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#qr-and-backup",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     totalTime: "PT10M",
     step: [
       {

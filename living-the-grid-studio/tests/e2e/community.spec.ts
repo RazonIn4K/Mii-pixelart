@@ -71,3 +71,34 @@ test("the hero image is preloaded only on the homepage", async ({ page }) => {
   );
   await expect(page.locator('img[src="/hero.webp"]')).toHaveAttribute("fetchpriority", "high");
 });
+
+test("original community artwork and generated avatars are wired into public routes", async ({
+  page,
+}) => {
+  await page.goto("/discover", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("img", {
+      name: "Five original pixel-art creators collaborating around a colorful grid in an open-air island workshop",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Mira's generated avatar", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/search", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("img", {
+      name: "An original pixel-art island map, magnifying glass, color swatches, and tiny workshop lantern robot ready for a search",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("img", {
+      name: "An original lantern workshop robot arranged as a repaintable pixel guide on graph paper",
+      exact: true,
+    }),
+  ).toBeVisible();
+});

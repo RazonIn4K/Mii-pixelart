@@ -85,7 +85,7 @@ const PUBLISHER_ORG = {
   '@type': 'Organization',
   name: 'Tomodachi',
   url: 'https://tomodachi.pw/',
-  logo: { '@type': 'ImageObject', url: 'https://tomodachi.pw/og-image.png' },
+  logo: { '@type': 'ImageObject', url: 'https://tomodachi.pw/icon-512.png' },
 };
 
 const COMMON_HEAD = `
@@ -93,7 +93,7 @@ const COMMON_HEAD = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#101016" />
   <meta name="robots" content="index,follow" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E" />`;
+  <link rel="icon" href="/icon-192.png" />`;
 
 function shellFor(route: string, shell: RouteShell): string {
   const url = `https://tomodachi.pw${route}`;
@@ -119,13 +119,13 @@ function shellFor(route: string, shell: RouteShell): string {
   <meta property="og:title" content="${shell.title}" />
   <meta property="og:description" content="${shell.description}" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:image" content="https://tomodachi.pw/og-image.png" />
+  <meta property="og:image" content="https://tomodachi.pw/community-og.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${shell.title}" />
   <meta name="twitter:description" content="${shell.description}" />
-  <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
+  <meta name="twitter:image" content="https://tomodachi.pw/community-og.jpg" />
   ${jsonLdTag}
 </head>
 <body>
@@ -179,7 +179,7 @@ const ROUTES: Record<string, RouteShell> = {
         applicationCategory: 'DesignApplication',
         operatingSystem: 'Any',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        image: 'https://tomodachi.pw/og-image.png',
+        image: 'https://tomodachi.pw/community-og.jpg',
         publisher: PUBLISHER_ORG,
       },
     ],
@@ -214,7 +214,7 @@ const ROUTES: Record<string, RouteShell> = {
         operatingSystem: 'Any',
         browserRequirements: 'Modern browser with JavaScript enabled.',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        image: 'https://tomodachi.pw/og-image.png',
+        image: 'https://tomodachi.pw/community-og.jpg',
         publisher: PUBLISHER_ORG,
       },
     ],
@@ -409,7 +409,7 @@ const ROUTES: Record<string, RouteShell> = {
           '@id': 'https://tomodachi.pw/#org',
           name: 'Tomodachi',
           url: 'https://tomodachi.pw/',
-          logo: 'https://tomodachi.pw/og-image.png',
+          logo: 'https://tomodachi.pw/icon-512.png',
           description:
             'Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.',
           sameAs: [
@@ -456,7 +456,7 @@ const ROUTES: Record<string, RouteShell> = {
         inLanguage: 'en',
         author: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
-        image: 'https://tomodachi.pw/og-image.png',
+        image: 'https://tomodachi.pw/community-og.jpg',
       },
     ],
   },

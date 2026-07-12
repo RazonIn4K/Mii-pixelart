@@ -43,7 +43,7 @@ import {
 } from "@shared/ai";
 
 const HERO_IMG = "/hero.webp";
-const CANVAS_IMG = "/canvas-demo.webp";
+const CANVAS_IMG = "/canvas-demo-v2.webp";
 const PALETTE_IMG = "/palette-swatches.webp";
 const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
 const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
@@ -513,9 +513,9 @@ export default function Home() {
 
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
               <figure className="island-showcase-card">
-                <img src={CANVAS_IMG} alt="A pixel-art mushroom arranged on graph paper" className="aspect-[4/3] w-full object-cover" width={1920} height={1920} loading="lazy" decoding="async" />
+                <img src={CANVAS_IMG} alt="An original lantern workshop robot arranged as a repaintable pixel guide on graph paper" className="aspect-[4/3] w-full object-cover" width={1254} height={1254} loading="lazy" decoding="async" />
                 <figcaption className="flex items-center justify-between gap-4 p-5">
-                  <div><p className="text-sm font-black text-[var(--island-ink)]">Grid guide</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Clean shapes, visible cells, repeatable result.</p></div>
+                  <div><p className="text-sm font-black text-[var(--island-ink)]">Original workshop bot</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Clean shapes, visible cells, repeatable result.</p></div>
                   <Grid3X3 className="h-5 w-5 text-primary" />
                 </figcaption>
               </figure>

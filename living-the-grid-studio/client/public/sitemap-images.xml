@@ -14,7 +14,7 @@
     <loc>https://tomodachi.pw/studio</loc>
     <lastmod>2026-07-10</lastmod>
     <image:image>
-      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
       <image:title>Tomodachi Studio · pixel-art editor</image:title>
       <image:caption>Browser-based pixel-art editor for designing custom Mii face masks square-by-square.</image:caption>
     </image:image>
@@ -32,7 +32,7 @@
     <loc>https://tomodachi.pw/guides</loc>
     <lastmod>2026-05-16</lastmod>
     <image:image>
-      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
       <image:title>Tomodachi Life player guides</image:title>
       <image:caption>Free in-depth guides covering Mii creation, gameplay basics, Tomodachishare breach recovery, and QR code save backup.</image:caption>
     </image:image>

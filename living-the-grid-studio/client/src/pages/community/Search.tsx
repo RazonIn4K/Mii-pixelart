@@ -75,9 +75,29 @@ export default function Search() {
       </section>
       <section className="container py-12">
         {loading ? <CommunityLoading label={`Searching for “${submittedQuery}”…`} /> : error ? <CommunityError message={error} retry={() => void search(submittedQuery)} /> : !submittedQuery ? (
-          <CommunityEmpty title="What are you looking for?" message="Search for design ideas without revealing any private or unlisted projects." icon={SearchIcon} />
+          <CommunityEmpty
+            title="What are you looking for?"
+            message="Search for design ideas without revealing any private or unlisted projects."
+            icon={SearchIcon}
+            image={{
+              alt: "An original pixel-art island map, magnifying glass, color swatches, and tiny workshop lantern robot ready for a search",
+              height: 800,
+              src: "/community-search-empty.webp",
+              width: 1200,
+            }}
+          />
         ) : items.length === 0 ? (
-          <CommunityEmpty title="No public creations matched" message="Try a shorter phrase, a different tag, or browse the newest creations." icon={SearchIcon} />
+          <CommunityEmpty
+            title="No public creations matched"
+            message="Try a shorter phrase, a different tag, or browse the newest creations."
+            icon={SearchIcon}
+            image={{
+              alt: "An original pixel-art island map and magnifying glass waiting for a different search",
+              height: 800,
+              src: "/community-search-empty.webp",
+              width: 1200,
+            }}
+          />
         ) : (
           <>
             <p className="mb-6 text-sm font-bold text-[var(--island-ink)]/60">Results for “{submittedQuery}”</p>

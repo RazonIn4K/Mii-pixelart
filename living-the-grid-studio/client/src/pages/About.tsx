@@ -37,7 +37,7 @@ const ABOUT_STRUCTURED_DATA = [
       "@id": "https://tomodachi.pw/#org",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: "https://tomodachi.pw/og-image.png",
+      logo: "https://tomodachi.pw/icon-512.png",
       description:
         "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
       sameAs: [

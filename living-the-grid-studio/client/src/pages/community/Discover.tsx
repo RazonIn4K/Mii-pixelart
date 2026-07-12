@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CreationCard } from "@/components/community/CreationCard";
 import { CommunityEmpty, CommunityError, CommunityLoading } from "@/components/community/CommunityState";
+import { IslandAvatar } from "@/components/community/IslandAvatar";
 import { CommunityPageIntro, CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
 import { communityApi, jsonBody, messageFromError, queryString } from "@/lib/community/api";
@@ -65,13 +66,40 @@ export default function Discover() {
   return (
     <CommunityShell>
       <section className="community-hero py-14 sm:py-20">
-        <div className="container">
+        <div className="container grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
           <CommunityPageIntro
             eyebrow="Community gallery"
             title="Find your next pixel idea."
             description="Browse original fan-made grids, save inspiration, and share your own work when it feels ready. Private drafts never appear here."
             action={<Button asChild className="island-button rounded-full"><Link href="/studio"><Plus /> Create something</Link></Button>}
           />
+          <figure className="relative overflow-hidden rounded-[2rem] border-2 border-[var(--island-ink)] bg-white shadow-[8px_8px_0_var(--island-ink)]">
+            <img
+              src="/island-creator-collective.webp"
+              alt="Five original pixel-art creators collaborating around a colorful grid in an open-air island workshop"
+              className="aspect-[3/2] w-full object-cover"
+              width={1440}
+              height={960}
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-lg backdrop-blur sm:inset-x-5 sm:bottom-5 sm:p-4">
+              <div className="flex -space-x-2" aria-label="Examples of generated Island Workshop avatars">
+                {[
+                  ["mira-coral", "Mira"],
+                  ["sol-sunbeam", "Sol"],
+                  ["jun-grid", "Jun"],
+                  ["ada-mint", "Ada"],
+                ].map(([seed, name]) => (
+                  <IslandAvatar key={seed} seed={seed} label={`${name}'s generated avatar`} className="h-9 w-9 sm:h-11 sm:w-11" />
+                ))}
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-black text-[var(--island-ink)]">A face for every maker</p>
+                <p className="mt-0.5 text-xs font-semibold text-[var(--island-ink)]/70">Generated from a stable seed · no photo upload</p>
+              </div>
+            </figcaption>
+          </figure>
         </div>
       </section>
 

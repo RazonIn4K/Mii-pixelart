@@ -41,20 +41,32 @@ export function CommunityEmpty({
   message,
   icon: Icon = Sparkles,
   action,
+  image = {
+    alt: "A cozy empty pixel workshop waiting for a new creation",
+    height: 800,
+    src: "/community-empty-state.webp",
+    width: 1200,
+  },
 }: {
   title: string;
   message: string;
   icon?: LucideIcon;
   action?: React.ReactNode;
+  image?: {
+    alt: string;
+    height: number;
+    src: string;
+    width: number;
+  };
 }) {
   return (
     <div className="community-state">
       <img
-        src="/community-empty-state.webp"
-        alt="A cozy empty pixel workshop waiting for a new creation"
+        src={image.src}
+        alt={image.alt}
         className="mb-2 w-full max-w-xs rounded-2xl border-2 border-[var(--island-ink)] object-cover shadow-[4px_4px_0_var(--island-ink)]"
-        width={1200}
-        height={800}
+        width={image.width}
+        height={image.height}
         loading="lazy"
         decoding="async"
       />

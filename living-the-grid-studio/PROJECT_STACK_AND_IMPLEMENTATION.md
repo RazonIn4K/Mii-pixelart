@@ -141,10 +141,14 @@ living-the-grid-studio/
       sitemap-images.xml
       manifest.webmanifest
       hero.webp
-      canvas-demo.webp
+      canvas-demo-v2.webp
+      island-creator-collective.webp
+      community-empty-state.webp
+      community-search-empty.webp
+      community-og.jpg
       empty-state.webp
       palette-swatches.webp
-      og-image.png
+      brand-mark.svg
       icon-192.png
       icon-512.png
       icon-maskable.png
@@ -948,10 +952,14 @@ These are the raster/static assets in `client/public/`.
 | Asset                   | Used For                             |
 | ----------------------- | ------------------------------------ |
 | `hero.webp`             | Public homepage hero/branding visual |
-| `canvas-demo.webp`      | Studio/demo visual                   |
+| `canvas-demo-v2.webp`   | Original workshop-robot grid demo    |
+| `island-creator-collective.webp` | Discover community hero artwork |
+| `community-empty-state.webp` | General community empty states  |
+| `community-search-empty.webp` | Search-specific empty states    |
+| `community-og.jpg`      | Default OpenGraph/social card image  |
 | `empty-state.webp`      | Empty state illustration             |
 | `palette-swatches.webp` | Palette preview visual               |
-| `og-image.png`          | OpenGraph/social card image          |
+| `brand-mark.svg`        | Source artwork for installed-app icons |
 | `icon-192.png`          | PWA/app icon                         |
 | `icon-512.png`          | PWA/app icon                         |
 | `icon-maskable.png`     | Maskable PWA icon                    |
@@ -969,11 +977,13 @@ These links render when the Markdown viewer supports local relative images:
 
 ![Hero image](client/public/hero.webp)
 
-![Canvas demo](client/public/canvas-demo.webp)
+![Canvas demo](client/public/canvas-demo-v2.webp)
+
+![Creator collective](client/public/island-creator-collective.webp)
 
 ![Palette swatches](client/public/palette-swatches.webp)
 
-![OpenGraph image](client/public/og-image.png)
+![OpenGraph image](client/public/community-og.jpg)
 
 ## 20. Cloudflare Worker, Pages Rollback, And Security
 

@@ -165,7 +165,7 @@ client/                  Vite + React SPA
       ui/                shadcn/ui primitives
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
     lib/                 engine (JSON import/export, palette ops), breadcrumb, consent, stripeUrl
-  public/                Static assets (sitemap.xml, og-image.png, robots.txt, _headers, manifest)
+  public/                Static assets (original WebP artwork, community social card, PWA icons, sitemap, robots, headers)
 worker/                  Unified Cloudflare Worker (API, auth, documents, jobs)
 migrations/              Forward-only D1 migrations
 shared/                  Shared validation and legacy contracts
@@ -178,6 +178,8 @@ server/                  Portable OpenRouter/Stripe helpers shared by legacy par
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```
+
+Visual artwork, deterministic avatars, and Cloudflare media boundaries are documented in [`docs/visual-assets.md`](docs/visual-assets.md).
 
 ## Contributing
 

@@ -97,6 +97,7 @@ docs/*
 !docs/community-data-flow.md
 !docs/community-deployment-runbook.md
 !docs/community-threat-model.md
+!docs/visual-assets.md
 
 # Cowork session output (in case it ever lands in the repo dir)
 cowork-output/
