@@ -36,7 +36,10 @@ breach-spike traffic.
 
 Before promoting from test to live:
 
-- Replace the placeholder mailing address in `Privacy.tsx`, `Terms.tsx`, and `Disclosure.tsx` with your real entity name and contact details.
+- Approve a complete, mail-ready public service address (city, state, ZIP code,
+  and country) or a safer PO box/registered-agent address before launch. The
+  legal pages contain no template tokens, but they intentionally do not publish
+  an incomplete residential address.
 - Decide on a fulfillment plan for `consult-30`. The Unlock page tells buyers they will receive a Google Meet link within one business day; the workflow needs to actually deliver that. The simplest pattern is to enable Stripe's "Receipt email" template with a Calendly link in the body.
 - Configure Stripe to send the events you need to `POST /api/webhooks/stripe`.
   The unified Worker already verifies the signature and five-minute timestamp

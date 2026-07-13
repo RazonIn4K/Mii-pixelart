@@ -8,7 +8,8 @@ the only deployment platform.
 
 The root `.gitlab-ci.yml` includes only GitLab security analyzers:
 
-- standard SAST plus GitLab Advanced SAST while Ultimate is available;
+- standard SAST, using GitLab Advanced SAST while Ultimate is available and
+  the Semgrep analyzer as its exact-tag fallback;
 - pipeline secret detection; and
 - SBOM-based dependency scanning.
 
@@ -37,11 +38,19 @@ security/github-pr-<number>-<first-12-sha>
 ```
 
 Before pushing the tag, verify that `.github/workflows/mirror-gitlab.yml` at the
-tagged commit is byte-for-byte identical to `origin/main`. The tag push then runs
-only that unchanged mirror workflow; it does not execute project code. GitLab
-accepts the SHA-suffixed tag as a security-only pipeline source. Record both the
-full GitHub commit and the resulting GitLab pipeline ID so the evidence cannot be
-mistaken for a scan of another revision.
+tagged commit is byte-for-byte identical to `origin/main`. Push the tag to GitHub,
+then manually dispatch that mirror workflow from the trusted `main` branch. The
+workflow fetches and mirrors all tags without executing project code. The
+slash-delimited security tag does not match the workflow's ordinary `tags: ["*"]`
+event filter, so the trusted manual dispatch is required.
+
+GitLab accepts the SHA-suffixed tag as a security-only pipeline source. Its
+analyzer templates normally create jobs only for branches and merge requests,
+so `.gitlab-ci.yml` defines tag-only child jobs for SAST, secret detection, and
+dependency scanning. SAST uses Advanced SAST when it is enabled and entitled;
+Semgrep covers supported files when Advanced SAST is unavailable or disabled.
+Record both the full GitHub commit and the resulting GitLab pipeline ID so the
+evidence cannot be mistaken for a scan of another revision.
 
 Do not use this exception for arbitrary tags or branches, and do not add a
 GitLab merge request. A failed or stale scan is corrected in the GitHub pull
@@ -96,8 +105,9 @@ Complete this at least four days before the Ultimate trial expires:
    keep the checked-in templates for post-trial continuity.
 5. Set `GITLAB_ADVANCED_SAST_ENABLED` to `"false"` and remove or disable any
    other Ultimate-only jobs or schedules.
-6. Run the remaining manual pipeline and verify standard SAST and pipeline secret
-   detection complete on the post-trial configuration.
+6. Run the remaining manual pipeline and a fresh reviewed exact-tag pipeline;
+   verify Semgrep SAST and pipeline secret detection complete on the post-trial
+   configuration.
 7. Verify the GitHub-to-GitLab deploy-key mirror still matches `main` and tags.
 
 Do not add GitLab Pages, Worker deployments, releases, or a second issue/merge

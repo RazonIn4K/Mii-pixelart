@@ -33,3 +33,46 @@ variables:
   GITLAB_ADVANCED_SAST_ENABLED: "true"
   SEARCH_MAX_DEPTH: "20"
   SECRET_DETECTION_HISTORIC_SCAN: "$[[ inputs.historic_secret_scan ]]"
+
+# GitLab's analyzer templates intentionally limit their built-in jobs to branch
+# and merge-request pipelines. Create tag-only children instead of overriding
+# those upstream rules, preserving normal manual/scheduled behavior while
+# scanning the exact immutable GitHub pull-request commit.
+gitlab-advanced-sast-security-tag:
+  extends: gitlab-advanced-sast
+  rules:
+    - if: '$SAST_DISABLED == "true" || $SAST_DISABLED == "1"'
+      when: never
+    - if: '$SAST_EXCLUDED_ANALYZERS =~ /(^|[,[:space:]])gitlab-advanced-sast([,[:space:]]|$)/'
+      when: never
+    - if: '(($CI_PIPELINE_SOURCE == "push") || ($CI_PIPELINE_SOURCE == "web")) && ($GITLAB_ADVANCED_SAST_ENABLED == "true" || $GITLAB_ADVANCED_SAST_ENABLED == "1") && $GITLAB_FEATURES =~ /\bsast_advanced\b/ && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
+      exists: !reference [.gitlab-advanced-sast-exist-rules, exists]
+
+semgrep-sast-security-tag:
+  extends: semgrep-sast
+  rules:
+    - if: '$SAST_DISABLED == "true" || $SAST_DISABLED == "1"'
+      when: never
+    - if: '$SAST_EXCLUDED_ANALYZERS =~ /(^|[,[:space:]])semgrep([,[:space:]]|$)/'
+      when: never
+    - if: '(($CI_PIPELINE_SOURCE == "push") || ($CI_PIPELINE_SOURCE == "web")) && ($GITLAB_ADVANCED_SAST_ENABLED == "true" || $GITLAB_ADVANCED_SAST_ENABLED == "1") && $GITLAB_FEATURES =~ /\bsast_advanced\b/ && $SAST_EXCLUDED_ANALYZERS !~ /(^|[,[:space:]])gitlab-advanced-sast([,[:space:]]|$)/ && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
+      variables:
+        SAST_EXCLUDED_PATHS: "$DEFAULT_SAST_EXCLUDED_PATHS, **/*.py, **/*.go, **/*.java, **/*.js, **/*.jsx, **/*.ts, **/*.tsx, **/*.cjs, **/*.mjs, **/*.cs, **/*.rb, **/*.php"
+        SAST_SEMGREP_EXCLUDED_PATHS: "**/*.py, **/*.go, **/*.java, **/*.js, **/*.jsx, **/*.ts, **/*.tsx, **/*.cjs, **/*.mjs, **/*.cs, **/*.rb, **/*.php"
+      exists: !reference [.semgrep-with-advanced-sast-exist-rules, exists]
+    - if: '(($CI_PIPELINE_SOURCE == "push") || ($CI_PIPELINE_SOURCE == "web")) && (($GITLAB_ADVANCED_SAST_ENABLED != "true" && $GITLAB_ADVANCED_SAST_ENABLED != "1") || $GITLAB_FEATURES !~ /\bsast_advanced\b/ || $SAST_EXCLUDED_ANALYZERS =~ /(^|[,[:space:]])gitlab-advanced-sast([,[:space:]]|$)/) && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
+      exists: !reference [.semgrep-exist-rules, exists]
+
+secret-detection-security-tag:
+  extends: secret_detection
+  rules:
+    - if: '$SECRET_DETECTION_DISABLED == "true" || $SECRET_DETECTION_DISABLED == "1"'
+      when: never
+    - if: '(($CI_PIPELINE_SOURCE == "push") || ($CI_PIPELINE_SOURCE == "web")) && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
+
+dependency-scanning-security-tag:
+  extends: dependency-scanning
+  rules:
+    - if: '$DEPENDENCY_SCANNING_DISABLED == "true" || $DEPENDENCY_SCANNING_DISABLED == "1"'
+      when: never
+    - if: '(($CI_PIPELINE_SOURCE == "push") || ($CI_PIPELINE_SOURCE == "web")) && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
