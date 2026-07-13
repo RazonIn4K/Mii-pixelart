@@ -874,6 +874,20 @@ test("project shelf paginates, edits private cards, and uses governed publishing
   await expect(
     publishDialog.getByText("1 image", { exact: true }),
   ).toBeVisible();
+  await expect(
+    publishDialog.getByText("Allow Studio project download", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    publishDialog.getByText(
+      "Shares editable Tomodachi Studio JSON only—not a Nintendo game or save file.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    publishDialog.getByText(
+      /does not use Living the Dream's local-wireless exchange or transfer anything to a console/u,
+    ),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
