@@ -61,7 +61,7 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 Initial production release of tomodachi.pw on Cloudflare Pages.
 
-- Studio: import → quantize to 84-color Tomodachi Life palette → grid editor → JSON/PNG/palette reference export
+- Studio: import → quantize to the Studio's 84-color working palette → grid editor → JSON/PNG/palette reference export
 - AI sketch assistant via OpenRouter (free-tier model rotation)
 - Recovery hub: browser-only HIBP k-anonymity password breach check + recovery-assistant chat
 - Stripe-backed paywall ($9 recovery checklist, $49 30-min consult)

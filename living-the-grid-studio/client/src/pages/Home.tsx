@@ -352,7 +352,7 @@ export default function Home() {
                     <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-yellow)]" />
                     <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-mint)]" />
                   </div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--island-ink)]/45">New project / Mii mask</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--island-ink)]/45">New project / Face paint</span>
                   <Grid3X3 className="h-4 w-4 text-[var(--island-ink)]/40" />
                 </div>
                 <div className="relative overflow-hidden bg-[var(--island-paper)] p-3 sm:p-5">

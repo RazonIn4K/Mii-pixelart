@@ -46,7 +46,7 @@ export const AI_SKETCH_LIMITS = {
 } as const;
 
 /**
- * The 84 valid Tomodachi palette IDs: R1..R11 x C1..C7 plus S1..S7.
+ * The 84 valid Studio working-palette IDs: R1..R11 x C1..C7 plus S1..S7.
  * Keep in sync with client/src/lib/engine/palette.ts.
  */
 export const PALETTE_COLOR_ID_PATTERN = /^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$/;

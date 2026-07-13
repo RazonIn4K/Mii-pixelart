@@ -7,20 +7,20 @@
 
 ## Vision
 
-Living The Grid Repaint Studio is a **browser-first repaint studio** for _Tomodachi Life: Living the Dream_ Mii face masks and creative pixel builds. It bridges Living The Grid-style image conversion with in-game repaint recipes for user-supplied character references, face photos, logos, brand-style marks, memes, clothing graphics, books, vinyl items, decor, and other fun player-made designs. The core insight is that existing tools convert images into pixel grids, but they do not optimize those grids for the actual task of hand-painting them in-game. This studio closes that gap.
+Living The Grid Repaint Studio is a **browser-first reference studio** for _Tomodachi Life: Living the Dream_ face paint, Palette House workshop creations, and other creative pixel builds. It bridges image conversion with manual copy guides for user-supplied character references, face photos, logos, brand-style marks, memes, clothing graphics, books, decor, and other fun player-made designs. The core insight is that existing tools convert images into pixel grids, but they do not optimize those grids for the actual task of recreating them with the game's own creation tools. This studio closes that gap without modifying game files.
 
 The strongest product angle: **not just "turn image into pixels," but "make this actually repaintable by hand."**
 
 ## Target User
 
-Creative gamers who play _Tomodachi Life: Living the Dream_ on Nintendo Switch and want to create face-mask guides for Mii characters, character-inspired fan builds from their own references, custom logos or brand-style marks, memes, vinyl items, books, clothing, food, decor, and house exteriors in the Palette House. These users range from casual players who want a funny face mask, mascot-style character, or recognizable logo to dedicated artists who build elaborate Mii portraits.
+Creative gamers who play _Tomodachi Life: Living the Dream_ on Nintendo Switch and want to create manual Face Paint references, character-inspired fan builds from their own references, custom logos or brand-style marks, memes, books, clothing, food, decor, and house exteriors in the Palette House. These users range from casual players who want a playful Face Paint design, mascot-style character, or recognizable logo to dedicated artists who build elaborate Mii portraits.
 
 ## Core Workflow
 
 The studio follows a linear pipeline that the user controls at every step:
 
 1. **Import** a character reference, face photo, logo/mark, meme, image file, or a Living The Grid JSON file, or **create** a blank starter canvas.
-2. **Choose a use-case preset** such as Mii Mask, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, or Pixel 256.
+2. **Choose a use-case preset** such as Face Paint, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, or Pixel 256.
 3. **Adjust framing and source type** with Fill/Fit/Stretch, focus controls, and Photo vs Pixel/Logo sampling so the face, logo, or subject lands where the repaint needs it.
 4. **Preview** the palette-limited grid before replacing the active project.
 5. **Commit or cancel** the image preview.
@@ -34,7 +34,7 @@ The studio follows a linear pipeline that the user controls at every step:
 | Feature            | Description                                                                                                                                                                                                                                 | Priority |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | Image import       | Upload PNG/JPG/GIF/WebP/AVIF, resize to grid, map to palette                                                                                                                                                                                | P0       |
-| Use-case presets   | Mii face mask, character, high-detail face/character, sprite, logo/mark, sticker, icon, full-image, and 256px pixel-art import settings                                                                                                     | P0       |
+| Use-case presets   | Face-paint, character, high-detail face/character, sprite, logo/mark, sticker, icon, full-image, and 256px pixel-art import settings                                                                                                                | P0       |
 | Face/subject focus | Nudge crop position with sliders or a draggable subject target before quantization                                                                                                                                                          | P0       |
 | Import preview     | Review generated image grids before committing them to history                                                                                                                                                                              | P0       |
 | Creation tools     | 28 original starter templates, saved JSON fixtures, blank starters, canvas detail resampling, inspect, pencil, eraser, eyedropper, and fill bucket tools                                                                                    | P0       |

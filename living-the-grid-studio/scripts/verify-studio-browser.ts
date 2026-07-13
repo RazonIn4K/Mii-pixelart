@@ -132,7 +132,7 @@ async function main(): Promise<void> {
     );
     for (const label of [
       "Create",
-      "Mii Mask",
+      "Face Paint",
       "Character 64",
       "Face 96",
       "Character 128",
@@ -697,7 +697,7 @@ async function verifyPresetImport(
 async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
   await clickByText(cdpClient, "Create", "mouse");
   for (const label of [
-    "People & Masks",
+    "Faces & Portraits",
     "Characters",
     "Horror & Spooky",
     "Marks & Objects",

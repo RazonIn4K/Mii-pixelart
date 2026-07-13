@@ -30,7 +30,7 @@ interface CreationPanelProps {
 }
 
 const STARTER_PRESETS = [
-  { label: "Mii Mask", name: "Mii Mask Canvas", width: 64, height: 64 },
+  { label: "Face Paint", name: "Face Paint Canvas", width: 64, height: 64 },
   { label: "Character 64", name: "Character Canvas", width: 64, height: 64 },
   { label: "Sprite 32", name: "Sprite Canvas", width: 32, height: 32 },
   { label: "Sticker 64", name: "Sticker Canvas", width: 64, height: 64 },
@@ -39,7 +39,7 @@ const STARTER_PRESETS = [
 ];
 
 const TEMPLATE_CATEGORY_ORDER = [
-  "People & Masks",
+  "Faces & Portraits",
   "Characters",
   "Horror & Spooky",
   "Marks & Objects",

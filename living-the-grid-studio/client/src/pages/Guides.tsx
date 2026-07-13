@@ -64,7 +64,7 @@ const GUIDES: GuideCard[] = [
   {
     id: "mii-face-mask-from-image",
     icon: Sparkles,
-    title: "Turn a photo into a custom face-paint reference",
+    title: "Turn a photo into a custom Face Paint reference",
     summary:
       "Import a face photo locally, simplify it into editable pixel art, and use the result as a manual Copy Guide alongside Living the Dream's Face Paint tools.",
     audience:
@@ -495,7 +495,7 @@ const LONG_GUIDES: LongGuide[] = [
         </p>
         <p>
           If you want to preserve a photo or character-art idea as an editable
-          face-paint reference, run the source image through the{" "}
+          Face Paint reference, run the source image through the{" "}
           <Link className="underline" href="/studio">
             Tomodachi Studio
           </Link>{" "}

@@ -50,7 +50,7 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/faq": {
     description:
-      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and how this site is funded.",
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Face Paint and Palette House reference studio, and how this site is funded.",
     title: "FAQ · Tomodachi",
   },
   "/guides": {

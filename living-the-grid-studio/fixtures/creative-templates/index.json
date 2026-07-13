@@ -2,8 +2,8 @@
   {
     "id": "face-guide",
     "name": "Face Guide",
-    "category": "People & Masks",
-    "description": "A simple original face-mask base with skin tones and details.",
+    "category": "Faces & Portraits",
+    "description": "A simple original Face Paint and portrait base with skin tones and details.",
     "width": 64,
     "height": 64,
     "filename": "face-guide.json",
@@ -162,7 +162,7 @@
   {
     "id": "portrait-bust",
     "name": "Portrait Bust",
-    "category": "People & Masks",
+    "category": "Faces & Portraits",
     "description": "A simple person/celebrity-style portrait base.",
     "width": 64,
     "height": 64,
@@ -202,7 +202,7 @@
   {
     "id": "arcade-fighter",
     "name": "Arcade Fighter",
-    "category": "People & Masks",
+    "category": "Faces & Portraits",
     "description": "A generic fighting-game portrait starter.",
     "width": 64,
     "height": 64,
@@ -212,7 +212,7 @@
   {
     "id": "space-helmet",
     "name": "Space Helmet",
-    "category": "People & Masks",
+    "category": "Faces & Portraits",
     "description": "A sci-fi helmet starter for armored characters.",
     "width": 64,
     "height": 64,
@@ -222,7 +222,7 @@
   {
     "id": "robot-face",
     "name": "Robot Face",
-    "category": "People & Masks",
+    "category": "Faces & Portraits",
     "description": "A mechanical face starter for robots and masks.",
     "width": 64,
     "height": 64,

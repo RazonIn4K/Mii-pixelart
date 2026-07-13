@@ -67,7 +67,7 @@ export function CreationCard({
             aria-hidden="true"
           >
             <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/92 px-2.5 py-1 text-[10px] font-black text-[var(--island-ink)] shadow-sm backdrop-blur">
-              <FileJson2 className="h-3 w-3" /> Project available
+              <FileJson2 className="h-3 w-3" /> Studio JSON available
             </span>
           </div>
         ) : null}

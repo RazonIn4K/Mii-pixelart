@@ -238,7 +238,7 @@ const ROUTES: Record<string, RouteShell> = {
       <h2>Recovery + studio teasers</h2>
       <ul>
         <li><a href="/help">Tomodachi breach recovery checklist</a> — free 24-hour actions.</li>
-        <li><a href="/studio">Turn a photo into a custom face-paint Copy Guide</a>.</li>
+        <li><a href="/studio">Turn a photo into a custom Face Paint Copy Guide</a>.</li>
         <li><a href="/studio">Reduce colors for repaintable pixel art</a>.</li>
         <li><a href="/">Password reuse cleanup after a community breach</a>.</li>
       </ul>`,
@@ -281,7 +281,7 @@ const ROUTES: Record<string, RouteShell> = {
   "/faq": {
     title: "FAQ · Tomodachi",
     description:
-      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the face-paint Copy Guide, and how this site is funded.",
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and how this site is funded.",
     h1: "Frequently asked questions",
     body: `
       <h2>Tomodachi Life releases</h2>
@@ -289,7 +289,7 @@ const ROUTES: Record<string, RouteShell> = {
       <p>Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.</p>
       <h3>Can I make my Mii look like a real person?</h3>
       <p>Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. The <a href="/guides#mii-creation">Mii creation guide</a> clearly labels the legacy workflow.</p>
-      <h3>What is the Studio's face-paint Copy Guide?</h3>
+      <h3>What is the Studio's Face Paint Copy Guide?</h3>
       <p>The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.</p>
       <h2>The Tomodachishare breach</h2>
       <h3>What was the Tomodachishare breach?</h3>
@@ -329,7 +329,7 @@ const ROUTES: Record<string, RouteShell> = {
           },
           {
             "@type": "Question",
-            name: "What is the Studio face-paint Copy Guide?",
+            name: "What is the Studio Face Paint Copy Guide?",
             acceptedAnswer: {
               "@type": "Answer",
               text: "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
@@ -385,7 +385,7 @@ const ROUTES: Record<string, RouteShell> = {
       "Why Tomodachi exists, what is in it, who is behind it, and how to reach the project for press or partnership.",
     h1: "About Tomodachi",
     body: `
-      <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual face-paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
+      <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual Face Paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
       <h2>Free first, sponsor-supported</h2>
       <p>The editor, the password check, the AI assistant, and every guide stay free. Optional paid extras live on <a href="/unlock">/unlock</a>; tips on <a href="/support">/support</a>.</p>
       <h2>Privacy on principle</h2>
@@ -416,7 +416,7 @@ const ROUTES: Record<string, RouteShell> = {
           knowsAbout: [
             "Tomodachi Life",
             "Mii pixel art",
-            "custom face-paint reference",
+            "custom Face Paint reference",
             "Tomodachishare breach recovery",
             "k-anonymity password breach lookup",
           ],

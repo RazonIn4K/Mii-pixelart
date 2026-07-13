@@ -135,7 +135,7 @@ All engine modules are **pure TypeScript with zero React dependencies**. They ca
 ```mermaid
 graph LR
     subgraph Engine["client/src/lib/engine/"]
-        palette["palette.ts<br/>84-color game palette<br/>PaletteColor[]"]
+        palette["palette.ts<br/>84-color Studio palette<br/>PaletteColor[]"]
         color["color.ts<br/>RGB ↔ HSL ↔ CIELAB<br/>Delta E CIE76"]
         grid["grid.ts<br/>GridDocument type<br/>immutable mutations"]
         components["components.ts<br/>BFS flood fill<br/>connected components"]
@@ -580,7 +580,7 @@ flowchart LR
 
 ## Palette Structure
 
-The game palette has 84 colors organized in a 12-row grid:
+The Studio working palette has 84 colors organized in a 12-row grid. It is a consistent planning convention, not verified proprietary game-palette data:
 
 ```
 Rows 1–11: 7 columns each = 77 base colors

@@ -179,7 +179,7 @@ export default function CreationDetailPage() {
                   >
                     <Heart className={creation.isLiked ? "fill-current" : ""} /> {formatCount(creation.likeCount)}
                   </Button>
-                  {creation.downloadEnabled ? <Button asChild variant="outline"><a href={`/api/creations/${creation.id}/media/project`} download><Download /> Project</a></Button> : null}
+                  {creation.downloadEnabled ? <Button asChild variant="outline"><a href={`/api/creations/${creation.id}/media/project`} download><Download /> Studio project (.json)</a></Button> : null}
                   {creation.canEdit ? <Button asChild><Link href={`/studio?cloud=${creation.id}`}>Edit in Studio</Link></Button> : null}
                 </div>
                 <div className="mt-3 rounded-2xl bg-white p-3">

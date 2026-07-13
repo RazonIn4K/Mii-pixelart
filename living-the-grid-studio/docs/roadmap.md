@@ -61,11 +61,11 @@
 
 **Completed:**
 
-- [x] 84-color Tomodachi Life: Living the Dream palette data (`palette.ts`)
+- [x] Original 84-color Studio working-palette data (`palette.ts`)
 - [x] Color usage counts and percentage display
 - [x] Color lock/unlock toggle
 - [x] Manual merge mode (click source → click target)
-- [x] Game palette reference grid (11×7 + saturated row)
+- [x] Studio palette reference grid (11×7 + saturated row)
 - [x] Hover-to-highlight on canvas
 
 ---
@@ -99,7 +99,7 @@
 - [x] Aspect-preserving framing modes: fill, fit, stretch
 - [x] Focus X/Y controls for face and subject positioning
 - [x] Draggable source-image subject target for faster face positioning
-- [x] Mii Mask, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 import presets
+- [x] Face Paint, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 import presets
 - [x] Photo vs Pixel/Logo sampling modes for smoother portraits and sharper local character/logo assets
 - [x] Retain the last uploaded source image for settings changes
 - [x] Reprocess retained images without reopening the file picker
@@ -109,7 +109,7 @@
 - [x] Non-destructive image preview with commit/cancel controls
 - [x] 28 original starter templates for face guides, mascot heads, space-crew suits, tiny dinos, cute monsters, horror mascots, bald schoolhouse teachers, masked villains, pumpkin ghouls, sheet ghosts, vampires, zombies, spooky clowns, heart stickers, star badges, compact icons, portrait busts, cap heroes, adventurers, speed mascots, arcade fighters, space helmets, robot faces, letter marks, controller icons, racing karts, pizza slices, and sword badges
 - [x] Saved native JSON fixtures for all creative templates (`fixtures/creative-templates/`, regenerated with `pnpm save:templates`)
-- [x] Blank starter canvases for Mii mask, character, sprite, sticker, icon, and full-image work
+- [x] Blank starter canvases for Face Paint, character, sprite, sticker, icon, and full-image work
 - [x] Inspect, pencil, eraser, eyedropper, and fill bucket tools for manual creation/touch-up
 - [x] Canvas detail controls to resample current grids to 64, 96, 128, 256, or 2x dimensions without overflowing the workspace
 - [x] Pure placement and background-cleanup coverage (`scripts/verify-image-import.ts`)

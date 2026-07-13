@@ -39,7 +39,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
         links: [{ label: "Mii creation guide", href: "/guides#mii-creation" }],
       },
       {
-        question: "What is the Studio's face-paint Copy Guide?",
+        question: "What is the Studio's Face Paint Copy Guide?",
         answer:
           "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for planning custom face art. You manually recreate the reference with the drawing tools available in your game; the Studio does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
         links: [{ label: "Try the Studio", href: "/studio" }],
@@ -147,7 +147,7 @@ function buildFaqJsonLd() {
 export default function Faq() {
   useDocumentTitle(
     "FAQ",
-    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the face-paint Copy Guide, and how this site is funded.",
+    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and how this site is funded.",
   );
   useStructuredData([
     breadcrumbFor([

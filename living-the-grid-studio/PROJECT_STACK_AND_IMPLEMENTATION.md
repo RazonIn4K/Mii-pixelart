@@ -32,18 +32,18 @@ Tomodachi Studio currently combines five product lanes:
 
 1. **Pixel-art repaint studio**
    - Import photos, character art, logos, memes, or JSON.
-   - Convert them into a grid backed by Tomodachi palette color IDs.
+   - Convert them into a grid backed by Studio working-palette color IDs.
    - Preview before commit.
    - Touch up with paint tools.
    - Optimize colors/noise for hand repainting.
    - Export JSON, PNG guides, palette sheets, paint-order notes, and reference packs.
 
-2. **Tomodachi Life Mii mask workflow**
+2. **Tomodachi Life Face Paint and workshop reference workflow**
    - Face-oriented import presets.
    - Subject focus controls.
    - Background flattening.
    - 64x64, 96x96, 128x128, and 256x256 detail paths.
-   - Starter canvases and character/mask templates.
+   - Starter canvases and original face, portrait, character, and object templates.
 
 3. **AI-assisted pixel sketching**
    - Local browser chat sessions.
@@ -118,7 +118,7 @@ This is how the user's abstraction-layer thinking maps onto the actual codebase.
 
 | Layer                        | What It Means Here                                                                                           | Concrete Project Pieces                                                                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| L0 Domain/game context       | Tomodachi Life: Living the Dream workflow, Palette House repainting, Mii face masks, character/fan-art grids | Product copy, guide pages, import presets, palette naming, starter templates                                                               |
+| L0 Domain/game context       | Tomodachi Life: Living the Dream Face Paint options, Palette House workshop creations, and manual Copy Guides | Product copy, guide pages, import presets, palette naming, starter templates                                                               |
 | L1 Source inputs             | Raw files and source ideas                                                                                   | Image files, AVIF/JPG/PNG/WebP/BMP/GIF, LTG JSON, starter templates, AI chat prompts                                                       |
 | L2 Core data model           | The normalized repaintable representation                                                                    | `GridDocument`, palette IDs, row-major `cells`, metadata, locked colors                                                                    |
 | L3 Engine logic              | Pure transformations that do not depend on React                                                             | `grid.ts`, `image-import.ts`, `json-io.ts`, `optimizer.ts`, `canvas-renderer.ts`, `color.ts`, `palette.ts`, `templates.ts`, `ai-sketch.ts` |
@@ -235,7 +235,7 @@ living-the-grid-studio/
 | Icons            | `lucide-react`                  | Studio toolbar icons, panel actions, import/export affordances                        |
 | Canvas           | HTML Canvas 2D                  | Grid renderer, image sampling, PNG export, palette sheet generation                   |
 | Image import     | Browser canvas APIs             | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels |
-| Color matching   | CIELAB + CIE76 Delta E          | Match source pixels to the closest Tomodachi palette color                            |
+| Color matching   | CIELAB + CIE76 Delta E          | Match source pixels to the closest Studio working-palette color                        |
 | State            | React state + `useGridDocument` | Holds `GridDocument`, image preview, undo/redo history, stroke transactions           |
 | AI               | OpenRouter Chat Completions     | Model picker, chat, optional image snapshot, applyable sketch JSON                    |
 | Payments         | Stripe REST API                 | Checkout sessions and checkout verification without Stripe Node SDK                   |
@@ -305,7 +305,7 @@ Important implementation rules:
 - `cells` is a flat row-major array, not a nested 2D grid.
 - Each painted cell stores a palette color ID such as `R10C1`, not a raw hex value.
 - `null` means empty/transparent/unpainted.
-- `palette` is the Tomodachi palette.
+- `palette` is the Studio's original 84-color working palette.
 - `usedColors` is derived from current cells.
 - `lockedColors` protects colors from optimizer passes.
 - `meta.sourceMetadata` is used to preserve imported information, including Living The Grid metadata and optional resident specs.
@@ -321,7 +321,7 @@ flowchart LR
   XY["x,y coordinate"] --> Index["row-major index"]
   Index --> Cell["cells[index]"]
   Cell --> PaletteID["palette ID or null"]
-  PaletteID --> Swatch["Tomodachi palette swatch"]
+  PaletteID --> Swatch["Studio palette swatch"]
 ```
 
 ### Core Grid Helpers
@@ -486,7 +486,7 @@ Data:
 
 | Preset        |    Size | Important Settings                                   |
 | ------------- | ------: | ---------------------------------------------------- |
-| Mii Mask      |   64x64 | face focus high, background flatten, moderate colors |
+| Face Paint    |   64x64 | face focus high, background flatten, moderate colors |
 | Character 64  |   64x64 | crisp sampling, stronger contrast/saturation         |
 | Face 96       |   96x96 | more facial detail, background flatten               |
 | Character 128 | 128x128 | higher detail, more colors                           |
@@ -632,7 +632,7 @@ Examples:
 Current caveat:
 
 - The palette has row/column, hex, RGB, and display names.
-- It does not yet include complete in-game H/S/B press-count recipes as first-class fields.
+- It does not claim or include verified in-game color recipes; row and column IDs are Studio planning conventions.
 
 ## 13. Canvas Rendering And Coordinate Mapping
 
@@ -730,7 +730,7 @@ The templates are original/generic starter designs, not direct copyrighted sprit
 
 | Category        | Examples                                                                                                            |
 | --------------- | ------------------------------------------------------------------------------------------------------------------- |
-| People & Masks  | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face                                                 |
+| Faces & Portraits | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face                                              |
 | Characters      | Mascot Head, Space Crew, Tiny Dino, Cute Monster, Red Cap Hero, Green Adventurer, Blue Speed Mascot                 |
 | Horror & Spooky | Haunted Mascot, Bald Teacher, Masked Slasher, Pumpkin Ghoul, Ghost Sheet, Vampire Count, Zombie Buddy, Creepy Clown |
 | Marks & Objects | Heart Sticker, Star Badge, Smile Icon, Letter Mark, Controller Icon, Racing Kart, Pizza Slice, Sword Badge          |
@@ -1307,7 +1307,7 @@ These are the most useful next engineering targets.
 | P0       | Complete the approval-gated staging Worker acceptance and live performance trace | The branch is implemented locally, but production must remain on Pages until staging evidence and cutover approval exist |
 | P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
 | P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
-| P2       | Add in-game H/S/B press-count data to `PaletteColor`                | Makes output more game-ready                                                        |
+| P2       | Validate Studio colors against documented, legally usable references | Improves manual matching without claiming proprietary game data                      |
 | P2       | Add editable resident feature-sheet UI                              | Schema exists, but the studio UI tab is not currently active                        |
 | P2       | Move heavy image/optimizer/export work into a Web Worker            | Prevents UI blocking at 128x128 and 256x256                                         |
 | P2       | Add Playwright visual tests                                         | Pixel output and upload flows need browser-level regression checks                  |

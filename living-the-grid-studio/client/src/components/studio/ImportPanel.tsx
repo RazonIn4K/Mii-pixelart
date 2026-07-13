@@ -425,7 +425,7 @@ export default function ImportPanel({
     setCropValues(...getSourceSquareCrop(sourceImageSize, "head"));
   }, [setCropValues, sourceImageSize]);
 
-  const applyMiiMaskPreset = useCallback(() => {
+  const applyFacePaintPreset = useCallback(() => {
     setGridWidth(64);
     setGridHeight(64);
     setFrameMode("cover");
@@ -934,9 +934,9 @@ export default function ImportPanel({
             variant="outline"
             size="sm"
             className="text-xs"
-            onClick={applyMiiMaskPreset}
+            onClick={applyFacePaintPreset}
           >
-            Mii Mask
+            Face Paint
           </Button>
           <Button
             type="button"

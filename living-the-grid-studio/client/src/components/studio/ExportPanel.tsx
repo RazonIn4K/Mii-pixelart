@@ -105,7 +105,8 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
       <div>
         <p className="section-header mb-1">Export</p>
         <p className="text-xs text-muted-foreground">
-          Download your work in various formats.
+          Download Studio project data, images, and manual Copy Guides. These
+          are not Nintendo game or save files.
         </p>
         {disabledReason && (
           <p className="mt-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs leading-relaxed text-amber-950">

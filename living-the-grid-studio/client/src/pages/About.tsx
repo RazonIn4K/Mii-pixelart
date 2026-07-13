@@ -44,7 +44,7 @@ const ABOUT_STRUCTURED_DATA = [
       knowsAbout: [
         "Tomodachi Life",
         "Mii pixel art",
-        "custom face-paint reference",
+        "custom Face Paint reference",
         "Tomodachishare breach recovery",
         "k-anonymity password breach lookup",
       ],

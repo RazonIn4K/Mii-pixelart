@@ -499,19 +499,19 @@ export function PublishDialog({
                         <Switch checked={commentsEnabled} onCheckedChange={(checked) => { setCommentsEnabled(checked); setCommentsTouched(true); }} />
                       </label>
                       <label className="flex items-center justify-between gap-4 text-sm font-medium">
-                        <span><span className="block font-bold">Allow project download</span><span className="block text-xs text-muted-foreground">Off by default. Previewing is always available.</span></span>
+                        <span><span className="block font-bold">Allow Studio project download</span><span className="block text-xs text-muted-foreground">Shares editable Tomodachi Studio JSON only—not a Nintendo game or save file.</span></span>
                         <Switch checked={downloadEnabled} onCheckedChange={setDownloadEnabled} />
                       </label>
                     </div>
                     <div className="flex gap-3 rounded-xl border border-[var(--island-blue)]/30 bg-[var(--island-blue-soft)] p-3 text-xs leading-5 text-[var(--island-ink)]/70">
                       <Eye className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>{visibility === "public" ? "This creation can appear in search, Discover, and your public profile." : "This creation stays out of search and profiles, but anyone with its stable link can view it."}</p>
+                      <p>{visibility === "public" ? "This creation can appear in search, Discover, and your public profile." : "This creation stays out of search and profiles, but anyone with its stable link can view it."} Tomodachi shares a web page only; it does not use Living the Dream's local-wireless exchange or transfer anything to a console.</p>
                     </div>
                     <dl className="grid gap-3 rounded-xl border border-[var(--island-ink)]/15 bg-white p-4 text-sm sm:grid-cols-2">
                       <div><dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Title</dt><dd className="mt-1 break-words font-black">{title.trim()}</dd></div>
                       <div><dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Showcase</dt><dd className="mt-1 font-black">{showcaseImages.length ? `${showcaseImages.length} image${showcaseImages.length === 1 ? "" : "s"}` : "Generated preview"}</dd></div>
                       <div><dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Comments</dt><dd className="mt-1 font-black">{commentsEnabled ? "Allowed" : "Off"}</dd></div>
-                      <div><dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Project file</dt><dd className="mt-1 font-black">{downloadEnabled ? "Downloadable" : "Private"}</dd></div>
+                      <div><dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Studio project</dt><dd className="mt-1 font-black">{downloadEnabled ? "JSON download on" : "Private"}</dd></div>
                     </dl>
                   </section>
                 </div>

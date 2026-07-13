@@ -57,7 +57,7 @@ The control panel uses four tabs that correspond to the linear workflow:
    - Usage bar (proportional width)
    - Lock/unlock toggle
    - Merge button
-3. **Game Palette Reference:** 11×7 grid of all 77 base colors plus a row of 7 saturated extras. Colors in use get a visible border.
+3. **Studio Palette Reference:** 11×7 grid of all 77 base colors plus a row of 7 saturated extras. Colors in use get a visible border.
 
 **Interactions:**
 - Hovering a swatch highlights all cells of that color on the canvas.
@@ -110,7 +110,7 @@ When no project is loaded, the canvas area displays a centered illustration with
 Merge mode is a temporary state activated by clicking the merge button on a color:
 
 1. A banner appears at the top of the control panel: "Merge mode: Click a target color to merge [source] into it."
-2. The user clicks any other color (in the palette list, the game palette grid, or directly on the canvas).
+2. The user clicks any other color (in the palette list, the Studio palette grid, or directly on the canvas).
 3. All cells of the source color are replaced with the target color.
 4. A toast confirms the merge.
 5. Merge mode exits automatically. The user can also cancel by clicking "Cancel" in the banner.

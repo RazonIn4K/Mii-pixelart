@@ -94,6 +94,22 @@ try {
     );
   }
 
+  const facePaintTag = database
+    .prepare("SELECT slug, name, description FROM tags WHERE id = ?")
+    .get("tag-face-masks") as
+    | { slug: string; name: string; description: string }
+    | undefined;
+  if (
+    facePaintTag?.slug !== "face-masks" ||
+    facePaintTag.name !== "Face Paint" ||
+    facePaintTag.description !==
+      "Manual pixel references for Living the Dream Face Paint designs."
+  ) {
+    throw new Error(
+      `Face Paint taxonomy migration is invalid: ${JSON.stringify(facePaintTag)}`,
+    );
+  }
+
   console.log(
     `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables.`,
   );

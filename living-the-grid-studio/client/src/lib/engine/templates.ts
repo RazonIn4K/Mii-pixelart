@@ -12,9 +12,9 @@ export const CREATIVE_TEMPLATES = [
   {
     id: "face-guide",
     name: "Face Guide",
-    category: "People & Masks",
+    category: "Faces & Portraits",
     description:
-      "A simple original face-mask base with skin tones and details.",
+      "A simple original Face Paint and portrait base with skin tones and details.",
     width: 64,
     height: 64,
   },
@@ -144,7 +144,7 @@ export const CREATIVE_TEMPLATES = [
   {
     id: "portrait-bust",
     name: "Portrait Bust",
-    category: "People & Masks",
+    category: "Faces & Portraits",
     description: "A simple person/celebrity-style portrait base.",
     width: 64,
     height: 64,
@@ -176,7 +176,7 @@ export const CREATIVE_TEMPLATES = [
   {
     id: "arcade-fighter",
     name: "Arcade Fighter",
-    category: "People & Masks",
+    category: "Faces & Portraits",
     description: "A generic fighting-game portrait starter.",
     width: 64,
     height: 64,
@@ -184,7 +184,7 @@ export const CREATIVE_TEMPLATES = [
   {
     id: "space-helmet",
     name: "Space Helmet",
-    category: "People & Masks",
+    category: "Faces & Portraits",
     description: "A sci-fi helmet starter for armored characters.",
     width: 64,
     height: 64,
@@ -192,7 +192,7 @@ export const CREATIVE_TEMPLATES = [
   {
     id: "robot-face",
     name: "Robot Face",
-    category: "People & Masks",
+    category: "Faces & Portraits",
     description: "A mechanical face starter for robots and masks.",
     width: 64,
     height: 64,
