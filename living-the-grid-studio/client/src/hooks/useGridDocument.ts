@@ -12,6 +12,7 @@ import {
 } from "@/lib/engine/grid";
 import {
   applyStudioTransaction,
+  buildPaintCellsTransaction,
   type StudioCommand,
 } from "@/lib/engine/studio-commands";
 import {
@@ -328,9 +329,10 @@ export function useGridDocument() {
         if (!prev.doc) return prev;
         let newDoc: GridDocument;
         try {
-          newDoc = applyStudioTransaction(prev.doc, [
-            { type: "paint_cells", cells: [...cells], colorId },
-          ]).doc;
+          newDoc = applyStudioTransaction(
+            prev.doc,
+            buildPaintCellsTransaction(cells, colorId),
+          ).doc;
         } catch (error) {
           return {
             ...prev,

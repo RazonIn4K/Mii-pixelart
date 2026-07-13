@@ -164,7 +164,7 @@ export function CanvasPaintToolbar({
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className={`inline-flex size-9 items-center justify-center rounded-md transition-colors ${
+                  className={`inline-flex size-11 items-center justify-center rounded-md transition-colors ${
                     horizontalMirror
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -187,7 +187,7 @@ export function CanvasPaintToolbar({
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className={`inline-flex size-9 items-center justify-center rounded-md transition-colors ${
+                  className={`inline-flex size-11 items-center justify-center rounded-md transition-colors ${
                     showCenterGuide
                       ? "bg-accent text-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"

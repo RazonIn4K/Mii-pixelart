@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createGridDocument } from "./grid";
-import { applyStudioTransaction, StudioCommandError } from "./studio-commands";
+import { bresenhamLine, createGridDocument } from "./grid";
+import { buildPaintCells } from "./paint-assists";
+import {
+  applyStudioTransaction,
+  buildPaintCellsTransaction,
+  MAX_PAINT_CELLS_PER_COMMAND,
+  StudioCommandError,
+} from "./studio-commands";
 
 describe("applyStudioTransaction", () => {
   it("applies multiple bounded paint commands as one derived document", () => {
@@ -71,6 +77,31 @@ describe("applyStudioTransaction", () => {
     expect(painted.doc.usedColors).toContain("R1C3");
     expect(painted.doc.usedColors).toContain("R6C3");
     expect(painted.doc.cells.some((cell) => cell === null)).toBe(true);
+  });
+
+  it("keeps a maximum-size mirrored manual stroke in one transaction", () => {
+    const source = createGridDocument(256, 256, "Mirrored stroke");
+    const cells = buildPaintCells(
+      bresenhamLine(0, 0, 255, 255),
+      5,
+      source,
+      true,
+    );
+    const commands = buildPaintCellsTransaction(cells, "R10C1");
+
+    expect(cells.length).toBeGreaterThan(MAX_PAINT_CELLS_PER_COMMAND);
+    expect(commands).toHaveLength(2);
+    expect(
+      commands.every(
+        (command) =>
+          command.type === "paint_cells" &&
+          command.cells.length <= MAX_PAINT_CELLS_PER_COMMAND,
+      ),
+    ).toBe(true);
+
+    const result = applyStudioTransaction(source, commands);
+    expect(result.appliedCommands).toBe(2);
+    expect(result.changedCells).toBe(cells.length);
   });
 
   it("rejects unknown colors, out-of-bounds cells, and oversized diffs atomically", () => {

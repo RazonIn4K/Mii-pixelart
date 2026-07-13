@@ -14,6 +14,7 @@ const colorId = z
   .max(12)
   .refine((value) => PALETTE_IDS.has(value), "Unknown palette color");
 const nullableColorId = colorId.nullable();
+export const MAX_PAINT_CELLS_PER_COMMAND = 4_096;
 
 const paintCellsCommand = z
   .object({
@@ -21,7 +22,7 @@ const paintCellsCommand = z
     cells: z
       .array(z.object({ x: coordinate, y: coordinate }).strict())
       .min(1)
-      .max(4_096),
+      .max(MAX_PAINT_CELLS_PER_COMMAND),
     colorId: nullableColorId,
   })
   .strict();
@@ -97,6 +98,30 @@ export const studioTransactionSchema = z
   .min(1)
   .max(64);
 export type StudioCommand = z.infer<typeof studioCommandSchema>;
+
+/**
+ * Split a large manual stroke into schema-bounded commands while preserving a
+ * single atomic Studio transaction. A maximum-size mirrored brush can touch
+ * more than 4,096 cells, but it still belongs in one undo entry.
+ */
+export function buildPaintCellsTransaction(
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  colorId: string | null,
+): StudioCommand[] {
+  const commands: StudioCommand[] = [];
+  for (
+    let start = 0;
+    start < cells.length;
+    start += MAX_PAINT_CELLS_PER_COMMAND
+  ) {
+    commands.push({
+      type: "paint_cells",
+      cells: cells.slice(start, start + MAX_PAINT_CELLS_PER_COMMAND),
+      colorId,
+    });
+  }
+  return commands;
+}
 
 export interface StudioTransactionResult {
   appliedCommands: number;
