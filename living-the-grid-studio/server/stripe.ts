@@ -27,7 +27,7 @@ export interface ApiResult {
 }
 
 const STRIPE_API_ORIGIN = "https://api.stripe.com";
-const CHECKOUT_SESSION_ID = /^cs_(?:test|live)_[A-Za-z0-9]{16,240}$/;
+const CHECKOUT_SESSION_ID_REGEX = /^cs_(?:test|live)_[A-Za-z0-9]{16,240}$/;
 
 type StripeRequest =
   | { kind: "create-checkout-session"; body: unknown }
@@ -105,7 +105,7 @@ async function stripeRequest(
     request.kind === "create-checkout-session"
       ? new URL("/v1/checkout/sessions", STRIPE_API_ORIGIN)
       : new URL(
-          `/v1/checkout/sessions/${request.sessionId}`,
+          `/v1/checkout/sessions/${encodeURIComponent(request.sessionId)}`,
           STRIPE_API_ORIGIN,
         );
   if (url.origin !== STRIPE_API_ORIGIN) {
@@ -232,7 +232,7 @@ export async function verifyCheckoutSession(
   sessionId: string,
   env?: StripeEnv,
 ): Promise<ApiResult> {
-  if (!CHECKOUT_SESSION_ID.test(sessionId)) {
+  if (!CHECKOUT_SESSION_ID_REGEX.test(sessionId)) {
     return {
       status: 400,
       body: { configured: true, error: "Invalid session id." },
