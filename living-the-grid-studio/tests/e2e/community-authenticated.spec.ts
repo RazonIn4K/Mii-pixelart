@@ -1112,6 +1112,10 @@ test("Studio selection controls expose their current state", async ({
   await expect(gridToggle).toHaveAttribute("aria-pressed", "false");
   await expect(labelToggle).toHaveAttribute("aria-pressed", "true");
 
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
   await page.getByRole("tab", { name: "Create" }).click();
   const inspectTool = page.getByRole("button", { name: "Inspect tool" });
   const pencilTool = page.getByRole("button", { name: "Pencil tool" });
@@ -1125,11 +1129,18 @@ test("Studio selection controls expose their current state", async ({
   await expect(inspectTool).toHaveAttribute("aria-pressed", "false");
   await expect(pencilTool).toHaveAttribute("aria-pressed", "true");
 
-  const black = page.getByRole("button", { name: "Select R10C1 Black" });
-  const darkRed = page.getByRole("button", { name: "Select R1C1 Dark Red" });
+  const quickColors = page.locator('[aria-label="Quick paint colors"]');
+  const black = quickColors.getByRole("button", {
+    name: "Select R10C1 Black",
+  });
   await expect(black).toHaveAttribute("aria-pressed", "true");
-  await expect(darkRed).toHaveAttribute("aria-pressed", "false");
-  await darkRed.click();
+  await page
+    .getByRole("button", { name: "Choose paint color. Current color Black" })
+    .click();
+  await page.getByRole("button", { name: "Select R1C1 Dark Red" }).click();
+  const darkRed = quickColors.getByRole("button", {
+    name: "Select R1C1 Dark Red",
+  });
   await expect(black).toHaveAttribute("aria-pressed", "false");
   await expect(darkRed).toHaveAttribute("aria-pressed", "true");
 });

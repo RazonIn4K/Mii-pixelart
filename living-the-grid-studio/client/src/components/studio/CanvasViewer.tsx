@@ -1,8 +1,8 @@
 /**
  * CanvasViewer.tsx — Grid canvas with zoom, pan, and interaction
  *
- * DESIGN: "Paper Studio" — graph-paper background, pale blue grid lines,
- * red accent for highlights. The canvas is the hero of the workspace.
+ * DESIGN: one crisp editable grid on an opaque paper sheet. The surrounding
+ * workspace stays neutral so it never competes with cell boundaries.
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -10,6 +10,7 @@ import { Hand } from "lucide-react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
   renderGrid,
+  shouldRenderGridLines,
   canvasToCell,
   type RenderOptions,
   DEFAULT_RENDER_OPTIONS,
@@ -176,9 +177,14 @@ export default function CanvasViewer({
       zoom,
       panX: metrics.panX,
       panY: metrics.panY,
-      showGrid,
+      showGrid: shouldRenderGridLines(showGrid, metrics.cellSize, zoom),
       showLabels,
       highlightColorId,
+      gridBackground: "#fffef9",
+      // Keep the only visible cell grid above the 3:1 non-text contrast target
+      // and at least one CSS pixel wide, including fitted mobile canvases.
+      gridColor: "#7f909c",
+      gridWidth: 1,
     });
 
     if (isKeyboardFocused) {
@@ -591,7 +597,8 @@ export default function CanvasViewer({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full graph-paper-fine overflow-hidden rounded-sm border border-border"
+      className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-[#e9e7e1] shadow-inner"
+      data-testid="canvas-workspace"
     >
       <p id={instructionsId} className="sr-only">
         Use one pointer to draw. Choose the Hand button or press H, then drag to
@@ -614,7 +621,7 @@ export default function CanvasViewer({
               panMode ? "Drawing interaction enabled." : "Hand tool enabled.",
             );
           }}
-          className={`flex size-11 items-center justify-center rounded-sm transition-colors ${
+          className={`flex size-11 items-center justify-center rounded-sm transition-colors sm:size-9 ${
             panMode
               ? "bg-accent text-foreground"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -631,7 +638,7 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={zoomOut}
-          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9"
           aria-label="Zoom out"
           title="Zoom out (-)"
         >
@@ -640,7 +647,7 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={resetView}
-          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground sm:h-9"
           aria-label="Reset zoom"
           title="Reset view (0)"
         >
@@ -649,7 +656,7 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={editView}
-          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground sm:h-9"
           aria-label="Zoom to edit pixels"
           title="Edit zoom (2)"
         >
@@ -658,7 +665,7 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={zoomIn}
-          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9"
           aria-label="Zoom in"
           title="Zoom in (+)"
         >

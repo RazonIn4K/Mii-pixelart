@@ -776,14 +776,11 @@ export default function Studio() {
                     <PreviewBlockedPanel title="Create" />
                   ) : (
                     <CreationPanel
-                      activeTool={paintTool}
                       currentDoc={doc}
-                      selectedColorId={selectedPaintColorId}
                       onActiveToolChange={setPaintTool}
                       onCreateCanvas={handleCreateCanvas}
                       onCreateTemplate={handleCreateTemplate}
                       onResampleCanvas={resampleCanvas}
-                      onSelectedColorChange={setSelectedPaintColorId}
                     />
                   )}
                 </TabsContent>

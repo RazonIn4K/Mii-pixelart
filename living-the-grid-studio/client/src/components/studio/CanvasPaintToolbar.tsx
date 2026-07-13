@@ -124,7 +124,7 @@ export function CanvasPaintToolbar({
           ))}
         </div>
 
-        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:overflow-x-auto">
           <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground">
             Size
             <select
@@ -196,14 +196,16 @@ export function CanvasPaintToolbar({
           </Popover>
 
           <div
-            className="flex shrink-0 items-center gap-1 pl-1"
+            className="flex w-full min-w-0 flex-wrap items-center gap-1 pl-1 sm:w-auto sm:shrink-0 sm:flex-nowrap"
             aria-label="Quick paint colors"
           >
-            {quickColors.map((color) => (
+            {quickColors.map((color, index) => (
               <button
                 key={color.id}
                 type="button"
                 className={`size-9 shrink-0 rounded-lg border ${
+                  index >= 6 ? "max-[359px]:hidden" : ""
+                } ${
                   selectedColorId === color.id
                     ? "border-primary ring-2 ring-primary/30"
                     : "border-black/15"

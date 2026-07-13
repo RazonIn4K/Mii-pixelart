@@ -19,15 +19,20 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   });
   await expect(canvas).toBeVisible();
   await expect(paintControls).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Pencil tool" }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pencil tool" })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Paint tools" })).toHaveCount(
+    1,
+  );
   await expect(
     page.getByRole("button", { name: /Choose paint color/ }),
   ).toBeVisible();
   await expect(
     page.getByText("Starter Designs", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByTestId("canvas-workspace")).toHaveCSS(
+    "background-image",
+    "none",
+  );
 
   // Let the lazily rendered Create panel settle before checking for the old
   // resize feedback loop. The regression continually grew the canvas; normal
@@ -70,6 +75,20 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
     ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => {
+      const quickColors = document.querySelector(
+        '[aria-label="Quick paint colors"]',
+      );
+      if (!quickColors) return false;
+      return Array.from(quickColors.querySelectorAll("button")).every(
+        (button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= 0 && rect.right <= window.innerWidth;
+        },
+      );
+    }),
   ).toBe(true);
 });
 

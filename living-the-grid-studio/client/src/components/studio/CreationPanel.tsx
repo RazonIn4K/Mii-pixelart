@@ -3,27 +3,10 @@
  */
 
 import { useMemo, useState } from "react";
-import {
-  Eraser,
-  MousePointer2,
-  PaintBucket,
-  Pencil,
-  Pipette,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  TOMODACHI_PALETTE,
-  getPaletteColor,
-  type PaletteColor,
-} from "@/lib/engine/palette";
+import { getPaletteColor } from "@/lib/engine/palette";
 import {
   CREATIVE_TEMPLATES,
   createCreativeTemplateDocument,
@@ -34,8 +17,6 @@ import type { GridDocument } from "@/lib/engine/grid";
 export type PaintTool = "inspect" | "pencil" | "eraser" | "eyedropper" | "fill";
 
 interface CreationPanelProps {
-  activeTool: PaintTool;
-  selectedColorId: string;
   onActiveToolChange: (tool: PaintTool) => void;
   onCreateCanvas: (
     width: number,
@@ -46,7 +27,6 @@ interface CreationPanelProps {
   onCreateTemplate: (templateId: CreativeTemplateId) => void;
   currentDoc: GridDocument | null;
   onResampleCanvas: (width: number, height: number) => void;
-  onSelectedColorChange: (colorId: string) => void;
 }
 
 const STARTER_PRESETS = [
@@ -58,18 +38,6 @@ const STARTER_PRESETS = [
   { label: "Full 64", name: "Full Image Canvas", width: 64, height: 64 },
 ];
 
-const TOOL_BUTTONS: {
-  icon: typeof MousePointer2;
-  label: string;
-  tool: PaintTool;
-}[] = [
-  { icon: MousePointer2, label: "Inspect tool", tool: "inspect" },
-  { icon: Pencil, label: "Pencil tool", tool: "pencil" },
-  { icon: Eraser, label: "Eraser tool", tool: "eraser" },
-  { icon: Pipette, label: "Eyedropper tool", tool: "eyedropper" },
-  { icon: PaintBucket, label: "Fill bucket tool", tool: "fill" },
-];
-
 const TEMPLATE_CATEGORY_ORDER = [
   "People & Masks",
   "Characters",
@@ -78,17 +46,13 @@ const TEMPLATE_CATEGORY_ORDER = [
 ] as const;
 
 export default function CreationPanel({
-  activeTool,
   currentDoc,
-  selectedColorId,
   onActiveToolChange,
   onCreateCanvas,
   onCreateTemplate,
   onResampleCanvas,
-  onSelectedColorChange,
 }: CreationPanelProps) {
   const [fillColorId, setFillColorId] = useState<string | null>("R10C7");
-  const selectedColor = getPaletteColor(selectedColorId);
   const templateGroups = useMemo(() => {
     const cards = CREATIVE_TEMPLATES.map((template) => ({
       doc: createCreativeTemplateDocument(template.id),
@@ -100,13 +64,6 @@ export default function CreationPanel({
       templates: cards.filter((card) => card.template.category === category),
     })).filter((group) => group.templates.length > 0);
   }, []);
-
-  const handleSelectColor = (colorId: string) => {
-    onSelectedColorChange(colorId);
-    if (activeTool === "inspect" || activeTool === "eyedropper") {
-      onActiveToolChange("pencil");
-    }
-  };
 
   return (
     <div className="space-y-4 p-4">
@@ -258,67 +215,12 @@ export default function CreationPanel({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
-        <Label className="text-xs font-semibold">Tools</Label>
-        <div
-          className="grid grid-cols-5 gap-2"
-          role="toolbar"
-          aria-label="Paint tools"
-        >
-          {TOOL_BUTTONS.map(({ icon: Icon, label, tool }) => (
-            <Tooltip key={tool}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={`flex h-9 items-center justify-center rounded-sm border transition-colors ${
-                    activeTool === tool
-                      ? "border-primary bg-accent text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-label={label}
-                  aria-pressed={activeTool === tool}
-                  title={label}
-                  onClick={() => onActiveToolChange(tool)}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">{label}</p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 rounded-sm border border-border bg-background p-2">
-          <div
-            className="h-7 w-7 shrink-0 rounded-sm border border-border"
-            style={{ backgroundColor: selectedColor?.hex ?? "#000000" }}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">
-              {selectedColor?.name ?? selectedColorId}
-            </p>
-            <p className="font-mono text-[0.7rem] text-muted-foreground">
-              {selectedColorId}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
-        <Label className="text-xs font-semibold">Paint Palette</Label>
-        <PaletteGrid
-          colors={TOMODACHI_PALETTE.filter((color) => !color.isSaturated)}
-          selectedColorId={selectedColorId}
-          onSelectColor={handleSelectColor}
-        />
-        <PaletteGrid
-          colors={TOMODACHI_PALETTE.filter((color) => color.isSaturated)}
-          selectedColorId={selectedColorId}
-          onSelectColor={handleSelectColor}
-        />
-      </div>
+      {currentDoc ? (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
+          Paint tools and the complete color picker stay above the canvas while
+          you browse starters here, so there is only one active editing toolbar.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -370,43 +272,4 @@ function buildTemplatePreview(doc: GridDocument): {
   }
 
   return { colors, size };
-}
-
-function PaletteGrid({
-  colors,
-  selectedColorId,
-  onSelectColor,
-}: {
-  colors: PaletteColor[];
-  selectedColorId: string;
-  onSelectColor: (colorId: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-7 gap-1">
-      {colors.map((color) => (
-        <Tooltip key={color.id}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className={`aspect-square rounded-sm border ${
-                selectedColorId === color.id
-                  ? "border-primary ring-2 ring-primary/25"
-                  : "border-border"
-              }`}
-              style={{ backgroundColor: color.hex }}
-              aria-label={`Select ${color.id} ${color.name}`}
-              aria-pressed={selectedColorId === color.id}
-              title={`${color.id} ${color.name}`}
-              onClick={() => onSelectColor(color.id)}
-            />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs font-mono">
-              {color.id} · {color.name} · {color.hex}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      ))}
-    </div>
-  );
 }

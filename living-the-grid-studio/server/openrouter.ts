@@ -10,6 +10,7 @@ import {
   AI_SKETCH_LIMITS,
   OPENROUTER_MODEL_PRESETS,
   PALETTE_COLOR_ID_PATTERN,
+  maxAiRefineDimension,
   validateAiGridSketch,
 } from "../shared/ai";
 // Resident Designer prompt retired alongside the Island tab in Pass 19.
@@ -60,6 +61,7 @@ interface NormalizedAiRequest {
   currentGridImage: AiGridImage | null;
   messages: OpenRouterMessage[];
   model: string;
+  preserveDimensions: boolean;
   requestSketch: boolean;
   sessionId?: string;
 }
@@ -96,11 +98,26 @@ export function isSupportedOpenRouterModel(modelId: string): boolean {
   return ALLOWED_MODEL_IDS.has(modelId);
 }
 
+function normalizeMaxOutputTokens(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 1_200 &&
+    value <= 65_536
+    ? Math.floor(value)
+    : undefined;
+}
+
+function getSketchOutputTokenLimit(modelId: string): number {
+  const preset = OPENROUTER_MODEL_PRESETS.find((entry) => entry.id === modelId);
+  return Math.max(8_000, Math.min(preset?.maxOutputTokens ?? 16_000, 32_768));
+}
+
 export function getOpenRouterStatus(env?: OpenRouterEnv): ApiResult {
   return {
     status: 200,
     body: {
       configured: Boolean(getOpenRouterApiKey(env)),
+      dataCollection: getOpenRouterDataCollection(env),
       envVar: "OPENROUTER_API_KEY",
       presets: OPENROUTER_MODEL_PRESETS,
     },
@@ -126,18 +143,36 @@ export async function getOpenRouterModels(
     }
 
     const payload = (await response.json()) as {
-      data?: { id?: string; name?: string }[];
+      data?: Array<{
+        architecture?: { input_modalities?: string[] };
+        id?: string;
+        name?: string;
+        top_provider?: { max_completion_tokens?: number | null };
+      }>;
     };
-    const availableIds = new Set(
-      (payload.data ?? []).map((model) => model.id).filter(Boolean),
+    const modelsById = new Map(
+      (payload.data ?? [])
+        .filter((model): model is typeof model & { id: string } =>
+          Boolean(model.id),
+        )
+        .map((model) => [model.id, model]),
     );
     return {
       status: 200,
       body: {
-        presets: OPENROUTER_MODEL_PRESETS.map((preset) => ({
-          ...preset,
-          available: availableIds.has(preset.id),
-        })),
+        presets: OPENROUTER_MODEL_PRESETS.map((preset) => {
+          const model = modelsById.get(preset.id);
+          return {
+            ...preset,
+            available: Boolean(model),
+            maxOutputTokens:
+              normalizeMaxOutputTokens(
+                model?.top_provider?.max_completion_tokens,
+              ) ?? preset.maxOutputTokens,
+            supportsImages:
+              model?.architecture?.input_modalities?.includes("image") ?? false,
+          };
+        }),
       },
     };
   } catch (error) {
@@ -208,7 +243,9 @@ export async function sendOpenRouterChat(
         // commentary. 3000 was the old budget and it was truncating mid-row,
         // which is why DeepSeek + Claude both spat out partial/invalid grids.
         // 16000 fits even 32x32 with room to breathe.
-        max_tokens: normalized.requestSketch ? 16000 : 1200,
+        max_tokens: normalized.requestSketch
+          ? getSketchOutputTokenLimit(normalized.model)
+          : 1200,
         messages,
         model: normalized.model,
         response_format: normalized.requestSketch
@@ -256,11 +293,25 @@ export async function sendOpenRouterChat(
   }
 
   const content = payload?.choices?.[0]?.message?.content?.trim() ?? "";
-  const parsed = normalized.requestSketch ? parseSketchContent(content) : null;
+  const parsed = normalized.requestSketch
+    ? parseSketchContent(content, !normalized.preserveDimensions)
+    : null;
   const reply =
     parsed?.reply ??
-    content ??
-    "The model returned an empty response. Try a different model.";
+    (content || "The model returned an empty response. Try a different model.");
+  const expectedDimensions =
+    normalized.currentDocument ?? normalized.currentGridImage;
+  const dimensionsChanged = Boolean(
+    normalized.preserveDimensions &&
+      expectedDimensions &&
+      parsed?.sketch &&
+      (parsed.sketch.width !== expectedDimensions.width ||
+        parsed.sketch.height !== expectedDimensions.height),
+  );
+  const sketch = dimensionsChanged ? null : (parsed?.sketch ?? null);
+  const warning = dimensionsChanged
+    ? `The model returned ${parsed?.sketch?.width}x${parsed?.sketch?.height}, but this refinement must remain ${expectedDimensions?.width}x${expectedDimensions?.height}. Nothing was applied.`
+    : parsed?.warning;
 
   return {
     status: 200,
@@ -268,7 +319,7 @@ export async function sendOpenRouterChat(
       configured: true,
       model: payload?.model ?? normalized.model,
       reply,
-      sketch: parsed?.sketch ?? null,
+      sketch,
       usage: payload?.usage
         ? {
             completionTokens: payload.usage.completion_tokens,
@@ -276,7 +327,7 @@ export async function sendOpenRouterChat(
             totalTokens: payload.usage.total_tokens,
           }
         : undefined,
-      warning: parsed?.warning,
+      warning,
     } satisfies AiChatResponse,
   };
 }
@@ -366,14 +417,53 @@ function normalizeAiRequest(
     return { ok: false, error: "Enter a message first." };
   }
 
+  const currentDocument = normalizeDocumentSummary(request.currentDocument);
+  const currentGridImage = isValidGridImage(request.currentGridImage)
+    ? request.currentGridImage
+    : null;
+  const preset = OPENROUTER_MODEL_PRESETS.find((entry) => entry.id === model);
+  if (currentGridImage && preset?.supportsImages !== true) {
+    return {
+      ok: false,
+      error: "Choose a vision-capable model before attaching the canvas.",
+    };
+  }
+  const preserveDimensions = request.preserveDimensions === true;
+  const expectedDimensions = currentDocument ?? currentGridImage;
+  if (
+    preserveDimensions &&
+    expectedDimensions &&
+    (expectedDimensions.width > AI_SKETCH_LIMITS.maxDimension ||
+      expectedDimensions.height > AI_SKETCH_LIMITS.maxDimension)
+  ) {
+    return {
+      ok: false,
+      error: `AI refinement supports canvases up to ${AI_SKETCH_LIMITS.maxDimension}x${AI_SKETCH_LIMITS.maxDimension}.`,
+    };
+  }
+  const modelRefineDimension = preset ? maxAiRefineDimension(preset) : 0;
+  if (
+    preserveDimensions &&
+    expectedDimensions &&
+    (expectedDimensions.width > modelRefineDimension ||
+      expectedDimensions.height > modelRefineDimension)
+  ) {
+    return {
+      ok: false,
+      error:
+        modelRefineDimension > 0
+          ? `The selected model supports full-grid refinement up to ${modelRefineDimension}x${modelRefineDimension}.`
+          : "Choose a vision-capable model with enough output capacity for refinement.",
+    };
+  }
+
   return {
-    currentDocument: normalizeDocumentSummary(request.currentDocument),
-    currentGridImage: isValidGridImage(request.currentGridImage)
-      ? request.currentGridImage
-      : null,
+    currentDocument,
+    currentGridImage,
     messages,
     model,
     ok: true,
+    preserveDimensions,
     requestSketch: request.requestSketch === true,
     sessionId: normalizeSessionId(request.sessionId),
   };
@@ -383,13 +473,14 @@ function buildContextMessages(
   currentDocument: AiDocumentSummary | null,
   currentGridImage: AiGridImage | null,
 ): OpenRouterMessage[] {
-  if (!currentDocument) return [];
-  const doc = currentDocument;
-  const summaryText = `Current grid summary: ${JSON.stringify({
-    name: doc.name,
-    size: `${doc.width}x${doc.height}`,
-    usedColors: doc.usedColors.slice(0, 24),
-  })}`;
+  if (!currentDocument && !currentGridImage) return [];
+  const summaryText = currentDocument
+    ? `Current grid summary: ${JSON.stringify({
+        name: currentDocument.name,
+        size: `${currentDocument.width}x${currentDocument.height}`,
+        usedColors: currentDocument.usedColors.slice(0, 24),
+      })}`
+    : `Current grid dimensions: ${currentGridImage?.width}x${currentGridImage?.height}`;
   if (currentGridImage) {
     return [
       {
@@ -536,9 +627,68 @@ function normalizeSessionId(value: unknown): string | undefined {
 
 function parseSketchContent(
   content: string,
+  allowSalvage = true,
 ): { reply: string; sketch: AiGridSketch | null; warning?: string } | null {
   // First attempt: clean JSON parse on the extracted object.
   const candidate = extractJsonObject(content);
+  const parsedCandidate = parseStructuredSketchCandidate(candidate);
+  if (parsedCandidate) return parsedCandidate;
+
+  // Some otherwise capable free models emit palette IDs as bare JSON tokens
+  // (`R1C3` instead of `"R1C3"`). Quote only exact allowlisted cell tokens,
+  // then run the same hostile-output validator as ordinary model JSON.
+  const quotedPaletteIds = candidate.replace(
+    /(\[|,)(\s*)((?:R(?:[1-9]|1[01])C[1-7])|(?:S[1-7]))(?=\s*(?:,|\]))/g,
+    '$1$2"$3"',
+  );
+  if (quotedPaletteIds !== candidate) {
+    const normalizedCandidate =
+      parseStructuredSketchCandidate(quotedPaletteIds);
+    if (normalizedCandidate) {
+      return {
+        ...normalizedCandidate,
+        warning:
+          normalizedCandidate.warning ??
+          "The model omitted JSON quotes around palette IDs; the validated sketch was normalized before review.",
+      };
+    }
+  }
+
+  // Salvage attempt: the model likely ran out of tokens mid-row and produced
+  // truncated JSON. Try to recover whatever rows were complete before the
+  // truncation. Common patterns are missing closing brackets and a final row
+  // that was cut mid-array. This is best-effort — if it works, the user gets
+  // a partial sketch they can build on; if it doesn't, we still show the raw
+  // text in the reply so they can debug.
+  const salvaged = allowSalvage
+    ? trySalvagePartialSketch(quotedPaletteIds)
+    : null;
+  if (salvaged) {
+    // The salvage path builds rows from regex-scraped fragments, so it goes
+    // through the exact same untrusted-output gate as a clean parse.
+    const validated = validateAiGridSketch(salvaged.sketch);
+    if (validated.ok) {
+      return {
+        reply:
+          salvaged.reply ||
+          "Recovered a partial sketch from a truncated response. Some rows may be incomplete.",
+        sketch: validated.sketch,
+        warning:
+          "The model response was truncated; the sketch may be missing rows or have incomplete rows filled with nulls.",
+      };
+    }
+  }
+
+  return {
+    reply: content || "The model did not return readable JSON.",
+    sketch: null,
+    warning: "The model response was not valid sketch JSON.",
+  };
+}
+
+function parseStructuredSketchCandidate(
+  candidate: string,
+): { reply: string; sketch: AiGridSketch | null; warning?: string } | null {
   try {
     const data = JSON.parse(candidate) as {
       reply?: unknown;
@@ -565,37 +715,8 @@ function parseSketchContent(
       warning: `The model returned an invalid sketch (${validated.error}). Ask it to try again.`,
     };
   } catch {
-    /* fall through to salvage */
+    return null;
   }
-
-  // Salvage attempt: the model likely ran out of tokens mid-row and produced
-  // truncated JSON. Try to recover whatever rows were complete before the
-  // truncation. Common patterns are missing closing brackets and a final row
-  // that was cut mid-array. This is best-effort — if it works, the user gets
-  // a partial sketch they can build on; if it doesn't, we still show the raw
-  // text in the reply so they can debug.
-  const salvaged = trySalvagePartialSketch(candidate);
-  if (salvaged) {
-    // The salvage path builds rows from regex-scraped fragments, so it goes
-    // through the exact same untrusted-output gate as a clean parse.
-    const validated = validateAiGridSketch(salvaged.sketch);
-    if (validated.ok) {
-      return {
-        reply:
-          salvaged.reply ||
-          "Recovered a partial sketch from a truncated response. Some rows may be incomplete.",
-        sketch: validated.sketch,
-        warning:
-          "The model response was truncated; the sketch may be missing rows or have incomplete rows filled with nulls.",
-      };
-    }
-  }
-
-  return {
-    reply: content || "The model did not return readable JSON.",
-    sketch: null,
-    warning: "The model response was not valid sketch JSON.",
-  };
 }
 
 /**

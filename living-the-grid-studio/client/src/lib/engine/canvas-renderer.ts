@@ -33,6 +33,8 @@ export interface RenderOptions {
   gridColor: string;
   /** Grid line width */
   gridWidth: number;
+  /** Optional paper color behind the editable grid only. */
+  gridBackground: string | null;
   /** Label font size (auto-scaled if 0) */
   labelFontSize: number;
 }
@@ -47,8 +49,19 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   panY: 0,
   gridColor: "rgba(197, 213, 228, 0.5)", // pale blue grid lines
   gridWidth: 0.5,
+  gridBackground: null,
   labelFontSize: 0,
 };
+
+export const MIN_VISIBLE_GRID_CELL_SIZE = 4;
+
+export function shouldRenderGridLines(
+  showGrid: boolean,
+  cellSize: number,
+  zoom: number,
+): boolean {
+  return showGrid && cellSize * zoom >= MIN_VISIBLE_GRID_CELL_SIZE;
+}
 
 /** Resolve a color ID to its hex value */
 function colorIdToHex(colorId: string): string {
@@ -63,7 +76,7 @@ function isLightColor(hex: string): boolean {
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
   // Relative luminance
-  return (0.299 * r + 0.587 * g + 0.114 * b) > 128;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 128;
 }
 
 /**
@@ -72,7 +85,7 @@ function isLightColor(hex: string): boolean {
 export function renderGrid(
   ctx: CanvasRenderingContext2D,
   doc: GridDocument,
-  options: Partial<RenderOptions> = {}
+  options: Partial<RenderOptions> = {},
 ): void {
   const opts = { ...DEFAULT_RENDER_OPTIONS, ...options };
   const { cellSize, zoom, panX, panY } = opts;
@@ -82,7 +95,7 @@ export function renderGrid(
   const labelMap = new Map<string, number>();
   const counts = getColorUsageCounts(doc);
   const sortedColors = Array.from(counts.keys()).sort(
-    (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0)
+    (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0),
   );
   sortedColors.forEach((id, i) => labelMap.set(id, i + 1));
 
@@ -93,6 +106,11 @@ export function renderGrid(
 
   ctx.save();
   ctx.translate(panX, panY);
+
+  if (opts.gridBackground) {
+    ctx.fillStyle = opts.gridBackground;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+  }
 
   // Draw cells
   for (let y = 0; y < doc.height; y++) {
@@ -137,7 +155,7 @@ export function renderGrid(
             x * scaledSize + 1,
             y * scaledSize + 1,
             scaledSize - 2,
-            scaledSize - 2
+            scaledSize - 2,
           );
         }
       }
@@ -163,7 +181,7 @@ export function renderGrid(
         ctx.fillText(
           String(label),
           x * scaledSize + scaledSize / 2,
-          y * scaledSize + scaledSize / 2
+          y * scaledSize + scaledSize / 2,
         );
       }
     }
@@ -178,7 +196,7 @@ export function renderGrid(
 export function canvasToCell(
   canvasX: number,
   canvasY: number,
-  options: Partial<RenderOptions> = {}
+  options: Partial<RenderOptions> = {},
 ): { x: number; y: number } | null {
   const opts = { ...DEFAULT_RENDER_OPTIONS, ...options };
   const scaledSize = opts.cellSize * opts.zoom;
@@ -193,7 +211,7 @@ export function canvasToCell(
  */
 export function exportGridAsPng(
   doc: GridDocument,
-  options: Partial<RenderOptions> = {}
+  options: Partial<RenderOptions> = {},
 ): string {
   const opts = { ...DEFAULT_RENDER_OPTIONS, ...options, panX: 0, panY: 0 };
   const scaledSize = opts.cellSize * opts.zoom;
@@ -211,7 +229,7 @@ export function exportGridAsPng(
 export function downloadGridAsPng(
   doc: GridDocument,
   options: Partial<RenderOptions> = {},
-  filename?: string
+  filename?: string,
 ): void {
   const dataUrl = exportGridAsPng(doc, options);
   const a = document.createElement("a");
@@ -239,7 +257,10 @@ export function exportPaletteSheetAsPng(doc: GridDocument): string {
   const width = 760;
   const headerHeight = 74;
   const rowHeight = 48;
-  const height = Math.max(180, headerHeight + sortedColors.length * rowHeight + 28);
+  const height = Math.max(
+    180,
+    headerHeight + sortedColors.length * rowHeight + 28,
+  );
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;

@@ -184,7 +184,7 @@ test("image upload moves directly into reliable paint mode after review", async 
     page.getByRole("region", { name: "Canvas paint controls" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Pencil tool" }).first(),
+    page.getByRole("button", { name: "Pencil tool" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("application", { name: /Editable \d+ by \d+ pixel grid/ }),
@@ -223,7 +223,7 @@ test("AI applies one validated document revision that Undo removes in one step",
   );
   await page.route("**/api/ai/status", (route) =>
     route.fulfill({
-      body: JSON.stringify({ configured: true }),
+      body: JSON.stringify({ configured: true, dataCollection: "deny" }),
       contentType: "application/json",
       status: 200,
     }),
@@ -235,8 +235,9 @@ test("AI applies one validated document revision that Undo removes in one step",
       status: 200,
     }),
   );
-  await page.route("**/api/ai/chat", (route) => {
+  await page.route("**/api/ai/chat", async (route) => {
     expect(route.request().postDataJSON().currentGridImage).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 250));
     return route.fulfill({
       body: JSON.stringify({
         configured: true,
@@ -266,11 +267,8 @@ test("AI applies one validated document revision that Undo removes in one step",
     page.getByText("Created Untitled Canvas", { exact: false }),
   ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
-  await expect(
-    page.getByRole("checkbox", {
-      name: "Include current canvas for editing",
-    }),
-  ).not.toBeChecked();
+  await expect(page.getByText("Text only", { exact: true })).toBeVisible();
+  await page.getByText("Advanced AI settings", { exact: true }).click();
   await page
     .getByPlaceholder(/Ask for a 32x32 horror icon/)
     .fill("Improve this canvas");
@@ -281,6 +279,8 @@ test("AI applies one validated document revision that Undo removes in one step",
     page.getByRole("alertdialog", { name: "AI processing consent" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Agree and send" }).click();
+  await expect(page.getByRole("button", { name: "New" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Delete" })).toBeDisabled();
   await expect(page.getByText("AI edit", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
 
@@ -288,6 +288,333 @@ test("AI applies one validated document revision that Undo removes in one step",
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
     page.getByText("64×64 · 0 colors", { exact: true }),
+  ).toBeVisible();
+});
+
+test("AI refine mode explicitly attaches only the rendered grid", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop request covers the shared AI payload builder.",
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem("ltg.ai.consent.v1.ai-refine-user", "granted");
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          session: { id: "ai-refine-session" },
+          user: {
+            avatarSeed: "ai-refine-user",
+            createdAt: Date.now(),
+            displayName: "AI Refine User",
+            id: "ai-refine-user",
+            role: "user",
+            status: "active",
+            termsAccepted: true,
+            termsVersion: "2026-07-12",
+            username: "ai-refine-user",
+          },
+        },
+        requestId: "ai-refine-session",
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ configured: true, dataCollection: "deny" }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/models", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ presets: [] }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/chat", (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.currentDocument).toMatchObject({ width: 64, height: 64 });
+    expect(body.currentGridImage).toMatchObject({ width: 64, height: 64 });
+    expect(body.currentGridImage.dataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(body.requestSketch).toBe(true);
+    expect(body.preserveDimensions).toBe(true);
+    return route.fulfill({
+      body: JSON.stringify({
+        configured: true,
+        model: "test/free",
+        reply: "I reviewed the rendered palette grid only.",
+        sketch: {
+          name: "Refined canvas",
+          width: 64,
+          height: 64,
+          rows: Array.from({ length: 64 }, (_, y) =>
+            Array.from({ length: 64 }, (_, x) =>
+              (x === 30 || x === 33) && y >= 28 && y <= 35 ? "R10C1" : null,
+            ),
+          ),
+        },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential cookies only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await page.getByRole("button", { name: "Refine this canvas" }).click();
+  await expect(
+    page.getByText("Canvas attached", { exact: true }),
+  ).toBeVisible();
+  await page.getByText("Advanced AI settings", { exact: true }).click();
+  await page.getByRole("combobox", { name: "AI model" }).click();
+  await expect(
+    page.getByRole("option", { name: /Gemma 4 31B/ }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  await expect(
+    page.getByText("I reviewed the rendered palette grid only.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Preview of Refined canvas" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Apply once" }).click();
+  await expect(
+    page.getByText("64×64 · 1 colors", { exact: true }),
+  ).toBeVisible();
+});
+
+test("AI refine explains its 64 pixel canvas ceiling", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared refinement dimension gate.",
+  );
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "96 Detail" }).click();
+  await expect(
+    page.getByText("96×96 · 0 colors", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await expect(
+    page.getByRole("button", { name: "Refine this canvas" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/Refine supports canvases up to 64×64/),
+  ).toBeVisible();
+  await page.getByText("Advanced AI settings", { exact: true }).click();
+  await expect(
+    page.getByLabel("Include current canvas for editing"),
+  ).toBeDisabled();
+});
+
+test("AI provider failure leaves manual painting available", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop failure run covers the shared recovery path.",
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem("ltg.ai.consent.v1.ai-failure-user", "granted");
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          session: { id: "ai-failure-session" },
+          user: {
+            avatarSeed: "ai-failure-user",
+            createdAt: Date.now(),
+            displayName: "AI Failure User",
+            id: "ai-failure-user",
+            role: "user",
+            status: "active",
+            termsAccepted: true,
+            termsVersion: "2026-07-12",
+            username: "ai-failure-user",
+          },
+        },
+        requestId: "ai-failure-session",
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ configured: true, dataCollection: "deny" }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/models", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ presets: [] }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/chat", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        configured: true,
+        reply: "The AI provider is temporarily unavailable.",
+      }),
+      contentType: "application/json",
+      status: 503,
+    }),
+  );
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential cookies only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await page.getByRole("button", { name: "Create a sketch" }).click();
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  await expect(
+    page.getByText("The AI provider is temporarily unavailable.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await page.getByRole("tab", { name: "Create" }).click();
+  const canvas = page.getByRole("application", {
+    name: "Editable 64 by 64 pixel grid",
+  });
+  await canvas.focus();
+  await canvas.press("Enter");
+  await expect(
+    page.getByText("64×64 · 1 colors", { exact: true }),
+  ).toBeVisible();
+});
+
+test("AI history and consent stay isolated between signed-in users", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop account switch covers browser-local AI data isolation.",
+  );
+  let currentUserId = "ai-account-a";
+  await page.addInitScript(() => {
+    localStorage.setItem("ltg.ai.consent.v1.ai-account-a", "granted");
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          session: { id: `${currentUserId}-session` },
+          user: {
+            avatarSeed: currentUserId,
+            createdAt: Date.now(),
+            displayName: currentUserId,
+            id: currentUserId,
+            role: "user",
+            status: "active",
+            termsAccepted: true,
+            termsVersion: "2026-07-12",
+            username: currentUserId,
+          },
+        },
+        requestId: `${currentUserId}-request`,
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ configured: true, dataCollection: "deny" }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/models", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ presets: [] }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/chat", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        configured: true,
+        reply: "Private reply for account A",
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential cookies only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await page
+    .getByPlaceholder(/Ask for a 32x32 horror icon/)
+    .fill("Private prompt for account A");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  await expect(
+    page.getByText("Private reply for account A", { exact: true }),
+  ).toBeVisible();
+  await page.waitForFunction(() =>
+    localStorage
+      .getItem("ltg.ai.sessions.v1.ai-account-a")
+      ?.includes("Private prompt for account A"),
+  );
+
+  currentUserId = "ai-account-b";
+  await page.reload();
+  await expect(
+    page.getByRole("application", {
+      name: "Editable 64 by 64 pixel grid",
+    }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await expect(page.getByText("Private prompt for account A")).toHaveCount(0);
+  await expect(page.getByText("Private reply for account A")).toHaveCount(0);
+  await page
+    .getByPlaceholder(/Ask for a 32x32 horror icon/)
+    .fill("Account B prompt");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  await expect(
+    page.getByRole("alertdialog", { name: "AI processing consent" }),
   ).toBeVisible();
 });
 

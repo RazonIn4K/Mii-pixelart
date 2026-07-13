@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   AI_SKETCH_LIMITS,
+  OPENROUTER_MODEL_PRESETS,
   PALETTE_COLOR_ID_PATTERN,
+  maxAiRefineDimension,
   validateAiGridSketch,
 } from "./ai";
 
@@ -110,4 +112,36 @@ describe("validateAiGridSketch", () => {
       expect(result.ok).toBe(false);
     },
   );
+
+  it("rejects an empty sketch", () => {
+    expect(
+      validateAiGridSketch({
+        ...validSketch(),
+        rows: Array.from({ length: 8 }, () => new Array(8).fill(null)),
+      }),
+    ).toEqual({
+      ok: false,
+      error: "Sketch must contain at least one painted cell.",
+    });
+  });
+
+  it("rejects a solid single-color rectangle", () => {
+    expect(
+      validateAiGridSketch({
+        ...validSketch(),
+        rows: Array.from({ length: 8 }, () => new Array(8).fill("R10C1")),
+      }),
+    ).toEqual({
+      ok: false,
+      error: "Sketch cannot be a solid single-color rectangle.",
+    });
+  });
+});
+
+describe("AI refinement capacity", () => {
+  it("derives safe grid ceilings from vision and output capabilities", () => {
+    expect(maxAiRefineDimension(OPENROUTER_MODEL_PRESETS[0])).toBe(64);
+    expect(maxAiRefineDimension(OPENROUTER_MODEL_PRESETS[1])).toBe(32);
+    expect(maxAiRefineDimension(OPENROUTER_MODEL_PRESETS[2])).toBe(0);
+  });
 });

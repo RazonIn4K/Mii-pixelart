@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IslandHeader } from "@/components/layout/IslandHeader";
 import { IslandFooter } from "@/components/layout/IslandFooter";
+import { GoogleSignIn } from "@/components/community/RequireAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertTriangle,
   ArrowRight,
@@ -48,7 +50,7 @@ const PALETTE_IMG = "/palette-swatches.webp";
 const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
 const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
 const DEFAULT_MODEL =
-  OPENROUTER_MODEL_PRESETS[0]?.id ?? "deepseek/deepseek-v4-flash:free";
+  OPENROUTER_MODEL_PRESETS[0]?.id ?? "google/gemma-4-26b-a4b-it:free";
 
 type PasswordBreachStatus = "idle" | "checking" | "safe" | "found" | "error";
 
@@ -156,6 +158,7 @@ function pickFirstAvailableModel(presets: AiModelPreset[]): string {
 
 export default function Home() {
   preload(HERO_IMG, { as: "image", fetchPriority: "high" });
+  const { serviceMessage, status: authStatus, user } = useAuth();
 
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
@@ -240,8 +243,8 @@ export default function Home() {
   };
 
   const createBreachRecoveryPlan = async () => {
-    const prompt = incidentPrompt.trim();
-    if (!prompt) return;
+    const prompt = incidentPrompt.trim().slice(0, 2000);
+    if (!prompt || !user) return;
 
     setIncidentLoading(true);
     setIncidentError(null);
@@ -575,11 +578,22 @@ export default function Home() {
                 <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Describe the situation without including passwords, payment details, recovery codes, or other secrets.</p>
                 <div className="mt-7 space-y-3">
                   <Label htmlFor="breach-situation" className="text-xs font-bold">What happened?</Label>
-                  <Textarea id="breach-situation" rows={4} placeholder="Example: My email appeared in a leak and I reused that password on two accounts…" value={incidentPrompt} onChange={(event) => setIncidentPrompt(event.target.value)} className="rounded-xl border-[var(--island-ink)]/15 bg-white" />
-                  <Button onClick={createBreachRecoveryPlan} disabled={incidentLoading || !incidentPrompt.trim()} className="h-12 w-full rounded-xl bg-[var(--island-blue)] font-bold text-[var(--island-ink)] hover:bg-[var(--island-blue)]/85">
+                  <Textarea id="breach-situation" rows={4} maxLength={2000} placeholder="Example: My email appeared in a leak and I reused that password on two accounts…" value={incidentPrompt} onChange={(event) => setIncidentPrompt(event.target.value)} className="rounded-xl border-[var(--island-ink)]/15 bg-white" />
+                  <Button onClick={createBreachRecoveryPlan} disabled={incidentLoading || !incidentPrompt.trim() || !user} className="h-12 w-full rounded-xl bg-[var(--island-blue)] font-bold text-[var(--island-ink)] hover:bg-[var(--island-blue)]/85">
                     <AlertTriangle className="mr-2 h-4 w-4" />
-                    {incidentLoading ? "Building your plan…" : "Generate recovery plan"}
+                    {incidentLoading ? "Building your plan…" : user ? "Generate recovery plan" : "Sign in to generate"}
                   </Button>
+                  {!user && authStatus !== "loading" ? (
+                    serviceMessage ? (
+                      <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">
+                        AI recovery plans are unavailable until the community Worker is connected. The private breach check still works.
+                      </p>
+                    ) : (
+                      <div className="flex justify-center rounded-xl bg-[var(--island-paper)] p-3">
+                        <GoogleSignIn returnTo="/" />
+                      </div>
+                    )
+                  ) : null}
                   {(incidentError || incidentPlan) && (
                     <div aria-live="polite" className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-[var(--island-paper)] p-4 text-xs font-medium leading-5 text-[var(--island-ink)]/70">
                       {incidentError ?? incidentPlan}

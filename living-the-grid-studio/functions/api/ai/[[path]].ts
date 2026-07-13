@@ -24,21 +24,19 @@
 
 import {
   getOpenRouterModels,
-  getOpenRouterStatus,
-  sendOpenRouterChat,
   type ApiResult,
   type OpenRouterEnv,
 } from "../../../server/openrouter";
-import {
-  RequestInputError,
-  publicRequestError,
-  readBoundedText,
-} from "../../../server/request-body";
+import { publicRequestError } from "../../../server/request-body";
 
 // KV namespace binding shape — present when EDGE_CACHE is wired up.
 interface KVNamespace {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  put(
+    key: string,
+    value: string,
+    options?: { expirationTtl?: number },
+  ): Promise<void>;
 }
 
 interface EdgeEnv extends OpenRouterEnv {
@@ -51,7 +49,7 @@ interface PagesContext {
   request: Request;
 }
 
-const KV_MODELS_KEY = "openrouter:models";
+const KV_MODELS_KEY = "openrouter:models:v2";
 const KV_MODELS_TTL_SECONDS = 3600; // 1 hour
 
 function jsonResponse(result: ApiResult): Response {
@@ -70,17 +68,6 @@ function resolveSubpath(params: PagesContext["params"]): string {
   if (!raw) return "";
   if (Array.isArray(raw)) return raw.join("/");
   return String(raw);
-}
-
-async function readJsonBody(request: Request): Promise<unknown> {
-  if (request.method !== "POST") return {};
-  const text = await readBoundedText(request, 1_000_000);
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new RequestInputError(400, "Invalid JSON request body.");
-  }
 }
 
 /**
@@ -116,7 +103,9 @@ async function handleModels(env: EdgeEnv): Promise<Response> {
 
   if (kv && result.status === 200) {
     try {
-      await kv.put(KV_MODELS_KEY, body, { expirationTtl: KV_MODELS_TTL_SECONDS });
+      await kv.put(KV_MODELS_KEY, body, {
+        expirationTtl: KV_MODELS_TTL_SECONDS,
+      });
     } catch {
       // KV write failure is non-fatal — the response is still valid.
     }
@@ -132,9 +121,7 @@ async function handleModels(env: EdgeEnv): Promise<Response> {
   });
 }
 
-export const onRequest = async (
-  context: PagesContext,
-): Promise<Response> => {
+export const onRequest = async (context: PagesContext): Promise<Response> => {
   const subpath = resolveSubpath(context.params).replace(/^\/+|\/+$/g, "");
   // Normalize HEAD to GET so HEAD/curl -I gets the same headers + status as GET
   // (RFC 7231 §4.3.2). The Response constructor strips the body for HEAD
@@ -145,14 +132,31 @@ export const onRequest = async (
 
   try {
     if (method === "GET" && subpath === "status") {
-      return jsonResponse(getOpenRouterStatus(env));
+      return jsonResponse({
+        status: 200,
+        body: {
+          configured: false,
+          dataCollection: "unknown",
+          unavailableReason:
+            "AI Draw requires the authenticated community Worker.",
+        },
+      });
     }
     if (method === "GET" && subpath === "models") {
       return handleModels(env);
     }
     if (method === "POST" && subpath === "chat") {
-      const body = await readJsonBody(context.request);
-      return jsonResponse(await sendOpenRouterChat(body, env));
+      // Pages does not have the D1 session and Worker rate-limit bindings
+      // required by the authenticated AI route. Fail closed during rollback
+      // rather than exposing the shared provider key to anonymous quota drain.
+      return jsonResponse({
+        status: 503,
+        body: {
+          configured: false,
+          reply:
+            "AI Draw requires the authenticated community Worker and is unavailable on this legacy Pages deployment.",
+        },
+      });
     }
 
     return new Response(

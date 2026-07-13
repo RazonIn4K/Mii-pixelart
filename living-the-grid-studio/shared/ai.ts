@@ -95,6 +95,8 @@ export function validateAiGridSketch(value: unknown): AiGridSketchValidation {
   }
 
   const safeRows: (string | null)[][] = [];
+  let paintedCellCount = 0;
+  const paintedColors = new Set<string>();
   for (let y = 0; y < height; y += 1) {
     const row = rows[y];
     if (!Array.isArray(row) || row.length !== width) {
@@ -115,9 +117,24 @@ export function validateAiGridSketch(value: unknown): AiGridSketchValidation {
           error: "Sketch used an unknown palette color ID.",
         };
       }
+      paintedCellCount += 1;
+      paintedColors.add(cell);
       safeRow.push(cell);
     }
     safeRows.push(safeRow);
+  }
+
+  if (paintedCellCount === 0) {
+    return {
+      ok: false,
+      error: "Sketch must contain at least one painted cell.",
+    };
+  }
+  if (paintedCellCount === width * height && paintedColors.size === 1) {
+    return {
+      ok: false,
+      error: "Sketch cannot be a solid single-color rectangle.",
+    };
   }
 
   const name =
@@ -146,6 +163,7 @@ export interface AiChatRequest {
   currentGridImage?: AiGridImage | null;
   messages: AiChatMessage[];
   model: string;
+  preserveDimensions?: boolean;
   requestSketch?: boolean;
   sessionId?: string;
 }
@@ -167,6 +185,8 @@ export interface AiModelPreset {
   context: string;
   id: string;
   label: string;
+  /** Current provider ceiling used to gate full-grid refinement safely. */
+  maxOutputTokens?: number;
   note: string;
   pricingCompletion: string;
   pricingPrompt: string;
@@ -175,54 +195,71 @@ export interface AiModelPreset {
   // Populated server-side by /api/ai/models when the OpenRouter catalog is
   // queryable. Clients should treat undefined as "unknown — try it".
   available?: boolean;
+  // Populated from architecture.input_modalities. Refine requires this to be
+  // explicitly true before a rendered canvas may be attached.
+  supportsImages?: boolean;
+}
+
+export function maxAiRefineDimension(preset: AiModelPreset): number {
+  if (preset.supportsImages !== true) return 0;
+  const tokens = preset.maxOutputTokens ?? 0;
+  if (tokens >= 24_000) return AI_SKETCH_LIMITS.maxDimension;
+  if (tokens >= 6_000) return Math.min(32, AI_SKETCH_LIMITS.maxDimension);
+  return 0;
 }
 
 export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [
-  // FREE-ONLY curated list, verified against OpenRouter on 2026-05-16.
+  // FREE-ONLY curated list, verified against OpenRouter on 2026-07-12.
   // The free tier rate-limits these (≈20 req/min per IP, 200/day per account)
   // but the user pays nothing. This list is also the server-side allowlist;
   // requests cannot select arbitrary or paid models with the shared site key.
   //
   // We intentionally keep this short because OpenRouter's free-tier roster
-  // rotates — every entry here was smoke-tested live before commit.
+  // rotates — entries are catalog-verified and provider-probed before commit.
   {
-    context: "1,000,000 tokens",
-    id: "deepseek/deepseek-v4-flash:free",
-    label: "DeepSeek V4 Flash (free)",
-    note: "Fast, 1M context, strong structured output. Default pick.",
+    context: "262,144 tokens",
+    id: "google/gemma-4-26b-a4b-it:free",
+    label: "Gemma 4 26B (free)",
+    maxOutputTokens: 32768,
+    note: "Vision-capable default for canvas refinement and structured grids.",
     pricingCompletion: "$0.00/1M",
     pricingPrompt: "$0.00/1M",
     rank: 1,
-    releaseDate: "2026-04-12",
+    releaseDate: "2026-04-03",
+    supportsImages: true,
+  },
+  {
+    context: "262,144 tokens",
+    id: "google/gemma-4-31b-it:free",
+    label: "Gemma 4 31B (free)",
+    maxOutputTokens: 8192,
+    note: "Vision-capable alternative for grid review and second opinions.",
+    pricingCompletion: "$0.00/1M",
+    pricingPrompt: "$0.00/1M",
+    rank: 2,
+    releaseDate: "2026-04-02",
+    supportsImages: true,
   },
   {
     context: "131,072 tokens",
     id: "openai/gpt-oss-120b:free",
     label: "GPT OSS 120B (free)",
-    note: "OpenAI-style 120B open model. Good at JSON / sketch grids.",
-    pricingCompletion: "$0.00/1M",
-    pricingPrompt: "$0.00/1M",
-    rank: 2,
-    releaseDate: "2025-12-15",
-  },
-  {
-    context: "131,072 tokens",
-    id: "z-ai/glm-4.5-air:free",
-    label: "GLM 4.5 Air (free)",
-    note: "Alternative architecture, useful for second-opinion drafts.",
+    note: "Text-only model for structured sketches and written advice.",
     pricingCompletion: "$0.00/1M",
     pricingPrompt: "$0.00/1M",
     rank: 3,
-    releaseDate: "2025-09-20",
+    releaseDate: "2025-08-05",
+    supportsImages: false,
   },
   {
     context: "1,000,000 tokens",
     id: "nvidia/nemotron-3-super-120b-a12b:free",
     label: "Nemotron 3 Super 120B (free)",
-    note: "Large NVIDIA model. Slower but more thorough on art critique.",
+    note: "Large text-only NVIDIA model for detailed prompts and critique.",
     pricingCompletion: "$0.00/1M",
     pricingPrompt: "$0.00/1M",
     rank: 4,
-    releaseDate: "2025-11-08",
+    releaseDate: "2026-03-11",
+    supportsImages: false,
   },
 ];

@@ -12,7 +12,7 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 ## What's inside
 
 - **Studio** ([/studio](https://tomodachi.pw/studio)) — Import a face photo, character art, logo, meme, or JSON file; crop/frame it for the mask or icon, snap to the 84-color Tomodachi Life: Living the Dream palette, preview before commit, touch up, optimize, and export repaint references.
-- **Recovery hub** — Browser-only password breach check using HIBP k-anonymity, plus an OpenRouter-backed recovery assistant. Built for visitors arriving from the Tomodachishare credential leak.
+- **Recovery hub** — Browser-only password breach check using HIBP k-anonymity, plus an account-gated OpenRouter recovery assistant. Built for visitors arriving from the Tomodachishare credential leak.
 - **Guides** ([/guides](https://tomodachi.pw/guides)) — Long-form articles on Mii creation, gameplay basics, breach recovery, and QR code save backup.
 - **Paid extras** ([/unlock](https://tomodachi.pw/unlock)) — Optional $9 detailed recovery checklist plus a $49 30-min consult.
 
@@ -30,12 +30,12 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 ## Tech stack (overview)
 
 - React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui/Radix primitives
-- Cloudflare Pages + Pages Functions (edge runtime)
-- Cloudflare KV cache + Cloudflare Web Analytics
+- Cloudflare Worker + Static Assets, with D1, private R2, KV, and rate-limit bindings
+- Cloudflare Web Analytics
 - Stripe Checkout with HMAC-SHA256 webhook verification at the edge
-- OpenRouter free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
+- OpenRouter free-tier model rotation (Gemma 4 vision, GPT-OSS 120B, Nemotron 3 Super 120B)
 
-The interesting engineering bit is the edge pre-render: Cloudflare Pages middleware UA-sniffs known search crawlers (Googlebot, Bingbot, DuckDuckBot, Applebot, etc.) and serves a static pre-rendered HTML shell with per-route JSON-LD, while real browsers continue to receive the React SPA. No SSR framework needed — just one TS file at the edge. See [`living-the-grid-studio/functions/_middleware.ts`](./living-the-grid-studio/functions/_middleware.ts).
+The interesting engineering bit is the Worker document renderer: it UA-sniffs known search crawlers and serves safe route-specific HTML, canonical/Open Graph metadata, and JSON-LD, while real browsers receive the React SPA through Static Assets. See [`living-the-grid-studio/worker/documents.ts`](./living-the-grid-studio/worker/documents.ts).
 
 ## License
 

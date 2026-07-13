@@ -27,13 +27,13 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 - Every color labeled by row + column (R9C5, R10C1, etc.) for exact in-game matching
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
-- AI sketch assistant with local chat sessions, optional grid snapshot context, validation, and cell-by-cell apply animation
+- Account-gated AI sketch assistant with local per-user chat sessions, explicit grid-snapshot consent, validation, visual review, and one-step undoable apply
 - Export individual repaint assets or a ZIP reference pack with JSON, labeled PNG guide, clean PNG, palette sheet PNG, paint-order CSV, notes, manifest, and HTML reference
 
 **Recovery hub** — [`/`](https://tomodachi.pw/)
 
 - Browser-only password breach check using HIBP k-anonymity (only the first 5 chars of the SHA-1 hash ever leave the page)
-- OpenRouter-backed AI recovery assistant on free-tier models (no signup)
+- OpenRouter-backed AI recovery assistant on curated free-tier models after Google sign-in
 
 **Guides** — [`/guides`](https://tomodachi.pw/guides)
 
@@ -59,7 +59,7 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
 - **Authentication:** Google authorization-code OIDC, encrypted transaction cookies, and hashed opaque sessions
 - **Payments:** Stripe Checkout with HMAC-SHA256 webhook verification at the edge
-- **AI:** OpenRouter with free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
+- **AI:** OpenRouter with capability-checked free-tier rotation (Gemma 4 vision, GPT-OSS 120B, Nemotron 3 Super 120B)
 - **Secrets:** Environment-scoped Wrangler secrets, optionally sourced from Doppler after deployment approval
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
 
@@ -100,7 +100,7 @@ flowchart LR
     QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
     PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}
-    AI -- yes --> SKETCH[AI sketch helper<br/>OpenRouter free tier<br/>cell-by-cell paint anim]
+    AI -- yes --> SKETCH[AI sketch helper<br/>vision-capability gate<br/>review then apply once]
     SKETCH --> GRID
     AI -- no --> EXPORT[Reference export<br/>ZIP pack or individual assets<br/>JSON + guide PNGs<br/>palette sheet + HTML]
     GRID --> EXPORT
@@ -171,7 +171,7 @@ migrations/              Forward-only D1 migrations
 shared/                  Shared validation and legacy contracts
 functions/               Legacy Pages rollback reference; not the active runtime
   api/
-    ai/[[path]].ts       OpenRouter chat + KV-cached model list
+    ai/[[path]].ts       KV-cached model list; chat fails closed without Worker auth/rate limits
     stripe/[[path]].ts   Checkout + session verification + products
     webhooks/stripe.ts   Stripe webhook with HMAC verification
 server/                  Portable OpenRouter/Stripe helpers shared by legacy parity code and the Worker

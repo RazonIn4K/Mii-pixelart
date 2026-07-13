@@ -147,12 +147,12 @@
 **Completed:**
 
 - [x] Server-side OpenRouter proxy routes (`/api/ai/status`, `/api/ai/models`, `/api/ai/chat`) so API keys stay out of the browser bundle
-- [x] AI tab in Studio with 25 OpenRouter model presets, custom model entry, chat history, local saved sessions, sketch mode, and current-grid summary toggle
+- [x] Account-gated AI tab with four curated free presets, per-user bounded local history, sketch/advice modes, explicit current-grid consent, and model-capability/output-budget gates
 - [x] Optional visual grid snapshot context so image-capable models can inspect the current canvas before proposing a sketch
-- [x] Applyable AI sketch JSON path that converts palette-ID rows into a normal undoable `GridDocument`
+- [x] Reviewable AI sketch JSON path that validates palette-ID rows and applies one normal, undoable `GridDocument` revision
 - [x] Fenced/loose JSON recovery for models that wrap valid sketch JSON in Markdown
 - [x] AI sketch validation coverage (`scripts/verify-ai-sketch.ts`) and browser smoke coverage for the AI tab
-- [x] Local session persistence in browser `localStorage`; no database is required for single-device private chat history
+- [x] Per-account session persistence in browser `localStorage`; no database is required for single-device private chat history
 - [x] OpenRouter model-comparison script (`pnpm compare:models`) that saves ranked-model outputs to `reports/` when `OPENROUTER_API_KEY` is configured
 
 **Principles:**

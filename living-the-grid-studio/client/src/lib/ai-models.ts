@@ -4,6 +4,12 @@ import {
 } from "../../../shared/ai";
 
 export const DEFAULT_OPENROUTER_MODEL_ID = OPENROUTER_MODEL_PRESETS[0].id;
+export const AI_SESSION_LIMITS = {
+  sessions: 12,
+  messagesPerSession: 24,
+  messageCharacters: 5000,
+  titleCharacters: 80,
+} as const;
 
 export function normalizeOpenRouterModelChoice(value: unknown): string {
   const normalized = typeof value === "string" ? value.trim() : "";
@@ -24,6 +30,17 @@ export interface SavedAiSession {
   updatedAt: string;
 }
 
+export function boundAiMessages(
+  messages: readonly AiChatMessage[],
+): AiChatMessage[] {
+  return messages
+    .slice(-AI_SESSION_LIMITS.messagesPerSession)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.slice(0, AI_SESSION_LIMITS.messageCharacters),
+    }));
+}
+
 type StoredAiSession = Omit<SavedAiSession, "includeGridImage"> & {
   includeGridImage?: boolean;
 };
@@ -37,10 +54,13 @@ export function parseSavedAiSessions(raw: string | null): SavedAiSession[] {
       .filter(isStoredAiSession)
       .map((session) => ({
         ...session,
+        id: session.id.slice(0, 256),
         includeGridImage: Boolean(session.includeGridImage),
+        messages: boundAiMessages(session.messages),
         modelChoice: normalizeOpenRouterModelChoice(session.modelChoice),
+        title: session.title.slice(0, AI_SESSION_LIMITS.titleCharacters),
       }))
-      .slice(0, 20);
+      .slice(0, AI_SESSION_LIMITS.sessions);
   } catch {
     return [];
   }

@@ -17,16 +17,32 @@ const jsonRequest = (url: string, body: string, contentLength?: number) =>
   });
 
 describe("legacy Pages input handling", () => {
-  it("returns a controlled AI error for a JSON null body", async () => {
+  it("advertises AI as unavailable when authenticated Worker bindings are absent", async () => {
+    const response = await handleAi({
+      env: { OPENROUTER_API_KEY: "test-key" },
+      params: { path: "status" },
+      request: new Request("https://example.test/api/ai/status"),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      configured: false,
+      unavailableReason: expect.stringContaining(
+        "authenticated community Worker",
+      ),
+    });
+  });
+
+  it("fails the legacy Pages AI chat route closed", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "null"),
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      configured: true,
-      reply: "Choose one of the supported free OpenRouter models.",
+      configured: false,
+      reply:
+        "AI Draw requires the authenticated community Worker and is unavailable on this legacy Pages deployment.",
     });
   });
 
@@ -54,10 +70,10 @@ describe("legacy Pages input handling", () => {
       params: { path: "checkout" },
       request: jsonRequest("https://example.test/api/stripe/checkout", "{"),
     });
-    expect(aiResponse.status).toBe(400);
+    expect(aiResponse.status).toBe(503);
     expect(stripeResponse.status).toBe(400);
     await expect(aiResponse.json()).resolves.toMatchObject({
-      reply: "Invalid JSON request body.",
+      reply: expect.stringContaining("authenticated community Worker"),
     });
     await expect(stripeResponse.json()).resolves.toMatchObject({
       error: "Invalid JSON request body.",
@@ -79,7 +95,7 @@ describe("legacy Pages input handling", () => {
         100_001,
       ),
     });
-    expect(aiResponse.status).toBe(413);
+    expect(aiResponse.status).toBe(503);
     expect(stripeResponse.status).toBe(413);
   });
 

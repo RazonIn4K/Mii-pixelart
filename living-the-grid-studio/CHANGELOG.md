@@ -1,8 +1,14 @@
 # Changelog
 
-All notable user-visible changes to Tomodachi are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and the project loosely uses semantic versioning for public releases. Date-only entries under "Unreleased" are operational / SEO / infrastructure changes that ship continuously to [tomodachi.pw](https://tomodachi.pw/) via Cloudflare Pages.
+All notable user-visible changes to Tomodachi are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and the project loosely uses semantic versioning for public releases. Date-only entries under "Unreleased" are operational / SEO / infrastructure changes prepared for the Cloudflare release pipeline serving [tomodachi.pw](https://tomodachi.pw/).
 
 ## Unreleased
+
+### 2026-07-12
+
+- **Studio canvas overhaul:** removed the competing graph-paper layer and duplicate tool/palette panels, added one high-contrast editable grid, consolidated touch/pen/mouse controls, kept phone quick colors visible, and suppresses grid lines when they would obscure 256×256 cells.
+- **AI safety and reliability:** scoped consent/history per account, bounded live messages, enforced capability- and output-aware refinement, added visual review and one-step apply, blocked destructive truncated refinements, and live-probed Gemma 4 text-to-grid and image refinement through the strict provider policy.
+- **Legacy rollback safety:** Pages advertises AI as unavailable and fails chat closed; authenticated, rate-limited AI remains on the unified community Worker.
 
 ### 2026-05-20
 

@@ -20,7 +20,7 @@ import {
 import { HttpError, readJson, readText, type WorkerRequestContext } from "./http";
 import type { Router } from "./router";
 
-const MODELS_CACHE_KEY = "openrouter:models";
+const MODELS_CACHE_KEY = "openrouter:models:v2";
 const MODELS_CACHE_SECONDS = 3_600;
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 const STRIPE_EVENT_TTL_SECONDS = 24 * 60 * 60;
