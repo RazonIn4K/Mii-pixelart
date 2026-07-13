@@ -62,6 +62,7 @@ import {
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
 import type { GridDocument } from "@/lib/engine/grid";
+import { buildPaintCells } from "@/lib/engine/paint-assists";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
 
@@ -113,6 +114,8 @@ export default function Studio() {
   const [highlightColorId, setHighlightColorId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
+  const [horizontalMirror, setHorizontalMirror] = useState(false);
+  const [showCenterGuide, setShowCenterGuide] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [paintTool, setPaintTool] = useState<PaintTool>("pencil");
   const [brushSize, setBrushSize] = useState<BrushSize>(1);
@@ -169,11 +172,23 @@ export default function Studio() {
       if (nextTool && doc && !imagePreview) {
         e.preventDefault();
         setPaintTool(nextTool);
+        return;
+      }
+      if (key === "m" && doc && !imagePreview) {
+        e.preventDefault();
+        const next = !horizontalMirror;
+        setHorizontalMirror(next);
+        if (next) setShowCenterGuide(true);
+        return;
+      }
+      if (key === "g" && doc && !imagePreview) {
+        e.preventDefault();
+        setShowCenterGuide((current) => !current);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [doc, imagePreview, undo, redo]);
+  }, [doc, horizontalMirror, imagePreview, undo, redo]);
 
   // Show errors
   useEffect(() => {
@@ -213,7 +228,7 @@ export default function Studio() {
         }
       }
 
-      if (imagePreview) return;
+      if (imagePreview || !doc) return;
 
       if (mergeSource) {
         if (colorId) {
@@ -226,7 +241,7 @@ export default function Studio() {
 
       if (paintTool === "pencil") {
         paintCells(
-          expandBrushCells([{ x, y }], brushSize, doc),
+          buildPaintCells([{ x, y }], brushSize, doc, horizontalMirror),
           selectedPaintColorId,
         );
         setHighlightColorId(selectedPaintColorId);
@@ -234,7 +249,10 @@ export default function Studio() {
       }
 
       if (paintTool === "eraser") {
-        paintCells(expandBrushCells([{ x, y }], brushSize, doc), null);
+        paintCells(
+          buildPaintCells([{ x, y }], brushSize, doc, horizontalMirror),
+          null,
+        );
         return;
       }
 
@@ -264,6 +282,7 @@ export default function Studio() {
       mergeSource,
       paintTool,
       brushSize,
+      horizontalMirror,
       selectedPaintColorId,
       mergeColors,
       paintCells,
@@ -274,14 +293,27 @@ export default function Studio() {
   const handleCellDrag = useCallback(
     (x: number, y: number) => {
       if (imagePreview || !doc) return;
-      const cells = expandBrushCells([{ x, y }], brushSize, doc);
+      const cells = buildPaintCells(
+        [{ x, y }],
+        brushSize,
+        doc,
+        horizontalMirror,
+      );
       if (paintTool === "pencil") {
         paintCells(cells, selectedPaintColorId);
       } else if (paintTool === "eraser") {
         paintCells(cells, null);
       }
     },
-    [brushSize, doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
+    [
+      brushSize,
+      doc,
+      horizontalMirror,
+      imagePreview,
+      paintTool,
+      selectedPaintColorId,
+      paintCells,
+    ],
   );
 
   /**
@@ -294,14 +326,27 @@ export default function Studio() {
   const handleCellDragSegment = useCallback(
     (cells: { x: number; y: number }[]) => {
       if (imagePreview || !doc) return;
-      const brushCells = expandBrushCells(cells, brushSize, doc);
+      const brushCells = buildPaintCells(
+        cells,
+        brushSize,
+        doc,
+        horizontalMirror,
+      );
       if (paintTool === "pencil") {
         paintCells(brushCells, selectedPaintColorId);
       } else if (paintTool === "eraser") {
         paintCells(brushCells, null);
       }
     },
-    [brushSize, doc, imagePreview, paintTool, selectedPaintColorId, paintCells],
+    [
+      brushSize,
+      doc,
+      horizontalMirror,
+      imagePreview,
+      paintTool,
+      selectedPaintColorId,
+      paintCells,
+    ],
   );
 
   /**
@@ -616,12 +661,19 @@ export default function Studio() {
                   activeTool={paintTool}
                   brushSize={brushSize}
                   doc={doc}
+                  horizontalMirror={horizontalMirror}
                   selectedColorId={selectedPaintColorId}
+                  showCenterGuide={showCenterGuide}
                   onBrushSizeChange={setBrushSize}
+                  onHorizontalMirrorChange={(enabled) => {
+                    setHorizontalMirror(enabled);
+                    if (enabled) setShowCenterGuide(true);
+                  }}
                   onSelectedColorChange={(colorId) => {
                     setSelectedPaintColorId(colorId);
                     setHighlightColorId(colorId);
                   }}
+                  onShowCenterGuideChange={setShowCenterGuide}
                   onToolChange={setPaintTool}
                 />
               ) : null}
@@ -636,6 +688,7 @@ export default function Studio() {
                   highlightColorId={highlightColorId}
                   showGrid={showGrid}
                   showLabels={showLabels}
+                  showCenterGuide={showCenterGuide}
                   onCellClick={handleCellClick}
                   onCellDrag={
                     paintTool === "pencil" || paintTool === "eraser"
@@ -848,36 +901,6 @@ export default function Studio() {
       </main>
     </div>
   );
-}
-
-function expandBrushCells(
-  cells: ReadonlyArray<{ x: number; y: number }>,
-  size: BrushSize,
-  doc: GridDocument | null,
-): { x: number; y: number }[] {
-  if (!doc || cells.length === 0) return [];
-  if (size === 1) return [...cells];
-
-  const start = -Math.floor(size / 2);
-  const end = start + size - 1;
-  const seen = new Set<number>();
-  const expanded: { x: number; y: number }[] = [];
-
-  for (const cell of cells) {
-    for (let offsetY = start; offsetY <= end; offsetY += 1) {
-      for (let offsetX = start; offsetX <= end; offsetX += 1) {
-        const x = cell.x + offsetX;
-        const y = cell.y + offsetY;
-        if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) continue;
-        const index = y * doc.width + x;
-        if (seen.has(index)) continue;
-        seen.add(index);
-        expanded.push({ x, y });
-      }
-    }
-  }
-
-  return expanded;
 }
 
 function PanelLoading() {

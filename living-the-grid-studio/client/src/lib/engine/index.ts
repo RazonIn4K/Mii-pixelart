@@ -13,6 +13,7 @@ export * from "./json-io";
 export * from "./file-signature";
 export * from "./canvas-renderer";
 export * from "./studio-commands";
+export * from "./paint-assists";
 export * from "./image-import";
 export * from "./templates";
 export * from "./ai-sketch";

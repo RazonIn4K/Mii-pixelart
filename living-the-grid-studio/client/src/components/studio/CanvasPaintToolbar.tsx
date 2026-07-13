@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import {
+  AlignCenterVertical,
   Eraser,
+  FlipHorizontal2,
   MousePointer2,
   PaintBucket,
   Palette,
@@ -20,9 +22,10 @@ import {
 } from "@/components/ui/tooltip";
 import type { PaintTool } from "@/components/studio/CreationPanel";
 import type { GridDocument } from "@/lib/engine/grid";
+import type { BrushSize } from "@/lib/engine/paint-assists";
 import { getPaletteColor, TOMODACHI_PALETTE } from "@/lib/engine/palette";
 
-export type BrushSize = 1 | 2 | 3 | 5;
+export type { BrushSize } from "@/lib/engine/paint-assists";
 
 const PAINT_TOOLS: ReadonlyArray<{
   icon: typeof Pencil;
@@ -52,17 +55,25 @@ export function CanvasPaintToolbar({
   activeTool,
   brushSize,
   doc,
+  horizontalMirror,
   selectedColorId,
+  showCenterGuide,
   onBrushSizeChange,
+  onHorizontalMirrorChange,
   onSelectedColorChange,
+  onShowCenterGuideChange,
   onToolChange,
 }: {
   activeTool: PaintTool;
   brushSize: BrushSize;
   doc: GridDocument;
+  horizontalMirror: boolean;
   selectedColorId: string;
+  showCenterGuide: boolean;
   onBrushSizeChange: (size: BrushSize) => void;
+  onHorizontalMirrorChange: (enabled: boolean) => void;
   onSelectedColorChange: (colorId: string) => void;
+  onShowCenterGuideChange: (enabled: boolean) => void;
   onToolChange: (tool: PaintTool) => void;
 }) {
   const selectedColor = getPaletteColor(selectedColorId);
@@ -144,6 +155,58 @@ export function CanvasPaintToolbar({
             </select>
           </label>
 
+          <div
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-white p-0.5"
+            role="group"
+            aria-label="Face assist"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex size-9 items-center justify-center rounded-md transition-colors ${
+                    horizontalMirror
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                  aria-keyshortcuts="M"
+                  aria-label="Mirror brush left to right"
+                  aria-pressed={horizontalMirror}
+                  title="Mirror brush left to right (M)"
+                  onClick={() => onHorizontalMirrorChange(!horizontalMirror)}
+                >
+                  <FlipHorizontal2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Mirror pencil and eraser · M</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex size-9 items-center justify-center rounded-md transition-colors ${
+                    showCenterGuide
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                  aria-keyshortcuts="G"
+                  aria-label="Show center-axis guide"
+                  aria-pressed={showCenterGuide}
+                  title="Show center-axis guide (G)"
+                  onClick={() => onShowCenterGuideChange(!showCenterGuide)}
+                >
+                  <AlignCenterVertical className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Center-axis guide · G</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -223,7 +286,7 @@ export function CanvasPaintToolbar({
       <p className="px-1 pt-1 text-[0.68rem] font-medium text-muted-foreground">
         {activeTool === "inspect"
           ? "Choose Pencil, Eraser, Fill, or Pick color to edit."
-          : `${PAINT_TOOLS.find((entry) => entry.tool === activeTool)?.label ?? "Paint"} · ${selectedColor?.name ?? selectedColorId}${brushEnabled ? ` · ${brushSize}×${brushSize}` : ""}. Drag with mouse, touch, or pen; use arrow keys and Space on the canvas.`}
+          : `${PAINT_TOOLS.find((entry) => entry.tool === activeTool)?.label ?? "Paint"} · ${selectedColor?.name ?? selectedColorId}${brushEnabled ? ` · ${brushSize}×${brushSize}${horizontalMirror ? " · mirrored" : ""}` : ""}. Drag with mouse, touch, or pen; use arrow keys and Space on the canvas.`}
       </p>
     </section>
   );

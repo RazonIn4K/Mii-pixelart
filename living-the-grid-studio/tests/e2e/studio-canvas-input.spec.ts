@@ -20,6 +20,12 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await expect(canvas).toBeVisible();
   await expect(paintControls).toBeVisible();
   await expect(page.getByRole("button", { name: "Pencil tool" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Mirror brush left to right" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Show center-axis guide" }),
+  ).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Paint tools" })).toHaveCount(
     1,
   );
@@ -110,8 +116,28 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await expect(canvas).toHaveCSS("touch-action", "none");
   await expect(canvas).toHaveAttribute(
     "aria-keyshortcuts",
-    "ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H",
+    "ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G",
   );
+
+  const mirrorButton = page.getByRole("button", {
+    name: "Mirror brush left to right",
+  });
+  const guideButton = page.getByRole("button", {
+    name: "Show center-axis guide",
+  });
+  await expect(mirrorButton).toHaveAttribute("aria-pressed", "false");
+  await expect(guideButton).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
+  await mirrorButton.click();
+  await expect(mirrorButton).toHaveAttribute("aria-pressed", "true");
+  await expect(guideButton).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute("data-center-guide", "visible");
+  await guideButton.click();
+  await expect(mirrorButton).toHaveAttribute("aria-pressed", "true");
+  await expect(guideButton).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
+  await guideButton.click();
+  await expect(canvas).toHaveAttribute("data-center-guide", "visible");
 
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
@@ -156,10 +182,46 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await expect(
     page.getByText("64×64 · 1 colors", { exact: true }),
   ).toBeVisible();
+
+  const mirroredPixels = await canvas.evaluate((element) => {
+    const canvasElement = element as HTMLCanvasElement;
+    const rect = canvasElement.getBoundingClientRect();
+    const cellSize = Math.max(
+      1,
+      Math.floor(Math.min((rect.width - 40) / 64, (rect.height - 40) / 64, 32)),
+    );
+    const panX = Math.round((rect.width - cellSize * 64) / 2);
+    const panY = Math.round((rect.height - cellSize * 64) / 2);
+    const dpr = window.devicePixelRatio || 1;
+    const context = canvasElement.getContext("2d");
+    if (!context) throw new Error("Canvas context unavailable");
+    const read = (x: number, y: number) =>
+      Array.from(
+        context.getImageData(
+          Math.floor((panX + (x + 0.5) * cellSize) * dpr),
+          Math.floor((panY + (y + 0.5) * cellSize) * dpr),
+          1,
+          1,
+        ).data,
+      );
+    return { mirror: read(59, 4), source: read(4, 4) };
+  });
+  expect(mirroredPixels.mirror).toEqual(mirroredPixels.source);
+  expect(
+    mirroredPixels.source[0] +
+      mirroredPixels.source[1] +
+      mirroredPixels.source[2],
+  ).toBeLessThan(180);
+
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
     page.getByText("64×64 · 0 colors", { exact: true }),
   ).toBeVisible();
+  await canvas.focus();
+  await canvas.press("m");
+  await expect(mirrorButton).toHaveAttribute("aria-pressed", "false");
+  await canvas.press("m");
+  await expect(mirrorButton).toHaveAttribute("aria-pressed", "true");
 
   const cancelStart = pointForCell(14, 8);
   const cancelEnd = pointForCell(18, 8);

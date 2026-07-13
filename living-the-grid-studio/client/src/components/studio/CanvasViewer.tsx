@@ -22,6 +22,8 @@ interface CanvasViewerProps {
   highlightColorId: string | null;
   showGrid: boolean;
   showLabels: boolean;
+  /** Draw a local-only vertical guide through the document's center axis. */
+  showCenterGuide?: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
   onCellDrag?: (x: number, y: number, colorId: string | null) => void;
   /**
@@ -59,6 +61,7 @@ export default function CanvasViewer({
   highlightColorId,
   showGrid,
   showLabels,
+  showCenterGuide = false,
   onCellClick,
   onCellDrag,
   onCellDragSegment,
@@ -187,6 +190,30 @@ export default function CanvasViewer({
       gridWidth: 1,
     });
 
+    if (showCenterGuide) {
+      const scaledSize = metrics.cellSize * zoom;
+      const centerX = metrics.panX + (doc.width * scaledSize) / 2;
+      const top = metrics.panY;
+      const bottom = metrics.panY + doc.height * scaledSize;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.lineWidth = 4;
+      ctx.moveTo(centerX, top);
+      ctx.lineTo(centerX, bottom);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.setLineDash([Math.max(4, scaledSize), Math.max(3, scaledSize / 2)]);
+      ctx.strokeStyle = "#0f766e";
+      ctx.lineWidth = 2;
+      ctx.moveTo(centerX, top);
+      ctx.lineTo(centerX, bottom);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (isKeyboardFocused) {
       const scaledSize = metrics.cellSize * zoom;
       const x = metrics.panX + keyboardCell.x * scaledSize;
@@ -211,6 +238,7 @@ export default function CanvasViewer({
     zoom,
     showGrid,
     showLabels,
+    showCenterGuide,
     highlightColorId,
     getRenderMetrics,
     isKeyboardFocused,
@@ -605,7 +633,8 @@ export default function CanvasViewer({
         pan. With the canvas focused, use the arrow keys to move the keyboard
         cursor, Enter or Space to activate a cell, plus and minus to zoom, and
         zero to fit the whole canvas. Press 2 to zoom to an easier painting
-        scale.
+        scale. Press M to mirror pencil and eraser strokes left to right, and G
+        to toggle the center-axis guide.
       </p>
       <p id={statusId} className="sr-only" role="status" aria-live="polite">
         {statusMessage}
@@ -692,10 +721,11 @@ export default function CanvasViewer({
         aria-label={`Editable ${doc.width} by ${doc.height} pixel grid`}
         aria-roledescription="pixel art canvas"
         aria-describedby={`${instructionsId} ${statusId}`}
-        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H"
+        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G"
         data-grid-width={doc.width}
         data-grid-height={doc.height}
         data-document-modified-at={doc.meta.modifiedAt}
+        data-center-guide={showCenterGuide ? "visible" : "hidden"}
         tabIndex={0}
         onBlur={() => {
           setIsKeyboardFocused(false);
