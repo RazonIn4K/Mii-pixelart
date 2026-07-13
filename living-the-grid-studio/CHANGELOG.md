@@ -6,6 +6,8 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Staging control-plane readiness:** completed the approved Google OAuth branding, isolated Stripe test-key/webhook setup, and forward-only `0006_align_game_taxonomy.sql` migration without deploying the Worker or changing DNS.
+- **Legal and release-mode hardening:** published the operator-approved postal contact on Terms, Privacy, and Copyright; recorded operational channel ownership; and made bootstrap validation accept restricted Stripe keys while rejecting test/live key mismatches by target.
 - **Webhook privacy and replay coverage:** removed Stripe event identifiers and types from both the unified Worker and retained Pages logs, then added signed valid, tampered, stale, missing-secret, oversized-body, and duplicate-delivery tests.
 - **Release artifact hardening:** deployment approvals and bootstrap secret bundles must be ignored regular files with owner-only `0600` permissions on POSIX systems; the local release checklist now verifies the complete forward-only migration chain.
 

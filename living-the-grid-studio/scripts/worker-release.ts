@@ -843,6 +843,7 @@ function bootstrapTarget(
 function isValidBootstrapSecret(
   name: (typeof REQUIRED_SECRETS)[number],
   value: unknown,
+  target: "staging" | "production",
 ): boolean {
   if (typeof value !== "string" || hasSentinelValue(value)) return false;
   const trimmed = value.trim();
@@ -864,7 +865,9 @@ function isValidBootstrapSecret(
     case "OPENROUTER_API_KEY":
       return /^sk-or-v1-[A-Za-z0-9]{32,}$/.test(trimmed);
     case "STRIPE_SECRET_KEY":
-      return /^sk_(?:test|live)_[A-Za-z0-9]{16,}$/.test(trimmed);
+      return target === "staging"
+        ? /^(?:sk|rk)_test_[A-Za-z0-9]{16,}$/.test(trimmed)
+        : /^(?:sk|rk)_live_[A-Za-z0-9]{16,}$/.test(trimmed);
     case "STRIPE_WEBHOOK_SECRET":
       return /^whsec_[A-Za-z0-9]{16,}$/.test(trimmed);
   }
@@ -909,7 +912,7 @@ async function validateBootstrapSecretsFile(
   }
   if (
     REQUIRED_SECRETS.some(
-      (name) => !isValidBootstrapSecret(name, secrets[name]),
+      (name) => !isValidBootstrapSecret(name, secrets[name], target),
     )
   ) {
     throw new ReleaseError(

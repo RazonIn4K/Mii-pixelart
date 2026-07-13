@@ -165,7 +165,8 @@ export default function Privacy() {
         hides content and revokes sessions immediately,
         provides a seven-day cancellation window, and then removes account and
         project data. Resolved report free-text is purged after 90 days; minimal
-        pseudonymized moderation records may be kept for two years.
+        pseudonymized moderation records are retained for two years and then
+        deleted.
       </p>
 
       <h2>6. Your rights and controls</h2>
@@ -196,7 +197,8 @@ export default function Privacy() {
 
       <h2>9. Contact</h2>
       <p>
-        The operator is David Ortiz. Questions or requests:{" "}
+        The operator is David Ortiz, 1110 S 9th st, DeKalb, Illinois 60115,
+        United States. Questions, requests, and postal privacy notices:{" "}
         <a href="mailto:privacy@tomodachi.pw">privacy@tomodachi.pw</a>.
       </p>
     </LegalLayout>

@@ -448,7 +448,10 @@ function makeHarness(
         SESSION_PEPPER: "session-pepper-a1b2c3d4e5f6g7h8i9j0k1l2",
         PSEUDONYM_KEY: "pseudonym-key-a1b2c3d4e5f6g7h8i9j0k1l2",
         OPENROUTER_API_KEY: `sk-${"or-v1"}-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`,
-        STRIPE_SECRET_KEY: `sk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
+        STRIPE_SECRET_KEY:
+          target === "staging"
+            ? `rk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`
+            : `sk_${"live"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
         STRIPE_WEBHOOK_SECRET: `wh${"sec"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
       }),
     );
@@ -1005,6 +1008,17 @@ describe("runRelease deploy gates", () => {
     ]);
   });
 
+  it("accepts a restricted Stripe test key for staging bootstrap", async () => {
+    const harness = makeHarness("staging", { bootstrap: true });
+
+    await runRelease(
+      { cwd: CWD, target: "staging", intent: "deploy" },
+      harness.dependencies,
+    );
+
+    expect(harness.calls).toHaveLength(4);
+  });
+
   it("permits an explicit read-only production bootstrap only after staging acceptance and cutover approval", async () => {
     const harness = makeHarness("production", { productionBootstrap: true });
 
@@ -1061,6 +1075,42 @@ describe("runRelease deploy gates", () => {
       expect(harness.calls).toHaveLength(0);
     }
   });
+
+  it.each([
+    {
+      target: "staging" as const,
+      options: { bootstrap: true },
+      stripeSecretKey: `rk_${"live"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
+    },
+    {
+      target: "production" as const,
+      options: { productionBootstrap: true },
+      stripeSecretKey: `sk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
+    },
+  ])(
+    "rejects a Stripe key from the wrong mode for $target bootstrap",
+    async ({ target, options, stripeSecretKey }) => {
+      const harness = makeHarness(target, options);
+      const secretPath = path.join(
+        CWD,
+        ".deployment-readiness",
+        `${target}.secrets.json`,
+      );
+      const secrets = JSON.parse(harness.files.get(secretPath)!);
+      secrets.STRIPE_SECRET_KEY = stripeSecretKey;
+      harness.files.set(secretPath, JSON.stringify(secrets));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target, intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow(
+        "One or more bootstrap secrets are missing, placeholder, or malformed.",
+      );
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
 
   it.each([
     { label: "a directory", isRegularFile: false, permissions: 0o600 },

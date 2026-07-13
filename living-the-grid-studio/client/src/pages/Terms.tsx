@@ -156,7 +156,8 @@ export default function Terms() {
 
       <h2>14. Contact</h2>
       <p>
-        The operator is David Ortiz. Questions:{" "}
+        The operator and postal contact for legal notices and service is David
+        Ortiz, 1110 S 9th st, DeKalb, Illinois 60115, United States. Questions:{" "}
         <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
       </p>
     </LegalLayout>

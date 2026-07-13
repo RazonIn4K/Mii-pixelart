@@ -24,16 +24,21 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 ## Launch blockers outside infrastructure
 
 - Operator David Ortiz and Illinois, United States governing law are recorded
-  in the public legal pages. Before launch, provide and approve a mail-ready
-  postal address with city, state, ZIP code, and country, and confirm that each
-  published contact address is deliverable. Do not infer missing address
-  components or publish a partial residential address.
+  in the public legal pages. On 2026-07-13, the operator approved the complete
+  Stripe-verified address for public legal and service use; Terms, Privacy, and
+  Copyright publish it verbatim. Confirm that each published email address is
+  deliverable before launch.
 - David Ortiz is the accountable admin and final human moderation reviewer; a
   separate moderator is optional. Assign his internal user ID after the first
-  approved sign-in and confirm who actively monitors `legal@`, `privacy@`,
-  `security@`, `help@`, and the abuse/report queue. Follow
+  approved sign-in. On 2026-07-13, he confirmed that he actively monitors
+  `legal@`, `privacy@`, `security@`, `help@`, the abuse/report queue, and the
+  consult intake channel. Verify delivery and escalation for each channel
+  before launch. Follow
   `docs/adr/0003-human-in-loop-moderation.md`; AI assistance is advisory and
   has no enforcement authority.
+- Consult channel ownership does not by itself complete paid fulfillment.
+  Before launch, verify the purchase notification, scheduling/intake, and
+  promised written follow-up workflow for the 30-minute consult.
 - Confirm 13+ policy, seven-day deletion grace, 90-day report-text cleanup, and
   two-year minimal moderation retention with the legal operator.
 - Confirm that Stripe is configured for the intended merchant account and tax
