@@ -44,9 +44,10 @@ Before promoting from test to live:
 - Configure Stripe to send the events you need to `POST /api/webhooks/stripe`.
   The unified Worker already verifies the signature and five-minute timestamp
   window, rejects bodies over 1 MB, and deduplicates event IDs in `EDGE_CACHE`
-  for 24 hours. It currently logs the event ID and type, then acknowledges the
-  delivery; it does not sync orders or fulfill products. Add and test idempotent
-  fulfillment before relying on the webhook for delivery.
+  for 24 hours. It deliberately excludes Stripe event IDs and types from logs,
+  then acknowledges the delivery; it does not sync orders or fulfill products.
+  Add and test idempotent fulfillment before relying on the webhook for
+  delivery.
 - Enable Stripe's tax calculator in Production. The Worker already passes
   `automatic_tax: { enabled: true }` to Checkout; you must also register the
   relevant tax jurisdictions in the Stripe dashboard.
