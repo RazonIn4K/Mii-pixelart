@@ -1,7 +1,7 @@
 # Studio game-reference roadmap
 
-**Status:** Product direction for the Studio overhaul  
-**Scope:** Local creation, manual reference workflows, AI-assisted editing, and community reuse  
+**Status:** Product direction for the Studio overhaul
+**Scope:** Local creation, manual reference workflows, AI-assisted editing, and community reuse
 **Last updated:** 2026-07-13
 
 ## Purpose
