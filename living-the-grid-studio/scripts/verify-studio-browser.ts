@@ -887,7 +887,10 @@ function spawnChrome(
 
 async function assertStudioReachable(): Promise<void> {
   try {
-    await fetchText(STUDIO_URL);
+    const document = await fetchText(STUDIO_URL);
+    if (!document.includes('id="root"')) {
+      throw new Error("the response is not the Tomodachi application shell");
+    }
   } catch (error) {
     throw new Error(
       `Studio is not reachable at ${STUDIO_URL}. Start it with pnpm dev before running verify:studio. ${
@@ -901,6 +904,12 @@ function fetchText(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     http
       .get(url, (response) => {
+        const status = response.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          response.resume();
+          reject(new Error(`HTTP ${status}`));
+          return;
+        }
         let data = "";
         response.on("data", (chunk: Buffer) => {
           data += chunk.toString("utf8");

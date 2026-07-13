@@ -56,7 +56,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    strictPort: false,
+    strictPort: true,
     host: "127.0.0.1",
     allowedHosts: ["localhost", "127.0.0.1"],
     fs: {
