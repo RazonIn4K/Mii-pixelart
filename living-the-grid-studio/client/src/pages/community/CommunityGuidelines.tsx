@@ -4,7 +4,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 export default function CommunityGuidelines() {
   useDocumentTitle("Community Guidelines");
   return (
-    <LegalLayout title="Community Guidelines" lastUpdated="July 12, 2026" intro="Tomodachi is a fan-made workshop for original, constructive pixel art. These rules apply to public and unlisted creations, showcase images, profiles, comments, and interactions.">
+    <LegalLayout title="Community Guidelines" lastUpdated="July 13, 2026" intro="Tomodachi is a fan-made workshop for original, constructive pixel art. These rules apply to public and unlisted creations, showcase images, profiles, comments, and interactions.">
       <h2>Share work you have the right to share</h2>
       <p>Post original work, licensed material, or material you are otherwise permitted to use. Do not upload game assets, private photos, personal information, or copyrighted work merely because it is available online.</p>
       <p>Before attaching a photo or screenshot, remove personal details and make sure every identifiable person has agreed to appear. Showcase images must relate to the creation and may not be used as general-purpose image hosting.</p>
@@ -13,7 +13,7 @@ export default function CommunityGuidelines() {
       <h2>Be constructive</h2>
       <p>Critique the work, not the person. Repeated unwanted contact, brigading, engagement manipulation, and attempts to evade moderation are prohibited.</p>
       <h2>How moderation works</h2>
-      <p>Reports are private. Moderators review context and may hide content, lock comments, suspend accounts, or take no action. Serious or repeated violations can result in permanent removal. Moderation actions are recorded for accountability.</p>
+      <p>Reports are private. Automated tools may classify, prioritize, summarize, and recommend a response, but they never hide content, suspend an account, resolve a report, or publish material on their own. An authorized human reviews the context and approves every enforcement decision. David Ortiz is the accountable administrator and final human reviewer. Serious or repeated violations can result in permanent removal, and moderation actions are recorded for accountability.</p>
       <h2>Questions and appeals</h2>
       <p>Contact <code>help@tomodachi.pw</code> with the case identifier shown in a moderation notice. Do not repost removed material while an appeal is pending.</p>
     </LegalLayout>

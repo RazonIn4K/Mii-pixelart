@@ -20,7 +20,7 @@ export default function Cookies() {
   return (
     <LegalLayout
       title="Cookie Notice"
-      lastUpdated="July 10, 2026"
+      lastUpdated="July 13, 2026"
       intro="This page explains what we store in your browser and why. You can change your mind any time."
     >
       <h2>What we use</h2>
@@ -41,6 +41,9 @@ export default function Cookies() {
           entry the banner would appear every visit.
         </li>
         <li>
+          <code>theme</code> — your light or dark appearance preference.
+        </li>
+        <li>
           Server session cookies during a Stripe checkout flow, set by Stripe
           directly. These cookies are required to complete a purchase.
         </li>
@@ -53,6 +56,12 @@ export default function Cookies() {
         is not used for cross-site tracking, and can be removed through your
         browser&apos;s site-data controls. Local drafts are not uploaded until you
         choose Save to account.
+      </p>
+      <p>
+        Local storage also keeps your AI consent choice and saved Studio AI chat
+        sessions, scoped to the current browser account. Those sessions may
+        contain prompts and model replies. You can delete them in the Studio or
+        clear the Site&apos;s browser data; they are not advertising cookies.
       </p>
 
       <h3>Analytics (opt-in)</h3>

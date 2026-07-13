@@ -189,7 +189,7 @@ function environmentConfig(
       ENVIRONMENT: target,
       PUBLIC_SITE_URL: values.site,
       GOOGLE_OIDC_REDIRECT_URI: values.redirect,
-      TERMS_VERSION: "2026-07-12",
+      TERMS_VERSION: "2026-07-13",
       COMMUNITY_MUTATIONS_ENABLED:
         target === "local" || remoteWritable ? "true" : "false",
     },

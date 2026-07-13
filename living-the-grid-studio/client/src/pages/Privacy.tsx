@@ -1,12 +1,4 @@
-/**
- * Privacy Policy page.
- *
- * This is general-purpose template language tuned for the actual data flows
- * Tomodachi runs. It is NOT legal advice. Before going to production with
- * paid services, have a lawyer review it for your jurisdiction and
- * substitute the placeholder contact details for your real mailing address
- * and operator entity.
- */
+/** Privacy Policy describing Tomodachi's current data flows. */
 
 import LegalLayout from "@/components/LegalLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -20,13 +12,13 @@ export default function Privacy() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      lastUpdated="July 12, 2026"
+      lastUpdated="July 13, 2026"
       intro="Tomodachi is a local-first pixel-art workshop with an optional account and community layer. Local editing and export do not require an account; cloud saving and publishing are deliberate choices."
     >
       <h2>1. Who we are</h2>
       <p>
-        Tomodachi (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
-        operates the websites at <code>tomodachi.pw</code> and{" "}
+        David Ortiz operates Tomodachi (&quot;we,&quot; &quot;us,&quot;
+        &quot;our&quot;) and the websites at <code>tomodachi.pw</code> and{" "}
         <code>tomodachi.brave</code> (collectively, the &quot;Site&quot;). You
         can reach us by email at{" "}
         <code>privacy@tomodachi.pw</code>.
@@ -57,8 +49,9 @@ export default function Privacy() {
           Newsletter email address, if you choose to subscribe.
         </li>
         <li>
-          Payment details (handled entirely by Stripe; we never see your full
-          card number).
+          Payment details processed by Stripe. We do not receive your full
+          card number, but we receive transaction records needed to fulfill a
+          purchase, handle support, and meet tax and accounting obligations.
         </li>
       </ul>
 
@@ -145,7 +138,10 @@ export default function Privacy() {
         </li>
         <li>
           <strong>Stripe</strong> for processing paid recovery guides and
-          consult bookings.
+          consult bookings. David Ortiz, operating Tomodachi, remains the
+          merchant of record; Stripe acts as the payment processor. Stripe Tax
+          may calculate tax, while required registrations, filings, collection,
+          and remittance remain the operator&apos;s responsibility.
         </li>
         <li>
           <strong>Google AdSense</strong> for advertising, if you have
@@ -200,7 +196,7 @@ export default function Privacy() {
 
       <h2>9. Contact</h2>
       <p>
-        Questions or requests:{" "}
+        The operator is David Ortiz. Questions or requests:{" "}
         <a href="mailto:privacy@tomodachi.pw">privacy@tomodachi.pw</a>.
       </p>
     </LegalLayout>

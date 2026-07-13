@@ -698,7 +698,7 @@ async function seedUser(username: string): Promise<{ id: string }> {
       `INSERT INTO users
        (id, username, display_name, bio, role, status, avatar_seed,
         terms_version, terms_accepted_at, created_at, updated_at)
-       VALUES (?, ?, ?, '', 'user', 'active', ?, '2026-07-12', ?, ?, ?)`,
+       VALUES (?, ?, ?, '', 'user', 'active', ?, '2026-07-13', ?, ?, ?)`,
     ).bind(id, username, username, id, now, now, now),
     env.DB.prepare(
       `INSERT INTO external_identities

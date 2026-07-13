@@ -17,7 +17,7 @@ interface __BaseEnv_Env {
 	ENVIRONMENT: "staging" | "production" | "local";
 	PUBLIC_SITE_URL: "https://staging.tomodachi.pw" | "https://tomodachi.pw" | "http://localhost:3000";
 	GOOGLE_OIDC_REDIRECT_URI: "https://staging.tomodachi.pw/api/auth/google/callback" | "https://tomodachi.pw/api/auth/google/callback" | "http://localhost:3000/api/auth/google/callback";
-	TERMS_VERSION: "2026-07-12";
+	TERMS_VERSION: "2026-07-13";
 	COMMUNITY_MUTATIONS_ENABLED: "false" | "true";
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_CLIENT_SECRET: string;
@@ -48,7 +48,7 @@ declare namespace Cloudflare {
 		ENVIRONMENT: "staging";
 		PUBLIC_SITE_URL: "https://staging.tomodachi.pw";
 		GOOGLE_OIDC_REDIRECT_URI: "https://staging.tomodachi.pw/api/auth/google/callback";
-		TERMS_VERSION: "2026-07-12";
+		TERMS_VERSION: "2026-07-13";
 		COMMUNITY_MUTATIONS_ENABLED: "false";
 		GOOGLE_CLIENT_ID: string;
 		GOOGLE_CLIENT_SECRET: string;
@@ -75,7 +75,7 @@ declare namespace Cloudflare {
 		ENVIRONMENT: "production";
 		PUBLIC_SITE_URL: "https://tomodachi.pw";
 		GOOGLE_OIDC_REDIRECT_URI: "https://tomodachi.pw/api/auth/google/callback";
-		TERMS_VERSION: "2026-07-12";
+		TERMS_VERSION: "2026-07-13";
 		COMMUNITY_MUTATIONS_ENABLED: "false";
 		GOOGLE_CLIENT_ID: string;
 		GOOGLE_CLIENT_SECRET: string;

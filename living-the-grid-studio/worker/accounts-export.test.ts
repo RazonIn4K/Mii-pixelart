@@ -36,7 +36,7 @@ describe("account export streaming", () => {
          (id, username, display_name, bio, role, status, avatar_seed,
           terms_version, terms_accepted_at, created_at, updated_at)
          VALUES (?, 'exporter', 'Exporter', '', 'user', 'active', ?,
-          '2026-07-12', ?, ?, ?)`,
+          '2026-07-13', ?, ?, ?)`,
       ).bind(userId, userId, now, now, now),
       env.DB.prepare(
         `INSERT INTO external_identities

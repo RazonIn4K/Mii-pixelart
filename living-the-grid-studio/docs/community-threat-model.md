@@ -113,10 +113,16 @@ authorization and is outside this API.
 
 ## Launch blockers
 
-- Legal operator identity, jurisdiction, contact disclosures, and copyright
-  process are still placeholders.
-- At least one accountable admin and moderator must be assigned and the abuse
-  inbox must be monitored.
+- Operator David Ortiz, Illinois governing law, and the copyright intake
+  process are identified. A complete mail-ready postal address and confirmed
+  monitoring for every published contact inbox remain launch blockers; no
+  missing address component may be inferred or a partial residential address
+  published.
+- David Ortiz is the accountable admin and final human moderation reviewer. His
+  internal user ID must be assigned after the first approved sign-in, and the
+  abuse inbox must be monitored. A separate moderator is optional. AI may
+  triage or recommend but cannot execute or finalize a moderation action; see
+  `docs/adr/0003-human-in-loop-moderation.md`.
 - Production Cloudflare/Google resources and any paid Images usage require
   explicit approval; see `docs/community-deployment-runbook.md`.
 

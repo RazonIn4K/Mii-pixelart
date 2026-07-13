@@ -23,13 +23,22 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 
 ## Launch blockers outside infrastructure
 
-- Replace every operator identity, jurisdiction, address/contact, and legal
-  placeholder in Terms, Privacy, Cookies, Community Guidelines, and Copyright.
-- Assign at least one accountable admin who owns moderation; a separate
-  moderator is optional. Confirm who monitors `legal@`, `privacy@`, `security@`,
-  `help@`, and the abuse/report queue.
+- Operator David Ortiz and Illinois, United States governing law are recorded
+  in the public legal pages. Before launch, provide and approve a mail-ready
+  postal address with city, state, ZIP code, and country, and confirm that each
+  published contact address is deliverable. Do not infer missing address
+  components or publish a partial residential address.
+- David Ortiz is the accountable admin and final human moderation reviewer; a
+  separate moderator is optional. Assign his internal user ID after the first
+  approved sign-in and confirm who actively monitors `legal@`, `privacy@`,
+  `security@`, `help@`, and the abuse/report queue. Follow
+  `docs/adr/0003-human-in-loop-moderation.md`; AI assistance is advisory and
+  has no enforcement authority.
 - Confirm 13+ policy, seven-day deletion grace, 90-day report-text cleanup, and
   two-year minimal moderation retention with the legal operator.
+- Confirm that Stripe is configured for the intended merchant account and tax
+  jurisdictions. Stripe Tax calculation does not replace the operator's
+  registration, filing, collection, or remittance duties.
 - Recheck current Workers, D1, R2, and Images pricing and approve any paid Images
   transformation usage.
 
