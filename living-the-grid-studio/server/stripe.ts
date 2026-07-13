@@ -26,7 +26,12 @@ export interface ApiResult {
   status: number;
 }
 
-const STRIPE_API_BASE = "https://api.stripe.com/v1";
+const STRIPE_API_ORIGIN = "https://api.stripe.com";
+const CHECKOUT_SESSION_ID_REGEX = /^cs_(?:test|live)_[A-Za-z0-9]{16,240}$/;
+
+type StripeRequest =
+  | { kind: "create-checkout-session"; body: unknown }
+  | { kind: "retrieve-checkout-session"; sessionId: string };
 
 function getStripeKey(env?: StripeEnv): string {
   if (env?.STRIPE_SECRET_KEY) {
@@ -77,9 +82,8 @@ function flatten(
 }
 
 async function stripeRequest(
-  path: string,
+  request: StripeRequest,
   env: StripeEnv | undefined,
-  init: { method: "GET" | "POST"; body?: unknown },
 ): Promise<{ status: number; payload: unknown }> {
   const key = getStripeKey(env);
   if (!key) {
@@ -96,15 +100,27 @@ async function stripeRequest(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${key}`,
   };
+  const method = request.kind === "create-checkout-session" ? "POST" : "GET";
+  const url =
+    request.kind === "create-checkout-session"
+      ? new URL("/v1/checkout/sessions", STRIPE_API_ORIGIN)
+      : new URL(
+          `/v1/checkout/sessions/${encodeURIComponent(request.sessionId)}`,
+          STRIPE_API_ORIGIN,
+        );
+  if (url.origin !== STRIPE_API_ORIGIN) {
+    throw new Error("Stripe request origin is not allowed.");
+  }
+
   let body: string | undefined;
-  if (init.method === "POST" && init.body) {
+  if (request.kind === "create-checkout-session") {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
-    const flat = flatten(init.body);
+    const flat = flatten(request.body);
     body = new URLSearchParams(flat).toString();
   }
 
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method: init.method,
+  const response = await fetch(url, {
+    method,
     headers,
     body,
   });
@@ -118,7 +134,7 @@ export async function createCheckoutSession(
 ): Promise<ApiResult> {
   const input =
     request && typeof request === "object" && !Array.isArray(request)
-      ? request as Record<string, unknown>
+      ? (request as Record<string, unknown>)
       : {};
   const productId = typeof input.productId === "string" ? input.productId : "";
   const product = findProduct(productId);
@@ -137,7 +153,9 @@ export async function createCheckoutSession(
     product.successPath.includes("?") ? "&" : "?"
   }session_id={CHECKOUT_SESSION_ID}`;
   const fallbackCancel =
-    product.category === "support" ? "/support?canceled=1" : "/unlock?canceled=1";
+    product.category === "support"
+      ? "/support?canceled=1"
+      : "/unlock?canceled=1";
   const cancelUrl = `${site}${product.cancelPath ?? fallbackCancel}`;
 
   const params = {
@@ -167,10 +185,13 @@ export async function createCheckoutSession(
       : {}),
   };
 
-  const { status, payload } = await stripeRequest("/checkout/sessions", env, {
-    method: "POST",
-    body: params,
-  });
+  const { status, payload } = await stripeRequest(
+    {
+      kind: "create-checkout-session",
+      body: params,
+    },
+    env,
+  );
   if (status >= 400) {
     return {
       status,
@@ -211,7 +232,7 @@ export async function verifyCheckoutSession(
   sessionId: string,
   env?: StripeEnv,
 ): Promise<ApiResult> {
-  if (!sessionId || sessionId.length > 256) {
+  if (!CHECKOUT_SESSION_ID_REGEX.test(sessionId)) {
     return {
       status: 400,
       body: { configured: true, error: "Invalid session id." },
@@ -219,9 +240,8 @@ export async function verifyCheckoutSession(
   }
 
   const { status, payload } = await stripeRequest(
-    `/checkout/sessions/${encodeURIComponent(sessionId)}`,
+    { kind: "retrieve-checkout-session", sessionId },
     env,
-    { method: "GET" },
   );
   if (status >= 400) {
     return {

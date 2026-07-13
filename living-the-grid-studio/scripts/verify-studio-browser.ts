@@ -10,6 +10,7 @@ import {
 import { tmpdir, homedir } from "node:os";
 import path from "node:path";
 import http from "node:http";
+import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 
@@ -105,7 +106,7 @@ const MASCOT_FIXTURE = path.join(generatedFixtureDir, "smoke-mascot.bmp");
 const SPRITE_FIXTURE = path.join(generatedFixtureDir, "smoke-sprite.bmp");
 const EMBLEM_FIXTURE = path.join(generatedFixtureDir, "smoke-emblem.bmp");
 const ICON_FIXTURE = path.join(generatedFixtureDir, "smoke-icon.bmp");
-const chromePort = 9400 + Math.floor(Math.random() * 1000);
+const chromePort = randomInt(9400, 10400);
 let chromeProcess: ChildProcessWithoutNullStreams | null = null;
 let cdp: CdpClient | null = null;
 let navigationCount = 0;
