@@ -21,30 +21,30 @@
  */
 
 const SOCIAL_CRAWLERS = [
-  'facebookexternalhit',
-  'Facebot',
-  'facebookcatalog',
-  'FacebookBot',
-  'Twitterbot',
-  'LinkedInBot',
-  'WhatsApp',
-  'Slackbot',
-  'TelegramBot',
-  'Discordbot',
+  "facebookexternalhit",
+  "Facebot",
+  "facebookcatalog",
+  "FacebookBot",
+  "Twitterbot",
+  "LinkedInBot",
+  "WhatsApp",
+  "Slackbot",
+  "TelegramBot",
+  "Discordbot",
 ];
 
 const SEARCH_CRAWLERS = [
-  'Googlebot',
-  'Bingbot',
-  'BingPreview',
-  'DuckDuckBot',
-  'DuckDuckGo-Favicons-Bot',
-  'Baiduspider',
-  'YandexBot',
-  'Slurp', // Yahoo
-  'Sogou',
-  'Mojeekbot',
-  'AhrefsBot',
+  "Googlebot",
+  "Bingbot",
+  "BingPreview",
+  "DuckDuckBot",
+  "DuckDuckGo-Favicons-Bot",
+  "Baiduspider",
+  "YandexBot",
+  "Slurp", // Yahoo
+  "Sogou",
+  "Mojeekbot",
+  "AhrefsBot",
 ];
 
 interface RouteShell {
@@ -59,20 +59,20 @@ interface RouteShell {
 }
 
 const BREADCRUMB_HOME = {
-  '@type': 'ListItem',
+  "@type": "ListItem",
   position: 1,
-  name: 'Home',
-  item: 'https://tomodachi.pw/',
+  name: "Home",
+  item: "https://tomodachi.pw/",
 };
 
 function breadcrumbFor(name: string, route: string): Record<string, unknown> {
   return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
     itemListElement: [
       BREADCRUMB_HOME,
       {
-        '@type': 'ListItem',
+        "@type": "ListItem",
         position: 2,
         name,
         item: `https://tomodachi.pw${route}`,
@@ -82,10 +82,10 @@ function breadcrumbFor(name: string, route: string): Record<string, unknown> {
 }
 
 const PUBLISHER_ORG = {
-  '@type': 'Organization',
-  name: 'Tomodachi',
-  url: 'https://tomodachi.pw/',
-  logo: { '@type': 'ImageObject', url: 'https://tomodachi.pw/icon-512.png' },
+  "@type": "Organization",
+  name: "Tomodachi",
+  url: "https://tomodachi.pw/",
+  logo: { "@type": "ImageObject", url: "https://tomodachi.pw/icon-512.png" },
 };
 
 const COMMON_HEAD = `
@@ -107,7 +107,7 @@ function shellFor(route: string, shell: RouteShell): string {
       (block) =>
         `<script type="application/ld+json">${JSON.stringify(block)}</script>`,
     )
-    .join('\n  ');
+    .join("\n  ");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>${COMMON_HEAD}
@@ -151,11 +151,11 @@ function shellFor(route: string, shell: RouteShell): string {
 }
 
 const ROUTES: Record<string, RouteShell> = {
-  '/': {
-    title: 'Tomodachi · Mii Studio & Recovery Guides',
+  "/": {
+    title: "Tomodachi · Mii Studio & Recovery Guides",
     description:
-      'A browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides for Tomodachi Life players.',
-    h1: 'Tomodachi · Mii Studio & Recovery Guides',
+      "A browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides for Tomodachi Life players.",
+    h1: "Tomodachi · Mii Studio & Recovery Guides",
     body: `
       <p>Tomodachi is two things stacked on one site. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for planning Mii-inspired face art — import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation. It does not transfer game files or connect directly to a Nintendo title.</p>
       <p>The <a href="/guides">guides</a> and the free <a href="/help">recovery help</a> page are for visitors arriving from the Tomodachishare credential leak — calm, free, no-spam steps to rotate passwords and lock down accounts.</p>
@@ -170,25 +170,25 @@ const ROUTES: Record<string, RouteShell> = {
       </ul>`,
     jsonLd: [
       {
-        '@context': 'https://schema.org',
-        '@type': 'WebApplication',
-        name: 'Tomodachi',
-        url: 'https://tomodachi.pw/',
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: "Tomodachi",
+        url: "https://tomodachi.pw/",
         description:
-          'Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players.',
-        applicationCategory: 'DesignApplication',
-        operatingSystem: 'Any',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        image: 'https://tomodachi.pw/community-og.jpg',
+          "Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players.",
+        applicationCategory: "DesignApplication",
+        operatingSystem: "Any",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        image: "https://tomodachi.pw/community-og.jpg",
         publisher: PUBLISHER_ORG,
       },
     ],
   },
-  '/studio': {
-    title: 'Studio · Tomodachi',
+  "/studio": {
+    title: "Studio · Tomodachi",
     description:
-      'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio working palette, and export a manual Copy Guide.',
-    h1: 'Tomodachi Studio',
+      "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio working palette, and export a manual Copy Guide.",
+    h1: "Tomodachi Studio",
     body: `
       <p>A browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo, character art, or JSON file; reduce noise against the Studio's 84-color working palette; export editable JSON, guide PNGs, and a ZIP Copy Guide with a palette sheet, paint order, and reference HTML. The palette and grid dimensions are Studio conventions, not verified proprietary game data.</p>
       <h2>Features</h2>
@@ -201,36 +201,36 @@ const ROUTES: Record<string, RouteShell> = {
       </ul>
       <p>See the <a href="/guides">guides</a> for step-by-step walkthroughs and the <a href="/faq">FAQ</a> for common questions.</p>`,
     jsonLd: [
-      breadcrumbFor('Studio', '/studio'),
+      breadcrumbFor("Studio", "/studio"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'SoftwareApplication',
-        name: 'Tomodachi Studio',
-        url: 'https://tomodachi.pw/studio',
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "Tomodachi Studio",
+        url: "https://tomodachi.pw/studio",
         description:
-          'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio 84-color working palette, and export a manual Copy Guide.',
-        applicationCategory: 'DesignApplication',
-        applicationSubCategory: 'Pixel Art Editor',
-        operatingSystem: 'Any',
-        browserRequirements: 'Modern browser with JavaScript enabled.',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        image: 'https://tomodachi.pw/community-og.jpg',
+          "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio 84-color working palette, and export a manual Copy Guide.",
+        applicationCategory: "DesignApplication",
+        applicationSubCategory: "Pixel Art Editor",
+        operatingSystem: "Any",
+        browserRequirements: "Modern browser with JavaScript enabled.",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        image: "https://tomodachi.pw/community-og.jpg",
         publisher: PUBLISHER_ORG,
       },
     ],
   },
-  '/guides': {
-    title: 'Guides · Tomodachi',
+  "/guides": {
+    title: "Guides · Tomodachi",
     description:
-      'Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.',
-    h1: 'Guides',
+      "Free walkthroughs on Mii creation, legacy 3DS Tomodachi Life basics, Tomodachishare breach recovery, and QR codes + save backup.",
+    h1: "Guides",
     body: `
       <p>Practical walkthroughs for Tomodachi Life players turning faces and characters into Mii repaint plans, and visitors arriving from the Tomodachishare breach notice.</p>
       <h2>Tomodachi Life player guides</h2>
       <h3 id="mii-creation"><a href="/guides#mii-creation">How to make custom Miis for Tomodachi Life</a></h3>
       <p>Mii Maker tricks, face presets, hair, eyes, eyebrows. Start with the Look-Alike Mii camera tool, dial in eyes and mouth before hair, save Mii Maker variants before importing to Tomodachi Life.</p>
-      <h3 id="gameplay-basics"><a href="/guides#gameplay-basics">Tomodachi Life gameplay basics</a></h3>
-      <p>Apartments, food, jobs, friendship, marriage. The four daily checks, why neutral food reactions waste money, how crush gating actually works, and the mid-game-slump reset moves.</p>
+      <h3 id="gameplay-basics"><a href="/guides#gameplay-basics">Legacy 3DS Tomodachi Life: daily-play basics</a></h3>
+      <p>A clearly labeled orientation for the original Nintendo 3DS/2DS game, with cautious request, reaction, relationship, and preservation guidance. It is not a guide to Living the Dream on Switch.</p>
       <h3 id="breach-recovery"><a href="/guides#breach-recovery">After the Tomodachishare breach</a></h3>
       <p>Step-by-step recovery: change your email password first, turn on 2FA, work through financial / cloud / identity / social accounts in priority order. 30-day monitoring rhythm.</p>
       <h3 id="qr-and-backup"><a href="/guides#qr-and-backup">QR codes, Mii sharing, save backup</a></h3>
@@ -238,58 +238,58 @@ const ROUTES: Record<string, RouteShell> = {
       <h2>Recovery + studio teasers</h2>
       <ul>
         <li><a href="/help">Tomodachi breach recovery checklist</a> — free 24-hour actions.</li>
-        <li><a href="/studio">Turn a photo into a repaintable Mii face mask</a>.</li>
+        <li><a href="/studio">Turn a photo into a custom face-paint Copy Guide</a>.</li>
         <li><a href="/studio">Reduce colors for repaintable pixel art</a>.</li>
         <li><a href="/">Password reuse cleanup after a community breach</a>.</li>
       </ul>`,
     jsonLd: [
-      breadcrumbFor('Guides', '/guides'),
+      breadcrumbFor("Guides", "/guides"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'CollectionPage',
-        name: 'Tomodachi Guides',
-        url: 'https://tomodachi.pw/guides',
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: "Tomodachi Guides",
+        url: "https://tomodachi.pw/guides",
         description:
-          'Long-form Tomodachi Life player guides plus shorter recovery and studio guides.',
-        inLanguage: 'en',
+          "Long-form Tomodachi Life player guides plus shorter recovery and studio guides.",
+        inLanguage: "en",
         publisher: PUBLISHER_ORG,
         hasPart: [
           {
-            '@type': 'HowTo',
-            name: 'How to make custom Miis for Tomodachi Life',
-            url: 'https://tomodachi.pw/guides#mii-creation',
+            "@type": "HowTo",
+            name: "How to make custom Miis for Tomodachi Life",
+            url: "https://tomodachi.pw/guides#mii-creation",
           },
           {
-            '@type': 'Article',
-            headline: 'Tomodachi Life gameplay basics',
-            url: 'https://tomodachi.pw/guides#gameplay-basics',
+            "@type": "Article",
+            headline: "Legacy 3DS Tomodachi Life: daily-play basics",
+            url: "https://tomodachi.pw/guides#gameplay-basics",
           },
           {
-            '@type': 'Article',
-            headline: 'After the Tomodachishare breach',
-            url: 'https://tomodachi.pw/guides#breach-recovery',
+            "@type": "Article",
+            headline: "After the Tomodachishare breach",
+            url: "https://tomodachi.pw/guides#breach-recovery",
           },
           {
-            '@type': 'HowTo',
-            name: 'QR codes, Mii sharing, save backup',
-            url: 'https://tomodachi.pw/guides#qr-and-backup',
+            "@type": "HowTo",
+            name: "QR codes, Mii sharing, save backup",
+            url: "https://tomodachi.pw/guides#qr-and-backup",
           },
         ],
       },
     ],
   },
-  '/faq': {
-    title: 'FAQ · Tomodachi',
+  "/faq": {
+    title: "FAQ · Tomodachi",
     description:
-      'Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and how this site is funded.',
-    h1: 'Frequently asked questions',
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the face-paint Copy Guide, and how this site is funded.",
+    h1: "Frequently asked questions",
     body: `
       <h2>Tomodachi Life releases</h2>
       <h3>Is Tomodachi Life still playable in 2026?</h3>
       <p>Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.</p>
       <h3>Can I make my Mii look like a real person?</h3>
       <p>Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. The <a href="/guides#mii-creation">Mii creation guide</a> clearly labels the legacy workflow.</p>
-      <h3>What's a Mii face mask?</h3>
+      <h3>What is the Studio's face-paint Copy Guide?</h3>
       <p>The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.</p>
       <h2>The Tomodachishare breach</h2>
       <h3>What was the Tomodachishare breach?</h3>
@@ -302,94 +302,94 @@ const ROUTES: Record<string, RouteShell> = {
       <h3>Is the Studio free?</h3>
       <p>Yes. Import, reduce, export, password breach check, AI assistant — all free. Optional paid extras on <a href="/unlock">/unlock</a> and tips on <a href="/support">/support</a>.</p>
       <h3>Do you store my photos or my password?</h3>
-      <p>No. The Studio runs entirely in your browser; uploads never leave the page. The password check is k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
+      <p>Local reference imports stay in your browser unless you deliberately choose a separate showcase upload for a cloud creation. Showcase files are normalized, metadata-stripped, and the raw upload is discarded. The password check uses k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
     jsonLd: [
-      breadcrumbFor('FAQ', '/faq'),
+      breadcrumbFor("FAQ", "/faq"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        url: 'https://tomodachi.pw/faq',
-        inLanguage: 'en',
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        url: "https://tomodachi.pw/faq",
+        inLanguage: "en",
         mainEntity: [
           {
-            '@type': 'Question',
-            name: 'Is Tomodachi Life still playable in 2026?',
+            "@type": "Question",
+            name: "Is Tomodachi Life still playable in 2026?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.',
+              "@type": "Answer",
+              text: "Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'Can I make my Mii look like a real person?',
+            "@type": "Question",
+            name: "Can I make my Mii look like a real person?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio only provides a manual Copy Guide.',
+              "@type": "Answer",
+              text: "Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio only provides a manual Copy Guide.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'What is a Mii face mask?',
+            "@type": "Question",
+            name: "What is the Studio face-paint Copy Guide?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.',
+              "@type": "Answer",
+              text: "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'What was the Tomodachishare breach?',
+            "@type": "Question",
+            name: "What was the Tomodachishare breach?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'A credential dump from the Tomodachishare community site exposed email addresses and password hashes. Reused passwords elsewhere are now at elevated risk.',
+              "@type": "Answer",
+              text: "A credential dump from the Tomodachishare community site exposed email addresses and password hashes. Reused passwords elsewhere are now at elevated risk.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'Was my password leaked?',
+            "@type": "Question",
+            name: "Was my password leaked?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Use the browser-only password breach check on the home page. It sends only the first 5 hex chars of a SHA-1 hash to the Have I Been Pwned API and compares locally; your full password never leaves the page.',
+              "@type": "Answer",
+              text: "Use the browser-only password breach check on the home page. It sends only the first 5 hex chars of a SHA-1 hash to the Have I Been Pwned API and compares locally; your full password never leaves the page.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'What should I do first if my password was leaked?',
+            "@type": "Question",
+            name: "What should I do first if my password was leaked?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Change your email password before anything else because email controls every other password reset. Then turn on 2FA on that email, then rotate other accounts.',
+              "@type": "Answer",
+              text: "Change your email password before anything else because email controls every other password reset. Then turn on 2FA on that email, then rotate other accounts.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'Is the Studio free?',
+            "@type": "Question",
+            name: "Is the Studio free?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. Import, reduce, export, password breach check, AI assistant are all free. Optional paid extras live on /unlock; tips on /support.',
+              "@type": "Answer",
+              text: "Yes. Import, reduce, export, password breach check, AI assistant are all free. Optional paid extras live on /unlock; tips on /support.",
             },
           },
           {
-            '@type': 'Question',
-            name: 'Do you store my photos or my password?',
+            "@type": "Question",
+            name: "Do you store my photos or my password?",
             acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'No. The Studio runs entirely in your browser; uploads never leave the page. The password check is k-anonymity, so only a 5-character SHA-1 prefix is sent.',
+              "@type": "Answer",
+              text: "No. The Studio runs entirely in your browser; uploads never leave the page. The password check is k-anonymity, so only a 5-character SHA-1 prefix is sent.",
             },
           },
         ],
       },
     ],
   },
-  '/about': {
-    title: 'About · Tomodachi',
+  "/about": {
+    title: "About · Tomodachi",
     description:
-      'Why Tomodachi exists, what is in it, who is behind it, and how to reach the project for press or partnership.',
-    h1: 'About Tomodachi',
+      "Why Tomodachi exists, what is in it, who is behind it, and how to reach the project for press or partnership.",
+    h1: "About Tomodachi",
     body: `
-      <p>Tomodachi is a Mii pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for Mii face masks; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
+      <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual face-paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
       <h2>Free first, sponsor-supported</h2>
       <p>The editor, the password check, the AI assistant, and every guide stay free. Optional paid extras live on <a href="/unlock">/unlock</a>; tips on <a href="/support">/support</a>.</p>
       <h2>Privacy on principle</h2>
-      <p>Photos never leave the browser. The password check uses k-anonymity against Have I Been Pwned. No accounts, no tracking until you opt in via the cookie banner.</p>
+      <p>Local reference imports stay in the browser unless you deliberately choose a separate, normalized showcase upload. Google accounts and private cloud projects are optional; anonymous editing and export remain available. The password check uses k-anonymity against Have I Been Pwned, and optional tracking waits for cookie consent.</p>
       <h2>How to reach the project</h2>
       <ul>
         <li>Source code &amp; issues: <a href="https://github.com/RazonIn4K/Mii-pixelart">github.com/RazonIn4K/Mii-pixelart</a></li>
@@ -397,41 +397,38 @@ const ROUTES: Record<string, RouteShell> = {
         <li>Brave Creators: tomodachi.pw is a verified Brave Creator.</li>
       </ul>`,
     jsonLd: [
-      breadcrumbFor('About', '/about'),
+      breadcrumbFor("About", "/about"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'AboutPage',
-        url: 'https://tomodachi.pw/about',
-        inLanguage: 'en',
-        name: 'About Tomodachi',
+        "@context": "https://schema.org",
+        "@type": "AboutPage",
+        url: "https://tomodachi.pw/about",
+        inLanguage: "en",
+        name: "About Tomodachi",
         mainEntity: {
-          '@type': 'Organization',
-          '@id': 'https://tomodachi.pw/#org',
-          name: 'Tomodachi',
-          url: 'https://tomodachi.pw/',
-          logo: 'https://tomodachi.pw/icon-512.png',
+          "@type": "Organization",
+          "@id": "https://tomodachi.pw/#org",
+          name: "Tomodachi",
+          url: "https://tomodachi.pw/",
+          logo: "https://tomodachi.pw/icon-512.png",
           description:
-            'Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.',
-          sameAs: [
-            'https://github.com/RazonIn4K',
-            'https://tomodachi.brave',
-          ],
+            "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
+          sameAs: ["https://github.com/RazonIn4K", "https://tomodachi.brave"],
           knowsAbout: [
-            'Tomodachi Life',
-            'Mii pixel art',
-            'Mii face mask',
-            'Tomodachishare breach recovery',
-            'k-anonymity password breach lookup',
+            "Tomodachi Life",
+            "Mii pixel art",
+            "custom face-paint reference",
+            "Tomodachishare breach recovery",
+            "k-anonymity password breach lookup",
           ],
         },
       },
     ],
   },
-  '/help': {
-    title: 'Help · Tomodachi',
+  "/help": {
+    title: "Help · Tomodachi",
     description:
-      'Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.',
-    h1: 'Tomodachi incident support',
+      "Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.",
+    h1: "Tomodachi incident support",
     body: `
       <p>A calm, practical path for users coming from breach notices or trust alerts. This route is intentionally light on promotions.</p>
       <h2>First 24 hours</h2>
@@ -445,26 +442,26 @@ const ROUTES: Record<string, RouteShell> = {
       <p>Rotate passwords on accounts in priority order: financial (banks, brokerage, PayPal, crypto), cloud (Google Drive, iCloud, Dropbox), identity (Apple ID, Microsoft, Google), social (X, Instagram, Discord, Reddit), everything else. A password manager makes this an evening of work rather than a month-long fight.</p>
       <p>For a longer checklist + 30-day monitoring plan, the paid <a href="/unlock">recovery checklist ($9)</a> spells out the same flow step by step on the return page. It does not include a PDF or Markdown download.</p>`,
     jsonLd: [
-      breadcrumbFor('Help', '/help'),
+      breadcrumbFor("Help", "/help"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: 'Tomodachi incident support — free 24-hour action plan',
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "Tomodachi incident support — free 24-hour action plan",
         description:
-          'Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.',
-        url: 'https://tomodachi.pw/help',
-        inLanguage: 'en',
+          "Free 24-hour action plan and ongoing checklist for anyone affected by the Tomodachishare breach.",
+        url: "https://tomodachi.pw/help",
+        inLanguage: "en",
         author: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
-        image: 'https://tomodachi.pw/community-og.jpg',
+        image: "https://tomodachi.pw/community-og.jpg",
       },
     ],
   },
-  '/unlock': {
-    title: 'Unlock · Tomodachi',
+  "/unlock": {
+    title: "Unlock · Tomodachi",
     description:
-      'Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.',
-    h1: 'Unlock',
+      "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.",
+    h1: "Unlock",
     body: `
       <p>Free guidance stays free. These are deeper deliverables for people who want a printable written plan or a real human to walk it through with them.</p>
       <h2>Breach Recovery Checklist — $9</h2>
@@ -473,45 +470,45 @@ const ROUTES: Record<string, RouteShell> = {
       <p>One scheduled call with a security-aware operator. We walk through your specific exposure and leave you with a written action plan. Google Meet link delivered after checkout. Written follow-up summary within 24 hours.</p>
       <p>Not legal or law-enforcement advice. For active criminal incidents contact the appropriate authorities. Payments are processed by Stripe. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
     jsonLd: [
-      breadcrumbFor('Unlock', '/unlock'),
+      breadcrumbFor("Unlock", "/unlock"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'ItemList',
-        url: 'https://tomodachi.pw/unlock',
-        name: 'Tomodachi paid recovery products',
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        url: "https://tomodachi.pw/unlock",
+        name: "Tomodachi paid recovery products",
         itemListElement: [
           {
-            '@type': 'ListItem',
+            "@type": "ListItem",
             position: 1,
             item: {
-              '@type': 'Product',
-              name: 'Breach Recovery Checklist',
+              "@type": "Product",
+              name: "Breach Recovery Checklist",
               description:
-                'A browser-based 12-step recovery flow for the Tomodachishare breach, unlocked on the return page without a PDF or Markdown download.',
+                "A browser-based 12-step recovery flow for the Tomodachishare breach, unlocked on the return page without a PDF or Markdown download.",
               offers: {
-                '@type': 'Offer',
-                price: '9.00',
-                priceCurrency: 'USD',
-                url: 'https://tomodachi.pw/unlock',
-                availability: 'https://schema.org/InStock',
+                "@type": "Offer",
+                price: "9.00",
+                priceCurrency: "USD",
+                url: "https://tomodachi.pw/unlock",
+                availability: "https://schema.org/InStock",
                 seller: PUBLISHER_ORG,
               },
             },
           },
           {
-            '@type': 'ListItem',
+            "@type": "ListItem",
             position: 2,
             item: {
-              '@type': 'Product',
-              name: '30-min Recovery Consult',
+              "@type": "Product",
+              name: "30-min Recovery Consult",
               description:
-                'One scheduled call with a security-aware operator. Written follow-up summary within 24 hours.',
+                "One scheduled call with a security-aware operator. Written follow-up summary within 24 hours.",
               offers: {
-                '@type': 'Offer',
-                price: '49.00',
-                priceCurrency: 'USD',
-                url: 'https://tomodachi.pw/unlock',
-                availability: 'https://schema.org/InStock',
+                "@type": "Offer",
+                price: "49.00",
+                priceCurrency: "USD",
+                url: "https://tomodachi.pw/unlock",
+                availability: "https://schema.org/InStock",
                 seller: PUBLISHER_ORG,
               },
             },
@@ -520,26 +517,26 @@ const ROUTES: Record<string, RouteShell> = {
       },
     ],
   },
-  '/support': {
-    title: 'Support · Tomodachi',
+  "/support": {
+    title: "Support · Tomodachi",
     description:
-      'Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.',
-    h1: 'Help keep the tools free',
+      "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.",
+    h1: "Help keep the tools free",
     body: `
       <p>The studio, the AI assistant, the breach recovery guides, and the password check are all free to use. Tips help cover hosting, API credits, and time to write the next free guide.</p>
       <p>Three fixed tip amounts via Stripe Checkout: $5, $15, $25.</p>
       <p>Not a registered nonprofit. Tips are not tax-deductible. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>
       <p>Brave Rewards: tomodachi.pw is a verified Brave Creator. Brave browser users see the Rewards icon in the address bar.</p>`,
     jsonLd: [
-      breadcrumbFor('Support', '/support'),
+      breadcrumbFor("Support", "/support"),
       {
-        '@context': 'https://schema.org',
-        '@type': 'WebPage',
-        url: 'https://tomodachi.pw/support',
-        name: 'Support the Tomodachi project',
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        url: "https://tomodachi.pw/support",
+        name: "Support the Tomodachi project",
         description:
-          'Tip jar for the Tomodachi project. Fixed Stripe tips at $5 / $15 / $25 plus Brave Rewards for the verified domain.',
-        inLanguage: 'en',
+          "Tip jar for the Tomodachi project. Fixed Stripe tips at $5 / $15 / $25 plus Brave Rewards for the verified domain.",
+        inLanguage: "en",
         about: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
       },
@@ -549,9 +546,9 @@ const ROUTES: Record<string, RouteShell> = {
 
 // Routes that should resolve to identical SEO shells via aliasing.
 const ROUTE_ALIASES: Record<string, string> = {
-  '/donate': '/support',
-  '/disclosure': '/about', // /affiliate-disclosure is a separate static legal page
-  '': '/',
+  "/donate": "/support",
+  "/disclosure": "/about", // /affiliate-disclosure is a separate static legal page
+  "": "/",
 };
 
 function isCrawler(ua: string, list: string[]): boolean {
@@ -566,13 +563,13 @@ interface PagesContext {
 
 export async function onRequest(context: PagesContext): Promise<Response> {
   const { request, next } = context;
-  const ua = request.headers.get('user-agent') || '';
+  const ua = request.headers.get("user-agent") || "";
 
   const url = new URL(request.url);
   const path = ROUTE_ALIASES[url.pathname] ?? url.pathname;
 
   // Only intercept GET. Everything else falls through.
-  if (request.method !== 'GET') return next();
+  if (request.method !== "GET") return next();
 
   // Search crawlers: serve a full pre-rendered shell with real content for any
   // mapped route. Unmapped routes fall through to the SPA.
@@ -582,11 +579,11 @@ export async function onRequest(context: PagesContext): Promise<Response> {
       return new Response(shellFor(path, shell), {
         status: 200,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=300',
-          'Vary': 'User-Agent',
-          'X-Robots-Tag': 'index, follow',
-          'X-Crawler-Render': 'search',
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+          Vary: "User-Agent",
+          "X-Robots-Tag": "index, follow",
+          "X-Crawler-Render": "search",
         },
       });
     }
@@ -599,11 +596,11 @@ export async function onRequest(context: PagesContext): Promise<Response> {
       return new Response(shellFor(path, shell), {
         status: 200,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=300',
-          'Vary': 'User-Agent',
-          'X-Robots-Tag': 'index, follow',
-          'X-Crawler-Render': 'social',
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+          Vary: "User-Agent",
+          "X-Robots-Tag": "index, follow",
+          "X-Crawler-Render": "social",
         },
       });
     }

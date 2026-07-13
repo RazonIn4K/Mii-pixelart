@@ -37,7 +37,7 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 **Guides** — [`/guides`](https://tomodachi.pw/guides)
 
-- Long-form articles on Mii creation, gameplay basics (apartments / food / jobs / marriage), Tomodachishare recovery, QR codes + save backup
+- Long-form articles on Mii creation, clearly labeled legacy 3DS daily-play basics, Tomodachishare recovery, QR codes + save backup
 
 **Island Workshop community** — opt-in only
 
@@ -140,19 +140,19 @@ pnpm worker:dry-run
 Worker secrets use an untracked `.dev.vars` locally and Cloudflare secrets after
 an explicit deployment approval. Vite-only `VITE_*` values may use `.env.local`:
 
-| Variable                        | Required for                   | Notes                                     |
-| ------------------------------- | ------------------------------ | ----------------------------------------- |
+| Variable                        | Required for                   | Notes                                               |
+| ------------------------------- | ------------------------------ | --------------------------------------------------- |
 | `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients |
-| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite              |
-| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                           |
-| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                 |
-| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                   |
-| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                       |
-| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                          |
-| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard |
-| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`        |
-| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent          |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                          |
+| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                        |
+| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                     |
+| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                           |
+| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                             |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                 |
+| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                                    |
+| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard           |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                  |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                    |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                    |
 
 ## Project structure
 

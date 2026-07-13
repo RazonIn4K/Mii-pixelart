@@ -36,18 +36,17 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
         question: "Can I make my Mii look like a real person?",
         answer:
           "Yes. In the legacy 3DS Mii Maker workflow, the Look-Alike Mii tool can generate a rough starting point from a camera photo. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio can prepare a manual Copy Guide, but it does not import a project into either game. The Guides page explains the legacy 3DS workflow.",
-        links: [
-          { label: "Mii creation guide", href: "/guides#mii-creation" },
-        ],
+        links: [{ label: "Mii creation guide", href: "/guides#mii-creation" }],
       },
       {
-        question: "What's a Mii face mask?",
+        question: "What is the Studio's face-paint Copy Guide?",
         answer:
           "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for planning custom face art. You manually recreate the reference with the drawing tools available in your game; the Studio does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
         links: [{ label: "Try the Studio", href: "/studio" }],
       },
       {
-        question: "Why can't I edit a Mii's face after it moves into Tomodachi Life?",
+        question:
+          "Why can't I edit a Mii's face after it moves into Tomodachi Life?",
         answer:
           "This question describes the original Tomodachi Life on 3DS, where a resident's underlying Mii face has legacy editing restrictions after import. Tomodachi Life: Living the Dream is a separate Switch title with its own creation tools. Tomodachi Studio only helps plan art for manual recreation; it does not modify a resident or save file.",
       },
@@ -148,7 +147,7 @@ function buildFaqJsonLd() {
 export default function Faq() {
   useDocumentTitle(
     "FAQ",
-    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and how this site is funded.",
+    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the face-paint Copy Guide, and how this site is funded.",
   );
   useStructuredData([
     breadcrumbFor([
@@ -165,11 +164,16 @@ export default function Faq() {
           <Link href="/" className="text-sm font-medium hover:underline">
             ← Tomodachi
           </Link>
-          <span className="text-xs text-muted-foreground">Frequently asked questions</span>
+          <span className="text-xs text-muted-foreground">
+            Frequently asked questions
+          </span>
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-10 sm:py-12 space-y-10">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-10 sm:py-12 space-y-10"
+      >
         <section className="space-y-3">
           <p className="section-header">FAQ</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">

@@ -40,14 +40,11 @@ const ABOUT_STRUCTURED_DATA = [
       logo: "https://tomodachi.pw/icon-512.png",
       description:
         "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
-      sameAs: [
-        "https://github.com/RazonIn4K",
-        "https://tomodachi.brave",
-      ],
+      sameAs: ["https://github.com/RazonIn4K", "https://tomodachi.brave"],
       knowsAbout: [
         "Tomodachi Life",
         "Mii pixel art",
-        "Mii face mask",
+        "custom face-paint reference",
         "Tomodachishare breach recovery",
         "k-anonymity password breach lookup",
       ],
@@ -73,7 +70,10 @@ export default function About() {
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-10 sm:py-12 space-y-10">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-10 sm:py-12 space-y-10"
+      >
         <section className="space-y-4">
           <p className="section-header">About</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
@@ -85,10 +85,10 @@ export default function About() {
               Studio
             </Link>{" "}
             is a browser-first pixel-art editor for planning Mii-inspired face
-            art — import a photo or character art, reduce its colors against
-            the Studio's 84-color working palette, and export a paint-by-numbers
-            Copy Guide for manual recreation. It does not transfer game files
-            or connect directly to a Nintendo title. The{" "}
+            art — import a photo or character art, reduce its colors against the
+            Studio's 84-color working palette, and export a paint-by-numbers
+            Copy Guide for manual recreation. It does not transfer game files or
+            connect directly to a Nintendo title. The{" "}
             <Link href="/guides" className="underline">
               Guides
             </Link>{" "}
@@ -124,7 +124,9 @@ export default function About() {
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
             <Heart className="h-5 w-5 text-primary" />
-            <h2 className="mt-3 text-sm font-semibold">Solo-built, sponsor-supported</h2>
+            <h2 className="mt-3 text-sm font-semibold">
+              Solo-built, sponsor-supported
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
               One developer, open source, supported by Stripe tips and a small
               paid recovery pack. GitHub Sponsors application in flight.
@@ -223,18 +225,21 @@ export default function About() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                github.com/RazonIn4K/Mii-pixelart <Github className="inline h-3.5 w-3.5" />
+                github.com/RazonIn4K/Mii-pixelart{" "}
+                <Github className="inline h-3.5 w-3.5" />
               </a>
             </li>
             <li>
               <strong>Press / partnership:</strong> open a GitHub issue tagged
-              <code className="ml-1 rounded bg-accent px-1.5 py-0.5 text-xs">press</code>
-              {" "}— it's the most reliable channel. We'll respond with whatever
+              <code className="ml-1 rounded bg-accent px-1.5 py-0.5 text-xs">
+                press
+              </code>{" "}
+              — it's the most reliable channel. We'll respond with whatever
               short bio, hero image, or numbers you need for the story.
             </li>
             <li>
-              <strong>Sponsorship:</strong> Stripe-backed tips and paid checklist
-              via the{" "}
+              <strong>Sponsorship:</strong> Stripe-backed tips and paid
+              checklist via the{" "}
               <Link href="/support" className="underline">
                 support page
               </Link>
