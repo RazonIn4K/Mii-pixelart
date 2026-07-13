@@ -569,10 +569,7 @@ function createEmptySession(): SavedAiSession {
   const now = new Date().toISOString();
   return {
     createdAt: now,
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: crypto.randomUUID(),
     includeGridImage: false,
     includeGridSummary: true,
     messages: [],
