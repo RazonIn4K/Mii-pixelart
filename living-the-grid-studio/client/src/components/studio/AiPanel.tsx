@@ -1020,14 +1020,22 @@ function summarizeDocument(doc: GridDocument | null): AiDocumentSummary | null {
   };
 }
 
+function createLocalSessionId(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+  return `session-${Array.from(randomBytes, byte =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("")}`;
+}
+
 function createEmptySession(): SavedAiSession {
   const now = new Date().toISOString();
   return {
     createdAt: now,
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: createLocalSessionId(),
     includeGridImage: false,
     includeGridSummary: false,
     messages: [],
