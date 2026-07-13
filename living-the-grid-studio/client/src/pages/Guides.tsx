@@ -105,7 +105,7 @@ const GUIDES: GuideCard[] = [
     cta: { href: "/", label: "Run the browser-only password check" },
     upsell: {
       href: "/unlock",
-      label: "Pair it with the recovery checklist or 30-min consult",
+      label: "Pair it with the paid recovery checklist",
     },
   },
 ];
@@ -392,9 +392,9 @@ const LONG_GUIDES: LongGuide[] = [
           <Link className="underline" href="/unlock">
             recovery checklist
           </Link>{" "}
-          covers the same flow in a printable 12-step format, or you can book a
-          30-minute consult to walk through your specific account inventory
-          together.
+          covers the same flow as a structured, browser-based 12-step plan.
+          Consult bookings are temporarily paused while the notification,
+          scheduling, and follow-up workflow is verified.
         </p>
       </>
     ),
@@ -725,10 +725,8 @@ export default function Guides() {
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
-                {/* Buttons always stack vertically inside the card. Trying to
-                    fit two buttons side-by-side breaks at <500px card widths
-                    because some upsell labels (e.g. "Pair it with the recovery
-                    checklist or 30-min consult") are too long to share a row. */}
+                {/* Buttons always stack vertically inside the card so longer
+                    action labels remain readable at narrow card widths. */}
                 <div className="mt-auto flex flex-col gap-2 pt-2">
                   <Button
                     asChild
@@ -810,15 +808,15 @@ export default function Guides() {
         <section className="border-t border-border pt-6">
           <h2 className="text-lg font-semibold">Help keep guides free</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every guide here stays free. Tips, paid checklists, and consults on{" "}
+            Every guide here stays free. The paid checklist on{" "}
             <Link href="/unlock" className="underline">
               /unlock
             </Link>{" "}
-            and{" "}
+            and tips on{" "}
             <Link href="/support" className="underline">
               /support
             </Link>{" "}
-            are what fund the next one.
+            help fund the next one.
           </p>
         </section>
       </main>

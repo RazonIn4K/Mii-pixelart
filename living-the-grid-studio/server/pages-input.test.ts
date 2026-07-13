@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
 import { onRequest as handleStripe } from "../functions/api/stripe/[[path]]";
 import { onRequestPost as handleStripeWebhook } from "../functions/api/webhooks/stripe";
+import { CONSULT_SALES_DISABLED_BODY } from "./stripe";
 
 const jsonRequest = (url: string, body: string, contentLength?: number) =>
   new Request(url, {
@@ -17,6 +18,66 @@ const jsonRequest = (url: string, body: string, contentLength?: number) =>
   });
 
 describe("legacy Pages input handling", () => {
+  it("filters consult products in Pages unless sales are explicitly enabled", async () => {
+    const disabledResponse = await handleStripe({
+      env: {
+        CONSULT_SALES_ENABLED: "false",
+        STRIPE_SECRET_KEY: "test-key",
+      },
+      params: { path: "products" },
+      request: new Request("https://example.test/api/stripe/products"),
+    });
+    const enabledResponse = await handleStripe({
+      env: {
+        CONSULT_SALES_ENABLED: "true",
+        STRIPE_SECRET_KEY: "test-key",
+      },
+      params: { path: "products" },
+      request: new Request("https://example.test/api/stripe/products"),
+    });
+    const disabledPayload = (await disabledResponse.json()) as {
+      products: Array<{ category: string; id: string }>;
+    };
+    const enabledPayload = (await enabledResponse.json()) as {
+      products: Array<{ category: string; id: string }>;
+    };
+
+    expect(disabledResponse.status).toBe(200);
+    expect(
+      disabledPayload.products.some((product) => product.id === "consult-30"),
+    ).toBe(false);
+    expect(
+      disabledPayload.products.some(
+        (product) => product.category === "recovery",
+      ),
+    ).toBe(true);
+    expect(
+      disabledPayload.products.some(
+        (product) => product.category === "support",
+      ),
+    ).toBe(true);
+    expect(
+      enabledPayload.products.some((product) => product.id === "consult-30"),
+    ).toBe(true);
+  });
+
+  it("rejects direct consult checkout through Pages while sales are disabled", async () => {
+    const response = await handleStripe({
+      env: {
+        CONSULT_SALES_ENABLED: "false",
+        STRIPE_SECRET_KEY: "test-key",
+      },
+      params: { path: "checkout" },
+      request: jsonRequest(
+        "https://example.test/api/stripe/checkout",
+        JSON.stringify({ productId: "consult-30" }),
+      ),
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual(CONSULT_SALES_DISABLED_BODY);
+  });
+
   it("advertises AI as unavailable when authenticated Worker bindings are absent", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },

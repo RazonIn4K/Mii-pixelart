@@ -82,7 +82,7 @@ async function handleStripe(context: WorkerRequestContext): Promise<Response> {
   const path = context.params.path.replace(/^\/+|\/+$/gu, "");
   if (method === "GET" && path === "products") {
     const category = context.url.searchParams.get("category");
-    const products = listPublicProducts()
+    const products = listPublicProducts(context.env)
       .filter((product) => !category || product.category === category)
       .map((product) => ({
         category: product.category,

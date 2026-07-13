@@ -54,7 +54,10 @@ function useQueryParam(name: string): string | null {
 }
 
 export default function Unlock() {
-  useDocumentTitle("Unlock", "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.");
+  useDocumentTitle(
+    "Unlock",
+    "Paid browser-based recovery checklist for the Tomodachishare breach. Consult bookings are temporarily paused.",
+  );
   useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Unlock", href: "/unlock" }])]);
 
   const [products, setProducts] = useState<PublicProduct[]>([]);
@@ -71,7 +74,8 @@ export default function Unlock() {
 
   useEffect(() => {
     let cancelled = false;
-    // Unlock only sells gated recovery + consult products.
+    // Unlock only sells gated recovery products plus any consult product the
+    // server has explicitly enabled after fulfillment verification.
     // Tip-jar items live on /support so they don't muddy the conversion path.
     fetch("/api/stripe/products")
       .then((response) => response.json())
@@ -183,8 +187,7 @@ export default function Unlock() {
           <h1 className="text-3xl font-semibold">Unlock</h1>
           <p className="mt-2 text-muted-foreground">
             Free guidance stays free. These are deeper deliverables for people
-            who want a written plan or a real human to walk it through with
-            them.
+            who want a structured, browser-based recovery plan.
           </p>
         </section>
 
@@ -310,6 +313,14 @@ export default function Unlock() {
 
         {!unlockedProductId ? (
           <section className="space-y-6">
+            <Card className="border-sky-500/30 bg-sky-50 p-4 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100">
+              <strong>Consult bookings are temporarily paused.</strong> The
+              30-minute consult will return only after its notification,
+              scheduling, and written follow-up workflow passes staging
+              verification. Recovery guidance and the checklist remain
+              available.
+            </Card>
+
             <div className="space-y-2">
               <Label htmlFor="unlock-email" className="text-xs">
                 Email for receipts (optional, pre-fills Stripe)
@@ -366,7 +377,12 @@ export default function Unlock() {
               ))}
             </div>
 
-            {productQuery ? (
+            {productQuery === "consult-30" ? (
+              <p className="text-xs text-muted-foreground" role="status">
+                The 30-minute consult is not accepting new bookings right now.
+                No checkout is available for this product.
+              </p>
+            ) : productQuery ? (
               <p className="text-xs text-muted-foreground">
                 Looking for &quot;{productQuery}&quot;? Pick it above and we will
                 hand you off to Stripe.

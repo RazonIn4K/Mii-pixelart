@@ -16,6 +16,7 @@ import {
 } from "../shared/products";
 
 export interface StripeEnv {
+  CONSULT_SALES_ENABLED?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   PUBLIC_SITE_URL?: string;
@@ -28,6 +29,12 @@ export interface ApiResult {
 
 const STRIPE_API_ORIGIN = "https://api.stripe.com";
 const CHECKOUT_SESSION_ID_REGEX = /^cs_(?:test|live)_[A-Za-z0-9]{16,240}$/;
+
+export const CONSULT_SALES_DISABLED_BODY = {
+  code: "consult_sales_disabled",
+  configured: true,
+  error: "Consult bookings are temporarily unavailable.",
+} as const;
 
 type StripeRequest =
   | { kind: "create-checkout-session"; body: unknown }
@@ -51,6 +58,19 @@ function getSiteUrl(env?: StripeEnv): string {
     return process.env.PUBLIC_SITE_URL.replace(/\/+$/, "");
   }
   return "http://localhost:3000";
+}
+
+/**
+ * Manual consult fulfillment must be proven before the product can be sold.
+ * Treat only the exact string `true` as enabled and never inherit a process
+ * value when a runtime binding object was supplied without the flag.
+ */
+export function isConsultSalesEnabled(env?: StripeEnv): boolean {
+  if (env !== undefined) return env.CONSULT_SALES_ENABLED === "true";
+  return (
+    typeof process !== "undefined" &&
+    String(process.env?.CONSULT_SALES_ENABLED) === "true"
+  );
 }
 
 /**
@@ -146,6 +166,9 @@ export async function createCheckoutSession(
         error: `Unknown product id: ${productId || "(missing)"}.`,
       },
     };
+  }
+  if (product.category === "consult" && !isConsultSalesEnabled(env)) {
+    return { status: 503, body: CONSULT_SALES_DISABLED_BODY };
   }
 
   const site = getSiteUrl(env);
@@ -284,6 +307,9 @@ export async function verifyCheckoutSession(
   };
 }
 
-export function listPublicProducts(): PaidProduct[] {
-  return [...PAID_PRODUCTS];
+export function listPublicProducts(env?: StripeEnv): PaidProduct[] {
+  const consultSalesEnabled = isConsultSalesEnabled(env);
+  return PAID_PRODUCTS.filter(
+    (product) => product.category !== "consult" || consultSalesEnabled,
+  );
 }

@@ -46,6 +46,58 @@ for (const route of publicRoutes) {
   });
 }
 
+test("Unlock keeps consult sales visibly paused and has no consult checkout action", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop check covers the shared fail-closed product catalog.",
+  );
+
+  const consultCheckoutRequests: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/stripe/checkout"
+    ) {
+      consultCheckoutRequests.push(request.postData() ?? "");
+    }
+  });
+
+  await page.goto("/unlock", { waitUntil: "networkidle" });
+  await expect(
+    page.getByText("Consult bookings are temporarily paused.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Breach Recovery Checklist",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "30-min Recovery Consult" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /consult|\$49/i })).toHaveCount(
+    0,
+  );
+
+  await page.goto("/unlock?product=consult-30", {
+    waitUntil: "networkidle",
+  });
+  await expect(
+    page.getByText(
+      "The 30-minute consult is not accepting new bookings right now. No checkout is available for this product.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /consult|\$49/i })).toHaveCount(
+    0,
+  );
+  expect(consultCheckoutRequests).toEqual([]);
+});
+
 test("mobile navigation exposes community and Studio destinations", async ({
   page,
 }) => {

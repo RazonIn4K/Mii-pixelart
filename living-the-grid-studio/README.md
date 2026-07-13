@@ -48,7 +48,7 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 **Paid extras** (optional)
 
-- [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist, $49 30-minute consult
+- [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist; 30-minute consult bookings remain paused until fulfillment passes staging verification
 - [`/support`](https://tomodachi.pw/support) — $5 / $15 / $25 tip jar
 
 ## Tech stack
@@ -140,19 +140,20 @@ pnpm worker:dry-run
 Worker secrets use an untracked `.dev.vars` locally and Cloudflare secrets after
 an explicit deployment approval. Vite-only `VITE_*` values may use `.env.local`:
 
-| Variable                        | Required for                   | Notes                                               |
-| ------------------------------- | ------------------------------ | --------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients |
-| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                        |
-| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                     |
-| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                           |
-| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                             |
-| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                 |
-| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                                    |
-| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard           |
-| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                  |
-| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                    |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                    |
+| Variable                        | Required for                   | Notes                                                       |
+| ------------------------------- | ------------------------------ | ----------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients         |
+| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                                |
+| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                             |
+| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                                   |
+| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                                     |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                         |
+| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                                            |
+| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard                   |
+| `CONSULT_SALES_ENABLED`         | Consult catalog and checkout   | Exact `true` only after fulfillment test; otherwise `false` |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                          |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                            |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                            |
 
 ## Project structure
 
@@ -199,7 +200,7 @@ pnpm verify       # Full verification suite
 If the studio or the guides have helped, a few ways to support the project:
 
 - **Tip jar:** [tomodachi.pw/support](https://tomodachi.pw/support) — $5 / $15 / $25 via Stripe
-- **Paid products:** [tomodachi.pw/unlock](https://tomodachi.pw/unlock) — $9 recovery checklist or $49 30-min consult
+- **Paid products:** [tomodachi.pw/unlock](https://tomodachi.pw/unlock) — $9 recovery checklist; consult bookings are temporarily paused
 - **GitHub Sponsors:** the [`Sponsor`](https://github.com/sponsors/RazonIn4K) button at the top of this repo (once GitHub Sponsors approval clears)
 - **Brave Creator:** [tomodachi.brave](https://tomodachi.brave) is verified for Brave Rewards if you tip with BAT
 

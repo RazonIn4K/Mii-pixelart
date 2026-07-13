@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "target": "staging",
   "intent": "deploy",
   "deploymentPhase": "staging-read-only-bootstrap",
@@ -35,7 +35,8 @@
   },
   "stripe": {
     "mode": "staging-test-or-production-live",
-    "taxConfirmation": "replace-with-the-approved-tax-check"
+    "taxConfirmation": "replace-with-the-approved-tax-check",
+    "consultSalesEnabled": false
   },
   "confirmations": {
     "targetIsolationConfirmed": false,
@@ -51,6 +52,7 @@
     "stagingAcceptancePassed": false,
     "productionCutoverApproved": false,
     "communityMutationsEnabled": false,
+    "consultFulfillmentTestPassed": false,
     "writableCommunityDeployApproved": false,
     "bootstrapReadOnlyApproved": false
   }

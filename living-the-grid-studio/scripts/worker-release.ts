@@ -376,6 +376,7 @@ interface BindingSnapshot {
   d1Id: string;
   kvId: string;
   communityMutationsEnabled: boolean;
+  consultSalesEnabled: boolean;
 }
 
 function singleBinding(
@@ -423,6 +424,19 @@ function validateVariables(config: JsonRecord, target: ReleaseTarget): boolean {
     throw new ReleaseError("Terms version is missing or invalid.");
   }
   return vars.COMMUNITY_MUTATIONS_ENABLED === "true";
+}
+
+function validateConsultSalesVariable(config: JsonRecord): boolean {
+  const vars = objectAt(config, "vars", "Environment variables");
+  if (
+    vars.CONSULT_SALES_ENABLED !== "true" &&
+    vars.CONSULT_SALES_ENABLED !== "false"
+  ) {
+    throw new ReleaseError(
+      "Consult sales mode must be an explicit true or false string.",
+    );
+  }
+  return vars.CONSULT_SALES_ENABLED === "true";
 }
 
 function validateRateLimits(config: JsonRecord): void {
@@ -598,6 +612,7 @@ function validateSourceConfig(
   validateOriginExposure(selected);
   validateCustomDomainRoute(selected, target);
   const communityMutationsEnabled = validateVariables(selected, target);
+  const consultSalesEnabled = validateConsultSalesVariable(selected);
 
   const d1 = singleBinding(selected, "d1_databases", "DB", "D1 bindings");
   expectExact(d1.database_name, expected.d1Name, "D1 database name");
@@ -631,7 +646,12 @@ function validateSourceConfig(
     "Required secret declaration",
   );
 
-  return { d1Id: d1.database_id, kvId: kv.id, communityMutationsEnabled };
+  return {
+    d1Id: d1.database_id,
+    kvId: kv.id,
+    communityMutationsEnabled,
+    consultSalesEnabled,
+  };
 }
 
 function bindingMap(config: JsonRecord): Map<string, JsonRecord> {
@@ -715,6 +735,11 @@ function validateGeneratedConfig(
     generatedCommunityMutationsEnabled,
     sourceCommunityMutationsEnabled,
     "Generated community mutation mode",
+  );
+  expectExact(
+    validateConsultSalesVariable(generated),
+    validateConsultSalesVariable(selected),
+    "Generated consult sales mode",
   );
   validateAssets(generated);
   const generatedTriggers = objectAt(
@@ -1034,6 +1059,7 @@ function validateAuditedInputs(
   approval: JsonRecord,
   target: "staging" | "production",
   communityMutationsEnabled: boolean,
+  consultSalesEnabled: boolean,
   deploymentPhase: DeploymentPhase,
 ): ValidatedApproval {
   const infrastructure = objectAt(
@@ -1160,6 +1186,11 @@ function validateAuditedInputs(
     "Stripe release mode",
   );
   requireApprovalText(stripe, "taxConfirmation", "Stripe tax approval input");
+  expectExact(
+    stripe.consultSalesEnabled,
+    consultSalesEnabled,
+    "Approved consult sales mode",
+  );
 
   const confirmations = objectAt(
     approval,
@@ -1171,7 +1202,21 @@ function validateAuditedInputs(
     communityMutationsEnabled,
     "Approved community mutation mode",
   );
+  if (
+    confirmations.consultFulfillmentTestPassed !== true &&
+    confirmations.consultFulfillmentTestPassed !== false
+  ) {
+    throw new ReleaseError(
+      "Consult fulfillment test confirmation must be an explicit boolean.",
+    );
+  }
   if (expectedBootstrapTarget !== null) {
+    expectExact(consultSalesEnabled, false, "Bootstrap consult sales mode");
+    expectExact(
+      confirmations.consultFulfillmentTestPassed,
+      false,
+      "Bootstrap consult fulfillment test state",
+    );
     expectExact(
       confirmations.adminModeratorAssigned,
       false,
@@ -1210,6 +1255,14 @@ function validateAuditedInputs(
     );
   }
   if (
+    consultSalesEnabled &&
+    confirmations.consultFulfillmentTestPassed !== true
+  ) {
+    throw new ReleaseError(
+      "Enabled consult sales require a passed fulfillment test.",
+    );
+  }
+  if (
     communityMutationsEnabled &&
     confirmations.writableCommunityDeployApproved !== true
   ) {
@@ -1233,6 +1286,7 @@ async function validateApproval(
   cwd: string,
   target: "staging" | "production",
   communityMutationsEnabled: boolean,
+  consultSalesEnabled: boolean,
   dependencies: ReleaseDependencies,
 ): Promise<ValidatedApproval> {
   const relativePath = path.join(".deployment-readiness", `${target}.json`);
@@ -1257,7 +1311,7 @@ async function validateApproval(
   }
 
   const approval = parseJson(raw, "Deployment approval");
-  expectExact(approval.schemaVersion, 2, "Deployment approval schema");
+  expectExact(approval.schemaVersion, 3, "Deployment approval schema");
   expectExact(approval.target, target, "Deployment approval target");
   expectExact(approval.intent, "deploy", "Deployment approval intent");
   const deploymentPhase = approval.deploymentPhase;
@@ -1324,6 +1378,7 @@ async function validateApproval(
     approval,
     target,
     communityMutationsEnabled,
+    consultSalesEnabled,
     deploymentPhase,
   );
 
@@ -1623,6 +1678,7 @@ export async function runRelease(
       cwd,
       remoteTarget,
       bindings.communityMutationsEnabled,
+      bindings.consultSalesEnabled,
       dependencies,
     );
     if (isBootstrapPhase(validatedApproval.deploymentPhase)) {

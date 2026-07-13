@@ -342,7 +342,7 @@ export default function Support() {
         </section>
 
         <p className="text-xs text-muted-foreground">
-          Need a recovery checklist or a paid consult instead of a tip? See{" "}
+          Need a structured recovery checklist instead of a tip? See{" "}
           <Link href="/unlock" className="underline">
             paid recovery guides
           </Link>

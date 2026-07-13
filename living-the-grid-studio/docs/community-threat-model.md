@@ -63,6 +63,7 @@ an R2 key is known.
 | Deletion bypass or partial deletion                                  | Information disclosure             | Immediately revoke sessions/hide content; seven-day cancel window with fresh Google auth; scheduled erasure is idempotent; verify D1 cascades and delete manifested R2 keys; retain only defined pseudonymized moderation records                                                                                                                                                            |
 | SSR/crawler metadata injection                                       | XSS / spoofing                     | Fetch only public/unlisted D1 records; HTML-escape title/description/username; set canonical route from configured origin; unlisted `noindex`; do not proxy arbitrary URLs                                                                                                                                                                                                                   |
 | Resource or secret mix-up between environments                       | Information disclosure             | Separate D1/R2/KV/Images/OAuth clients/secrets; explicit Wrangler environments; production resource IDs reviewed in approval gate; random preview auth disabled                                                                                                                                                                                                                              |
+| Payment accepted for an unverified consult workflow                  | Financial / consumer harm          | `CONSULT_SALES_ENABLED` fails closed unless exactly `true`; both Worker and retained Pages catalogs omit `consult-30` and direct checkout returns a stable 503 while disabled; release approval must match the runtime flag and record a passed end-to-end notification, scheduling, and written-follow-up test before enablement. AI cannot claim, schedule, or fulfill a consult.          |
 
 ## Authorization matrix
 
@@ -135,6 +136,10 @@ authorization and is outside this API.
 - Authentication/session controls, deletion controls, legacy AI and Stripe
   behavior, and Stripe webhooks are intentionally operational exemptions.
   Any new unsafe API route is blocked by default until explicitly classified.
+- `CONSULT_SALES_ENABLED` is a separate fail-closed payment control. Bootstrap
+  deployments require it and `consultFulfillmentTestPassed` to be false. A
+  later release may set it to true only when the readiness approval records a
+  passed end-to-end consult fulfillment test.
 - The tracked staging and production configurations remain read-only. Enabling
   mutations, replacing placeholder resource IDs, writing secrets, deploying,
   and attaching a domain are separate approval gates.

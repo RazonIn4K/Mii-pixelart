@@ -33,8 +33,8 @@ const SUGGESTIONS: Array<{
   },
   {
     href: "/unlock",
-    title: "Paid recovery checklist + consult",
-    description: "$9 printable 12-step checklist or $49 30-minute one-on-one call.",
+    title: "Paid recovery checklist",
+    description: "$9 browser-based 12-step recovery checklist.",
   },
 ];
 

@@ -8,7 +8,7 @@ This pass adds the content-and-trust layer that turns free traffic into recurrin
 breach notice traffic ──┐
 brave / web3 referrals ─┼──► /  ──► /guides ──► free tool (/, /studio, /help)
 seo / search ───────────┘                                │
-                                                         ├──► /unlock   (recovery checklist, consult)
+                                                         ├──► /unlock   (recovery checklist; consult paused)
                                                          └──► /support  (tip jar, Brave/BAT)
 ```
 
@@ -24,9 +24,9 @@ New in this pass. Lists four guides as cards, each pointing at the existing free
 
 The cards intentionally avoid being full long-form articles right now. The content lives in the linked destinations (`/`, `/studio`, `/help`, `/unlock`). When traffic justifies it, lift each card into its own `/guides/[slug]` route.
 
-### /unlock — paid digital products and consults
+### /unlock — paid recovery checklist
 
-Already in place. Now filters out `category === "support"` so tip jars don't dilute the conversion path. Sells the $9 recovery checklist and the $49 30-min consult.
+Already in place. It filters out `category === "support"` so tip jars do not dilute the conversion path. The $9 browser-based recovery checklist remains available. `consult-30` stays in the source catalog for historical session verification, but public catalogs omit it and direct checkout fails closed while `CONSULT_SALES_ENABLED=false`.
 
 ### /support — tip jar
 
@@ -38,7 +38,7 @@ Includes a Brave Rewards section that's just messaging today. Once `tomodachi.pw
 
 Mixing tip-jar payments into the gated-content paywall page hurts both flows. Visitors looking for the paid checklist get distracted by the cheaper tips and pick the lower-value option. Visitors who arrived to support the project get nudged into buying gated content they didn't want.
 
-Stripe Checkout sessions on tip products use `category: "support"` and a `successPath` that lands on `/support?thanks=1&support=…`. Stripe Checkout sessions on gated products keep `category: "recovery" | "consult"` and land on `/unlock?product=…`. The `cancelPath` field on each product is honored by `server/stripe.ts` so canceling out of a tip returns to `/support`, not `/unlock`.
+Stripe Checkout sessions on tip products use `category: "support"` and a `successPath` that lands on `/support?thanks=1&support=…`. The currently sellable gated product uses `category: "recovery"` and lands on `/unlock?product=…`. The retained `consult` category cannot create a new Checkout Session while its fail-closed flag is false. The `cancelPath` field on each product is honored by `server/stripe.ts` so canceling out of a tip returns to `/support`, not `/unlock`.
 
 ## Wiring summary
 
@@ -59,6 +59,7 @@ Stripe Checkout sessions on tip products use `category: "support"` and a `succes
 | Variable                       | Scope               | Notes                                                                          |
 |--------------------------------|---------------------|--------------------------------------------------------------------------------|
 | `VITE_STRIPE_DONATION_LINK`    | Build-time (Vite)   | Optional. URL of a Stripe Payment Link with custom-amount enabled.             |
+| `CONSULT_SALES_ENABLED`        | Worker runtime      | Keep `false`; exact `true` requires a passed fulfillment test and release gate. |
 
 No new server-side secrets. Tips use the same `STRIPE_SECRET_KEY` as gated products.
 

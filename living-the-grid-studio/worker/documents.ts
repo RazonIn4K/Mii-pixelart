@@ -75,7 +75,7 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/unlock": {
     description:
-      "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.",
+      "Paid browser-based recovery checklist for the Tomodachishare breach. Consult bookings are temporarily paused.",
     title: "Unlock · Tomodachi",
   },
 };

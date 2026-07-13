@@ -199,8 +199,8 @@ export default function About() {
               <Link href="/unlock" className="underline">
                 Unlock
               </Link>
-              : a $9 printable 12-step recovery checklist and a $49 30-minute
-              one-on-one consult.
+              : a $9 browser-based 12-step recovery checklist. Consult bookings
+              are temporarily paused while fulfillment is verified.
             </li>
             <li>
               <Link href="/support" className="underline">

@@ -203,6 +203,7 @@ function environmentConfig(
       TERMS_VERSION: "2026-07-13",
       COMMUNITY_MUTATIONS_ENABLED:
         target === "local" || remoteWritable ? "true" : "false",
+      CONSULT_SALES_ENABLED: "false",
     },
     secrets: { required: requiredSecrets },
     d1_databases: [
@@ -303,7 +304,7 @@ function approval(
 ) {
   const bootstrap = deploymentPhase !== "standard";
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     target,
     intent: "deploy",
     deploymentPhase,
@@ -341,6 +342,7 @@ function approval(
     stripe: {
       mode: target === "staging" ? "staging-test" : "production-live",
       taxConfirmation: "Stripe tax configuration reviewed and approved",
+      consultSalesEnabled: false,
     },
     confirmations: {
       targetIsolationConfirmed: true,
@@ -356,6 +358,7 @@ function approval(
       stagingAcceptancePassed: target === "production" || !bootstrap,
       productionCutoverApproved: target === "production" || !bootstrap,
       communityMutationsEnabled,
+      consultFulfillmentTestPassed: false,
       writableCommunityDeployApproved: communityMutationsEnabled,
       bootstrapReadOnlyApproved: bootstrap,
     },
@@ -953,6 +956,150 @@ describe("runRelease deploy gates", () => {
       ),
     ).rejects.toThrow("Stripe release mode");
     expect(stripeHarness.calls).toHaveLength(0);
+  });
+
+  it("requires an explicit consult sales variable before running commands", async () => {
+    const harness = makeHarness("staging");
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    delete source.env.staging.vars.CONSULT_SALES_ENABLED;
+    harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(
+      "Consult sales mode must be an explicit true or false string",
+    );
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it("rejects a generated consult sales mode that disagrees with the selected source", async () => {
+    const harness = makeHarness("staging");
+    const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+    generated.vars.CONSULT_SALES_ENABLED = "true";
+    harness.files.set(GENERATED_PATH, JSON.stringify(generated));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Generated consult sales mode");
+    expect(harness.calls).toHaveLength(3);
+    expect(harness.calls.at(-1)?.args).toEqual(["build"]);
+    expect(harness.calls.some((call) => call.args.includes("deploy"))).toBe(
+      false,
+    );
+  });
+
+  it("requires consult sales and fulfillment evidence to remain false during bootstrap", async () => {
+    const salesHarness = makeHarness("staging", { bootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const salesSource = JSON.parse(salesHarness.files.get(SOURCE_PATH)!);
+    salesSource.env.staging.vars.CONSULT_SALES_ENABLED = "true";
+    salesHarness.files.set(SOURCE_PATH, JSON.stringify(salesSource));
+    salesHarness.files.set(
+      GENERATED_PATH,
+      JSON.stringify(generatedConfig("staging", salesSource)),
+    );
+    const salesApproval = JSON.parse(salesHarness.files.get(approvalPath)!);
+    salesApproval.stripe.consultSalesEnabled = true;
+    salesHarness.files.set(approvalPath, JSON.stringify(salesApproval));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        salesHarness.dependencies,
+      ),
+    ).rejects.toThrow("Bootstrap consult sales mode");
+    expect(salesHarness.calls).toHaveLength(0);
+
+    const testHarness = makeHarness("staging", { bootstrap: true });
+    const testApproval = JSON.parse(testHarness.files.get(approvalPath)!);
+    testApproval.confirmations.consultFulfillmentTestPassed = true;
+    testHarness.files.set(approvalPath, JSON.stringify(testApproval));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        testHarness.dependencies,
+      ),
+    ).rejects.toThrow("Bootstrap consult fulfillment test state");
+    expect(testHarness.calls).toHaveLength(0);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["not a boolean", "true"],
+  ])(
+    "rejects %s consult fulfillment evidence before running commands",
+    async (_label, value) => {
+      const harness = makeHarness("staging");
+      const approvalPath = path.join(
+        CWD,
+        ".deployment-readiness",
+        "staging.json",
+      );
+      const deploymentApproval = JSON.parse(harness.files.get(approvalPath)!);
+      if (value === undefined) {
+        delete deploymentApproval.confirmations.consultFulfillmentTestPassed;
+      } else {
+        deploymentApproval.confirmations.consultFulfillmentTestPassed = value;
+      }
+      harness.files.set(approvalPath, JSON.stringify(deploymentApproval));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow(
+        "Consult fulfillment test confirmation must be an explicit boolean",
+      );
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
+
+  it("permits consult sales only with matching passed fulfillment evidence", async () => {
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+
+    for (const fulfillmentTestPassed of [false, true]) {
+      const harness = makeHarness("staging");
+      const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+      source.env.staging.vars.CONSULT_SALES_ENABLED = "true";
+      harness.files.set(SOURCE_PATH, JSON.stringify(source));
+      harness.files.set(
+        GENERATED_PATH,
+        JSON.stringify(generatedConfig("staging", source)),
+      );
+      const deploymentApproval = JSON.parse(harness.files.get(approvalPath)!);
+      deploymentApproval.stripe.consultSalesEnabled = true;
+      deploymentApproval.confirmations.consultFulfillmentTestPassed =
+        fulfillmentTestPassed;
+      harness.files.set(approvalPath, JSON.stringify(deploymentApproval));
+
+      const result = runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      );
+      if (fulfillmentTestPassed) {
+        await expect(result).resolves.toBeDefined();
+        expect(harness.calls).toHaveLength(4);
+      } else {
+        await expect(result).rejects.toThrow(
+          "Enabled consult sales require a passed fulfillment test",
+        );
+        expect(harness.calls).toHaveLength(0);
+      }
+    }
   });
 
   it("binds writable remote mode to explicit approval and permits it when both values are true", async () => {

@@ -19,6 +19,7 @@ interface __BaseEnv_Env {
 	GOOGLE_OIDC_REDIRECT_URI: "https://staging.tomodachi.pw/api/auth/google/callback" | "https://tomodachi.pw/api/auth/google/callback" | "http://localhost:3000/api/auth/google/callback";
 	TERMS_VERSION: "2026-07-13";
 	COMMUNITY_MUTATIONS_ENABLED: "false" | "true";
+	CONSULT_SALES_ENABLED: "false";
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_CLIENT_SECRET: string;
 	OIDC_COOKIE_KEY: string;
@@ -50,6 +51,7 @@ declare namespace Cloudflare {
 		GOOGLE_OIDC_REDIRECT_URI: "https://staging.tomodachi.pw/api/auth/google/callback";
 		TERMS_VERSION: "2026-07-13";
 		COMMUNITY_MUTATIONS_ENABLED: "false";
+		CONSULT_SALES_ENABLED: "false";
 		GOOGLE_CLIENT_ID: string;
 		GOOGLE_CLIENT_SECRET: string;
 		OIDC_COOKIE_KEY: string;
@@ -77,6 +79,7 @@ declare namespace Cloudflare {
 		GOOGLE_OIDC_REDIRECT_URI: "https://tomodachi.pw/api/auth/google/callback";
 		TERMS_VERSION: "2026-07-13";
 		COMMUNITY_MUTATIONS_ENABLED: "false";
+		CONSULT_SALES_ENABLED: "false";
 		GOOGLE_CLIENT_ID: string;
 		GOOGLE_CLIENT_SECRET: string;
 		OIDC_COOKIE_KEY: string;
@@ -93,7 +96,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "PUBLIC_SITE_URL" | "GOOGLE_OIDC_REDIRECT_URI" | "TERMS_VERSION" | "COMMUNITY_MUTATIONS_ENABLED" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "OIDC_COOKIE_KEY" | "SESSION_PEPPER" | "PSEUDONYM_KEY" | "OPENROUTER_API_KEY" | "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "PUBLIC_SITE_URL" | "GOOGLE_OIDC_REDIRECT_URI" | "TERMS_VERSION" | "COMMUNITY_MUTATIONS_ENABLED" | "CONSULT_SALES_ENABLED" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "OIDC_COOKIE_KEY" | "SESSION_PEPPER" | "PSEUDONYM_KEY" | "OPENROUTER_API_KEY" | "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET">> {}
 }
 
 // Begin runtime types

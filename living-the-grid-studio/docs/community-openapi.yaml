@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Tomodachi Studio Community API
-  version: 1.1.0
+  version: 1.1.1
   license:
     name: MIT
     identifier: MIT
@@ -13,7 +13,11 @@ info:
     project/media downloads are the documented streaming exceptions. Legacy
     `/api/ai/*`, `/api/stripe/*`, and `/api/webhooks/stripe` parity routes are
     intentionally outside this community contract and retain their preexisting
-    response shapes rather than the community JSON envelope. Unsafe community
+    response shapes rather than the community JSON envelope. Consult sales on
+    those parity routes fail closed unless `CONSULT_SALES_ENABLED` is exactly
+    `true`: the catalog omits `consult-30`, and direct checkout returns HTTP 503
+    with `{code:"consult_sales_disabled",configured:true,error:"Consult bookings are temporarily unavailable."}`.
+    Recovery and support products remain available. Unsafe community
     mutations can return the shared `503 ServiceUnavailable` response while the
     fail-closed incident switch is disabled; documented authentication,
     deletion, AI, Stripe, and webhook controls are exempt.

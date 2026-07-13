@@ -277,7 +277,7 @@ Routes are declared with `wouter`:
 | `/guides`               | `Guides`     | Guide content                      |
 | `/faq`                  | `Faq`        | FAQ                                |
 | `/about`                | `About`      | About                              |
-| `/unlock`               | `Unlock`     | Paid recovery/consult products     |
+| `/unlock`               | `Unlock`     | Paid recovery; consult gated       |
 | `/support`              | `Support`    | Tip/support products               |
 | `/donate`               | `Support`    | Alias route                        |
 | `/404`                  | `NotFound`   | Explicit 404                       |
@@ -1135,6 +1135,13 @@ Current products include:
 - `support-jar-5`
 - `support-jar-15`
 - `support-jar-25`
+
+`consult-30` remains in the source catalog so historical paid sessions can be
+verified, but it is omitted from both Worker and retained Pages public catalogs
+and rejected at checkout unless `CONSULT_SALES_ENABLED` is exactly `true`.
+Local, staging, and production configurations currently set it to `false`.
+Release readiness schema 3 prevents enablement until an end-to-end consult
+fulfillment test is recorded as passed.
 
 ### Why The Stripe SDK Is Not Used
 

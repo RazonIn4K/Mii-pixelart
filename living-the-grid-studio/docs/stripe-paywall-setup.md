@@ -6,11 +6,12 @@ This guide covers wiring up the `/unlock` paywall page to a real Stripe account.
 
 Set these as secrets or environment values on each Cloudflare Worker environment:
 
-| Variable                | Type   | Notes                                                                                    |
-|-------------------------|--------|------------------------------------------------------------------------------------------|
-| `STRIPE_SECRET_KEY`     | Secret | `sk_test_…` outside production, `sk_live_…` in Production.                               |
-| `STRIPE_WEBHOOK_SECRET` | Secret | Required when Stripe sends events to `/api/webhooks/stripe`; the route returns 503 if it is absent. |
-| `PUBLIC_SITE_URL`       | Plain  | Used to build Stripe `success_url` / `cancel_url`. `https://tomodachi.pw` in production. |
+| Variable                  | Type   | Notes                                                                                              |
+| ------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`       | Secret | `sk_test_…` outside production, `sk_live_…` in Production.                                         |
+| `STRIPE_WEBHOOK_SECRET`   | Secret | Required when Stripe sends events to `/api/webhooks/stripe`; the route returns 503 if it is absent. |
+| `PUBLIC_SITE_URL`         | Plain  | Used to build Stripe `success_url` / `cancel_url`. `https://tomodachi.pw` in production.           |
+| `CONSULT_SALES_ENABLED`   | Plain  | Exact `true` only after fulfillment verification; otherwise explicitly `false`.                    |
 
 Locally:
 
@@ -22,7 +23,7 @@ pnpm dev
 
 ## 2. How the flow works
 
-1. `/unlock` calls `GET /api/stripe/products` on mount and renders one card per item from `shared/products.ts`.
+1. `/unlock` calls `GET /api/stripe/products` on mount and renders one card per available item from `shared/products.ts`. The server omits `consult-30` unless `CONSULT_SALES_ENABLED` is exactly `true`.
 2. The "Buy" button POSTs `{ productId, customerEmail }` to `/api/stripe/checkout`. The endpoint creates a Stripe Checkout Session via the REST API and returns `{ url }`.
 3. The browser redirects to Stripe-hosted checkout.
 4. After payment Stripe redirects to `<PUBLIC_SITE_URL>/unlock?product=…&session_id={CHECKOUT_SESSION_ID}` (success) or `<PUBLIC_SITE_URL>/unlock?canceled=1` (cancel).
@@ -40,7 +41,12 @@ Before promoting from test to live:
   and country) or a safer PO box/registered-agent address before launch. The
   legal pages contain no template tokens, but they intentionally do not publish
   an incomplete residential address.
-- Decide on a fulfillment plan for `consult-30`. The Unlock page tells buyers they will receive a Google Meet link within one business day; the workflow needs to actually deliver that. The simplest pattern is to enable Stripe's "Receipt email" template with a Calendly link in the body.
+- Keep `CONSULT_SALES_ENABLED=false` until `consult-30` has a named human owner
+  and an end-to-end staging test proves purchase notification, intake,
+  scheduling, delivery, the promised written follow-up, refund/escalation, and
+  audit evidence. A receipt template or scheduling link alone is not proof of
+  fulfillment. When disabled, both Worker and retained Pages catalogs omit the
+  product and direct checkout fails closed with HTTP 503.
 - Configure Stripe to send the events you need to `POST /api/webhooks/stripe`.
   The unified Worker already verifies the signature and five-minute timestamp
   window, rejects bodies over 1 MB, and deduplicates event IDs in `EDGE_CACHE`
@@ -58,7 +64,7 @@ Before promoting from test to live:
 
 1. Append an entry to `PAID_PRODUCTS` in `shared/products.ts`.
 2. If the new product needs a unique unlocked-content block, add a new `unlockedProductId === "your-id"` branch in `client/src/pages/Unlock.tsx`.
-3. Smoke-test in Stripe test mode using card `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP.
+3. Smoke-test in Stripe test mode using card `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP. A consult product additionally requires a passed fulfillment test in deployment readiness before its runtime flag may be enabled.
 
 ## 5. Refunds and disputes
 

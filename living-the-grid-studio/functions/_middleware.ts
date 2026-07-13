@@ -165,7 +165,7 @@ const ROUTES: Record<string, RouteShell> = {
         <li><a href="/">Home recovery hub</a> — browser-only k-anonymity password breach check + AI recovery assistant.</li>
         <li><a href="/guides">Long-form guides</a> — Mii creation, Tomodachi Life gameplay basics, post-breach recovery, QR codes + save backup.</li>
         <li><a href="/faq">FAQ</a> — common questions answered.</li>
-        <li><a href="/unlock">Unlock</a> — paid $9 recovery checklist + $49 30-min consult.</li>
+        <li><a href="/unlock">Unlock</a> — paid $9 browser-based recovery checklist; consult bookings are temporarily paused.</li>
         <li><a href="/support">Support</a> — $5 / $15 / $25 Stripe tips.</li>
       </ul>`,
     jsonLd: [
@@ -460,14 +460,14 @@ const ROUTES: Record<string, RouteShell> = {
   "/unlock": {
     title: "Unlock · Tomodachi",
     description:
-      "Paid recovery checklist ($9) and 30-minute one-on-one consult ($49) for the Tomodachishare breach.",
+      "Paid browser-based recovery checklist for the Tomodachishare breach. Consult bookings are temporarily paused.",
     h1: "Unlock",
     body: `
-      <p>Free guidance stays free. These are deeper deliverables for people who want a printable written plan or a real human to walk it through with them.</p>
+      <p>Free guidance stays free. The optional paid checklist provides a structured, browser-based recovery plan.</p>
       <h2>Breach Recovery Checklist — $9</h2>
       <p>A browser-based 12-step recovery flow for the Tomodachishare breach, with password, 2FA, session, and 30-day monitoring priorities. The checklist is unlocked on the return page; no PDF or Markdown download is included.</p>
-      <h2>30-min Recovery Consult — $49</h2>
-      <p>One scheduled call with a security-aware operator. We walk through your specific exposure and leave you with a written action plan. Google Meet link delivered after checkout. Written follow-up summary within 24 hours.</p>
+      <h2>Consult bookings are temporarily paused</h2>
+      <p>The 30-minute consult is not accepting new bookings while its purchase notification, scheduling, and written follow-up workflow completes staging verification. No consult checkout is available.</p>
       <p>Not legal or law-enforcement advice. For active criminal incidents contact the appropriate authorities. Payments are processed by Stripe. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
     jsonLd: [
       breadcrumbFor("Unlock", "/unlock"),
@@ -488,24 +488,6 @@ const ROUTES: Record<string, RouteShell> = {
               offers: {
                 "@type": "Offer",
                 price: "9.00",
-                priceCurrency: "USD",
-                url: "https://tomodachi.pw/unlock",
-                availability: "https://schema.org/InStock",
-                seller: PUBLISHER_ORG,
-              },
-            },
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            item: {
-              "@type": "Product",
-              name: "30-min Recovery Consult",
-              description:
-                "One scheduled call with a security-aware operator. Written follow-up summary within 24 hours.",
-              offers: {
-                "@type": "Offer",
-                price: "49.00",
                 priceCurrency: "USD",
                 url: "https://tomodachi.pw/unlock",
                 availability: "https://schema.org/InStock",

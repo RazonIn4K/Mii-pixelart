@@ -37,8 +37,9 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   `docs/adr/0003-human-in-loop-moderation.md`; AI assistance is advisory and
   has no enforcement authority.
 - Consult channel ownership does not by itself complete paid fulfillment.
-  Before launch, verify the purchase notification, scheduling/intake, and
-  promised written follow-up workflow for the 30-minute consult.
+  Keep `CONSULT_SALES_ENABLED=false` until the purchase notification,
+  scheduling/intake, and promised written follow-up workflow for the 30-minute
+  consult passes an end-to-end staging test.
 - Confirm 13+ policy, seven-day deletion grace, 90-day report-text cleanup, and
   two-year minimal moderation retention with the legal operator.
 - Confirm that Stripe is configured for the intended merchant account and tax
@@ -46,6 +47,13 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   registration, filing, collection, or remittance duties.
 - Recheck current Workers, D1, R2, and Images pricing and approve any paid Images
   transformation usage.
+- The deterministic 640 px project-preview PNG renderer measured roughly
+  61–79 ms on the 2026-07-13 local release host. The current Workers Free plan
+  allows only 10 ms of CPU per request, so a writable staging or production
+  release is blocked until Workers Paid is approved or the renderer is proven
+  below the applicable [Workers CPU limit](https://developers.cloudflare.com/workers/platform/limits/).
+  The first community-read-only bootstrap is not blocked because the mutation
+  gate rejects creation saves before preview rendering runs.
 
 ## Local preflight (no remote side effects)
 
@@ -99,6 +107,11 @@ Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`,
 per user; do not merge it into the 60-per-minute social lane. The AI and Stripe
 bindings independently limit AI chat and Stripe checkout/session to 10 requests
 per minute per privacy-preserving client key.
+
+`CONSULT_SALES_ENABLED` is a non-secret string variable and must be explicitly
+`"false"` or `"true"` in every environment. Only the exact value `"true"`
+enables the consult catalog entry and checkout; all other runtime values fail
+closed. Recovery and support products are unaffected.
 
 `pnpm test:preflight` and every target-specific Worker dry run validate all
 seven rate-limit binding names, limits, periods, and environment-isolated
@@ -216,7 +229,9 @@ IDs. The wrapper requires a private regular file and validates its fields
 without logging their values. Inspect the flattened output config before every
 deploy.
 
-Readiness schema version 2 requires an explicit `deploymentPhase`. Use
+Readiness schema version 3 requires an explicit `deploymentPhase`, a
+`stripe.consultSalesEnabled` value matching the selected Wrangler environment,
+and an explicit `confirmations.consultFulfillmentTestPassed` boolean. Use
 `standard` for every writable deploy and every deploy after the first
 privileged account has been assigned. Two target-specific bootstrap phases,
 `staging-read-only-bootstrap` and `production-read-only-bootstrap`, break the
@@ -224,7 +239,9 @@ first-account dependency. Both require
 `COMMUNITY_MUTATIONS_ENABLED=false`, null admin/moderator IDs,
 `adminModeratorAssigned=false`, an explicit
 `bootstrapReadOnlyApproved=true`, and no existing privileged users in the
-selected remote D1 database. Production bootstrap additionally requires passed
+selected remote D1 database. Bootstrap requires both consult values to be
+false. Any later approval with consult sales enabled requires the fulfillment
+test confirmation to be true. Production bootstrap additionally requires passed
 staging acceptance and explicit production cutover approval. The wrapper
 verifies the empty role state before it builds. Missing, legacy, cross-target,
 or contradictory phase fields fail closed. Every `standard` deploy
@@ -280,12 +297,13 @@ After explicit approval for resources and staging deployment:
    enable community mutations only in a later reviewed artifact used for
    authenticated write acceptance. Stop if the generated artifact contains the
    production hostname or if the staging hostname is already claimed.
-   - For the first deployment only, use readiness schema 2 with
+   - For the first deployment only, use readiness schema 3 with
      `deploymentPhase=staging-read-only-bootstrap`. Keep both privileged IDs
      null, `adminModeratorAssigned=false`,
      `writableCommunityDeployApproved=false`, and
-     `bootstrapReadOnlyApproved=true`. Do not use this phase if any admin or
-     moderator already exists.
+     `bootstrapReadOnlyApproved=true`. Keep `stripe.consultSalesEnabled=false`
+     and `confirmations.consultFulfillmentTestPassed=false`. Do not use this
+     phase if any admin or moderator already exists.
    - After the read-only Worker and staging hostname are available, the named
      admin signs in with the approved Google account. A separately staffed
      moderator signs in too when one will be assigned. OAuth provisioning
@@ -352,7 +370,8 @@ domain cutover:
 5. The first production deployment uses
    `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
    production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
-   staging acceptance and rollback readiness, and verify the generated config
+   staging acceptance and rollback readiness, keep consult sales and its
+   fulfillment-test confirmation false, and verify the generated config
    contains exactly `{ "pattern": "tomodachi.pw", "custom_domain": true }`.
    Immediately before the approved deploy, detach `tomodachi.pw` from the Pages
    project through the audited Cloudflare control plane; a Worker Custom Domain
@@ -386,6 +405,9 @@ availability, or privacy regression.
    `COMMUNITY_MUTATIONS_ENABLED=false` in a reviewed build and deploy it) to
    disable community mutations while preserving anonymous Studio and the
    documented operational routes.
+   Keep `CONSULT_SALES_ENABLED=false` unless that exact rollback artifact still
+   has a proven, staffed fulfillment path; a Pages rollback must not silently
+   re-enable consult checkout.
 2. For a Worker-code rollback, deploy the last known-good Worker version without
    changing the Custom Domain. For a Pages rollback, remove the Worker Custom
    Domain through the audited Cloudflare control plane, reattach

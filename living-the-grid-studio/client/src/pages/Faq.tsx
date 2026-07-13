@@ -115,7 +115,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "How can I support the project?",
         answer:
-          "Three ways: drop a tip on /support ($5, $15, or $25 via Stripe), pick up the paid recovery checklist or 30-min consult on /unlock, or watch the GitHub repo for the Sponsor button once the application is approved.",
+          "Three ways: drop a tip on /support ($5, $15, or $25 via Stripe), pick up the paid recovery checklist on /unlock, or watch the GitHub repo for the Sponsor button once the application is approved. Consult bookings are temporarily paused while fulfillment is verified.",
         links: [
           { label: "Tip jar", href: "/support" },
           { label: "Paid recovery content", href: "/unlock" },

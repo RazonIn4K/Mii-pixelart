@@ -72,7 +72,7 @@ export const onRequest = async (
     if (method === "GET" && subpath === "products") {
       const url = new URL(context.request.url);
       const categoryFilter = url.searchParams.get("category");
-      const products = listPublicProducts()
+      const products = listPublicProducts(env)
         .filter(
           (product) => !categoryFilter || product.category === categoryFilter,
         )
