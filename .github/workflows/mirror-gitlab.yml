@@ -1,0 +1,63 @@
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: [main]
+    tags: ["*"]
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Mirror main and tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Push canonical refs to GitLab
+        shell: bash
+        env:
+          GITLAB_KNOWN_HOSTS: ${{ vars.GITLAB_KNOWN_HOSTS }}
+          GITLAB_MIRROR_SSH_KEY: ${{ secrets.GITLAB_MIRROR_SSH_KEY }}
+          GITLAB_MIRROR_URL: ${{ vars.GITLAB_MIRROR_URL }}
+        run: |
+          set -euo pipefail
+
+          test -n "${GITLAB_KNOWN_HOSTS}"
+          test -n "${GITLAB_MIRROR_SSH_KEY}"
+          case "${GITLAB_MIRROR_URL}" in
+            git@gitlab.com:*) ;;
+            *) echo "GITLAB_MIRROR_URL must use GitLab.com SSH." >&2; exit 1 ;;
+          esac
+
+          umask 077
+          install -d "${HOME}/.ssh"
+          printf '%s\n' "${GITLAB_MIRROR_SSH_KEY}" > "${HOME}/.ssh/id_ed25519"
+          printf '%s\n' "${GITLAB_KNOWN_HOSTS}" > "${HOME}/.ssh/known_hosts"
+          trap 'rm -f "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/known_hosts"' EXIT
+
+          export GIT_SSH_COMMAND="ssh -i ${HOME}/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${HOME}/.ssh/known_hosts"
+
+          git remote add gitlab "${GITLAB_MIRROR_URL}"
+          git fetch --prune origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch --tags origin
+          git push gitlab refs/remotes/origin/main:refs/heads/main
+          git push gitlab --tags
+
+          github_sha="$(git rev-parse refs/remotes/origin/main)"
+          gitlab_sha="$(git ls-remote gitlab refs/heads/main | awk '{print $1}')"
+          test "${github_sha}" = "${gitlab_sha}"
+          echo "GitLab main matches GitHub main at ${github_sha}."
