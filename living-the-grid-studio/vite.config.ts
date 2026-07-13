@@ -1,11 +1,9 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
-import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import {
   getOpenRouterModels,
   getOpenRouterStatus,
@@ -340,15 +338,10 @@ function vitePluginStripeApi(): Plugin {
   };
 }
 
-// Manus dev tooling (vitePluginManusRuntime + vitePluginManusDebugCollector)
-// was injecting ~366KB of console/network capture runtime into every PROD HTML
-// response. That's bigger than the actual app bundle (~190KB gzipped).
-// Gate both behind dev-mode only so production stays lean. Same logic for
-// jsxLocPlugin which only matters for source-map UX in the dev editor.
+// Keep the local debug collector out of production HTML. Third-party Manus
+// runtime and source-location plugins are intentionally not part of this app.
 const isDev = process.env.NODE_ENV !== "production";
-const devOnlyPlugins = isDev
-  ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()]
-  : [];
+const devOnlyPlugins = isDev ? [vitePluginManusDebugCollector()] : [];
 
 const plugins = [
   react(),
