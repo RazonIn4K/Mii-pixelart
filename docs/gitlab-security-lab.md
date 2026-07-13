@@ -23,16 +23,18 @@ the place where a blocked mirror is fixed.
 
 ## One-time baseline
 
-Run one manual pipeline on `main` with:
+Run one manual pipeline on `main` and enable the typed pipeline input:
 
 ```text
-SECRET_DETECTION_HISTORIC_SCAN=true
+historic_secret_scan = true
 ```
 
+The input maps to GitLab's `SECRET_DETECTION_HISTORIC_SCAN` analyzer variable.
 Historic secret scanning is intentionally a one-time operation because it scans
-the repository history. Triage findings without copying any detected value into
-an issue, log, chat, or pull request. Remediation is made through a GitHub branch
-and pull request, then mirrored back to GitLab.
+the repository history. Leave the input at its safe `false` default for later
+pipelines. Triage findings without copying any detected value into an issue,
+log, chat, or pull request. Remediation is made through a GitHub branch and pull
+request, then mirrored back to GitLab.
 
 Download the SAST, secret-detection, dependency, and CycloneDX artifacts after
 the baseline. Confirmed work belongs in GitHub issues or pull requests, not a
