@@ -157,7 +157,7 @@ const ROUTES: Record<string, RouteShell> = {
       'A browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides for Tomodachi Life players.',
     h1: 'Tomodachi · Mii Studio & Recovery Guides',
     body: `
-      <p>Tomodachi is two things stacked on one site. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for Mii face masks — import a face photo or character art, reduce the colors against the in-game Tomodachi Life: Living the Dream palette, and export a paint-by-numbers reference you can recreate on a real 3DS.</p>
+      <p>Tomodachi is two things stacked on one site. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for planning Mii-inspired face art — import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation. It does not transfer game files or connect directly to a Nintendo title.</p>
       <p>The <a href="/guides">guides</a> and the free <a href="/help">recovery help</a> page are for visitors arriving from the Tomodachishare credential leak — calm, free, no-spam steps to rotate passwords and lock down accounts.</p>
       <h2>What's inside</h2>
       <ul>
@@ -187,14 +187,14 @@ const ROUTES: Record<string, RouteShell> = {
   '/studio': {
     title: 'Studio · Tomodachi',
     description:
-      'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the in-game palette, export a paint-by-numbers reference pack.',
+      'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio working palette, and export a manual Copy Guide.',
     h1: 'Tomodachi Studio',
     body: `
-      <p>A browser-first pixel-art editor for designing custom Mii face masks square-by-square. Import a face photo, character art, or JSON file; reduce noise against the 84-color Tomodachi Life: Living the Dream palette; export editable JSON, guide PNGs, and a ZIP reference pack with a palette sheet, paint order, and reference HTML.</p>
+      <p>A browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo, character art, or JSON file; reduce noise against the Studio's 84-color working palette; export editable JSON, guide PNGs, and a ZIP Copy Guide with a palette sheet, paint order, and reference HTML. The palette and grid dimensions are Studio conventions, not verified proprietary game data.</p>
       <h2>Features</h2>
       <ul>
         <li>Import any image or LTG JSON file.</li>
-        <li>84-color in-game palette labeled by row and column for exact matching.</li>
+        <li>Studio 84-color working palette labeled by row and column for consistent manual matching.</li>
         <li>Color-reduction optimizer that preserves facial readability.</li>
         <li>AI assistant for sketch drafts (OpenRouter, free tier).</li>
         <li>Reference pack export — ZIP with JSON, guide PNGs, palette sheet, paint order, and reference HTML.</li>
@@ -208,7 +208,7 @@ const ROUTES: Record<string, RouteShell> = {
         name: 'Tomodachi Studio',
         url: 'https://tomodachi.pw/studio',
         description:
-          'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the 84-color in-game palette, export a paint-by-numbers reference pack.',
+          'Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio 84-color working palette, and export a manual Copy Guide.',
         applicationCategory: 'DesignApplication',
         applicationSubCategory: 'Pixel Art Editor',
         operatingSystem: 'Any',
@@ -284,13 +284,13 @@ const ROUTES: Record<string, RouteShell> = {
       'Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and how this site is funded.',
     h1: 'Frequently asked questions',
     body: `
-      <h2>Tomodachi Life as a game</h2>
+      <h2>Tomodachi Life releases</h2>
       <h3>Is Tomodachi Life still playable in 2026?</h3>
-      <p>Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The eShop is closed so you can't buy it digitally anymore, but cartridges and previously-downloaded copies work fine.</p>
+      <p>Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.</p>
       <h3>Can I make my Mii look like a real person?</h3>
-      <p>Yes. The 3DS Mii Maker has a Look-Alike Mii tool that generates a rough Mii from a front-camera photo. The <a href="/guides#mii-creation">Mii creation guide</a> walks through the fine-tuning.</p>
+      <p>Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. The <a href="/guides#mii-creation">Mii creation guide</a> clearly labels the legacy workflow.</p>
       <h3>What's a Mii face mask?</h3>
-      <p>A wearable in-game item that lets a Mii put on a custom face painted square-by-square. The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers reference.</p>
+      <p>The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.</p>
       <h2>The Tomodachishare breach</h2>
       <h3>What was the Tomodachishare breach?</h3>
       <p>A credential dump from the Tomodachishare community site exposed email addresses and password hashes. Reused passwords elsewhere are now at elevated risk.</p>
@@ -316,7 +316,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: 'Is Tomodachi Life still playable in 2026?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The 3DS eShop is closed so you cannot buy it digitally anymore, but cartridges and previously-downloaded copies work fine.',
+              text: 'Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.',
             },
           },
           {
@@ -324,7 +324,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: 'Can I make my Mii look like a real person?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Yes. The 3DS Mii Maker has a Look-Alike Mii tool that generates a rough Mii from a front-camera photo. The Mii creation guide walks through the fine-tuning.',
+              text: 'Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio only provides a manual Copy Guide.',
             },
           },
           {
@@ -332,7 +332,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: 'What is a Mii face mask?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'A wearable in-game item that lets a Mii put on a custom face painted square-by-square. The Studio converts a photo or character image into a paint-by-numbers reference.',
+              text: 'Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.',
             },
           },
           {

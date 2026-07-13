@@ -183,7 +183,7 @@ export default function PalettePanel({
 
       {/* Full Palette Reference */}
       <div className="border-t border-border px-4 py-3">
-        <p className="section-header mb-2">Game Palette Reference</p>
+        <p className="section-header mb-2">Studio Palette Reference</p>
         <div className="grid grid-cols-7 gap-0.5">
           {TOMODACHI_PALETTE.filter((c) => !c.isSaturated)
             .slice(0, 77)

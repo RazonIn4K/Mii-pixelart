@@ -11,11 +11,11 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for Mii face masks. Import a face photo or character art, reduce the colors against the in-game Tomodachi Life: Living the Dream palette, and export a paint-by-numbers reference you can recreate on a real 3DS. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
+Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
 ## Why this exists
 
-The 3DS touch editor is fine for freehand sketching but brutal for anything reference-based. Recreating a face from a photo means picking colors one at a time from a tiny on-screen palette while squinting at a print-out next to the console. A desktop editor that snaps to the same 84-color palette and exports a paint-by-numbers reference is 10x faster, and works on phones too.
+Freeform console editors are fine for sketching but difficult for reference-based work. Recreating a face from a photo means choosing colors manually while comparing the source on another screen. A browser editor that reduces the image to a consistent 84-color working palette and exports a paint-by-numbers Copy Guide makes that planning easier, and it works on phones too. The palette and grid dimensions are Studio conventions rather than verified proprietary game data.
 
 The recovery section came later. When the Tomodachishare leak hit, players started showing up to community channels looking for somewhere calm and free to learn what to do next. So this site does both: a real tool for a hobby, and a soft landing for people in a bad week.
 
@@ -23,8 +23,8 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 **Studio** — [`/studio`](https://tomodachi.pw/studio)
 
-- 16×16 through 256×256 import/detail presets that snap to the 84-color Tomodachi Life: Living the Dream palette
-- Every color labeled by row + column (R9C5, R10C1, etc.) for exact in-game matching
+- 16×16 through 256×256 import/detail presets that reduce images to the Studio's 84-color working palette
+- Every color labeled by row + column (R9C5, R10C1, etc.) for consistent manual matching in the Copy Guide
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
 - Account-gated AI sketch assistant with local per-user chat sessions, explicit grid-snapshot consent, validation, visual review, and one-step undoable apply
@@ -96,7 +96,7 @@ See [`worker/documents.ts`](./worker/documents.ts) for the implementation.
 ```mermaid
 flowchart LR
     IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> FRAME[Crop + frame source<br/>face / head / full image]
-    FRAME --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
+    FRAME --> QUANT[Color reduction<br/>Studio 84-color<br/>working palette]
     QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
     PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}
@@ -104,7 +104,7 @@ flowchart LR
     SKETCH --> GRID
     AI -- no --> EXPORT[Reference export<br/>ZIP pack or individual assets<br/>JSON + guide PNGs<br/>palette sheet + HTML]
     GRID --> EXPORT
-    EXPORT --> COPY([Copy on 3DS])
+    EXPORT --> COPY([Recreate manually<br/>with Copy Guide])
 
     classDef io fill:#fff7e8,stroke:#d94f4f,color:#101016,stroke-width:2px
     classDef step fill:#f5f5f5,stroke:#666,color:#101016

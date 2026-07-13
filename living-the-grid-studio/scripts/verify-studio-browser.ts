@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import http from "node:http";
+import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 
@@ -109,7 +110,7 @@ const MASCOT_FIXTURE = path.join(generatedFixtureDir, "smoke-mascot.bmp");
 const SPRITE_FIXTURE = path.join(generatedFixtureDir, "smoke-sprite.bmp");
 const EMBLEM_FIXTURE = path.join(generatedFixtureDir, "smoke-emblem.bmp");
 const ICON_FIXTURE = path.join(generatedFixtureDir, "smoke-icon.bmp");
-const chromePort = 9400 + Math.floor(Math.random() * 1000);
+const chromePort = randomInt(9400, 10400);
 let chromeProcess: ChildProcessWithoutNullStreams | null = null;
 let cdp: CdpClient | null = null;
 let navigationCount = 0;
@@ -231,7 +232,9 @@ async function main(): Promise<void> {
 
     await clickByText(cdp, "Import", "mouse");
     await waitFor(() =>
-      cdp!.evaluate<boolean>("Boolean(document.querySelector('#ltg-image-input'))"),
+      cdp!.evaluate<boolean>(
+        "Boolean(document.querySelector('#ltg-image-input'))",
+      ),
     );
     await uploadFile(cdp, "#ltg-image-input", JPG_FIXTURE);
     await waitFor(() =>
@@ -381,7 +384,7 @@ async function main(): Promise<void> {
       "document.body.innerText",
     );
     assert.ok(
-      jsonImportText.includes("has no exact game swatch") ||
+      jsonImportText.includes("has no exact Studio swatch") ||
         jsonImportText.includes("Delta E"),
       "real LTG JSON import should surface mapping warnings",
     );
@@ -390,7 +393,9 @@ async function main(): Promise<void> {
     writeFileSync(unsupportedFixture, "not importable");
     await clickByText(cdp, "Import", "mouse");
     await waitFor(() =>
-      cdp!.evaluate<boolean>("Boolean(document.querySelector('#ltg-image-input'))"),
+      cdp!.evaluate<boolean>(
+        "Boolean(document.querySelector('#ltg-image-input'))",
+      ),
     );
     await uploadFile(cdp, "#ltg-image-input", unsupportedFixture);
     await waitFor(() =>

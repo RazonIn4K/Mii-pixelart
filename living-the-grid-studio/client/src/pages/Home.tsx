@@ -80,7 +80,7 @@ const featureCards = [
   {
     icon: Palette,
     eyebrow: "Stay accurate",
-    title: "84 game-ready colors",
+    title: "84-color working palette",
     description:
       "Every swatch has a stable row-and-column ID, so your guide stays reproducible.",
     className: "bg-[var(--island-yellow-soft)]",

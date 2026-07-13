@@ -1,9 +1,9 @@
 /**
- * palette.ts — Tomodachi Life: Living the Dream game palette
+ * palette.ts — Tomodachi Studio working palette
  *
- * DESIGN: "Paper Studio" — this module provides the 84-color game palette
- * (77 base shades + 7 fully saturated extras) used by the Palette House.
- * Each color is labeled by row and column for easy in-game matching.
+ * DESIGN: "Paper Studio" — this module provides an original 84-color working
+ * palette (77 base shades + 7 fully saturated extras). It is an editing aid,
+ * not a verified Nintendo palette or a claim about proprietary game data.
  */
 
 export interface PaletteColor {
@@ -15,18 +15,18 @@ export interface PaletteColor {
   hex: string;
   /** RGB tuple */
   rgb: [number, number, number];
-  /** Row index (1-based) in the game palette grid */
+  /** Row index (1-based) in the Studio palette grid */
   row: number;
-  /** Column index (1-based) in the game palette grid */
+  /** Column index (1-based) in the Studio palette grid */
   col: number;
   /** Whether this is one of the 7 fully saturated extras */
   isSaturated: boolean;
 }
 
 /**
- * The complete Tomodachi Life: Living the Dream palette.
+ * Tomodachi Studio's 84-color working palette.
  * Organized as 11 rows x 7 columns (77 base) + 7 saturated extras.
- * Colors are approximations based on community-documented values.
+ * These are Studio-defined colors and are not verified as game values.
  */
 export const TOMODACHI_PALETTE: PaletteColor[] = [
   // Row 1: Reds

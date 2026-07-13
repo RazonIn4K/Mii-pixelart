@@ -340,7 +340,7 @@ function mapHexToPaletteId(
       exactMatches.find((color) => !color.isSaturated) ?? exactMatches[0];
     if (exactMatches.length > 1) {
       warnings.push(
-        `Palette index ${sourceIndex} (${hex}) matches multiple game swatches; mapped to ${preferred.id}.`,
+        `Palette index ${sourceIndex} (${hex}) matches multiple Studio swatches; mapped to ${preferred.id}.`,
       );
     }
     return {
@@ -361,7 +361,7 @@ function mapHexToPaletteId(
     b: match.color.rgb[2],
   });
   warnings.push(
-    `Palette index ${sourceIndex} (${hex}) has no exact game swatch; mapped to ${match.color.id} at Delta E ${distance.toFixed(2)}.`,
+    `Palette index ${sourceIndex} (${hex}) has no exact Studio swatch; mapped to ${match.color.id} at Delta E ${distance.toFixed(2)}.`,
   );
 
   return {

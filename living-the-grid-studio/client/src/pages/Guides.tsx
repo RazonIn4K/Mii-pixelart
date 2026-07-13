@@ -123,7 +123,7 @@ const LONG_GUIDES: LongGuide[] = [
     icon: ScanFace,
     title: "How to make custom Miis for Tomodachi Life",
     tagline:
-      "Mii Maker tricks, face presets, hair, eyes, eyebrows, and the small adjustments that take a Mii from 'okay' to 'looks like the person'.",
+      "A clearly labeled legacy 3DS Mii Maker workflow, plus where the separate Living the Dream creation paths fit.",
     body: (
       <>
         <p>
@@ -134,7 +134,17 @@ const LONG_GUIDES: LongGuide[] = [
           default templates.
         </p>
 
-        <h4 className="font-semibold mt-4">Start from a real face, not a blank slate</h4>
+        <h4 className="font-semibold mt-4">Choose the workflow for your game</h4>
+        <p>
+          The steps below are for the original Tomodachi Life and Mii Maker on
+          Nintendo 3DS or 2DS. Tomodachi Life: Living the Dream is a separate
+          Nintendo Switch title released on April 16, 2026, with its own Get
+          Help and From Scratch creation paths. Tomodachi Studio does not
+          transfer projects into either title; its Copy Guide is a manual
+          reference.
+        </p>
+
+        <h4 className="font-semibold mt-4">Legacy 3DS: start from a real face</h4>
         <p>
           The 3DS Mii Maker has a built-in "Look-Alike Mii" tool: from the home
           menu open Mii Maker, then Start from Scratch, then choose "Look-Alike
@@ -144,10 +154,9 @@ const LONG_GUIDES: LongGuide[] = [
           rough head shape and skin tone, then go in by hand for everything else.
         </p>
         <p>
-          On a Wii U, use the same flow from the Mii Maker app via the GamePad
-          camera. On the Nintendo Switch (Tomodachi Life isn't on Switch, but
-          your Miis travel via QR), the System Settings Mii editor has the same
-          starting point.
+          On a Wii U, the comparable legacy flow starts in the Mii Maker app
+          with the GamePad camera. This QR-era workflow is distinct from Living
+          the Dream's Get Help and From Scratch tools on Nintendo Switch.
         </p>
 
         <h4 className="font-semibold mt-4">Eyes first, then mouth, then everything else</h4>
@@ -422,16 +431,17 @@ const LONG_GUIDES: LongGuide[] = [
   {
     id: "qr-and-backup",
     icon: QrCode,
-    title: "Tomodachi Life QR codes, Mii sharing, and save backup",
+    title: "Legacy 3DS Tomodachi Life QR codes and save backup",
     tagline:
-      "How to share Miis with friends, scan QR codes from the wider community, and back up your save before the hardware finally dies.",
+      "A legacy 3DS/Wii U QR-sharing and save-preservation workflow, separate from Living the Dream on Nintendo Switch.",
     body: (
       <>
         <p>
-          Tomodachi Life shipped before the era of always-on cloud saves, which
-          means the responsibility for protecting your island sits with you.
-          The good news: QR codes and the SD card backup pathway are reliable
-          if you set them up before something breaks.
+          This section applies to the original Tomodachi Life on Nintendo 3DS
+          or 2DS and its legacy Mii Maker QR workflow. Tomodachi Life: Living
+          the Dream is a separate Nintendo Switch title, and Tomodachi Studio
+          does not bridge save files or online sharing between either game.
+          Verify any backup pathway before changing or deleting source data.
         </p>
 
         <h4 className="font-semibold mt-4">Exporting a Mii as a QR code</h4>
@@ -532,9 +542,9 @@ const GUIDES_STRUCTURED_DATA = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to make custom Miis for Tomodachi Life",
+    name: "Legacy 3DS workflow for making custom Miis for Tomodachi Life",
     description:
-      "Step-by-step process for designing recognizable custom Miis: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants in Mii Maker before they're locked into the game save.",
+      "A legacy Nintendo 3DS Mii Maker workflow: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants before importing into the original Tomodachi Life.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#mii-creation",
     image: "https://tomodachi.pw/community-og.jpg",
@@ -543,8 +553,8 @@ const GUIDES_STRUCTURED_DATA = [
       {
         "@type": "HowToStep",
         position: 1,
-        name: "Start from a Look-Alike Mii, not a blank slate",
-        text: "Open Mii Maker on the 3DS, choose Start from Scratch, then Look-Alike Mii. Use the camera to seed the head shape and skin tone. Output is almost always wrong but faster to fix than to build from blank.",
+        name: "Legacy 3DS: start from a Look-Alike Mii",
+        text: "For the original Tomodachi Life workflow, open Mii Maker on the 3DS, choose Start from Scratch, then Look-Alike Mii. Use the camera output as a rough starting point before manual edits.",
       },
       {
         "@type": "HowToStep",
@@ -605,9 +615,9 @@ const GUIDES_STRUCTURED_DATA = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "Tomodachi Life QR codes, Mii sharing, and save backup",
+    name: "Legacy 3DS Tomodachi Life QR codes, Mii sharing, and save backup",
     description:
-      "How to export Miis as QR codes from a 3DS or Wii U, scan QR codes from the wider community into Tomodachi Life, and back up a Tomodachi Life save before the hardware dies.",
+      "A legacy workflow for exporting Miis as QR codes from a 3DS or Wii U, scanning those QR codes into the original Tomodachi Life, and preserving its save data.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#qr-and-backup",
     image: "https://tomodachi.pw/community-og.jpg",

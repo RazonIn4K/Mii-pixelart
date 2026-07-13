@@ -44,7 +44,7 @@ export interface GridMeta {
   notes?: string;
 }
 
-/** Mapping from an imported palette entry to a game palette color */
+/** Mapping from an imported palette entry to a Studio working color */
 export interface SourcePaletteMapping {
   sourceIndex: number;
   sourceHex: string;

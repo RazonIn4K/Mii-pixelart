@@ -65,7 +65,7 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/studio": {
     description:
-      "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the in-game palette, export a paint-by-numbers reference pack.",
+      "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio's 84-color working palette, and export a manual Copy Guide.",
     title: "Studio · Tomodachi",
   },
   "/support": {

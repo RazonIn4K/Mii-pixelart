@@ -84,10 +84,11 @@ export default function About() {
             <Link href="/studio" className="underline">
               Studio
             </Link>{" "}
-            is a browser-first pixel-art editor for Mii face masks — import a
-            photo or character art, reduce its colors against the in-game
-            Tomodachi Life: Living the Dream palette, and export a paint-by-
-            numbers reference you can recreate on a real 3DS. The{" "}
+            is a browser-first pixel-art editor for planning Mii-inspired face
+            art — import a photo or character art, reduce its colors against
+            the Studio's 84-color working palette, and export a paint-by-numbers
+            Copy Guide for manual recreation. It does not transfer game files
+            or connect directly to a Nintendo title. The{" "}
             <Link href="/guides" className="underline">
               Guides
             </Link>{" "}
@@ -165,9 +166,10 @@ export default function About() {
                 Studio
               </Link>
               : import → reduce colors → export editable JSON, labeled or clean
-              PNGs, or a ZIP reference pack with a palette sheet, paint order,
-              and reference HTML. 84-color in-game palette with row/column
-              labels for exact matching.
+              PNGs, or a ZIP Copy Guide with a palette sheet, paint order, and
+              reference HTML. The Studio's 84-color working palette uses
+              row/column labels for consistent manual matching; it is not a
+              verified proprietary game palette.
             </li>
             <li>
               <Link href="/" className="underline">

@@ -25,17 +25,17 @@ interface FaqItem {
 
 const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
   {
-    heading: "Tomodachi Life as a game",
+    heading: "Tomodachi Life releases",
     items: [
       {
         question: "Is Tomodachi Life still playable in 2026?",
         answer:
-          "Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The 3DS eShop is closed, so you can no longer buy the game digitally, but if you already own it (cartridge or downloaded), it works exactly as it always did. The online \"Tomodachi Life Travel\" service and StreetPass Plaza shutdowns affected QR-code-based Mii sharing very little; the local QR-code import/export still works. There's no Switch port.",
+          "Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio is an unofficial planning tool: it does not transfer game files or provide an online bridge to either game.",
       },
       {
         question: "Can I make my Mii look like a real person?",
         answer:
-          "Yes — the 3DS Mii Maker has a built-in \"Look-Alike Mii\" tool that generates a rough Mii from a front-camera photo. The output is almost always wrong on details, but it's faster to correct a wrong Mii than to build one from a blank canvas. The Guides page has a step-by-step walkthrough.",
+          "Yes. In the legacy 3DS Mii Maker workflow, the Look-Alike Mii tool can generate a rough starting point from a camera photo. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio can prepare a manual Copy Guide, but it does not import a project into either game. The Guides page explains the legacy 3DS workflow.",
         links: [
           { label: "Mii creation guide", href: "/guides#mii-creation" },
         ],
@@ -43,18 +43,18 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "What's a Mii face mask?",
         answer:
-          "In Tomodachi Life, a Mii face mask is a wearable item that lets a Mii put on a custom face painted square-by-square in-game. The Studio on this site converts a photo or character image into a paint-by-numbers reference so you can repaint that face cell-by-cell without guessing the colors.",
+          "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for planning custom face art. You manually recreate the reference with the drawing tools available in your game; the Studio does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
         links: [{ label: "Try the Studio", href: "/studio" }],
       },
       {
         question: "Why can't I edit a Mii's face after it moves into Tomodachi Life?",
         answer:
-          "Mii face data is locked at the moment the Mii enters a Tomodachi Life apartment. After that, only personality, clothing, and voice are editable in-game. To change the face, you either re-import a fresh version of the Mii from Mii Maker (which replaces the old one and may lose relationships), or accept the existing face. The Studio's pixel-art face-mask path is the workaround — you can change the wearable face mask any time without touching the underlying Mii.",
+          "This question describes the original Tomodachi Life on 3DS, where a resident's underlying Mii face has legacy editing restrictions after import. Tomodachi Life: Living the Dream is a separate Switch title with its own creation tools. Tomodachi Studio only helps plan art for manual recreation; it does not modify a resident or save file.",
       },
       {
         question: "How do I back up my Tomodachi Life save?",
         answer:
-          "Three real options on the 3DS: (1) Nintendo's official system transfer moves saves between 3DS units; (2) some games support save export from System Settings → Data Management to SD card; (3) on a homebrew-enabled 3DS, tools like Checkpoint can copy saves off the system for true off-device backup. The QR & save backup guide covers each in detail.",
+          "For the original 3DS release, the relevant legacy options are Nintendo's system transfer, any supported System Settings data-management path, and third-party save managers on homebrew-enabled hardware. Verify compatibility before changing or deleting anything. This is separate from Tomodachi Life: Living the Dream on Switch, and Tomodachi Studio does not read or back up game saves. The QR & save backup guide covers the legacy workflow.",
         links: [
           { label: "QR + save backup guide", href: "/guides#qr-and-backup" },
         ],
