@@ -4,6 +4,8 @@
 
 **Live site:** [tomodachi.pw](https://tomodachi.pw/)
 
+**Canonical source:** [GitHub](https://github.com/RazonIn4K/Mii-pixelart). GitLab is used only as a private continuity mirror; issues, pull requests, and releases belong on GitHub.
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-101016?style=flat-square)](./living-the-grid-studio/LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-d94f4f?style=flat-square)](https://tomodachi.pw/support)
 
