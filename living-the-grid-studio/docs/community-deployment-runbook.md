@@ -2,7 +2,7 @@
 
 **Status:** Implementation runbook; remote execution is not authorized by this
 document.
-**Last checked against Cloudflare documentation:** 2026-07-10
+**Last checked against Cloudflare documentation:** 2026-07-13
 
 This runbook supersedes the compute portion of `cloudflare-deployment.md` only
 after the Worker cutover. Until then, the existing Pages project remains the
@@ -153,6 +153,15 @@ Cloudflare documents this direct binding model in the
   Worker-generated responses, headers, or metadata. Treat the route patterns in
   `wrangler.jsonc` as the source of truth and review the flattened output config
   before deployment.
+- Each remote environment declares exactly one Worker Custom Domain:
+  `staging.tomodachi.pw` for staging and `tomodachi.pw` for production. The
+  release wrapper rejects a missing, additional, cross-target, or non-custom
+  route in both the source and Vite-generated configurations before Wrangler
+  can deploy. Local development declares no public route.
+- Every target explicitly sets `workers_dev` and `preview_urls` to `false`.
+  The release wrapper validates both source and generated configurations so an
+  unreviewed `*.workers.dev` or version-preview origin cannot bypass the exact
+  hostname, cookie, CSP, OAuth, or canonical-URL contract.
 - Dynamic Worker responses receive CSP and all security headers in middleware.
   Static responses continue to receive the audited `_headers` policy. Keep the
   two script policies aligned; local Worker fallback must not block Vite's
@@ -238,12 +247,16 @@ After explicit approval for resources and staging deployment:
    environment.
 4. List unapplied migrations against the **database name**, review the output,
    then apply them only after the migration approval gate.
-5. Run `pnpm worker:dry-run:staging`, inspect the generated output
-   configuration, then deploy that exact output Worker to its staging hostname
-   after the separate deployment approval. The first deployment remains
-   read-only; enable community mutations only in a later reviewed artifact used
-   for authenticated write acceptance. Do not attach the production hostname or
-   route.
+5. Confirm `staging.tomodachi.pw` has no conflicting DNS record or Custom
+   Domain, run `pnpm worker:dry-run:staging`, and inspect the generated output
+   configuration. It must contain exactly
+   `{ "pattern": "staging.tomodachi.pw", "custom_domain": true }`.
+   After the separate deployment-and-domain approval, deploy that exact output;
+   Wrangler will attach the declared Custom Domain and Cloudflare will create
+   its DNS record and certificate. The first deployment remains read-only;
+   enable community mutations only in a later reviewed artifact used for
+   authenticated write acceptance. Stop if the generated artifact contains the
+   production hostname or if the staging hostname is already claimed.
    - For the first deployment only, use readiness schema 2 with
      `deploymentPhase=staging-read-only-bootstrap`. Keep both privileged IDs
      null, `adminModeratorAssigned=false`,
@@ -316,11 +329,18 @@ domain cutover:
 5. The first production deployment uses
    `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
    production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
-   staging acceptance and rollback readiness, atomically install the production
-   secrets, and attach `tomodachi.pw`. Verify TLS, assets, SPA fallback, dynamic
-   documents, API headers, Stripe webhook, AI routes, robots/sitemap, and no
-   Pages/Worker route overlap before continuing. If this read-only cutover fails,
-   route immediately back to the recorded Pages deployment.
+   staging acceptance and rollback readiness, and verify the generated config
+   contains exactly `{ "pattern": "tomodachi.pw", "custom_domain": true }`.
+   Immediately before the approved deploy, detach `tomodachi.pw` from the Pages
+   project through the audited Cloudflare control plane; a Worker Custom Domain
+   cannot take over a hostname with a conflicting record or product attachment.
+   Deploy the reviewed artifact to atomically install the production secrets and
+   attach the Worker Custom Domain, which creates its DNS record and certificate.
+   Keep the recorded Pages deployment available at its immutable `pages.dev`
+   URL. Verify TLS, assets, SPA fallback, dynamic documents, API headers, Stripe
+   webhook, AI routes, robots/sitemap, and no Pages/Worker route overlap before
+   continuing. If this read-only cutover fails, remove the partial Worker Custom
+   Domain and immediately restore `tomodachi.pw` to the recorded Pages deployment.
 6. The named production admin signs in through the production Google client,
    reads only the internal UUID from `/api/auth/session`, and is promoted with
    the same narrowly scoped, exactly-one-row D1 procedure used in staging.
@@ -343,8 +363,12 @@ availability, or privacy regression.
    `COMMUNITY_MUTATIONS_ENABLED=false` in a reviewed build and deploy it) to
    disable community mutations while preserving anonymous Studio and the
    documented operational routes.
-2. Route `tomodachi.pw` back to the recorded Pages deployment or last known-good
-   Worker version.
+2. For a Worker-code rollback, deploy the last known-good Worker version without
+   changing the Custom Domain. For a Pages rollback, remove the Worker Custom
+   Domain through the audited Cloudflare control plane, reattach
+   `tomodachi.pw` to the recorded Pages deployment, and verify DNS/TLS plus the
+   immutable Pages URL before reopening traffic. Never leave both products
+   claiming the hostname.
 3. Do **not** roll back D1 by deleting tables or reversing an applied migration.
    Deploy code compatible with the current schema; repair data only through a
    reviewed forward migration/script.

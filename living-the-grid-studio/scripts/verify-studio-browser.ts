@@ -793,6 +793,12 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
       "document.body.textContent.includes('AI Draw')",
     ),
   );
+  await clickByText(cdpClient, "Advanced AI settings", "mouse");
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      "Boolean(document.querySelector('details[open] button[aria-label=\"AI model\"]'))",
+    ),
+  );
   const openedModelPicker = await cdpClient.evaluate<boolean>(`(() => {
     const label = [...document.querySelectorAll('label')]
       .find((candidate) => candidate.textContent.trim() === 'Model');
@@ -822,6 +828,24 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
       `AI model picker should retain free preset: ${preset.label}`,
     );
   }
+
+  const selectedCurrentModel = await cdpClient.evaluate<boolean>(`(() => {
+    const option = document.querySelector('[role="option"][aria-selected="true"]');
+    if (!(option instanceof HTMLElement)) return false;
+    option.click();
+    return true;
+  })()`);
+  assert.equal(
+    selectedCurrentModel,
+    true,
+    "AI model picker should close through a visible selection",
+  );
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      `document.querySelectorAll('[role="option"]').length === 0 &&
+        document.querySelector('button[aria-label="AI model"]')?.getAttribute('aria-expanded') !== 'true'`,
+    ),
+  );
 
   const status = await cdpClient.evaluate<{
     configured?: boolean;
@@ -859,14 +883,6 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
     ),
     "AI model presets should match the curated shared preset list",
   );
-  await cdpClient.send("Input.dispatchKeyEvent", {
-    key: "Escape",
-    type: "keyDown",
-  });
-  await cdpClient.send("Input.dispatchKeyEvent", {
-    key: "Escape",
-    type: "keyUp",
-  });
 }
 
 function spawnChrome(
@@ -989,7 +1005,7 @@ async function clickByText(
     x: number;
     y: number;
   } | null>(`(() => {
-    const candidates = [...document.querySelectorAll('button,[role="tab"],label')];
+    const candidates = [...document.querySelectorAll('button,[role="tab"],label,summary')];
     const element = candidates.find((candidate) => {
       const rect = candidate.getBoundingClientRect();
       return rect.width > 0 &&
@@ -1015,7 +1031,7 @@ async function clickByText(
       text: string;
       url: string;
     }>(`({
-      buttons: [...document.querySelectorAll('button,[role="tab"],label')]
+      buttons: [...document.querySelectorAll('button,[role="tab"],label,summary')]
         .filter((candidate) => {
           const rect = candidate.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
@@ -1035,7 +1051,7 @@ async function clickByText(
   if (mode === "js") {
     await cdpClient.evaluate(
       `(() => {
-        const candidates = [...document.querySelectorAll('button,[role="tab"],label')];
+        const candidates = [...document.querySelectorAll('button,[role="tab"],label,summary')];
         const element = candidates.find((candidate) => {
           const rect = candidate.getBoundingClientRect();
           return rect.width > 0 &&

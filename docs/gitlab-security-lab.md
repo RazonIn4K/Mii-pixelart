@@ -13,13 +13,39 @@ The root `.gitlab-ci.yml` includes only GitLab security analyzers:
 - SBOM-based dependency scanning.
 
 Normal mirror pushes do not create GitLab pipelines. A pipeline must be started
-from **Build > Pipelines > New pipeline** or from an explicit GitLab schedule.
-This prevents GitLab from duplicating GitHub typecheck, unit, browser, build,
-packaging, preview, and deployment jobs.
+from **Build > Pipelines > New pipeline**, from an explicit GitLab schedule, or
+from the exact-PR tag flow below. This prevents GitLab from duplicating GitHub
+typecheck, unit, browser, build, packaging, preview, and deployment jobs.
 
 Secret Push Protection is enabled in the GitLab project UI. It is an additional
 pre-receive boundary for newly pushed high-confidence credentials; GitHub remains
 the place where a blocked mirror is fixed.
+
+The checked-in secret-detection ruleset extends GitLab's defaults with
+high-confidence Tomodachi patterns for OpenRouter keys, Stripe webhook signing
+secrets, and assignment-scoped Runpod and N8N credentials. Keep the expressions
+synthetic in tests and never paste a real credential into repository history.
+
+## Exact pull-request scan
+
+GitLab must scan the reviewed GitHub pull-request commit, not merely the last
+mirrored `main`. After GitHub checks pass, create an annotated tag with this
+exact shape at the 40-character PR head:
+
+```text
+security/github-pr-<number>-<first-12-sha>
+```
+
+Before pushing the tag, verify that `.github/workflows/mirror-gitlab.yml` at the
+tagged commit is byte-for-byte identical to `origin/main`. The tag push then runs
+only that unchanged mirror workflow; it does not execute project code. GitLab
+accepts the SHA-suffixed tag as a security-only pipeline source. Record both the
+full GitHub commit and the resulting GitLab pipeline ID so the evidence cannot be
+mistaken for a scan of another revision.
+
+Do not use this exception for arbitrary tags or branches, and do not add a
+GitLab merge request. A failed or stale scan is corrected in the GitHub pull
+request and repeated with a new SHA-suffixed tag.
 
 ## One-time baseline
 
@@ -36,6 +62,16 @@ request, then mirrored back to GitLab.
 Download the SAST, secret-detection, dependency, and CycloneDX artifacts after
 the baseline. Confirmed work belongs in GitHub issues or pull requests, not a
 parallel GitLab backlog.
+
+For each retained baseline or release-candidate scan, record privately:
+
+- pipeline ID and the full commit SHA;
+- analyzer versions and job names;
+- finding counts and their dispositions;
+- SHA-256 hashes for security reports and CycloneDX artifacts; and
+- dependency and license export timestamps.
+
+Do not commit raw scanner reports to the public GitHub repository.
 
 ## Staging-only dynamic scans
 
@@ -55,11 +91,14 @@ Complete this at least four days before the Ultimate trial expires:
 2. Export security reports, CycloneDX SBOMs, dependency/license data, and audit
    events needed for the project record.
 3. Move confirmed findings into GitHub and close duplicate GitLab work items.
-4. Set `GITLAB_ADVANCED_SAST_ENABLED` to `"false"` and remove or disable any
+4. If GitLab security profiles and the checked-in templates are both scheduling
+   the same analyzers, detach the profile assignments after the exact-PR scan;
+   keep the checked-in templates for post-trial continuity.
+5. Set `GITLAB_ADVANCED_SAST_ENABLED` to `"false"` and remove or disable any
    other Ultimate-only jobs or schedules.
-5. Run the remaining manual pipeline and verify standard SAST and pipeline secret
+6. Run the remaining manual pipeline and verify standard SAST and pipeline secret
    detection complete on the post-trial configuration.
-6. Verify the GitHub-to-GitLab deploy-key mirror still matches `main` and tags.
+7. Verify the GitHub-to-GitLab deploy-key mirror still matches `main` and tags.
 
 Do not add GitLab Pages, Worker deployments, releases, or a second issue/merge
 request workflow. This lane exists to improve independent detection without

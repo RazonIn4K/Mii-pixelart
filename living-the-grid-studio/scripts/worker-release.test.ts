@@ -29,6 +29,7 @@ const migrationNames = [
   "0003_atomic_quota_reservations.sql",
   "0004_preserve_moderation_state.sql",
   "0005_creation_showcase_images.sql",
+  "0006_align_game_taxonomy.sql",
 ] as const;
 const PRIVILEGED_ROLE_COUNT_QUERY =
   "SELECT COUNT(*) AS count FROM users WHERE role IN ('admin', 'moderator')";
@@ -106,6 +107,7 @@ const targetValues = {
     name: "tomodachi-studio",
     site: "http://localhost:3000",
     redirect: "http://localhost:3000/api/auth/google/callback",
+    customDomain: null,
     d1Name: "tomodachi-studio-local",
     d1Id: "00000000-0000-0000-0000-000000000000",
     r2Name: "tomodachi-studio-projects-local",
@@ -117,6 +119,7 @@ const targetValues = {
     name: "tomodachi-studio-staging",
     site: "https://staging.tomodachi.pw",
     redirect: "https://staging.tomodachi.pw/api/auth/google/callback",
+    customDomain: "staging.tomodachi.pw",
     d1Name: "tomodachi-studio-staging",
     d1Id: "4ad58d24-8874-4f20-8a68-1f37a9311d7e",
     r2Name: "tomodachi-studio-projects-staging",
@@ -128,6 +131,7 @@ const targetValues = {
     name: "tomodachi-studio-production",
     site: "https://tomodachi.pw",
     redirect: "https://tomodachi.pw/api/auth/google/callback",
+    customDomain: "tomodachi.pw",
     d1Name: "tomodachi-studio-production",
     d1Id: "f31935cc-acde-4fba-8e41-b02a979f1337",
     r2Name: "tomodachi-studio-projects-production",
@@ -185,6 +189,13 @@ function environmentConfig(
   const values = targetValues[target];
   return {
     ...(target === "local" ? {} : { name: values.name }),
+    workers_dev: false,
+    preview_urls: false,
+    ...(values.customDomain === null
+      ? {}
+      : {
+          routes: [{ pattern: values.customDomain, custom_domain: true }],
+        }),
     vars: {
       ENVIRONMENT: target,
       PUBLIC_SITE_URL: values.site,
@@ -264,6 +275,8 @@ function generatedConfig(target: ReleaseTarget, source = sourceConfig()) {
     definedEnvironments: ["staging", "production"],
     targetEnvironment: target === "local" ? "" : target,
     name: targetValues[target].name,
+    workers_dev: selected.workers_dev,
+    preview_urls: selected.preview_urls,
     compatibility_date: source.compatibility_date,
     compatibility_flags: source.compatibility_flags,
     triggers: source.triggers,
@@ -274,6 +287,7 @@ function generatedConfig(target: ReleaseTarget, source = sourceConfig()) {
     kv_namespaces: selected.kv_namespaces,
     images: selected.images,
     ratelimits: selected.ratelimits,
+    ...(target === "local" ? {} : { routes: selected.routes }),
   };
   return generated;
 }
@@ -615,6 +629,68 @@ describe("runRelease dry-run", () => {
     expect(harness.calls[1].args.at(-1)).toBe("--dry-run");
     expect(result.warnings).toHaveLength(1);
     expect(harness.logs.join("\n")).not.toMatch(/11111111/);
+  });
+
+  it("rejects a staging hostname that is not the approved custom domain", async () => {
+    const harness = makeHarness("staging");
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    source.env.staging.routes[0].pattern = "tomodachi.pw";
+    harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Custom-domain routes");
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it("rejects an alternate workers.dev origin for staging", async () => {
+    const harness = makeHarness("staging");
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    source.env.staging.workers_dev = true;
+    harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Workers.dev public-origin policy");
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it("rejects a generated config that drops the custom-domain route", async () => {
+    const harness = makeHarness("staging");
+    const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+    delete generated.routes;
+    harness.files.set(GENERATED_PATH, JSON.stringify(generated));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Custom-domain routes");
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0].args).toEqual(["build"]);
+  });
+
+  it("rejects a generated config that enables version preview URLs", async () => {
+    const harness = makeHarness("staging");
+    const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+    generated.preview_urls = true;
+    harness.files.set(GENERATED_PATH, JSON.stringify(generated));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Worker preview-URL public-origin policy");
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0].args).toEqual(["build"]);
   });
 
   it("allows legal launch markers only as a non-deploying warning", async () => {

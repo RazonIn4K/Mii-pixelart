@@ -2,6 +2,8 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "tomodachi-studio",
   "main": "./worker/index.ts",
+  "workers_dev": false,
+  "preview_urls": false,
   // Preserve the current Pages runtime behavior for the first parity cutover.
   // Advance this in a dedicated, tested compatibility update.
   "compatibility_date": "2025-05-01",
@@ -100,6 +102,11 @@
   "env": {
     "staging": {
       "name": "tomodachi-studio-staging",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [
+        { "pattern": "staging.tomodachi.pw", "custom_domain": true }
+      ],
       "vars": {
         "ENVIRONMENT": "staging",
         "PUBLIC_SITE_URL": "https://staging.tomodachi.pw",
@@ -141,6 +148,11 @@
     },
     "production": {
       "name": "tomodachi-studio-production",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [
+        { "pattern": "tomodachi.pw", "custom_domain": true }
+      ],
       "vars": {
         "ENVIRONMENT": "production",
         "PUBLIC_SITE_URL": "https://tomodachi.pw",

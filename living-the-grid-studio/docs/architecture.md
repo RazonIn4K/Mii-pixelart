@@ -1,13 +1,14 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.1
+**Version:** 2.2
 
-**Last Updated:** 2026-07-11
+**Last Updated:** 2026-07-13
 
-> **Deployment status (2026-07-11):** The target architecture on this branch is
+> **Deployment status (2026-07-13):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
 > Images, and scheduled handlers. Production `tomodachi.pw` still runs the
-> rollback-safe Cloudflare Pages deployment from commit `654df95`; references
+> rollback-safe Cloudflare Pages deployment from protected `main`; record its
+> exact immutable deployment and source commit at the cutover gate. References
 > below to Pages Functions or Express describe that legacy compatibility
 > surface, not the branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
 > for the decision and the [community deployment runbook](community-deployment-runbook.md)
@@ -81,7 +82,7 @@ Mii-pixelart/
 | Color Science | Custom CIELAB + Delta E (CIE76) | Perceptual color matching |
 | Package manager | pnpm | Required; lockfile committed |
 | Target deploy | Cloudflare Worker + Static Assets | One runtime for SPA, APIs, dynamic documents, and scheduled jobs |
-| Production rollback | Cloudflare Pages commit `654df95` | Preserved until the approved Worker cutover and soak complete |
+| Production rollback | Current protected-`main` Cloudflare Pages deployment | Record the exact immutable URL and source commit at cutover; preserve it through the Worker soak |
 | Data | D1 + private R2 + KV + Images | Relational authority, immutable projects/media, bounded cache, generated previews, and normalized optional showcase variants |
 | Secrets | Doppler | Runtime injection; no `.env` files committed |
 
@@ -528,7 +529,7 @@ graph TB
     end
 
     subgraph Rollback["Current production and rollback surface"]
-        Pages["Cloudflare Pages project: mii-pixelart\ncommit 654df95"]
+        Pages["Cloudflare Pages project: mii-pixelart\nrecord exact deployment at cutover"]
         Production["tomodachi.pw"]
     end
 

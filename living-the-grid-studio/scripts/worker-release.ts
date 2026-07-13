@@ -77,6 +77,7 @@ const TARGETS: Record<
     environment: ReleaseTarget;
     siteUrl: string;
     redirectUri: string;
+    customDomain: string | null;
     d1Name: string;
     r2Name: string;
   }
@@ -86,6 +87,7 @@ const TARGETS: Record<
     environment: "local",
     siteUrl: "http://localhost:3000",
     redirectUri: "http://localhost:3000/api/auth/google/callback",
+    customDomain: null,
     d1Name: "tomodachi-studio-local",
     r2Name: "tomodachi-studio-projects-local",
   },
@@ -94,6 +96,7 @@ const TARGETS: Record<
     environment: "staging",
     siteUrl: "https://staging.tomodachi.pw",
     redirectUri: "https://staging.tomodachi.pw/api/auth/google/callback",
+    customDomain: "staging.tomodachi.pw",
     d1Name: "tomodachi-studio-staging",
     r2Name: "tomodachi-studio-projects-staging",
   },
@@ -102,6 +105,7 @@ const TARGETS: Record<
     environment: "production",
     siteUrl: "https://tomodachi.pw",
     redirectUri: "https://tomodachi.pw/api/auth/google/callback",
+    customDomain: "tomodachi.pw",
     d1Name: "tomodachi-studio-production",
     r2Name: "tomodachi-studio-projects-production",
   },
@@ -461,6 +465,43 @@ function validateAssets(config: JsonRecord): void {
   );
 }
 
+function validateOriginExposure(config: JsonRecord): void {
+  expectExact(config.workers_dev, false, "Workers.dev public-origin policy");
+  expectExact(
+    config.preview_urls,
+    false,
+    "Worker preview-URL public-origin policy",
+  );
+}
+
+function validateCustomDomainRoute(
+  config: JsonRecord,
+  target: ReleaseTarget,
+): string | null {
+  const expected = TARGETS[target].customDomain;
+  if (expected === null) {
+    if (config.routes !== undefined || config.route !== undefined) {
+      throw new ReleaseError(
+        "Local Worker routing must not declare a public hostname.",
+      );
+    }
+    return null;
+  }
+
+  if (config.route !== undefined) {
+    throw new ReleaseError(
+      "Custom-domain routes do not match the release contract.",
+    );
+  }
+  const routes = arrayAt(config, "routes", "Custom-domain routes");
+  expectJsonExact(
+    routes,
+    [{ pattern: expected, custom_domain: true }],
+    "Custom-domain routes",
+  );
+  return expected;
+}
+
 function requireUniqueStrings(values: unknown[], label: string): void {
   if (
     values.some((value) => typeof value !== "string" || value.length === 0) ||
@@ -479,10 +520,12 @@ function validateSourceIsolation(source: JsonRecord): void {
   const d1Ids: unknown[] = [];
   const r2Names: unknown[] = [];
   const kvIds: unknown[] = [];
+  const customDomains: unknown[] = [];
   const rateNamespaces: unknown[] = [];
 
   for (const target of ["local", "staging", "production"] as const) {
     const selected = selectedSourceConfig(source, target);
+    validateOriginExposure(selected);
     const vars = objectAt(selected, "vars", "Environment variables");
     const d1 = singleBinding(selected, "d1_databases", "DB", "D1 bindings");
     const r2 = singleBinding(selected, "r2_buckets", "PROJECTS", "R2 bindings");
@@ -499,6 +542,8 @@ function validateSourceIsolation(source: JsonRecord): void {
     d1Ids.push(d1.database_id);
     r2Names.push(r2.bucket_name);
     kvIds.push(kv.id);
+    const customDomain = validateCustomDomainRoute(selected, target);
+    if (customDomain !== null) customDomains.push(customDomain);
     for (const rate of arrayAt(selected, "ratelimits", "Rate-limit bindings")) {
       rateNamespaces.push(isRecord(rate) ? rate.namespace_id : undefined);
     }
@@ -510,6 +555,7 @@ function validateSourceIsolation(source: JsonRecord): void {
   requireUniqueStrings(d1Ids, "D1 resource IDs");
   requireUniqueStrings(r2Names, "R2 bucket names");
   requireUniqueStrings(kvIds, "KV resource IDs");
+  requireUniqueStrings(customDomains, "Custom-domain routes");
   requireUniqueStrings(rateNamespaces, "Rate-limit namespaces");
 }
 
@@ -545,6 +591,8 @@ function validateSourceConfig(
   const selected = selectedSourceConfig(source, target);
   const selectedName = target === "local" ? source.name : selected.name;
   expectExact(selectedName, expected.workerName, "Selected Worker name");
+  validateOriginExposure(selected);
+  validateCustomDomainRoute(selected, target);
   const communityMutationsEnabled = validateVariables(selected, target);
 
   const d1 = singleBinding(selected, "d1_databases", "DB", "D1 bindings");
@@ -642,6 +690,8 @@ function validateGeneratedConfig(
     "Generated target environment",
   );
   expectExact(generated.name, expected.workerName, "Generated Worker name");
+  validateOriginExposure(generated);
+  validateCustomDomainRoute(generated, target);
   expectExact(
     generated.compatibility_date,
     source.compatibility_date,

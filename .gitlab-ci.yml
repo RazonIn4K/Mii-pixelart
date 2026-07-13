@@ -13,6 +13,10 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    # A reviewed PR head may also be mirrored as an immutable, SHA-suffixed tag
+    # by the unchanged default-branch mirror workflow. This scans the exact
+    # commit without granting GitLab a write path back to GitHub.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^security\/github-pr-[1-9][0-9]*-[0-9a-f]{12}$/'
     - when: never
 
 stages:
