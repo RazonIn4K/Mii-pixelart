@@ -27,6 +27,7 @@ This repository holds the source of [tomodachi.pw](https://tomodachi.pw/). The a
 | Read the detailed implementation atlas                    | [`living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md`](./living-the-grid-studio/PROJECT_STACK_AND_IMPLEMENTATION.md) |
 | Report a security issue                                   | [`living-the-grid-studio/SECURITY.md`](./living-the-grid-studio/SECURITY.md)                                                 |
 | See the changelog                                         | [`living-the-grid-studio/CHANGELOG.md`](./living-the-grid-studio/CHANGELOG.md)                                               |
+| Run the downstream GitLab security lab                    | [`docs/gitlab-security-lab.md`](./docs/gitlab-security-lab.md)                                                               |
 | Sponsor the project                                       | [tomodachi.pw/support](https://tomodachi.pw/support) or the Sponsor button at the top of this repo                           |
 
 ## Tech stack (overview)

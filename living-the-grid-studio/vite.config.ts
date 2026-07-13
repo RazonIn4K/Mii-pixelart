@@ -4,7 +4,6 @@ import react from "@vitejs/plugin-react";
 import { cp, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
-
 import {
   assertNoForbiddenReleaseSecretArtifacts,
   isForbiddenReleaseSecretFilename,

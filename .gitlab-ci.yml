@@ -1,0 +1,31 @@
+spec:
+  inputs:
+    historic_secret_scan:
+      description: Run the one-time full-history secret baseline (expensive).
+      type: boolean
+      default: false
+---
+# GitHub is the canonical repository and Cloudflare is the only deployment
+# platform. This downstream GitLab pipeline is intentionally security-only.
+# Mirrored pushes do not create pipelines; run it manually or from an explicit
+# schedule so the mirror remains cheap and predictable after the Ultimate trial.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+
+stages:
+  - test
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
+
+variables:
+  # Ultimate-only during the trial. Set to "false" before the trial expires;
+  # standard SAST and pipeline secret detection remain useful on the Free tier.
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
+  SEARCH_MAX_DEPTH: "20"
+  SECRET_DETECTION_HISTORIC_SCAN: "$[[ inputs.historic_secret_scan ]]"
