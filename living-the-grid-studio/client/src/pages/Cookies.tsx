@@ -13,7 +13,12 @@ import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Cookies() {
   useDocumentTitle("Cookies");
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Cookies", href: "/cookies" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Cookies", href: "/cookies" },
+    ]),
+  ]);
 
   const [reset, setReset] = useState(false);
 
@@ -41,9 +46,6 @@ export default function Cookies() {
           entry the banner would appear every visit.
         </li>
         <li>
-          <code>theme</code> — your light or dark appearance preference.
-        </li>
-        <li>
           Server session cookies during a Stripe checkout flow, set by Stripe
           directly. These cookies are required to complete a purchase.
         </li>
@@ -54,8 +56,8 @@ export default function Cookies() {
         IndexedDB keeps local drafts, cloud revision metadata, offline retry
         state, and an OAuth resume marker. This is first-party browser storage,
         is not used for cross-site tracking, and can be removed through your
-        browser&apos;s site-data controls. Local drafts are not uploaded until you
-        choose Save to account.
+        browser&apos;s site-data controls. Local drafts are not uploaded until
+        you choose Save to account.
       </p>
       <p>
         Local storage also keeps your AI consent choice and saved Studio AI chat
@@ -69,16 +71,15 @@ export default function Cookies() {
         <li>
           Aggregate event counts (e.g. &quot;breach-check submitted&quot;,
           &quot;AI plan generated&quot;). No identifiers, no cross-site
-          tracking. Only loaded after you accept analytics in the cookie
-          banner.
+          tracking. Only loaded after you accept analytics in the cookie banner.
         </li>
       </ul>
 
       <h3>Marketing (opt-in)</h3>
       <ul>
         <li>
-          Google AdSense cookies for ad measurement and frequency capping.
-          Only loaded after you accept marketing cookies. AdSense&apos;s own{" "}
+          Google AdSense cookies for ad measurement and frequency capping. Only
+          loaded after you accept marketing cookies. AdSense&apos;s own{" "}
           <a href="https://policies.google.com/privacy" rel="noopener">
             privacy policy
           </a>{" "}

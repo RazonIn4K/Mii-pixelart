@@ -571,12 +571,7 @@ test("authenticated users finish onboarding before entering account routes", asy
     }
   });
 
-  for (const accountRoute of [
-    "/me",
-    "/me/projects",
-    "/me/settings",
-    "/moderation",
-  ]) {
+  for (const accountRoute of ["/me", "/me/projects", "/moderation"]) {
     await page.goto(accountRoute);
     await expect(page).toHaveURL(/\/me\/setup\?returnTo=/);
     expect(new URL(page.url()).searchParams.get("returnTo")).toBe(accountRoute);
@@ -586,6 +581,19 @@ test("authenticated users finish onboarding before entering account routes", asy
   }
 
   expect(protectedRequests).toBe(0);
+
+  await page.goto("/me/settings");
+  await expect(page).toHaveURL(/\/me\/settings$/);
+  await expect(
+    page.getByRole("heading", { name: "Account setup is still required" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your data" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Delete account" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Public profile" }),
+  ).toBeHidden();
 });
 
 test("project shelf paginates, edits private cards, and uses governed publishing defaults", async ({

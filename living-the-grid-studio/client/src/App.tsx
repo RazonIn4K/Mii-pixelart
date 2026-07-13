@@ -34,22 +34,21 @@ const Me = lazy(() => import("./pages/community/Me"));
 const Projects = lazy(() => import("./pages/community/Projects"));
 const Settings = lazy(() => import("./pages/community/Settings"));
 const Moderation = lazy(() => import("./pages/community/Moderation"));
-const CommunityGuidelines = lazy(() => import("./pages/community/CommunityGuidelines"));
+const CommunityGuidelines = lazy(
+  () => import("./pages/community/CommunityGuidelines"),
+);
 const Copyright = lazy(() => import("./pages/community/Copyright"));
 const Security = lazy(() => import("./pages/community/Security"));
 
 function OnboardedAccountRoute({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
   if (
-    status === "authenticated"
-    && user
-    && (!user.username || user.termsAccepted !== true)
+    status === "authenticated" &&
+    user &&
+    (!user.username || user.termsAccepted !== true)
   ) {
     return (
-      <Redirect
-        to={setupPathForReturnTo(currentRelativeReturnTo())}
-        replace
-      />
+      <Redirect to={setupPathForReturnTo(currentRelativeReturnTo())} replace />
     );
   }
   return <>{children}</>;
@@ -66,16 +65,22 @@ function Router() {
       <Route path={"/creation/:slug"} component={CreationDetail} />
       <Route path={"/me/setup"} component={Setup} />
       <Route path={"/me/projects"}>
-        <OnboardedAccountRoute><Projects /></OnboardedAccountRoute>
+        <OnboardedAccountRoute>
+          <Projects />
+        </OnboardedAccountRoute>
       </Route>
       <Route path={"/me/settings"}>
-        <OnboardedAccountRoute><Settings /></OnboardedAccountRoute>
+        <Settings />
       </Route>
       <Route path={"/me"}>
-        <OnboardedAccountRoute><Me /></OnboardedAccountRoute>
+        <OnboardedAccountRoute>
+          <Me />
+        </OnboardedAccountRoute>
       </Route>
       <Route path={"/moderation"}>
-        <OnboardedAccountRoute><Moderation /></OnboardedAccountRoute>
+        <OnboardedAccountRoute>
+          <Moderation />
+        </OnboardedAccountRoute>
       </Route>
       <Route path={"/community-guidelines"} component={CommunityGuidelines} />
       <Route path={"/copyright"} component={Copyright} />
@@ -127,7 +132,10 @@ function App() {
             <Toaster />
             <Suspense
               fallback={
-                <div className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60" role="status">
+                <div
+                  className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60"
+                  role="status"
+                >
                   Opening the workshop…
                 </div>
               }
