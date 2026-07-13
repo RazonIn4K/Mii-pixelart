@@ -23,11 +23,8 @@ the place where a blocked mirror is fixed.
 
 ## One-time baseline
 
-Run one manual pipeline on `main` and enable the typed pipeline input:
-
-```text
-historic_secret_scan = true
-```
+Run one manual pipeline on `main` and turn on the `historic_secret_scan`
+checkbox in GitLab's **Run pipeline** form.
 
 The input maps to GitLab's `SECRET_DETECTION_HISTORIC_SCAN` analyzer variable.
 Historic secret scanning is intentionally a one-time operation because it scans
