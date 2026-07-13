@@ -56,10 +56,14 @@ sequenceDiagram
   Note over B,D: Sign-in does not save or publish the draft
 ```
 
-The OAuth transaction cookie contains only state, nonce, PKCE verifier,
-validated relative return path, and expiry. Google tokens are discarded after
-validation. D1 stores the provider `sub`, verified email, and only the SHA-256
-hash of the application session token.
+The OAuth transaction cookie contains state, nonce, PKCE verifier, validated
+relative return path, expiry, and an explicit `login` or `reauth` intent. A
+reauthentication transaction also contains the encrypted internal user,
+session, and Google subject it must confirm. A successful reauthentication
+rejects a different Google account and rotates the existing application
+session token. Google tokens are discarded after validation. D1 stores the
+provider `sub`, verified email, and only the SHA-256 hash of the application
+session token.
 
 ## First save and autosave saga
 

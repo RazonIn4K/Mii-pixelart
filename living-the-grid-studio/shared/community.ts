@@ -477,6 +477,7 @@ export const TagSlugSchema = z
 
 export const GoogleAuthStartSchema = z
   .object({
+    intent: z.enum(["login", "reauth"]).default("login"),
     returnTo: z
       .string()
       .max(512)

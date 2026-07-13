@@ -29,6 +29,7 @@ export default function Setup() {
   const [submitting, setSubmitting] = useState(false);
   const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
   const reviewingUpdatedTerms = Boolean(user?.username && user.termsAccepted !== true);
+  const requiredTermsVersion = user?.requiredTermsVersion ?? user?.termsVersion ?? null;
 
   useEffect(() => {
     if (!user) return;
@@ -52,6 +53,10 @@ export default function Setup() {
       toast.error("Confirm the age and community terms before continuing.");
       return;
     }
+    if (!requiredTermsVersion) {
+      toast.error("The current Terms version is unavailable. Refresh and try again.");
+      return;
+    }
     setSubmitting(true);
     try {
       await communityApi<CommunityUser>("/api/me/setup", {
@@ -60,7 +65,7 @@ export default function Setup() {
           username: normalized,
           displayName: displayName.trim(),
           bio: bio.trim(),
-          termsVersion: "2026-07-12",
+          termsVersion: requiredTermsVersion,
           acceptsTerms: true,
           confirmsAge13OrOlder: true,
         }),

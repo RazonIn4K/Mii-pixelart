@@ -43,7 +43,7 @@ an R2 key is known.
 
 | Threat | Category | Required controls and verification |
 | --- | --- | --- |
-| Forged OAuth callback or login CSRF | Spoofing | Authorization code flow; S256 PKCE; cryptographic state and nonce; ten-minute encrypted transaction cookie; exact issuer/audience/expiry/nonce validation; single-use callback; auth throttling keyed by an environment-scoped `PSEUDONYM_KEY` HMAC rather than a stored/logged raw IP |
+| Forged OAuth callback, login CSRF, or cross-account reauthentication | Spoofing | Authorization code flow; S256 PKCE; cryptographic state and nonce; ten-minute encrypted transaction cookie; exact issuer/audience/expiry/nonce validation; single-use callback; explicit login/reauth intent; reauth bound to the current internal user, session, and Google subject; auth throttling keyed by an environment-scoped `PSEUDONYM_KEY` HMAC rather than a stored/logged raw IP |
 | Open redirect through `returnTo` | Spoofing | Accept only a relative path beginning with one `/`; reject schemes, hosts, backslashes, and `//`; use a safe default |
 | Session theft or fixation | Spoofing | Generate 32 random bytes after callback; rotate on login; store only SHA-256 hash; Secure/HttpOnly/SameSite=Lax/Path=/ cookie; fixed 30-day expiry; revoke on status/role/deletion changes |
 | CSRF on cookie-authenticated mutations | Tampering | Require exact configured `Origin`; require JSON; reject form/simple-content requests; SameSite=Lax; OAuth callback is the only state-changing GET. Raw showcase bytes use a random one-use Bearer ticket with `credentials: omit`, exact Origin, no Cookie, declared length/type, and ten-minute expiry. |

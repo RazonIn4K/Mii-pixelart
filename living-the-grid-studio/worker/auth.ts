@@ -37,13 +37,54 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 const FRESH_SESSION_MS = 15 * 60 * 1_000;
 const MAX_ACTIVE_SESSIONS = 10;
 
-const OidcTransactionSchema = z.object({
+const OidcTransactionBaseSchema = z.object({
   expiresAt: z.number().int(),
   nonce: z.string().min(16),
   pkceVerifier: z.string().min(32),
   returnTo: z.string(),
   state: z.string().min(16),
 });
+
+const OidcTransactionSchema = z.discriminatedUnion("intent", [
+  OidcTransactionBaseSchema.extend({
+    intent: z.literal("login"),
+  }),
+  OidcTransactionBaseSchema.extend({
+    expectedProviderSubject: z.string().min(1),
+    expectedUserId: z.string().uuid(),
+    intent: z.literal("reauth"),
+    sessionId: z.string().uuid(),
+  }),
+]);
+
+interface GoogleAuthorizationInput {
+  codeChallenge: string;
+  nonce: string;
+  redirectUri: string;
+  state: string;
+}
+
+interface GoogleCallbackChecks {
+  expectedNonce: string;
+  expectedState: string;
+  pkceCodeVerifier: string;
+}
+
+interface GoogleIdentityClaims {
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  subject: string;
+}
+
+export interface GoogleOidcProvider {
+  authorizationUrl(env: Env, input: GoogleAuthorizationInput): Promise<URL>;
+  exchangeCallback(
+    env: Env,
+    callbackUrl: URL,
+    checks: GoogleCallbackChecks,
+  ): Promise<GoogleIdentityClaims>;
+}
 
 interface SessionRow {
   avatar_seed: string;
@@ -54,6 +95,7 @@ interface SessionRow {
   email: string;
   expires_at: number;
   last_seen_at: number;
+  provider_subject: string;
   role: "admin" | "moderator" | "user";
   last_authenticated_at: number;
   session_id: string;
@@ -72,6 +114,7 @@ export interface AuthenticatedSession {
   id: string;
   createdAt: number;
   lastSeenAt: number;
+  providerSubject: string;
   role: "admin" | "moderator" | "user";
   user: {
     avatarSeed: string;
@@ -89,42 +132,84 @@ export interface AuthenticatedSession {
   };
 }
 
-export function registerAuthRoutes(router: Router): void {
+const googleOidcProvider: GoogleOidcProvider = {
+  async authorizationUrl(env, input) {
+    const config = await googleConfiguration(env);
+    return buildAuthorizationUrl(config, {
+      client_id: env.GOOGLE_CLIENT_ID,
+      code_challenge: input.codeChallenge,
+      code_challenge_method: "S256",
+      nonce: input.nonce,
+      prompt: "select_account",
+      redirect_uri: input.redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state: input.state,
+    });
+  },
+  async exchangeCallback(env, callbackUrl, checks) {
+    const config = await googleConfiguration(env);
+    const tokens = await authorizationCodeGrant(config, callbackUrl, {
+      expectedNonce: checks.expectedNonce,
+      expectedState: checks.expectedState,
+      idTokenExpected: true,
+      pkceCodeVerifier: checks.pkceCodeVerifier,
+    });
+    const claims = tokens.claims();
+    return {
+      email: typeof claims?.email === "string" ? claims.email : "",
+      emailVerified: claims?.email_verified === true,
+      name: typeof claims?.name === "string" ? claims.name : undefined,
+      subject: typeof claims?.sub === "string" ? claims.sub : "",
+    };
+  },
+};
+
+export function registerAuthRoutes(
+  router: Router,
+  provider: GoogleOidcProvider = googleOidcProvider,
+): void {
   router
-    .add("POST", "/api/auth/google/start", startGoogleLogin)
-    .add("GET", "/api/auth/google/callback", finishGoogleLogin)
+    .add("POST", "/api/auth/google/start", (context) => startGoogleLogin(context, provider))
+    .add("GET", "/api/auth/google/callback", (context) => finishGoogleLogin(context, provider))
     .add("GET", "/api/auth/session", getAuthSession)
     .add("POST", "/api/auth/logout", logout)
     .add("POST", "/api/auth/revoke-all", revokeAllSessions);
 }
 
-async function startGoogleLogin(context: WorkerRequestContext): Promise<Response> {
+async function startGoogleLogin(
+  context: WorkerRequestContext,
+  provider: GoogleOidcProvider,
+): Promise<Response> {
   assertOidcConfigured(context.env);
   await enforceRateLimit(context.env.AUTH_RATE_LIMITER, await clientKey(context.env, context.request));
-  const { returnTo: requestedReturnTo } = await readLoginStart(context.request);
+  const { intent, returnTo: requestedReturnTo } = await readLoginStart(context.request);
+  const currentSession = intent === "reauth" ? await requireSession(context) : null;
 
   const state = randomState();
   const nonce = randomNonce();
   const pkceVerifier = randomPKCECodeVerifier();
   const codeChallenge = await calculatePKCECodeChallenge(pkceVerifier);
-  const transaction = {
+  const transaction = OidcTransactionSchema.parse({
     expiresAt: Date.now() + OIDC_TTL_SECONDS * 1_000,
+    ...(currentSession
+      ? {
+          expectedProviderSubject: currentSession.providerSubject,
+          expectedUserId: currentSession.user.id,
+          sessionId: currentSession.id,
+        }
+      : {}),
+    intent,
     nonce,
     pkceVerifier,
     returnTo: safeRelativeReturnTo(requestedReturnTo),
     state,
-  };
+  });
 
-  const config = await googleConfiguration(context.env);
-  const authorizationUrl = buildAuthorizationUrl(config, {
-    client_id: context.env.GOOGLE_CLIENT_ID,
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
+  const authorizationUrl = await provider.authorizationUrl(context.env, {
+    codeChallenge,
     nonce,
-    prompt: "select_account",
-    redirect_uri: context.env.GOOGLE_OIDC_REDIRECT_URI,
-    response_type: "code",
-    scope: "openid email profile",
+    redirectUri: context.env.GOOGLE_OIDC_REDIRECT_URI,
     state,
   });
 
@@ -140,47 +225,85 @@ async function startGoogleLogin(context: WorkerRequestContext): Promise<Response
   return response;
 }
 
-async function finishGoogleLogin(context: WorkerRequestContext): Promise<Response> {
+async function finishGoogleLogin(
+  context: WorkerRequestContext,
+  provider: GoogleOidcProvider,
+): Promise<Response> {
   assertOidcConfigured(context.env);
   await enforceRateLimit(context.env.AUTH_RATE_LIMITER, await clientKey(context.env, context.request));
   const encrypted = parseCookies(context.request).get(transactionCookieName(context.env));
   if (!encrypted) {
-    throw new HttpError(400, "invalid_oidc_transaction", "Login transaction is missing or expired.");
+    throw callbackError(context.env, 400, "invalid_oidc_transaction", "Login transaction is missing or expired.");
   }
 
-  const transaction = await decryptTransaction(encrypted, context.env);
+  let transaction: z.output<typeof OidcTransactionSchema>;
+  try {
+    transaction = await decryptTransaction(encrypted, context.env);
+  } catch {
+    throw callbackError(context.env, 400, "invalid_oidc_transaction", "Login transaction is invalid.");
+  }
   if (transaction.expiresAt < Date.now()) {
-    throw new HttpError(400, "expired_oidc_transaction", "Login transaction has expired.");
+    throw callbackError(context.env, 400, "expired_oidc_transaction", "Login transaction has expired.");
   }
 
-  const config = await googleConfiguration(context.env);
-  const tokens = await authorizationCodeGrant(config, context.url, {
-    expectedNonce: transaction.nonce,
-    expectedState: transaction.state,
-    idTokenExpected: true,
-    pkceCodeVerifier: transaction.pkceVerifier,
-  });
-  const claims = tokens.claims();
-  if (!claims || typeof claims.sub !== "string" || claims.sub.length === 0) {
-    throw new HttpError(400, "invalid_identity", "Google did not return a valid subject.");
+  let claims: GoogleIdentityClaims;
+  try {
+    claims = await provider.exchangeCallback(context.env, context.url, {
+      expectedNonce: transaction.nonce,
+      expectedState: transaction.state,
+      pkceCodeVerifier: transaction.pkceVerifier,
+    });
+  } catch {
+    throw callbackError(
+      context.env,
+      400,
+      "invalid_oidc_response",
+      "Google login could not be verified. Start sign-in again.",
+    );
   }
-  const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
-  if (!email || claims.email_verified !== true) {
-    throw new HttpError(403, "email_not_verified", "A verified Google email is required.");
+  if (!claims.subject) {
+    throw callbackError(context.env, 400, "invalid_identity", "Google did not return a valid subject.");
+  }
+  const email = claims.email.trim().toLowerCase();
+  if (!email || !claims.emailVerified) {
+    throw callbackError(context.env, 403, "email_not_verified", "A verified Google email is required.");
   }
   const displayName =
-    typeof claims.name === "string" && claims.name.trim()
+    claims.name?.trim()
       ? claims.name.trim().slice(0, 50)
       : email.split("@")[0].slice(0, 50);
 
-  const userId = await provisionGoogleUser(context.env, {
-    displayName,
-    email,
-    subject: claims.sub,
-  });
-  const session = await createSession(context, userId);
+  let session: { token: string };
+  let userId: string;
+  if (transaction.intent === "reauth") {
+    const currentSession = await optionalSession(context);
+    if (
+      !currentSession
+      || currentSession.id !== transaction.sessionId
+      || currentSession.user.id !== transaction.expectedUserId
+      || currentSession.providerSubject !== transaction.expectedProviderSubject
+      || claims.subject !== transaction.expectedProviderSubject
+    ) {
+      throw callbackError(
+        context.env,
+        403,
+        "reauthentication_identity_mismatch",
+        "Use the same Google account that is already connected to this profile.",
+      );
+    }
+    userId = currentSession.user.id;
+    await updateGoogleIdentityEmail(context.env, userId, claims.subject, email);
+    session = await rotateSession(context, currentSession);
+  } else {
+    userId = await provisionGoogleUser(context.env, {
+      displayName,
+      email,
+      subject: claims.subject,
+    });
+    session = await createSession(context, userId);
+  }
   const user = await loadUser(context.env, userId);
-  const destination = user?.username
+  const destination = transaction.intent === "reauth" || user?.username
     ? transaction.returnTo
     : `/me/setup?returnTo=${encodeURIComponent(transaction.returnTo)}`;
 
@@ -194,7 +317,11 @@ async function getAuthSession(context: WorkerRequestContext): Promise<Response> 
   const session = await optionalSession(context);
   return success(context.requestId, session
     ? {
-        user: { ...session.user, role: session.role },
+        user: {
+          ...session.user,
+          requiredTermsVersion: context.env.TERMS_VERSION,
+          role: session.role,
+        },
         session: {
           createdAt: session.createdAt,
           current: true,
@@ -241,7 +368,8 @@ export async function optionalSession(
        s.id AS session_id, s.last_authenticated_at, s.created_at, s.last_seen_at,
        s.expires_at, u.id AS user_id, u.username, u.display_name, u.bio,
        u.role, u.status, u.avatar_seed, u.terms_accepted_at, u.terms_version,
-       u.deletion_due_at, u.created_at AS user_created_at, ei.email
+       u.deletion_due_at, u.created_at AS user_created_at, ei.email,
+       ei.provider_subject
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      JOIN external_identities ei ON ei.user_id = u.id AND ei.provider = 'google'
@@ -265,6 +393,7 @@ export async function optionalSession(
     fresh: now - row.last_authenticated_at <= FRESH_SESSION_MS,
     id: row.session_id,
     lastSeenAt: row.last_seen_at,
+    providerSubject: row.provider_subject,
     role: row.role,
     user: {
       avatarSeed: row.avatar_seed,
@@ -424,6 +553,56 @@ async function createSession(
   return { token };
 }
 
+async function rotateSession(
+  context: WorkerRequestContext,
+  session: AuthenticatedSession,
+): Promise<{ token: string }> {
+  const token = randomToken();
+  const tokenHash = await sha256(`${sessionPepper(context.env)}:${token}`);
+  const now = Date.now();
+  const result = await context.env.DB.prepare(
+    `UPDATE sessions SET token_hash = ?, last_authenticated_at = ?, last_seen_at = ?,
+     expires_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?`,
+  ).bind(
+    tokenHash,
+    now,
+    now,
+    now + SESSION_TTL_MS,
+    session.id,
+    session.user.id,
+    now,
+  ).run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw callbackError(
+      context.env,
+      401,
+      "reauthentication_session_expired",
+      "Your session expired during sign-in. Start again.",
+    );
+  }
+  return { token };
+}
+
+async function updateGoogleIdentityEmail(
+  env: Env,
+  userId: string,
+  subject: string,
+  email: string,
+): Promise<void> {
+  const result = await env.DB.prepare(
+    `UPDATE external_identities SET email = ?, email_verified = 1, updated_at = ?
+     WHERE user_id = ? AND provider = 'google' AND provider_subject = ?`,
+  ).bind(email, Date.now(), userId, subject).run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw callbackError(
+      env,
+      403,
+      "reauthentication_identity_mismatch",
+      "Use the same Google account that is already connected to this profile.",
+    );
+  }
+}
+
 async function loadUser(env: Env, id: string): Promise<{ username: string | null } | null> {
   return env.DB.prepare("SELECT username FROM users WHERE id = ?")
     .bind(id)
@@ -522,6 +701,17 @@ function clearTransactionCookie(env: Env): string {
   return cookie(transactionCookieName(env), "", { maxAge: 0, secure: secureCookies(env) });
 }
 
+function callbackError(
+  env: Env,
+  status: number,
+  code: string,
+  message: string,
+): HttpError {
+  return new HttpError(status, code, message, undefined, undefined, {
+    "Set-Cookie": clearTransactionCookie(env),
+  });
+}
+
 function secureCookies(env: Env): boolean {
   return new URL(env.PUBLIC_SITE_URL).protocol === "https:";
 }
@@ -544,7 +734,10 @@ async function readLoginStart(request: Request) {
     }
     const text = await readText(request, 10_000);
     const form = new URLSearchParams(text);
-    const parsed = GoogleAuthStartSchema.safeParse({ returnTo: form.get("returnTo") ?? undefined });
+    const parsed = GoogleAuthStartSchema.safeParse({
+      intent: form.get("intent") ?? undefined,
+      returnTo: form.get("returnTo") ?? undefined,
+    });
     if (parsed.success) return parsed.data;
     throw new HttpError(400, "validation_error", "Login return path is invalid.");
   }

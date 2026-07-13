@@ -5,7 +5,10 @@ import { pathToFileURL } from "node:url";
 
 export type ReleaseTarget = "local" | "staging" | "production";
 export type ReleaseIntent = "dry-run" | "deploy";
-type DeploymentPhase = "standard" | "staging-read-only-bootstrap";
+type DeploymentPhase =
+  | "standard"
+  | "staging-read-only-bootstrap"
+  | "production-read-only-bootstrap";
 
 export interface ReleaseOptions {
   cwd: string;
@@ -771,6 +774,95 @@ function hasSentinelValue(value: string): boolean {
   return compact.length >= 8 && /^([a-z0-9])\1+$/.test(compact);
 }
 
+function isBootstrapPhase(phase: DeploymentPhase): boolean {
+  return phase !== "standard";
+}
+
+function bootstrapTarget(
+  phase: DeploymentPhase,
+): "staging" | "production" | null {
+  if (phase === "staging-read-only-bootstrap") return "staging";
+  if (phase === "production-read-only-bootstrap") return "production";
+  return null;
+}
+
+function isValidBootstrapSecret(
+  name: (typeof REQUIRED_SECRETS)[number],
+  value: unknown,
+): boolean {
+  if (typeof value !== "string" || hasSentinelValue(value)) return false;
+  const trimmed = value.trim();
+  switch (name) {
+    case "GOOGLE_CLIENT_ID":
+      return /^\d+-[A-Za-z0-9_-]{20,}[.]apps[.]googleusercontent[.]com$/.test(
+        trimmed,
+      );
+    case "GOOGLE_CLIENT_SECRET":
+      return trimmed.length >= 24 && /^[A-Za-z0-9_-]+$/.test(trimmed);
+    case "OIDC_COOKIE_KEY":
+      return (
+        /^[A-Za-z0-9_-]{43}$/.test(trimmed) &&
+        Buffer.from(trimmed, "base64url").byteLength === 32
+      );
+    case "SESSION_PEPPER":
+    case "PSEUDONYM_KEY":
+      return trimmed.length >= 32;
+    case "OPENROUTER_API_KEY":
+      return /^sk-or-v1-[A-Za-z0-9]{32,}$/.test(trimmed);
+    case "STRIPE_SECRET_KEY":
+      return /^sk_(?:test|live)_[A-Za-z0-9]{16,}$/.test(trimmed);
+    case "STRIPE_WEBHOOK_SECRET":
+      return /^whsec_[A-Za-z0-9]{16,}$/.test(trimmed);
+  }
+}
+
+async function validateBootstrapSecretsFile(
+  cwd: string,
+  target: "staging" | "production",
+  dependencies: ReleaseDependencies,
+): Promise<string> {
+  const relativePath = path.join(
+    ".deployment-readiness",
+    `${target}.secrets.json`,
+  );
+  const absolutePath = path.join(cwd, relativePath);
+  let secrets: JsonRecord;
+  try {
+    secrets = parseJson(
+      await dependencies.readText(absolutePath),
+      "Bootstrap secrets file",
+    );
+  } catch (error) {
+    if (error instanceof ReleaseError) throw error;
+    throw new ReleaseError(
+      "The target-specific bootstrap secrets file is missing or unreadable.",
+    );
+  }
+
+  const actualNames = Object.keys(secrets).sort();
+  const expectedNames = [...REQUIRED_SECRETS].sort();
+  if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) {
+    throw new ReleaseError(
+      "The bootstrap secrets file must contain exactly the required secret names.",
+    );
+  }
+  if (
+    REQUIRED_SECRETS.some(
+      (name) => !isValidBootstrapSecret(name, secrets[name]),
+    )
+  ) {
+    throw new ReleaseError(
+      "One or more bootstrap secrets are missing, placeholder, or malformed.",
+    );
+  }
+  if (!(await dependencies.isPathIgnored(cwd, relativePath))) {
+    throw new ReleaseError(
+      "The bootstrap secrets file is not protected by the repository ignore rules.",
+    );
+  }
+  return absolutePath;
+}
+
 function validateRemoteResourceIds(snapshot: BindingSnapshot): void {
   if (
     hasSentinelValue(snapshot.d1Id) ||
@@ -926,10 +1018,11 @@ function validateAuditedInputs(
   const owners = objectAt(approval, "owners", "Operational owner inputs");
   let adminInternalId: string | null = null;
   let moderatorInternalId: string | null = null;
-  if (deploymentPhase === "staging-read-only-bootstrap") {
-    if (target !== "staging" || communityMutationsEnabled) {
+  const expectedBootstrapTarget = bootstrapTarget(deploymentPhase);
+  if (expectedBootstrapTarget !== null) {
+    if (target !== expectedBootstrapTarget || communityMutationsEnabled) {
       throw new ReleaseError(
-        "The bootstrap phase is allowed only for read-only staging.",
+        "The bootstrap phase must match its read-only release target.",
       );
     }
     expectExact(owners.adminInternalId, null, "Bootstrap admin internal ID");
@@ -993,7 +1086,7 @@ function validateAuditedInputs(
     communityMutationsEnabled,
     "Approved community mutation mode",
   );
-  if (deploymentPhase === "staging-read-only-bootstrap") {
+  if (expectedBootstrapTarget !== null) {
     expectExact(
       confirmations.adminModeratorAssigned,
       false,
@@ -1011,12 +1104,12 @@ function validateAuditedInputs(
     );
     expectExact(
       confirmations.stagingAcceptancePassed,
-      false,
+      expectedBootstrapTarget === "production",
       "Bootstrap staging acceptance state",
     );
     expectExact(
       confirmations.productionCutoverApproved,
-      false,
+      expectedBootstrapTarget === "production",
       "Bootstrap production cutover state",
     );
   } else {
@@ -1079,16 +1172,18 @@ async function validateApproval(
   const deploymentPhase = approval.deploymentPhase;
   if (
     deploymentPhase !== "standard" &&
-    deploymentPhase !== "staging-read-only-bootstrap"
+    deploymentPhase !== "staging-read-only-bootstrap" &&
+    deploymentPhase !== "production-read-only-bootstrap"
   ) {
     throw new ReleaseError("Deployment phase is missing or invalid.");
   }
+  const expectedBootstrapTarget = bootstrapTarget(deploymentPhase);
   if (
-    deploymentPhase === "staging-read-only-bootstrap" &&
-    (target !== "staging" || communityMutationsEnabled)
+    expectedBootstrapTarget !== null &&
+    (target !== expectedBootstrapTarget || communityMutationsEnabled)
   ) {
     throw new ReleaseError(
-      "The bootstrap phase is allowed only for read-only staging.",
+      "The bootstrap phase must match its read-only release target.",
     );
   }
   if (!isNonPlaceholderApprovalText(approval.approvedBy)) {
@@ -1268,10 +1363,9 @@ async function validateRemotePrivilegedRoleState(
   approval: ValidatedApproval,
   dependencies: ReleaseDependencies,
 ): Promise<void> {
-  const query =
-    approval.deploymentPhase === "staging-read-only-bootstrap"
-      ? PRIVILEGED_ROLE_COUNT_QUERY
-      : PRIVILEGED_ROLE_LIST_QUERY;
+  const query = isBootstrapPhase(approval.deploymentPhase)
+    ? PRIVILEGED_ROLE_COUNT_QUERY
+    : PRIVILEGED_ROLE_LIST_QUERY;
   let result: CommandResult;
   try {
     result = await dependencies.runCommand(
@@ -1326,10 +1420,14 @@ async function validateRemotePrivilegedRoleState(
   }
   const rows = payload[0].results as JsonRecord[];
 
-  if (approval.deploymentPhase === "staging-read-only-bootstrap") {
-    if (rows.length !== 1 || rows[0].count !== 0 || target !== "staging") {
+  if (isBootstrapPhase(approval.deploymentPhase)) {
+    if (
+      rows.length !== 1 ||
+      rows[0].count !== 0 ||
+      target !== bootstrapTarget(approval.deploymentPhase)
+    ) {
       throw new ReleaseError(
-        "Staging bootstrap requires an empty privileged-role state.",
+        "Bootstrap requires an empty privileged-role state for the selected target.",
       );
     }
     return;
@@ -1401,6 +1499,7 @@ export async function runRelease(
     "wrangler.json",
   );
   const warnings: string[] = [];
+  let bootstrapSecretsPath: string | null = null;
 
   dependencies.log(
     "info",
@@ -1435,6 +1534,13 @@ export async function runRelease(
       bindings.communityMutationsEnabled,
       dependencies,
     );
+    if (isBootstrapPhase(validatedApproval.deploymentPhase)) {
+      bootstrapSecretsPath = await validateBootstrapSecretsFile(
+        cwd,
+        remoteTarget,
+        dependencies,
+      );
+    }
     dependencies.log("info", "Verifying the remote D1 migration ledger.");
     await validateRemoteMigrationLedger(
       cwd,
@@ -1500,6 +1606,9 @@ export async function runRelease(
 
   const deployArgs = ["exec", "wrangler", "deploy", "--config", generatedPath];
   if (options.intent === "dry-run") deployArgs.push("--dry-run");
+  if (bootstrapSecretsPath !== null) {
+    deployArgs.push("--secrets-file", bootstrapSecretsPath);
+  }
   dependencies.log(
     "info",
     options.intent === "dry-run"

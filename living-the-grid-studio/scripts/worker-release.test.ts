@@ -282,9 +282,12 @@ function approval(
   target: "staging" | "production",
   communityMutationsEnabled = false,
   overrides: Record<string, unknown> = {},
-  deploymentPhase: "standard" | "staging-read-only-bootstrap" = "standard",
+  deploymentPhase:
+    | "standard"
+    | "staging-read-only-bootstrap"
+    | "production-read-only-bootstrap" = "standard",
 ) {
-  const bootstrap = deploymentPhase === "staging-read-only-bootstrap";
+  const bootstrap = deploymentPhase !== "standard";
   return {
     schemaVersion: 2,
     target,
@@ -336,8 +339,8 @@ function approval(
       rollbackReady: true,
       deployApproved: true,
       stagingDeployApproved: true,
-      stagingAcceptancePassed: !bootstrap,
-      productionCutoverApproved: !bootstrap,
+      stagingAcceptancePassed: target === "production" || !bootstrap,
+      productionCutoverApproved: target === "production" || !bootstrap,
       communityMutationsEnabled,
       writableCommunityDeployApproved: communityMutationsEnabled,
       bootstrapReadOnlyApproved: bootstrap,
@@ -372,8 +375,11 @@ function makeHarness(
     approval?: boolean;
     remoteWritable?: boolean;
     bootstrap?: boolean;
+    productionBootstrap?: boolean;
   } = {},
 ): Harness {
+  const bootstrap =
+    options.bootstrap === true || options.productionBootstrap === true;
   const source = sourceConfig(
     options.sentinel && target !== "local" ? target : undefined,
     options.remoteWritable && target !== "local" ? target : undefined,
@@ -404,9 +410,29 @@ function makeHarness(
           target,
           options.remoteWritable === true,
           {},
-          options.bootstrap ? "staging-read-only-bootstrap" : "standard",
+          options.productionBootstrap
+            ? "production-read-only-bootstrap"
+            : options.bootstrap
+              ? "staging-read-only-bootstrap"
+              : "standard",
         ),
       ),
+    );
+  }
+  if (target !== "local" && bootstrap) {
+    files.set(
+      path.join(CWD, ".deployment-readiness", `${target}.secrets.json`),
+      JSON.stringify({
+        GOOGLE_CLIENT_ID:
+          "1020760650950-eqv69pk6cbq6bh7k91r56ogmjn35506t.apps.googleusercontent.com",
+        GOOGLE_CLIENT_SECRET: `GOC${"SPX"}-a1b2c3d4e5f6g7h8i9j0k1l2`,
+        OIDC_COOKIE_KEY: "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+        SESSION_PEPPER: "session-pepper-a1b2c3d4e5f6g7h8i9j0k1l2",
+        PSEUDONYM_KEY: "pseudonym-key-a1b2c3d4e5f6g7h8i9j0k1l2",
+        OPENROUTER_API_KEY: `sk-${"or-v1"}-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`,
+        STRIPE_SECRET_KEY: `sk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
+        STRIPE_WEBHOOK_SECRET: `wh${"sec"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
+      }),
     );
   }
 
@@ -415,7 +441,7 @@ function makeHarness(
   let commandResult: CommandResult = { exitCode: 0, stdout: "", stderr: "" };
   let migrationCommandResult = migrationLedgerResult();
   let roleCommandResult = privilegedRoleResult(
-    options.bootstrap ? [{ count: 0 }] : undefined,
+    bootstrap ? [{ count: 0 }] : undefined,
   );
   let gitState = { commit: COMMIT, dirty: false };
   let ignored = true;
@@ -878,7 +904,66 @@ describe("runRelease deploy gates", () => {
       "deploy",
       "--config",
       GENERATED_PATH,
+      "--secrets-file",
+      path.join(CWD, ".deployment-readiness", "staging.secrets.json"),
     ]);
+  });
+
+  it("permits an explicit read-only production bootstrap only after staging acceptance and cutover approval", async () => {
+    const harness = makeHarness("production", { productionBootstrap: true });
+
+    await runRelease(
+      { cwd: CWD, target: "production", intent: "deploy" },
+      harness.dependencies,
+    );
+
+    expect(harness.calls).toHaveLength(4);
+    expect(harness.calls[1].args).toContain(PRIVILEGED_ROLE_COUNT_QUERY);
+    expect(harness.calls[3].args).toEqual([
+      "exec",
+      "wrangler",
+      "deploy",
+      "--config",
+      GENERATED_PATH,
+      "--secrets-file",
+      path.join(CWD, ".deployment-readiness", "production.secrets.json"),
+    ]);
+  });
+
+  it("rejects missing, extra, placeholder, or malformed bootstrap secrets before any remote command", async () => {
+    const secretPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.secrets.json",
+    );
+    const cases = [
+      (secrets: Record<string, string>) => {
+        delete secrets.STRIPE_WEBHOOK_SECRET;
+      },
+      (secrets: Record<string, string>) => {
+        secrets.EXTRA_SECRET = "not-allowed";
+      },
+      (secrets: Record<string, string>) => {
+        secrets.STRIPE_SECRET_KEY = "sk_test_REPLACE_ME";
+      },
+      (secrets: Record<string, string>) => {
+        secrets.OIDC_COOKIE_KEY = "too-short";
+      },
+    ];
+
+    for (const mutate of cases) {
+      const harness = makeHarness("staging", { bootstrap: true });
+      const secrets = JSON.parse(harness.files.get(secretPath)!);
+      mutate(secrets);
+      harness.files.set(secretPath, JSON.stringify(secrets));
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toBeInstanceOf(ReleaseError);
+      expect(harness.calls).toHaveLength(0);
+    }
   });
 
   it("rejects bootstrap intent outside a first read-only staging deployment", async () => {
@@ -888,7 +973,7 @@ describe("runRelease deploy gates", () => {
         { cwd: CWD, target: "production", intent: "deploy" },
         production.dependencies,
       ),
-    ).rejects.toThrow("allowed only for read-only staging");
+    ).rejects.toThrow("must match its read-only release target");
     expect(production.calls).toHaveLength(0);
 
     const writable = makeHarness("staging", {
@@ -900,7 +985,7 @@ describe("runRelease deploy gates", () => {
         { cwd: CWD, target: "staging", intent: "deploy" },
         writable.dependencies,
       ),
-    ).rejects.toThrow("allowed only for read-only staging");
+    ).rejects.toThrow("must match its read-only release target");
     expect(writable.calls).toHaveLength(0);
 
     const unapproved = makeHarness("staging", { bootstrap: true });

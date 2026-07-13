@@ -9,6 +9,7 @@ function user(overrides: Record<string, unknown> = {}) {
     createdAt: 1_700_000_000_000,
     displayName: "Test Islander",
     id: "00000000-0000-4000-8000-000000000001",
+    requiredTermsVersion: "2026-07-12",
     role: "user",
     status: "active",
     termsAccepted: true,

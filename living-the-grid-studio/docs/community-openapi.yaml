@@ -46,7 +46,7 @@ paths:
       operationId: startGoogleAuth
       tags: [Auth]
       summary: Start Google authorization-code OIDC
-      description: Requires an exact allowed Origin. Returns a Google URL for a top-level browser navigation and sets the encrypted ten-minute OIDC transaction cookie.
+      description: Requires an exact allowed Origin. Returns a Google URL for a top-level browser navigation and sets the encrypted ten-minute OIDC transaction cookie. The optional reauth intent requires an existing session and binds the callback to that session's internal user and Google subject.
       security: []
       x-rate-limit: 10 requests per minute per HMAC-derived privacy-preserving client key
       requestBody:
@@ -1561,6 +1561,7 @@ components:
       additionalProperties: false
       required: [returnTo]
       properties:
+        intent: { type: string, enum: [login, reauth], default: login }
         returnTo: { type: string, maxLength: 512, pattern: '^/(?!/)' }
     AuthStartEnvelope:
       type: object
@@ -1613,7 +1614,7 @@ components:
     PrivateUser:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, bio, avatarSeed, role, status, email, termsVersion, termsAcceptedAt, createdAt]
+      required: [id, username, displayName, bio, avatarSeed, role, status, email, requiredTermsVersion, termsVersion, termsAcceptedAt, createdAt]
       properties:
         id: { type: string, format: uuid }
         username:
@@ -1626,6 +1627,7 @@ components:
         role: { $ref: '#/components/schemas/UserRole' }
         status: { $ref: '#/components/schemas/UserStatus' }
         email: { type: string, format: email }
+        requiredTermsVersion: { type: string, minLength: 1, maxLength: 40 }
         termsVersion: { type: [string, 'null'] }
         termsAcceptedAt: { type: [integer, 'null'] }
         termsAccepted: { type: boolean }

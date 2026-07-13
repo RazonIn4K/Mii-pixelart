@@ -190,13 +190,17 @@ owners or decisions. The wrapper validates these fields without logging their
 values. Inspect the flattened output config before every deploy.
 
 Readiness schema version 2 requires an explicit `deploymentPhase`. Use
-`standard` for every production deploy and every writable staging deploy. A
-single bootstrap phase, `staging-read-only-bootstrap`, exists only to break the
-first-account dependency: it requires staging, `COMMUNITY_MUTATIONS_ENABLED=false`,
-null admin/moderator IDs, `adminModeratorAssigned=false`, an explicit
-`bootstrapReadOnlyApproved=true`, and no existing privileged users in remote
-D1. The wrapper verifies that empty role state before it builds. Missing,
-legacy, or contradictory phase fields fail closed. Every `standard` deploy
+`standard` for every writable deploy and every deploy after the first
+privileged account has been assigned. Two target-specific bootstrap phases,
+`staging-read-only-bootstrap` and `production-read-only-bootstrap`, break the
+first-account dependency. Both require
+`COMMUNITY_MUTATIONS_ENABLED=false`, null admin/moderator IDs,
+`adminModeratorAssigned=false`, an explicit
+`bootstrapReadOnlyApproved=true`, and no existing privileged users in the
+selected remote D1 database. Production bootstrap additionally requires passed
+staging acceptance and explicit production cutover approval. The wrapper
+verifies the empty role state before it builds. Missing, legacy, cross-target,
+or contradictory phase fields fail closed. Every `standard` deploy
 requires one real internal UUID already assigned the exact `admin` role. The
 moderator UUID may be null because admins have moderator authority; when a
 separate moderator UUID is supplied, it must be distinct and already assigned
@@ -211,12 +215,18 @@ After explicit approval for resources and staging deployment:
    Google project, owners, and expected cost in the change ticket.
 2. Create isolated staging resources. Copy only synthetic fixtures; never clone
    production identity, project, report, or session data.
-3. Add staging binding IDs to the staging Wrangler environment and write only
-   the eight allowlisted secrets with an explicit target through the approved
-   secret manager/CLI flow, never a tracked file. The obsolete bulk-Doppler
-   helper was removed because it selected neither an environment nor an
-   allowlist. `secrets.required` in Wrangler must list the same eight names in
-   every environment.
+3. Add staging binding IDs to the staging Wrangler environment. For the first
+   deployment, prepare an ignored JSON object at
+   `.deployment-readiness/staging.secrets.json` containing exactly the eight
+   allowlisted secret names. Never print, commit, or place the values in shell
+   arguments. The release wrapper validates the exact allowlist, rejects known
+   placeholders and malformed provider credentials, and passes the file to
+   `wrangler deploy --secrets-file` so secrets and code are installed in the
+   same approved deployment. Do not run `wrangler secret put` before the Worker
+   exists: that command creates and deploys a Worker version. After bootstrap,
+   use a separately approved Wrangler versions workflow for rotations.
+   `secrets.required` in Wrangler must list the same eight names in every
+   environment.
 4. List unapplied migrations against the **database name**, review the output,
    then apply them only after the migration approval gate.
 5. Run `pnpm worker:dry-run:staging`, inspect the generated output
@@ -291,20 +301,28 @@ domain cutover:
    list, DNS/routes, OAuth redirect configuration, and rollback owner.
 3. List and apply only reviewed unapplied D1 migrations by production database
    name. Never re-run SQL manually or edit the migration ledger.
-4. Run `pnpm worker:dry-run:production`, inspect the generated output
-   configuration, and deploy the production Worker in read-only mode without
-   changing the canonical domain. Smoke test its workers.dev/controlled route
-   with authentication disabled unless that exact host exists in the production
-   OAuth client.
-5. After the read-only smoke test, create and verify the exact production
-   artifact with `COMMUNITY_MUTATIONS_ENABLED=true` under the cutover approval,
-   then attach `tomodachi.pw` to that Worker. Verify TLS, assets, SPA fallback, dynamic
+4. Prepare `.deployment-readiness/production.secrets.json` with exactly the
+   eight production secret names using the same non-logging process as staging.
+   Run `pnpm worker:dry-run:production` and inspect the generated output.
+5. The first production deployment uses
+   `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
+   production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
+   staging acceptance and rollback readiness, atomically install the production
+   secrets, and attach `tomodachi.pw`. Verify TLS, assets, SPA fallback, dynamic
    documents, API headers, Stripe webhook, AI routes, robots/sitemap, and no
-   Pages/Worker route overlap.
-6. Run anonymous edit/export, Google sign-in/onboarding, explicit private save,
+   Pages/Worker route overlap before continuing. If this read-only cutover fails,
+   route immediately back to the recorded Pages deployment.
+6. The named production admin signs in through the production Google client,
+   reads only the internal UUID from `/api/auth/session`, and is promoted with
+   the same narrowly scoped, exactly-one-row D1 procedure used in staging.
+   Replace the bootstrap readiness file with a fresh `standard` approval bound
+   to the clean commit and verified admin role. A later reviewed artifact may
+   set `COMMUNITY_MUTATIONS_ENABLED=true`; bootstrap itself never permits
+   community writes.
+7. Run anonymous edit/export, Google sign-in/onboarding, explicit private save,
    autosave/conflict, publish/unpublish, unlisted noindex, search, social,
    moderation, export, deletion cancellation, and cross-account denial tests.
-7. Monitor error rate, D1/R2 failures, OAuth errors, rate-limit counts, cleanup
+8. Monitor error rate, D1/R2 failures, OAuth errors, rate-limit counts, cleanup
    failures, and abuse queue during the soak. Keep Pages intact.
 
 ## Rollback

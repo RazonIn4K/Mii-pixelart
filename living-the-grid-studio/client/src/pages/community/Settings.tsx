@@ -101,6 +101,7 @@ export default function SettingsPage() {
                 <p className="text-sm font-black text-[var(--island-ink)]">Sensitive controls require a recent Google sign-in</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--island-ink)]/60">Confirm your identity immediately before exporting data or scheduling deletion. The fresh-authentication window lasts 15 minutes and does not create a second account.</p>
                 <form action="/api/auth/google/start" method="post" className="mt-3">
+                  <input type="hidden" name="intent" value="reauth" />
                   <input type="hidden" name="returnTo" value="/me/settings" />
                   <Button type="submit" variant="outline" className="bg-white"><KeyRound /> Confirm identity with Google</Button>
                 </form>

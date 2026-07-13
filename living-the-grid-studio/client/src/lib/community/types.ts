@@ -19,6 +19,7 @@ export interface CommunityUser {
   status: UserStatus;
   avatarSeed: string;
   createdAt: number;
+  requiredTermsVersion?: string;
   termsAccepted?: boolean;
   termsVersion?: string | null;
   followerCount?: number;
