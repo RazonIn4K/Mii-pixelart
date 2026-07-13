@@ -78,6 +78,9 @@ describe("Worker security primitives", () => {
     });
     expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
     expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "form-action 'self' https://accounts.google.com https://checkout.stripe.com",
+    );
   });
 
   it("returns a Retry-After hint when a binding rejects a request", async () => {
