@@ -47,13 +47,17 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   registration, filing, collection, or remittance duties.
 - Recheck current Workers, D1, R2, and Images pricing and approve any paid Images
   transformation usage.
-- The deterministic 640 px project-preview PNG renderer measured roughly
-  61–79 ms on the 2026-07-13 local release host. The current Workers Free plan
-  allows only 10 ms of CPU per request, so a writable staging or production
-  release is blocked until Workers Paid is approved or the renderer is proven
-  below the applicable [Workers CPU limit](https://developers.cloudflare.com/workers/platform/limits/).
-  The first community-read-only bootstrap is not blocked because the mutation
-  gate rejects creation saves before preview rendering runs.
+- Workers Paid was activated with owner approval on 2026-07-13. The tracked
+  staging candidate configures a 2,000 ms CPU limit, deliberately well below
+  the Paid plan's 30-second default. The release validator requires that exact
+  configuration in both source and generated staging artifacts and rejects it
+  in local or production configuration. Cloudflare may allow occasional CPU
+  overruns, so treat this as a cost and runaway-work guardrail rather than a
+  hard wall. This
+  resolves the plan-level 10 ms blocker only: staging remains read-only until
+  an approved writable acceptance run measures full-request image generation,
+  the scheduled cleanup handler, quotas, derivatives, cleanup, and cost. See
+  [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
 ## Local preflight (no remote side effects)
 

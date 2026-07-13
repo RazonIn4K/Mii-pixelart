@@ -200,6 +200,7 @@ const TARGET_CONFIRMATIONS: Record<
 
 const APPROVAL_MAX_AGE_MS = 30 * 60 * 1_000;
 const APPROVAL_CLOCK_SKEW_MS = 60 * 1_000;
+const STAGING_CPU_LIMIT_MS = 2_000;
 const MAX_CAPTURE_BYTES = 64 * 1_024;
 const MIGRATION_FILE_PATTERN = /^\d{4}_[a-z0-9_]+[.]sql$/u;
 const MIGRATION_LEDGER_QUERY = "SELECT name FROM d1_migrations ORDER BY id";
@@ -492,6 +493,12 @@ function validateOriginExposure(config: JsonRecord): void {
   );
 }
 
+function validateCpuLimits(config: JsonRecord, target: ReleaseTarget): void {
+  const expected =
+    target === "staging" ? { cpu_ms: STAGING_CPU_LIMIT_MS } : undefined;
+  expectJsonExact(config.limits, expected, "Staging-only Worker CPU limit");
+}
+
 function validateCustomDomainRoute(
   config: JsonRecord,
   target: ReleaseTarget,
@@ -544,6 +551,7 @@ function validateSourceIsolation(source: JsonRecord): void {
   for (const target of ["local", "staging", "production"] as const) {
     const selected = selectedSourceConfig(source, target);
     validateOriginExposure(selected);
+    validateCpuLimits(selected, target);
     const vars = objectAt(selected, "vars", "Environment variables");
     const d1 = singleBinding(selected, "d1_databases", "DB", "D1 bindings");
     const r2 = singleBinding(selected, "r2_buckets", "PROJECTS", "R2 bindings");
@@ -715,6 +723,7 @@ function validateGeneratedConfig(
   );
   expectExact(generated.name, expected.workerName, "Generated Worker name");
   validateOriginExposure(generated);
+  validateCpuLimits(generated, target);
   validateCustomDomainRoute(generated, target);
   expectExact(
     generated.compatibility_date,

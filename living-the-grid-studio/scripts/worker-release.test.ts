@@ -191,6 +191,7 @@ function environmentConfig(
     ...(target === "local" ? {} : { name: values.name }),
     workers_dev: false,
     preview_urls: false,
+    ...(target === "staging" ? { limits: { cpu_ms: 2_000 } } : {}),
     ...(values.customDomain === null
       ? {}
       : {
@@ -278,6 +279,7 @@ function generatedConfig(target: ReleaseTarget, source = sourceConfig()) {
     name: targetValues[target].name,
     workers_dev: selected.workers_dev,
     preview_urls: selected.preview_urls,
+    ...(selected.limits === undefined ? {} : { limits: selected.limits }),
     compatibility_date: source.compatibility_date,
     compatibility_flags: source.compatibility_flags,
     triggers: source.triggers,
@@ -718,6 +720,71 @@ describe("runRelease dry-run", () => {
     expect(harness.calls).toHaveLength(1);
     expect(harness.calls[0].args).toEqual(["build"]);
   });
+
+  it.each([
+    ["drops", undefined],
+    ["widens", { cpu_ms: 30_000 }],
+  ])(
+    "rejects a generated config that %s the staging CPU limit",
+    async (_label, limits) => {
+      const harness = makeHarness("staging");
+      const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+      if (limits === undefined) delete generated.limits;
+      else generated.limits = limits;
+      harness.files.set(GENERATED_PATH, JSON.stringify(generated));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "dry-run" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("Staging-only Worker CPU limit");
+      expect(harness.calls).toHaveLength(1);
+      expect(harness.calls[0].args).toEqual(["build"]);
+    },
+  );
+
+  it.each(["local", "production"] as const)(
+    "rejects a generated %s config that inherits the staging CPU limit",
+    async (target) => {
+      const harness = makeHarness(target);
+      const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+      generated.limits = { cpu_ms: 2_000 };
+      harness.files.set(GENERATED_PATH, JSON.stringify(generated));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target, intent: "dry-run" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("Staging-only Worker CPU limit");
+      expect(harness.calls).toHaveLength(1);
+      expect(harness.calls[0].args).toEqual(["build"]);
+    },
+  );
+
+  it.each([
+    ["removes the staging cap", "staging", undefined],
+    ["widens the staging cap", "staging", { cpu_ms: 30_000 }],
+    ["adds a production cap", "production", { cpu_ms: 2_000 }],
+  ] as const)(
+    "rejects source configuration that %s",
+    async (_label, target, limits) => {
+      const harness = makeHarness("staging");
+      const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+      if (limits === undefined) delete source.env[target].limits;
+      else source.env[target].limits = limits;
+      harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "dry-run" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("Staging-only Worker CPU limit");
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
 
   it("allows legal launch markers only as a non-deploying warning", async () => {
     const harness = makeHarness("production", { legalMarker: true });

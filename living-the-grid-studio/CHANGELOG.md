@@ -6,6 +6,7 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Staging CPU guardrail:** activated Workers Paid with owner approval and configured a staging-only 2-second CPU limit, enforced exactly in both source and generated release configuration; community writes and production remain unchanged pending live staging acceptance.
 - **Consult-sales containment:** consult checkout now fails closed in both the unified Worker and retained Pages path, stays out of the public catalog while disabled, and cannot be enabled by the release wrapper until an end-to-end fulfillment test is recorded. Recovery and support products remain available.
 - **Staging control-plane readiness:** completed the approved Google OAuth branding, isolated Stripe test-key/webhook setup, and forward-only `0006_align_game_taxonomy.sql` migration without deploying the Worker or changing DNS.
 - **Legal and release-mode hardening:** published the operator-approved postal contact on Terms, Privacy, and Copyright; recorded operational channel ownership; and made bootstrap validation accept restricted Stripe keys while rejecting test/live key mismatches by target.

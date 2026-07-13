@@ -105,6 +105,9 @@
       "name": "tomodachi-studio-staging",
       "workers_dev": false,
       "preview_urls": false,
+      "limits": {
+        "cpu_ms": 2000
+      },
       "routes": [
         { "pattern": "staging.tomodachi.pw", "custom_domain": true }
       ],
