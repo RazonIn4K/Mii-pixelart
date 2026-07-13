@@ -5,6 +5,11 @@ import { cp, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
+import {
+  assertNoForbiddenReleaseSecretArtifacts,
+  isForbiddenReleaseSecretFilename,
+} from "./scripts/release-output-hygiene";
+
 function pagesRollbackAssets(): Plugin {
   const clientDirectory = path.resolve(import.meta.dirname, "dist", "client");
   const pagesDirectory = path.resolve(import.meta.dirname, "dist", "public");
@@ -26,6 +31,26 @@ function pagesRollbackAssets(): Plugin {
   };
 }
 
+function releaseOutputSecretHygiene(): Plugin {
+  const outputDirectory = path.resolve(import.meta.dirname, "dist");
+
+  return {
+    name: "tomodachi-release-output-secret-hygiene",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      for (const fileName of Object.keys(bundle)) {
+        if (isForbiddenReleaseSecretFilename(path.basename(fileName))) {
+          delete bundle[fileName];
+        }
+      }
+    },
+    async closeBundle() {
+      await assertNoForbiddenReleaseSecretArtifacts(outputDirectory);
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -39,6 +64,7 @@ export default defineConfig({
       remoteBindings: false,
     }),
     pagesRollbackAssets(),
+    releaseOutputSecretHygiene(),
   ],
   resolve: {
     alias: {
