@@ -1,14 +1,12 @@
 import { spawn } from "node:child_process";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export type ReleaseTarget = "local" | "staging" | "production";
 export type ReleaseIntent = "dry-run" | "deploy";
 type DeploymentPhase =
-  | "standard"
-  | "staging-read-only-bootstrap"
-  | "production-read-only-bootstrap";
+  "standard" | "staging-read-only-bootstrap" | "production-read-only-bootstrap";
 
 export interface ReleaseOptions {
   cwd: string;
@@ -36,10 +34,16 @@ export interface FileStat {
   mtimeMs: number;
 }
 
+export interface FileSecurity {
+  isRegularFile: boolean;
+  permissions?: number;
+}
+
 export interface ReleaseDependencies {
   readText(filePath: string): Promise<string>;
   readDirectory(directoryPath: string): Promise<readonly string[]>;
   statFile(filePath: string): Promise<FileStat>;
+  inspectFileSecurity(filePath: string): Promise<FileSecurity>;
   runCommand(
     command: string,
     args: readonly string[],
@@ -876,6 +880,13 @@ async function validateBootstrapSecretsFile(
     `${target}.secrets.json`,
   );
   const absolutePath = path.join(cwd, relativePath);
+  await requirePrivateRegularFile(
+    absolutePath,
+    "The target-specific bootstrap secrets file is missing or unreadable.",
+    "The bootstrap secrets file must be a private regular file with permissions 0600.",
+    dependencies,
+  );
+
   let secrets: JsonRecord;
   try {
     secrets = parseJson(
@@ -911,6 +922,27 @@ async function validateBootstrapSecretsFile(
     );
   }
   return absolutePath;
+}
+
+async function requirePrivateRegularFile(
+  filePath: string,
+  missingMessage: string,
+  insecureMessage: string,
+  dependencies: ReleaseDependencies,
+): Promise<void> {
+  let fileSecurity: FileSecurity;
+  try {
+    fileSecurity = await dependencies.inspectFileSecurity(filePath);
+  } catch {
+    throw new ReleaseError(missingMessage);
+  }
+  if (
+    !fileSecurity.isRegularFile ||
+    (fileSecurity.permissions !== undefined &&
+      fileSecurity.permissions !== 0o600)
+  ) {
+    throw new ReleaseError(insecureMessage);
+  }
 }
 
 function validateRemoteResourceIds(snapshot: BindingSnapshot): void {
@@ -1202,6 +1234,12 @@ async function validateApproval(
 ): Promise<ValidatedApproval> {
   const relativePath = path.join(".deployment-readiness", `${target}.json`);
   const approvalPath = path.join(cwd, relativePath);
+  await requirePrivateRegularFile(
+    approvalPath,
+    "The target-specific deployment approval is missing or unreadable.",
+    "The deployment approval file must be a private regular file with permissions 0600.",
+    dependencies,
+  );
   let raw: string;
   let fileStat: FileStat;
   try {
@@ -1798,6 +1836,14 @@ export function createNodeDependencies(): ReleaseDependencies {
     statFile: async (filePath) => {
       const result = await stat(filePath);
       return { mtimeMs: result.mtimeMs };
+    },
+    inspectFileSecurity: async (filePath) => {
+      const result = await lstat(filePath);
+      return {
+        isRegularFile: result.isFile(),
+        permissions:
+          process.platform === "win32" ? undefined : result.mode & 0o777,
+      };
     },
     runCommand: spawnCaptured,
     getGitState: nodeGitState,

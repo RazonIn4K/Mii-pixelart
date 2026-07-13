@@ -36,7 +36,11 @@ import {
 
 interface KVNamespace {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  put(
+    key: string,
+    value: string,
+    options?: { expirationTtl?: number },
+  ): Promise<void>;
 }
 
 interface StripeWebhookEnv {
@@ -98,7 +102,10 @@ function timingSafeEqualHex(a: string, b: string): boolean {
   return result === 0;
 }
 
-async function computeHmacHex(secret: string, payload: string): Promise<string> {
+async function computeHmacHex(
+  secret: string,
+  payload: string,
+): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -131,7 +138,10 @@ async function verifyStripeSignature(
     return { ok: false, reason: "Webhook timestamp outside tolerance window." };
   }
 
-  const expected = await computeHmacHex(secret, `${parsed.timestamp}.${rawBody}`);
+  const expected = await computeHmacHex(
+    secret,
+    `${parsed.timestamp}.${rawBody}`,
+  );
   const match = parsed.v1Signatures.some((sig) =>
     timingSafeEqualHex(sig, expected),
   );
@@ -190,14 +200,13 @@ async function markProcessed(
   }
 }
 
-async function dispatchEvent(event: StripeEvent): Promise<void> {
-  const type = event.type ?? "(unknown)";
-
-  // Skeleton: record only the allowlisted event category. Wire actual
-  // fulfillment here in a later pass
+async function dispatchEvent(): Promise<void> {
+  // Fulfillment remains intentionally empty. Wire actual idempotent delivery
+  // here in a later pass
   // (e.g. R2 signed URL email for the breach recovery PDF, Google Meet link
   // for the 30-min consult, internal Slack/Discord ping, etc.).
-  console.log(JSON.stringify({ eventType: type, message: "stripe_event_received" }));
+  // Do not log Stripe event identifiers, types, or payload fields. The retained
+  // Pages rollback path has no approved provider-specific logging surface.
 }
 
 /**
@@ -235,22 +244,16 @@ export const onRequestPost = async (
 
   let rawBody: string;
   try {
-    rawBody = await readBoundedText(
-      context.request,
-      MAXIMUM_WEBHOOK_BYTES,
-    );
+    rawBody = await readBoundedText(context.request, MAXIMUM_WEBHOOK_BYTES);
   } catch (error) {
     const requestError = publicRequestError(
       error,
       "Could not read webhook body.",
     );
-    return new Response(
-      JSON.stringify({ error: requestError.message }),
-      {
-        status: requestError.status,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: requestError.message }), {
+      status: requestError.status,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   const verification = await verifyStripeSignature(
     rawBody,
@@ -258,48 +261,44 @@ export const onRequestPost = async (
     secret,
   );
   if (!verification.ok) {
-    return new Response(
-      JSON.stringify({ error: verification.reason }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: verification.reason }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   let event: StripeEvent;
   try {
     event = JSON.parse(rawBody) as StripeEvent;
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body." }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Invalid JSON body." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   const eventId = event.id ?? "";
 
   if (await alreadyProcessed(context.env, eventId)) {
-    return new Response(
-      JSON.stringify({ received: true, deduped: true }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ received: true, deduped: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   try {
-    await dispatchEvent(event);
+    await dispatchEvent();
     await markProcessed(context.env, eventId);
-  } catch (error) {
+  } catch {
     // 5xx → Stripe will retry. Don't mark as processed on failure.
-    console.error(JSON.stringify({
-      errorType: error instanceof Error ? error.name : "UnknownError",
-      message: "stripe_webhook_dispatch_failed",
-    }));
     return new Response(
       JSON.stringify({ error: "Dispatch failed; will retry." }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 
-  return new Response(
-    JSON.stringify({ received: true }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 };

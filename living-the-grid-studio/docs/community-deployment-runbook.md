@@ -59,8 +59,9 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
    pnpm verify:bundle
    ```
 
-4. Apply `migrations/0001_community.sql` to a disposable local D1 database and
-   run `PRAGMA foreign_key_check` and `PRAGMA integrity_check`.
+4. Run `pnpm verify:migrations`. The verifier applies every tracked migration
+   in order to a disposable local SQLite database and requires both
+   `PRAGMA foreign_key_check` and `PRAGMA integrity_check` to pass.
 5. Exercise the Worker locally with local-only D1/R2/KV bindings. Use fake OIDC
    fixtures for automated tests; use a dedicated localhost Google client only
    for an explicitly approved manual sign-in test.
@@ -204,8 +205,11 @@ to the exact clean Git commit. The approval expires after 30 minutes and records
 the intended read-only/writable mutation mode. It must also confirm the exact
 Cloudflare/Google/domain, pricing/Images, legal/contact/retention,
 admin/moderator/inbox, consult-fulfillment, Stripe/tax, rollback, and migration
-owners or decisions. The wrapper validates these fields without logging their
-values. Inspect the flattened output config before every deploy.
+owners or decisions. Create it under `umask 077`, retain mode `0600`, and never
+commit it because it can contain a public-service address and internal account
+IDs. The wrapper requires a private regular file and validates its fields
+without logging their values. Inspect the flattened output config before every
+deploy.
 
 Readiness schema version 2 requires an explicit `deploymentPhase`. Use
 `standard` for every writable deploy and every deploy after the first
@@ -237,14 +241,28 @@ After explicit approval for resources and staging deployment:
    deployment, prepare an ignored JSON object at
    `.deployment-readiness/staging.secrets.json` containing exactly the eight
    allowlisted secret names. Never print, commit, or place the values in shell
-   arguments. The release wrapper validates the exact allowlist, rejects known
-   placeholders and malformed provider credentials, and passes the file to
-   `wrangler deploy --secrets-file` so secrets and code are installed in the
-   same approved deployment. Do not run `wrangler secret put` before the Worker
-   exists: that command creates and deploys a Worker version. After bootstrap,
-   use a separately approved Wrangler versions workflow for rotations.
+   arguments. Create the directory and file with a restrictive umask, and
+   retain owner-only permissions after the approved secret-manager workflow
+   populates it:
+
+   ```bash
+   umask 077
+   mkdir -p .deployment-readiness
+   # Populate the JSON through the approved non-logging secret-manager flow.
+   chmod 600 .deployment-readiness/staging.secrets.json
+   ```
+
+   The release wrapper requires a regular file, enforces POSIX mode `0600`
+   where permission metadata is available, validates the exact allowlist,
+   rejects known placeholders and malformed provider credentials, and passes
+   the file to `wrangler deploy --secrets-file` so secrets and code are
+   installed in the same approved deployment. Do not run `wrangler secret put`
+   before the Worker exists: that command creates and deploys a Worker version.
+   After bootstrap, use a separately approved Wrangler versions workflow for
+   rotations.
    `secrets.required` in Wrangler must list the same eight names in every
    environment.
+
 4. List unapplied migrations against the **database name**, review the output,
    then apply them only after the migration approval gate.
 5. Confirm `staging.tomodachi.pw` has no conflicting DNS record or Custom

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
 import { onRequest as handleStripe } from "../functions/api/stripe/[[path]]";
@@ -116,4 +116,63 @@ describe("legacy Pages input handling", () => {
       error: "Request body is too large.",
     });
   });
+
+  it("keeps the retained Pages webhook free of provider-specific logs", async () => {
+    const secret = "test-only-pages-webhook-secret";
+    const eventId = "evt_pages_sensitive_123";
+    const eventType = "checkout.session.completed";
+    const body = JSON.stringify({ id: eventId, type: eventType });
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const errorLog = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    try {
+      const response = await handleStripeWebhook({
+        env: { STRIPE_WEBHOOK_SECRET: secret },
+        request: new Request("https://example.test/api/webhooks/stripe", {
+          body,
+          headers: {
+            "Stripe-Signature": await stripeSignature(body, secret),
+          },
+          method: "POST",
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ received: true });
+      expect(log).not.toHaveBeenCalled();
+      expect(errorLog).not.toHaveBeenCalled();
+      const serializedLogs = JSON.stringify([
+        ...log.mock.calls,
+        ...errorLog.mock.calls,
+      ]);
+      expect(serializedLogs).not.toContain(eventId);
+      expect(serializedLogs).not.toContain(eventType);
+    } finally {
+      log.mockRestore();
+      errorLog.mockRestore();
+    }
+  });
 });
+
+async function stripeSignature(body: string, secret: string): Promise<string> {
+  const timestamp = Math.floor(Date.now() / 1_000);
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(`${timestamp}.${body}`),
+  );
+  const signature = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `t=${timestamp},v1=${signature}`;
+}

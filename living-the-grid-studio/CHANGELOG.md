@@ -4,6 +4,11 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-07-13
+
+- **Webhook privacy and replay coverage:** removed Stripe event identifiers and types from both the unified Worker and retained Pages logs, then added signed valid, tampered, stale, missing-secret, oversized-body, and duplicate-delivery tests.
+- **Release artifact hardening:** deployment approvals and bootstrap secret bundles must be ignored regular files with owner-only `0600` permissions on POSIX systems; the local release checklist now verifies the complete forward-only migration chain.
+
 ### 2026-07-12
 
 - **Studio canvas overhaul:** removed the competing graph-paper layer and duplicate tool/palette panels, added one high-contrast editable grid, consolidated touch/pen/mouse controls, kept phone quick colors visible, and suppresses grid lines when they would obscure 256×256 cells.

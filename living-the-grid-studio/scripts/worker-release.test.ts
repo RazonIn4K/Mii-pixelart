@@ -379,6 +379,10 @@ interface Harness {
   setRoleCommandResult(result: CommandResult): void;
   setGitState(state: { commit: string; dirty: boolean }): void;
   setIgnored(value: boolean): void;
+  setFileSecurity(
+    filePath: string,
+    security: { isRegularFile: boolean; permissions?: number },
+  ): void;
 }
 
 function makeHarness(
@@ -459,6 +463,10 @@ function makeHarness(
   );
   let gitState = { commit: COMMIT, dirty: false };
   let ignored = true;
+  const fileSecurity = new Map<
+    string,
+    { isRegularFile: boolean; permissions?: number }
+  >();
   const dependencies: ReleaseDependencies = {
     async readText(filePath) {
       const value = files.get(filePath);
@@ -472,6 +480,15 @@ function makeHarness(
     async statFile(filePath) {
       if (!files.has(filePath)) throw new Error("ENOENT");
       return { mtimeMs: NOW };
+    },
+    async inspectFileSecurity(filePath) {
+      if (!files.has(filePath)) throw new Error("ENOENT");
+      return (
+        fileSecurity.get(filePath) ?? {
+          isRegularFile: true,
+          permissions: 0o600,
+        }
+      );
     },
     async runCommand(command, args, commandOptions) {
       calls.push({ command, args: [...args], options: commandOptions });
@@ -514,6 +531,9 @@ function makeHarness(
     },
     setIgnored(value) {
       ignored = value;
+    },
+    setFileSecurity(filePath, security) {
+      fileSecurity.set(filePath, security);
     },
   };
 }
@@ -1041,6 +1061,98 @@ describe("runRelease deploy gates", () => {
       expect(harness.calls).toHaveLength(0);
     }
   });
+
+  it.each([
+    { label: "a directory", isRegularFile: false, permissions: 0o600 },
+    {
+      label: "group-readable permissions",
+      isRegularFile: true,
+      permissions: 0o640,
+    },
+    {
+      label: "world-readable permissions",
+      isRegularFile: true,
+      permissions: 0o604,
+    },
+    {
+      label: "owner-executable permissions",
+      isRegularFile: true,
+      permissions: 0o700,
+    },
+    {
+      label: "owner-read-only permissions",
+      isRegularFile: true,
+      permissions: 0o400,
+    },
+  ])(
+    "rejects a bootstrap secrets file that is $label",
+    async ({ isRegularFile, permissions }) => {
+      const harness = makeHarness("staging", { bootstrap: true });
+      const secretPath = path.join(
+        CWD,
+        ".deployment-readiness",
+        "staging.secrets.json",
+      );
+      harness.setFileSecurity(secretPath, { isRegularFile, permissions });
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("private regular file with permissions 0600");
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
+
+  it("accepts private bootstrap secret files when permission metadata is unavailable", async () => {
+    const harness = makeHarness("staging", { bootstrap: true });
+    const secretPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.secrets.json",
+    );
+    harness.setFileSecurity(secretPath, { isRegularFile: true });
+
+    await runRelease(
+      { cwd: CWD, target: "staging", intent: "deploy" },
+      harness.dependencies,
+    );
+
+    expect(harness.calls).toHaveLength(4);
+  });
+
+  it.each([
+    {
+      label: "a symlink or non-regular file",
+      isRegularFile: false,
+      permissions: 0o600,
+    },
+    {
+      label: "group-readable permissions",
+      isRegularFile: true,
+      permissions: 0o640,
+    },
+  ])(
+    "rejects a deployment approval file that is $label",
+    async ({ isRegularFile, permissions }) => {
+      const harness = makeHarness("staging", { bootstrap: true });
+      const approvalPath = path.join(
+        CWD,
+        ".deployment-readiness",
+        "staging.json",
+      );
+      harness.setFileSecurity(approvalPath, { isRegularFile, permissions });
+
+      await expect(
+        runRelease(
+          { cwd: CWD, target: "staging", intent: "deploy" },
+          harness.dependencies,
+        ),
+      ).rejects.toThrow("private regular file with permissions 0600");
+      expect(harness.calls).toHaveLength(0);
+    },
+  );
 
   it("rejects bootstrap intent outside a first read-only staging deployment", async () => {
     const production = makeHarness("production", { bootstrap: true });

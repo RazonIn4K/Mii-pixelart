@@ -12,12 +12,13 @@ import {
   verifyCheckoutSession,
   type ApiResult as StripeApiResult,
 } from "../server/stripe";
+import { clientKey, enforceRateLimit, requireOnboardedSession } from "./auth";
 import {
-  clientKey,
-  enforceRateLimit,
-  requireOnboardedSession,
-} from "./auth";
-import { HttpError, readJson, readText, type WorkerRequestContext } from "./http";
+  HttpError,
+  readJson,
+  readText,
+  type WorkerRequestContext,
+} from "./http";
 import type { Router } from "./router";
 
 const MODELS_CACHE_KEY = "openrouter:models:v2";
@@ -33,7 +34,8 @@ export function registerLegacyRoutes(router: Router): void {
 }
 
 async function handleAi(context: WorkerRequestContext): Promise<Response> {
-  const method = context.request.method === "HEAD" ? "GET" : context.request.method;
+  const method =
+    context.request.method === "HEAD" ? "GET" : context.request.method;
   const path = context.params.path.replace(/^\/+|\/+$/gu, "");
   if (method === "GET" && path === "status") {
     return legacyJson(getOpenRouterStatus(context.env));
@@ -50,7 +52,10 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
         }),
       );
     }
-    return new Response(body, { status: result.status, headers: legacyHeaders("MISS") });
+    return new Response(body, {
+      status: result.status,
+      headers: legacyHeaders("MISS"),
+    });
   }
   if (method === "POST" && path === "chat") {
     const session = await requireOnboardedSession(context);
@@ -72,7 +77,8 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
 }
 
 async function handleStripe(context: WorkerRequestContext): Promise<Response> {
-  const method = context.request.method === "HEAD" ? "GET" : context.request.method;
+  const method =
+    context.request.method === "HEAD" ? "GET" : context.request.method;
   const path = context.params.path.replace(/^\/+|\/+$/gu, "");
   if (method === "GET" && path === "products") {
     const category = context.url.searchParams.get("category");
@@ -97,10 +103,17 @@ async function handleStripe(context: WorkerRequestContext): Promise<Response> {
   if (method === "GET" && path === "session") {
     await enforceStripeRateLimit(context);
     return legacyJson(
-      await verifyCheckoutSession(context.url.searchParams.get("session_id") ?? "", context.env),
+      await verifyCheckoutSession(
+        context.url.searchParams.get("session_id") ?? "",
+        context.env,
+      ),
     );
   }
-  throw new HttpError(404, "stripe_route_not_found", "Stripe route was not found.");
+  throw new HttpError(
+    404,
+    "stripe_route_not_found",
+    "Stripe route was not found.",
+  );
 }
 
 async function enforceStripeRateLimit(
@@ -112,32 +125,53 @@ async function enforceStripeRateLimit(
   );
 }
 
-async function handleStripeWebhook(context: WorkerRequestContext): Promise<Response> {
+async function handleStripeWebhook(
+  context: WorkerRequestContext,
+): Promise<Response> {
   if (!context.env.STRIPE_WEBHOOK_SECRET) {
-    throw new HttpError(503, "stripe_not_configured", "Stripe webhook is not configured.");
+    throw new HttpError(
+      503,
+      "stripe_not_configured",
+      "Stripe webhook is not configured.",
+    );
   }
   const signature = context.request.headers.get("stripe-signature");
-  if (!signature) throw new HttpError(400, "missing_signature", "Stripe signature is missing.");
+  if (!signature)
+    throw new HttpError(
+      400,
+      "missing_signature",
+      "Stripe signature is missing.",
+    );
   const declaredLength = Number(context.request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > 1_000_000) {
     throw new HttpError(413, "payload_too_large", "Webhook body is too large.");
   }
   const rawBody = await readText(context.request, 1_000_000);
-  if (!(await verifyStripeSignature(rawBody, signature, context.env.STRIPE_WEBHOOK_SECRET))) {
-    throw new HttpError(400, "invalid_signature", "Stripe signature is invalid.");
+  if (
+    !(await verifyStripeSignature(
+      rawBody,
+      signature,
+      context.env.STRIPE_WEBHOOK_SECRET,
+    ))
+  ) {
+    throw new HttpError(
+      400,
+      "invalid_signature",
+      "Stripe signature is invalid.",
+    );
   }
   const event = parseStripeEvent(rawBody);
   const eventId = event.id ?? "";
-  if (eventId && await context.env.EDGE_CACHE.get(`stripe:event:${eventId}`)) {
+  if (
+    eventId &&
+    (await context.env.EDGE_CACHE.get(`stripe:event:${eventId}`))
+  ) {
     return Response.json({ deduped: true, received: true });
   }
 
-  console.log(JSON.stringify({
-    eventId,
-    eventType: event.type ?? "unknown",
-    message: "stripe_event_received",
-    requestId: context.requestId,
-  }));
+  // The Worker entry point emits the approved six-field request log. Do not
+  // create a second provider-specific log here: Stripe event identifiers and
+  // types are payment metadata and must not enter application logs.
   if (eventId) {
     await context.env.EDGE_CACHE.put(`stripe:event:${eventId}`, "1", {
       expirationTtl: STRIPE_EVENT_TTL_SECONDS,
@@ -171,16 +205,20 @@ function toRecord(value: unknown): Record<string, unknown> {
 function isAiChatRequest(value: unknown): value is AiChatRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  if (typeof record.model !== "string" || !Array.isArray(record.messages)) return false;
+  if (typeof record.model !== "string" || !Array.isArray(record.messages))
+    return false;
   return record.messages.every((message) => {
-    if (!message || typeof message !== "object" || Array.isArray(message)) return false;
+    if (!message || typeof message !== "object" || Array.isArray(message))
+      return false;
     const entry = message as Record<string, unknown>;
-    return (entry.role === "user" || entry.role === "assistant")
-      && typeof entry.content === "string";
+    return (
+      (entry.role === "user" || entry.role === "assistant") &&
+      typeof entry.content === "string"
+    );
   });
 }
 
-function parseStripeEvent(rawBody: string): { id?: string; type?: string } {
+function parseStripeEvent(rawBody: string): { id?: string } {
   try {
     const value: unknown = JSON.parse(rawBody);
     if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -189,7 +227,6 @@ function parseStripeEvent(rawBody: string): { id?: string; type?: string } {
     const record = value as Record<string, unknown>;
     return {
       id: typeof record.id === "string" ? record.id : undefined,
-      type: typeof record.type === "string" ? record.type : undefined,
     };
   } catch {
     throw new HttpError(400, "invalid_json", "Webhook body is not valid JSON.");
@@ -203,9 +240,14 @@ async function verifyStripeSignature(
 ): Promise<boolean> {
   const parts = header.split(",").map((part) => part.trim().split("=", 2));
   const timestamp = Number(parts.find(([key]) => key === "t")?.[1]);
-  const signatures = parts.filter(([key]) => key === "v1").map(([, value]) => value);
+  const signatures = parts
+    .filter(([key]) => key === "v1")
+    .map(([, value]) => value);
   if (!Number.isFinite(timestamp) || signatures.length === 0) return false;
-  if (Math.abs(Math.floor(Date.now() / 1_000) - timestamp) > STRIPE_SIGNATURE_TOLERANCE_SECONDS) {
+  if (
+    Math.abs(Math.floor(Date.now() / 1_000) - timestamp) >
+    STRIPE_SIGNATURE_TOLERANCE_SECONDS
+  ) {
     return false;
   }
   const encoder = new TextEncoder();
@@ -231,7 +273,8 @@ function constantTimeEqual(left: string, right: string): boolean {
   const size = Math.max(left.length, right.length);
   let difference = left.length ^ right.length;
   for (let index = 0; index < size; index += 1) {
-    difference |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+    difference |=
+      (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
   }
   return difference === 0;
 }
