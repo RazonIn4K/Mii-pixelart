@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { OPENROUTER_MODEL_PRESETS, type AiChatRequest } from "../shared/ai";
 import {
+  OPENROUTER_MODEL_PRESETS,
+  type AiChatRequest,
+  validateAiGridSketch,
+} from "../shared/ai";
+import {
+  buildAiSystemPrompt,
   getOpenRouterModels,
   getOpenRouterStatus,
   isSupportedOpenRouterModel,
@@ -14,6 +19,21 @@ const request = (model: string): AiChatRequest => ({
 });
 
 describe("OpenRouter model policy", () => {
+  it("uses a complete validator-accepted sketch example in the system prompt", () => {
+    const prompt = buildAiSystemPrompt(true);
+    const serializedExample = prompt
+      .split(
+        "Required JSON shape (the example is complete and validator-accepted): ",
+      )[1]
+      ?.split(" The rows array must")[0];
+
+    expect(serializedExample).toBeTruthy();
+    const example = JSON.parse(serializedExample ?? "null") as {
+      sketch?: unknown;
+    };
+    expect(validateAiGridSketch(example.sketch)).toMatchObject({ ok: true });
+  });
+
   it("allows every curated free preset", () => {
     for (const preset of OPENROUTER_MODEL_PRESETS) {
       expect(isSupportedOpenRouterModel(preset.id)).toBe(true);

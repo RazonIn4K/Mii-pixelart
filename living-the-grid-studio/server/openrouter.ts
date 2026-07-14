@@ -94,6 +94,54 @@ const ALLOWED_MODEL_IDS = new Set(
   OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
 );
 
+// Keep the prompt example structurally valid. Free models often imitate the
+// example more literally than the surrounding prose, so an abbreviated rows
+// array can teach them to return an empty or malformed sketch even when the
+// requested dimensions are correct.
+const AI_SKETCH_PROMPT_COLORS = {
+  ".": null,
+  B: "R10C1",
+  R: "R1C2",
+  S: "R9C5",
+  W: "R10C7",
+} as const;
+const AI_SKETCH_PROMPT_ROWS = [
+  ".....BBBBBB.....",
+  "...BBRRRRRRBB...",
+  "..BRRWWRRWWRRB..",
+  ".BRRRRRRRRRRRRB.",
+  ".BRWWRRRRRRWWRB.",
+  ".BRRRRRRRRRRRRB.",
+  "..BBRRRRRRRRBB..",
+  "...BBBSSSSBBB...",
+  ".....BSSSSB.....",
+  ".....BSSSSB.....",
+  ".....BSBBSB.....",
+  ".....BSSSSB.....",
+  ".....BSSSSB.....",
+  "......BSSB......",
+  "......BBBB......",
+  "................",
+] as const;
+const AI_SKETCH_PROMPT_EXAMPLE = {
+  reply:
+    "A compact mushroom badge with a dark outline, red cap, white spots, and beige stem.",
+  sketch: {
+    height: 16,
+    name: "Mushroom Badge",
+    rows: AI_SKETCH_PROMPT_ROWS.map((row) =>
+      Array.from(
+        row,
+        (glyph) =>
+          AI_SKETCH_PROMPT_COLORS[
+            glyph as keyof typeof AI_SKETCH_PROMPT_COLORS
+          ] ?? null,
+      ),
+    ),
+    width: 16,
+  },
+} satisfies { reply: string; sketch: AiGridSketch };
+
 export function isSupportedOpenRouterModel(modelId: string): boolean {
   return ALLOWED_MODEL_IDS.has(modelId);
 }
@@ -303,10 +351,10 @@ export async function sendOpenRouterChat(
     normalized.currentDocument ?? normalized.currentGridImage;
   const dimensionsChanged = Boolean(
     normalized.preserveDimensions &&
-      expectedDimensions &&
-      parsed?.sketch &&
-      (parsed.sketch.width !== expectedDimensions.width ||
-        parsed.sketch.height !== expectedDimensions.height),
+    expectedDimensions &&
+    parsed?.sketch &&
+    (parsed.sketch.width !== expectedDimensions.width ||
+      parsed.sketch.height !== expectedDimensions.height),
   );
   const sketch = dimensionsChanged ? null : (parsed?.sketch ?? null);
   const warning = dimensionsChanged
@@ -546,9 +594,10 @@ export function buildAiSystemPrompt(requestSketch: boolean): string {
     "Use R10C1 (black) or R11C1 (charcoal) for outlines, a different color for the main fill, and at least one accent color for facial features or highlights.",
     "Avoid noisy dithering. Avoid one-cell artifacts unless they are essential facial details such as pupils, teeth, buttons, or highlights.",
     paletteGuide,
-    "Required JSON shape (replace example rows with your actual art):",
-    '{"reply":"Short summary of the design choices.","sketch":{"name":"Project Name","width":16,"height":16,"rows":[ [null,null,null,null,"R10C1","R10C1","R10C1","R10C1","R10C1","R10C1",null,null,null,null,null,null], [null,null,"R10C1","R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1","R10C1",null,null,null,null], [null,"R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1",null,null,null], [null,"R10C1","R9C5","R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1","R9C5","R10C1",null,null,null], [null,"R10C1","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R9C5","R10C1",null,null,null] ]}}',
+    "Required JSON shape (the example is complete and validator-accepted):",
+    JSON.stringify(AI_SKETCH_PROMPT_EXAMPLE),
     "The rows array must have EXACTLY height rows, and each row must have EXACTLY width cells. Count them before you finish.",
+    "The rows must contain at least one non-null painted cell. If your painted-cell count is zero, fix the sketch before returning it.",
     "If you must shorten the grid to fit, return a smaller width and height instead of producing an invalid number of cells.",
   ].join(" ");
 }

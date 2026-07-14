@@ -6,6 +6,12 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-14
 
+- **AI sketch reliability follow-up:** replaced the abbreviated five-row
+  example that contradicted the 16×16 AI schema with a complete,
+  validator-approved mushroom grid and an explicit non-empty-cell requirement.
+  The hostile-output validator and strict no-data provider policy remain
+  unchanged; the default staging model returned a validated 16×16 sketch in a
+  protected provider probe after the correction.
 - **Writable-staging account acceptance candidate:** exposed the fail-closed
   community-write capability through the session contract, added truthful
   read-only profile/setup affordances, made phone sign-in visible without
