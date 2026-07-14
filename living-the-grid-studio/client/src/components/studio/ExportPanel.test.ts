@@ -26,6 +26,7 @@ describe("reference pack export safety", () => {
 
     expect(html).not.toContain("<img src=x");
     expect(html).not.toContain("</title></title>");
+    expect(html).not.toContain("https://fonts.");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(html).toContain("&amp;&quot;&#39;&lt;/title&gt;");
   });

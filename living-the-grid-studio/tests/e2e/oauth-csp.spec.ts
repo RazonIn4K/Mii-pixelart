@@ -6,6 +6,10 @@ const headersSource = readFileSync(
   new URL("../../client/public/_headers", import.meta.url),
   "utf8",
 );
+const indexSource = readFileSync(
+  new URL("../../client/index.html", import.meta.url),
+  "utf8",
+);
 const contentSecurityPolicy = headersSource.match(
   /^\s*Content-Security-Policy:\s*(.+)$/mu,
 )?.[1];
@@ -17,18 +21,14 @@ if (!contentSecurityPolicy) {
   throw new Error("The authored Content-Security-Policy header is missing.");
 }
 
-test("allows only the intended Google Fonts preconnect origins", () => {
-  const connectSources = contentSecurityPolicy
-    .split(";")
-    .find((directive) => directive.trimStart().startsWith("connect-src "))
-    ?.trim()
-    .split(/\s+/u)
-    .slice(1);
-
-  expect(connectSources).toContain("https://fonts.googleapis.com");
-  expect(connectSources).toContain("https://fonts.gstatic.com");
-  expect(connectSources).not.toContain("https://*.googleapis.com");
-  expect(connectSources).not.toContain("https://*.gstatic.com");
+test("uses native font stacks without third-party font origins", () => {
+  expect(indexSource).not.toContain("fonts.googleapis.com");
+  expect(indexSource).not.toContain("fonts.gstatic.com");
+  expect(contentSecurityPolicy).toContain("font-src 'self' data:");
+  expect(contentSecurityPolicy).not.toContain("fonts.googleapis.com");
+  expect(contentSecurityPolicy).not.toContain("fonts.gstatic.com");
+  expect(contentSecurityPolicy).not.toContain("https://*.googleapis.com");
+  expect(contentSecurityPolicy).not.toContain("https://*.gstatic.com");
 });
 
 test("does not ship a report-only policy without a reporting endpoint", () => {

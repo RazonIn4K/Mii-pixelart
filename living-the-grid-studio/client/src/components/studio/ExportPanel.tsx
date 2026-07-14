@@ -188,7 +188,7 @@ export function buildReferenceHtml(doc: GridDocument, json: string): string {
   <meta charset="UTF-8">
   <title>${escapeHtml(doc.meta.name)} - Reference Pack</title>
   <style>
-    body { font-family: "Noto Sans JP", sans-serif; background: #FAFAF5; color: #4A4A4A; padding: 2rem; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif; background: #FAFAF5; color: #4A4A4A; padding: 2rem; }
     h1 { font-size: 1.25rem; font-weight: 600; }
     .meta { font-size: 0.75rem; color: #888; margin-bottom: 2rem; }
     .palette { display: flex; flex-wrap: wrap; gap: 4px; margin: 1rem 0; }

@@ -82,7 +82,13 @@ describe("Worker security primitives", () => {
       "form-action 'self' https://accounts.google.com https://checkout.stripe.com",
     );
     expect(response.headers.get("content-security-policy")).toContain(
-      "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+      "font-src 'self' data:",
+    );
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "fonts.googleapis.com",
+    );
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "fonts.gstatic.com",
     );
     expect(
       response.headers.get("content-security-policy-report-only"),
@@ -135,7 +141,6 @@ describe("Worker security primitives", () => {
     expect(isCommunityMutationBlocked("POST", "/api/future-write", undefined)).toBe(true);
   });
 });
-
 describe("deterministic preview rendering", () => {
   it("renders exact Studio palette hex colors and no user markup", () => {
     const timestamp = "2026-07-10T12:00:00.000Z";

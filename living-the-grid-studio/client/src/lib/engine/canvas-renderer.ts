@@ -15,6 +15,11 @@ import { getCell, getColorUsageCounts } from "./grid";
 import { TOMODACHI_PALETTE, type PaletteColor } from "./palette";
 import { formatCountLabel } from "../format-count";
 
+const CANVAS_SANS_FONT =
+  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif';
+const CANVAS_MONO_FONT =
+  'ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+
 /** Rendering options */
 export interface RenderOptions {
   /** Size of each cell in pixels */
@@ -166,7 +171,7 @@ export function renderGrid(
   // Draw labels
   if (opts.showLabels && scaledSize >= 12) {
     const fontSize = opts.labelFontSize || Math.max(8, scaledSize * 0.45);
-    ctx.font = `${fontSize}px "Noto Sans Mono", monospace`;
+    ctx.font = `${fontSize}px ${CANVAS_MONO_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
@@ -270,9 +275,9 @@ export function exportPaletteSheetAsPng(doc: GridDocument): string {
   ctx.fillStyle = "#FAFAF5";
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = "#4A4A4A";
-  ctx.font = '600 22px "Noto Sans JP", sans-serif';
+  ctx.font = `600 22px ${CANVAS_SANS_FONT}`;
   ctx.fillText(`${doc.meta.name} Palette Sheet`, 24, 34);
-  ctx.font = '12px "Noto Sans Mono", monospace';
+  ctx.font = `12px ${CANVAS_MONO_FONT}`;
   ctx.fillStyle = "#77736D";
   ctx.fillText(
     `${doc.width}x${doc.height} grid · ${formatCountLabel(sortedColors.length, "color")} · fan-made repaint reference`,
@@ -300,14 +305,14 @@ export function exportPaletteSheetAsPng(doc: GridDocument): string {
     ctx.strokeRect(36.5, y + 8.5, 29, 29);
 
     ctx.fillStyle = "#2F2B26";
-    ctx.font = '700 13px "Noto Sans Mono", monospace';
+    ctx.font = `700 13px ${CANVAS_MONO_FONT}`;
     ctx.fillText(entry.id, 80, y + 21);
 
-    ctx.font = '12px "Noto Sans JP", sans-serif';
+    ctx.font = `12px ${CANVAS_SANS_FONT}`;
     ctx.fillStyle = "#4A4A4A";
     ctx.fillText(color?.name ?? "Unknown palette color", 146, y + 21);
 
-    ctx.font = '11px "Noto Sans Mono", monospace';
+    ctx.font = `11px ${CANVAS_MONO_FONT}`;
     ctx.fillStyle = "#77736D";
     ctx.fillText(color?.hex ?? entry.id, 146, y + 36);
 
