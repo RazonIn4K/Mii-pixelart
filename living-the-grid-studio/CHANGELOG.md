@@ -14,7 +14,9 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
   advice, canvas refinements, provider errors, and timeouts never retry. The
   hostile-output validator and strict no-data provider policy remain unchanged.
   A protected provider probe exercised the correction and returned a validated
-  16×16 sketch after the first stochastic response failed validation.
+  16×16 sketch after the first stochastic response failed validation. The
+  exact writable-staging result is recorded in
+  [`docs/release-evidence/2026-07-14-writable-staging-profile-ai-061cef1.md`](./docs/release-evidence/2026-07-14-writable-staging-profile-ai-061cef1.md).
 - **Writable-staging account acceptance candidate:** exposed the fail-closed
   community-write capability through the session contract, added truthful
   read-only profile/setup affordances, made phone sign-in visible without
