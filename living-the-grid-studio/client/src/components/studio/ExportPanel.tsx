@@ -17,6 +17,7 @@ import {
 } from "@/lib/engine/canvas-renderer";
 import { TOMODACHI_PALETTE } from "@/lib/engine/palette";
 import { validateMiiResidentSpec } from "@shared/residents";
+import { formatCountLabel } from "@/lib/format-count";
 
 interface ExportPanelProps {
   doc: GridDocument | null;
@@ -198,7 +199,7 @@ export function buildReferenceHtml(doc: GridDocument, json: string): string {
 <body>
   <h1>${escapeHtml(doc.meta.name)}</h1>
   <div class="meta">
-    ${doc.width}×${doc.height} grid · ${doc.usedColors.length} colors · Created ${doc.meta.createdAt}
+    ${doc.width}×${doc.height} grid · ${formatCountLabel(doc.usedColors.length, "color")} · Created ${doc.meta.createdAt}
   </div>
   <p class="meta">Fan-made repaint reference. Not affiliated with Nintendo, TomodachiShare, or any referenced source.</p>
   ${
@@ -272,7 +273,7 @@ function buildSourceNotes(doc: GridDocument): string {
   const lines = [
     `${doc.meta.name}`,
     `${doc.width}x${doc.height} grid`,
-    `${doc.usedColors.length} colors`,
+    formatCountLabel(doc.usedColors.length, "color"),
     "",
     "Fan-made repaint reference. Not affiliated with Nintendo, Tomodachi Life, TomodachiShare, or any referenced source.",
     "",

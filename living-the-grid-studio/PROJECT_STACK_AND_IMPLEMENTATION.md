@@ -2,18 +2,21 @@
 
 Generated: 2026-05-20
 
-Last reconciled with the Worker branch: 2026-07-11
+Last reconciled with the Worker branch: 2026-07-14
 
 This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and payments.
 
 > **Runtime status:** `codex/island-workshop-community` targets one Cloudflare
 > Worker (Hono) with Worker Static Assets, D1, private R2, KV, Images, rate-limit
-> bindings, and scheduled cleanup. Production `tomodachi.pw` still serves the
-> rollback-safe Cloudflare Pages deployment from commit `654df95`. Pages
-> Functions and Express references in this map are retained only where they
-> explain that production rollback surface or shared legacy helpers. The
-> authoritative decision is [ADR 0001](docs/adr/0001-workers-community-platform.md),
-> and deployment, migration, cutover, and rollback steps live in the
+> bindings, and scheduled cleanup. Exact source
+> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on the isolated
+> staging Worker in standard read-only mode. Production `tomodachi.pw` still
+> serves the rollback-safe Cloudflare Pages deployment; record its exact
+> immutable deployment and source at the production cutover gate rather than
+> carrying a stale commit identifier here. Pages Functions references explain
+> that active production/rollback surface. The authoritative decision is
+> [ADR 0001](docs/adr/0001-workers-community-platform.md), and deployment,
+> migration, cutover, and rollback steps live in the
 > [community deployment runbook](docs/community-deployment-runbook.md).
 
 The project is a browser-first React/TypeScript studio for turning images, JSON files, AI sketches, and starter templates into repaintable Tomodachi Life: Living the Dream style pixel guides. The important product idea is not only "make pixels"; it is "make a grid a person can repaint square by square without guessing."
@@ -109,7 +112,8 @@ flowchart TD
   Community --> R2["Private R2 projects/media"]
   Worker --> Headers["Dynamic + static security headers"]
 
-  LegacyPages["Current production rollback\nPages commit 654df95"] --> Live["tomodachi.pw until approved cutover"]
+  Worker --> Staging["staging.tomodachi.pw\nread-only exact 4d905038"]
+  LegacyPages["Current production and rollback\nCloudflare Pages"] --> Live["tomodachi.pw until approved cutover"]
 ```
 
 ## 3. Layer Model For This Project
@@ -241,7 +245,7 @@ living-the-grid-studio/
 | Payments         | Stripe REST API                 | Checkout sessions and checkout verification without Stripe Node SDK                   |
 | ZIP export       | JSZip                           | Bundles reference-pack assets into one downloadable archive                           |
 | Target hosting   | Cloudflare Workers + Static Assets | SPA, dynamic documents, APIs, and scheduled jobs in one deployment unit             |
-| Production rollback | Cloudflare Pages commit `654df95` | Current `tomodachi.pw` surface retained through approved cutover and soak            |
+| Production rollback | Current Cloudflare Pages deployment | Record its exact immutable identity at cutover and retain it through the Worker soak |
 | Edge runtime     | Hono Worker                     | Legacy AI/Stripe parity plus auth, account, project, discovery, social, and moderation APIs |
 | Data/storage     | D1 + private R2                 | Relational authorization state plus immutable validated projects and generated media |
 | Edge cache/media | Cloudflare KV + Images          | Bounded OpenRouter cache and deterministic generated preview transformation           |
@@ -1026,11 +1030,13 @@ change.
 
 ### Legacy Pages Rollback Compatibility
 
-Production still serves Cloudflare Pages commit `654df95`. Its
+Production still serves the current Cloudflare Pages deployment. Its
 `functions/api/*` handlers and `functions/_middleware.ts` remain in the tree so
-that rollback deployment continues to provide AI, Stripe, webhook, and crawler
-behavior while the Worker is staged and soaked. They are not a second target
-implementation for new community features.
+that production and the rollback deployment continue to provide AI, Stripe,
+webhook, and crawler behavior while the Worker is staged and soaked. They are
+not a second target implementation for new community features. The cutover
+procedure records the then-current immutable Pages deployment and source rather
+than relying on this architecture map for release identity.
 
 On the branch, `worker/documents.ts` serves safe crawler/public-profile/creation
 documents and delegates ordinary SPA assets to `ASSETS`. On the Pages rollback,
@@ -1312,7 +1318,7 @@ These are the most useful next engineering targets.
 
 | Priority | Improvement                                                         | Why It Matters                                                                      |
 | -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| P0       | Complete the approval-gated staging Worker acceptance and live performance trace | The branch is implemented locally, but production must remain on Pages until staging evidence and cutover approval exist |
+| P0       | Complete approval-gated writable staging and current-source launch checks | Exact `4d905038` read-only staging is accepted and the branch passes a direct local 200 percent Chrome page-scale regression; authenticated writes, cross-user boundaries, hosted current-source acceptance, and final performance evidence remain before production cutover |
 | P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
 | P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
 | P2       | Validate Studio colors against documented, legally usable references | Improves manual matching without claiming proprietary game data                      |

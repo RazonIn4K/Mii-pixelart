@@ -1,20 +1,21 @@
-# Roadmap — Living The Grid Repaint Studio
+# Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-04-27
+**Last Updated:** 2026-07-14
 
 ---
 
 ## Phase Overview
 
-| Phase | Title                   | Status      | Description                                                                                               |
-| ----- | ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| 0     | JSON Fixture Inspection | ✅ Complete | Inspect the real Living The Grid JSON and finalize the import adapter                                     |
-| 1     | JSON Round-Trip         | Current     | Import JSON → normalize to GridDocument → render canvas → export JSON                                     |
-| 2     | Palette Panel           | In Progress | Usage counts, color locking, manual merges, palette editing                                               |
-| 3     | One-Click Optimizer     | In Progress | Deterministic color merging, island removal, cleanup passes                                               |
-| 4     | Image Upload            | In Progress | Framing, background cleanup, tone controls, color limiting, and palette quantization from uploaded images |
-| 5     | Reference Pack Export   | Planned     | Download complete reference packs with guide, palette sheet, and JSON                                     |
-| 6     | AI Suggestions          | Partial     | OpenRouter chat/sketch tab exists; future work can add merge, contrast, and paint-order suggestions       |
+| Phase | Title                      | Status                  | Description                                                                                                  |
+| ----- | -------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 0     | JSON Fixture Inspection    | ✅ Complete             | Inspect the real Living The Grid JSON and finalize the import adapter                                        |
+| 1     | JSON Round-Trip            | ✅ Complete             | Import JSON → normalize to GridDocument → render canvas → export JSON                                        |
+| 2     | Palette Panel              | ✅ Complete             | Usage counts, color locking, manual merges, and palette reference                                            |
+| 3     | One-Click Optimizer        | ✅ Complete             | Deterministic color merging, island removal, cleanup passes, and palette limiting                            |
+| 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
+| 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
+| 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
+| 7     | Island Workshop Community  | Read-only staging       | Source and CI complete; exact `4d905038` read-only staging accepted; authenticated writes and launch gated    |
 
 ---
 
@@ -39,7 +40,7 @@
 
 ---
 
-## Phase 1: JSON Round-Trip (Current)
+## Phase 1: JSON Round-Trip
 
 **Goal:** Full import → edit → export cycle using the native GridDocument format.
 
@@ -85,7 +86,7 @@
 
 ---
 
-## Phase 4: Image Upload
+## Phase 4: Image Import
 
 **Goal:** Convert character references, face photos, logos/marks, memes, and other uploaded images into palette-limited grids.
 
@@ -115,9 +116,11 @@
 - [x] Pure placement and background-cleanup coverage (`scripts/verify-image-import.ts`)
 - [x] Browser smoke coverage for creation tools, local character assets, generated mascot/sprite/emblem/sticker/icon fixtures, JPG, AVIF, LTG JSON, unsupported files, preview commit, and export downloads (`scripts/verify-studio-browser.ts`)
 
-**Remaining:**
+**Optional refinement:**
 
-- [ ] Full crop rectangle / pan-and-zoom crop controls
+- [ ] Add finer pan-and-zoom controls inside the implemented draggable crop
+      rectangle when user testing shows the current crop and focus controls are
+      insufficient.
 
 ---
 
@@ -131,12 +134,10 @@
 - [x] PNG guide export (with grid lines and labels)
 - [x] Clean PNG export (without overlays)
 - [x] HTML reference page export
-
-**Remaining:**
-
-- [ ] Palette sheet image (swatches with labels and IDs)
-- [ ] Step-by-step painting order suggestion
-- [ ] ZIP bundle of all files
+- [x] Palette sheet PNG with labels and working-palette IDs
+- [x] Paint-order CSV sorted by usage
+- [x] ZIP reference pack with guides, project JSON, palette sheet, paint order,
+      source notes, manifest, and HTML reference
 
 ---
 
@@ -168,7 +169,61 @@
 - Generate a "painting order" that minimizes brush changes.
 - Auto-detect and suggest removal of compression artifacts.
 - Let models propose localized edits to the current grid instead of replacing the full document.
-- Optional future database only if the app adds accounts, cross-device sync, shared team sessions, or public galleries.
+- Keep AI chat history browser-local unless a later privacy review explicitly
+  approves opt-in cloud sync; account-backed project sync and public galleries
+  use the separate Island Workshop data model.
+
+---
+
+## Phase 7: Island Workshop Community
+
+**Goal:** Preserve anonymous local Studio use while adding explicit opt-in
+accounts, private cloud projects, publishing, discovery, social tools, and
+human-authorized moderation.
+
+**Implemented and locally/CI tested:**
+
+- [x] Unified Hono Worker with Static Assets, D1, private R2, KV, Images, rate
+      limits, scheduled maintenance, dynamic documents, and legacy AI/Stripe
+      parity
+- [x] Google authorization-code OIDC, onboarding, hashed opaque sessions,
+      generated avatars, avatar regeneration, profile/settings, export, and
+      deletion lifecycle
+- [x] Explicit first private save, IndexedDB resume/sync metadata, autosave,
+      offline/conflict states, immutable project revisions, quotas, and media
+      generation
+- [x] Review-before-publish flow, public/unlisted visibility, project-download
+      control, profiles, search, tags, recent/popular discovery, sharing, and
+      normalized showcase images
+- [x] Likes, comments, follows, reports, reversible moderation, legal/community
+      documents, structured redacted logs, and retention jobs
+- [x] ADRs, threat model, data-flow documentation, OpenAPI contract, forward-only
+      migrations `0001` through `0006`, release guards, Worker integration
+      tests, and responsive/accessibility coverage
+- [x] Direct local Chromium 200 percent page-scale regression with keyboard
+      focus and no document-level overflow
+
+**Accepted on isolated staging:**
+
+- [x] Exact source `4d905038d755cf4ffd0860bee02037f647ddfc0a`
+      deployed in standard read-only mode
+- [x] Anonymous API/security/crawler, CSP/font, responsive browser,
+      accessibility, local-only Studio stroke/undo, zero-write D1, and rollback
+      checks
+
+**Remaining approval gates:**
+
+- [ ] Authenticated single-user writable staging acceptance for cloud projects,
+      generated/uploaded media, publishing, conflicts, quotas, and cleanup
+- [ ] Distinct second-user cross-account, social, report, moderation, and
+      destructive account-lifecycle acceptance
+- [ ] Hosted current-source browser and final performance closeout
+- [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
+      cutover, admin bootstrap, writable enablement, rollback drill, and soak
+
+Production `tomodachi.pw` remains on the existing Cloudflare Pages deployment.
+Community mutations and consult sales remain disabled on staging; no roadmap
+status grants approval for a later release gate.
 
 ---
 

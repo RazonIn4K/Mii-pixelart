@@ -648,7 +648,7 @@ async function verifyPresetImport(
   const colorCount = await cdpClient.evaluate<number | null>(`(() => {
     const match = document.body.innerText.match(${JSON.stringify(
       `${expectedDimensions} · `,
-    )} + '(\\\\d+) colors');
+    )} + '(\\\\d+) colors?');
     return match ? Number(match[1]) : null;
   })()`);
   assert.ok(colorCount, `${presetLabel} should show a color count`);
@@ -745,14 +745,14 @@ async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
   await clickByText(cdpClient, "Icon 16", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('Icon Canvas') && document.body.innerText.includes('16×16 · 1 colors')",
+      "document.body.innerText.includes('Icon Canvas') && document.body.innerText.includes('16×16 · 1 color')",
     ),
   );
 
   await clickByText(cdpClient, "Upscale 2x", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('32×32 · 1 colors')",
+      "document.body.innerText.includes('32×32 · 1 color')",
     ),
   );
 
@@ -767,14 +767,14 @@ async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
   await clickCanvasCell(cdpClient, 2, 2);
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('32×32 · 1 colors')",
+      "document.body.innerText.includes('32×32 · 1 color')",
     ),
   );
 
   await clickByText(cdpClient, "256 Detail", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('256×256 · 1 colors')",
+      "document.body.innerText.includes('256×256 · 1 color')",
     ),
   );
   await assertCanvasFitsViewport(cdpClient);
@@ -1137,7 +1137,7 @@ async function clickCanvasCell(
   } | null>(`(() => {
     const canvas = document.querySelector('canvas');
     const text = document.body.innerText;
-    const match = text.match(/(\\d+)×(\\d+) · \\d+ colors/);
+    const match = text.match(/(\\d+)×(\\d+) · \\d+ colors?/);
     if (!canvas || !match) return null;
     const width = Number(match[1]);
     const height = Number(match[2]);

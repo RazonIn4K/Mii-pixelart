@@ -13,6 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatCountLabel } from "@/lib/format-count";
 
 interface PalettePanelProps {
   usedColors: string[];
@@ -56,7 +57,8 @@ export default function PalettePanel({
       <div className="px-4 py-3 border-b border-border">
         <p className="section-header mb-1">Palette</p>
         <p className="text-xs text-muted-foreground">
-          {usedColors.length} colors · {totalCells.toLocaleString()} cells
+          {formatCountLabel(usedColors.length, "color")} ·{" "}
+          {formatCountLabel(totalCells, "cell")}
         </p>
       </div>
 

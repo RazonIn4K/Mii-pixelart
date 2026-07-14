@@ -260,6 +260,7 @@ export function CanvasPaintToolbar({
 
           <div
             className="flex w-full min-w-0 flex-wrap items-center gap-1 pl-1 sm:w-auto sm:shrink-0 sm:flex-nowrap"
+            role="group"
             aria-label="Quick paint colors"
           >
             {quickColors.map((color, index) => (

@@ -273,6 +273,7 @@ export default function Discover() {
             <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-lg backdrop-blur max-[360px]:flex-col max-[360px]:items-start max-[360px]:gap-2 sm:inset-x-5 sm:bottom-5 sm:p-4">
               <div
                 className="flex -space-x-2"
+                role="group"
                 aria-label="Examples of generated Island Workshop avatars"
               >
                 {[

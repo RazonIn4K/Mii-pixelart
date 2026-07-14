@@ -1,18 +1,20 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.2
+**Version:** 2.3
 
-**Last Updated:** 2026-07-13
+**Last Updated:** 2026-07-14
 
-> **Deployment status (2026-07-13):** The target architecture on this branch is
+> **Deployment status (2026-07-14):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
-> Images, and scheduled handlers. Production `tomodachi.pw` still runs the
-> rollback-safe Cloudflare Pages deployment from protected `main`; record its
-> exact immutable deployment and source commit at the cutover gate. References
-> below to Pages Functions or Express describe that legacy compatibility
-> surface, not the branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
-> for the decision and the [community deployment runbook](community-deployment-runbook.md)
-> for gated staging, cutover, and rollback operations.
+> Images, and scheduled handlers. Exact source
+> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on the isolated
+> staging Worker in standard read-only mode. Production `tomodachi.pw` still
+> runs the rollback-safe Cloudflare Pages deployment from protected `main`.
+> Authenticated writable staging, PR merge, production resources, and Worker
+> domain cutover remain independent approval gates. References below to Pages
+> Functions describe the active production/rollback compatibility surface, not
+> the staging branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
+> and the [community deployment runbook](community-deployment-runbook.md).
 
 ---
 
@@ -39,18 +41,17 @@ Mii-pixelart/
     │       ├── App.tsx            ← Root component + router
     │       ├── main.tsx           ← React DOM entry point
     │       ├── index.css          ← Tailwind + design tokens
-    │       ├── const.ts           ← App-wide constants
     │       ├── components/
     │       │   ├── studio/        ← Studio panel components
-    │       │   └── ui/            ← shadcn/ui primitives (53 files)
-    │       ├── contexts/          ← ThemeContext
+    │       │   ├── community/     ← Account, publishing, gallery, and sharing UI
+    │       │   └── ui/            ← shadcn/ui primitives
+    │       ├── contexts/          ← AuthContext and ThemeContext
     │       ├── hooks/
     │       │   └── useGridDocument.ts  ← Central state hook
     │       ├── lib/
     │       │   └── engine/        ← Pure TS engine (no React deps)
     │       └── pages/             ← Route-level page components
     ├── server/                    ← Shared AI/Stripe helpers retained for parity
-    │   ├── index.ts
     │   ├── openrouter.ts
     │   └── stripe.ts
     ├── functions/                 ← Legacy Pages rollback Functions
@@ -60,7 +61,6 @@ Mii-pixelart/
     ├── shared/                    ← Shared types/constants
     ├── fixtures/                  ← Test fixtures and creative templates
     ├── scripts/                   ← Verification and utility scripts
-    ├── patches/                   ← pnpm patches (wouter)
     ├── package.json
     ├── vite.config.ts
     ├── wrangler.jsonc
@@ -98,16 +98,18 @@ graph TB
         Canvas["HTML5 Canvas API"]
         FileAPI["File API / Blob / URL"]
         LS["localStorage<br/>(AI sessions)"]
+        IDB["IndexedDB<br/>(draft resume + sync metadata)"]
 
         SPA -->|"calls"| Engine
         Engine -->|"renders to"| Canvas
         Engine -->|"reads/writes"| FileAPI
         SPA -->|"persists"| LS
+        SPA -->|"persists"| IDB
     end
 
     subgraph Edge["Target branch: Cloudflare Worker"]
         Worker["Hono Worker<br/>auth + API + dynamic documents"]
-        Static["Worker Static Assets<br/>dist/client/"]
+        Static["Worker Static Assets<br/>dist/public/"]
         Data["D1 + private R2 + KV + Images"]
         Worker --> Static
         Worker --> Data
@@ -603,7 +605,7 @@ Row themes:
 ## Future Considerations
 
 - **Web Workers:** For grids larger than 128×128, optimizer passes could move off the main thread.
-- **IndexedDB:** Project auto-save and recovery using browser storage.
 - **WASM:** If Delta E calculations become a bottleneck at 256×256, a Rust/WASM module could accelerate the inner loop.
-- **Crop rectangle:** Full pan-and-zoom crop controls for image import (Phase 4 remaining).
-- **Palette sheet export:** Swatches with labels and IDs as a downloadable image (Phase 5 remaining).
+- **Crop refinement:** Add finer pan-and-zoom controls inside the implemented draggable crop rectangle if user testing warrants them.
+- **Optimizer explanation:** Add per-pass previews, change summaries, and a repaintability score without changing deterministic output.
+- **AI history:** Keep chat browser-local unless a later privacy review approves explicit opt-in cloud sync.

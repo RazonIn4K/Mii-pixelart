@@ -16,6 +16,7 @@ import {
   DEFAULT_RENDER_OPTIONS,
 } from "@/lib/engine/canvas-renderer";
 import { bresenhamLine, getCell } from "@/lib/engine/grid";
+import { formatCountLabel } from "@/lib/format-count";
 
 interface CanvasViewerProps {
   doc: GridDocument;
@@ -717,10 +718,11 @@ export default function CanvasViewer({
       {/* Grid info + live coordinate readout */}
       <div className="absolute bottom-3 left-3 z-10 rounded-sm border border-border bg-card/90 px-2 py-1 backdrop-blur-sm">
         <span className="text-xs font-mono text-muted-foreground">
-          {doc.width}×{doc.height} · {doc.usedColors.length} colors
+          {doc.width}×{doc.height} ·{" "}
+          {formatCountLabel(doc.usedColors.length, "color")}
           {hoverCell && (
-            <span className="ml-2 text-foreground">
-              · x:{hoverCell.x} y:{hoverCell.y}
+            <span className="text-foreground">
+              {" · "}x:{hoverCell.x} y:{hoverCell.y}
             </span>
           )}
         </span>

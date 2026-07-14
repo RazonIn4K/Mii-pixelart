@@ -188,7 +188,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   });
 
   await expect(
-    page.getByText("64×64 · 1 colors", { exact: true }),
+    page.getByText("64×64 · 1 color", { exact: true }),
   ).toBeVisible();
 
   const mirroredPixels = await canvas.evaluate((element) => {
@@ -268,9 +268,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await canvas.focus();
   await canvas.press("ArrowRight");
   await canvas.press("Enter");
-  await expect(
-    page.getByText("64×64 · 1 colors", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText(/^64×64 · 1 color · x:\d+ y:\d+$/)).toBeVisible();
   await expect(page.getByText(/Activated column \d+, row \d+\./)).toHaveCount(
     1,
   );

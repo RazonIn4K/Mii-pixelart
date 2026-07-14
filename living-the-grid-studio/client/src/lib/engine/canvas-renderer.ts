@@ -13,6 +13,7 @@
 import type { GridDocument } from "./grid";
 import { getCell, getColorUsageCounts } from "./grid";
 import { TOMODACHI_PALETTE, type PaletteColor } from "./palette";
+import { formatCountLabel } from "../format-count";
 
 /** Rendering options */
 export interface RenderOptions {
@@ -274,7 +275,7 @@ export function exportPaletteSheetAsPng(doc: GridDocument): string {
   ctx.font = '12px "Noto Sans Mono", monospace';
   ctx.fillStyle = "#77736D";
   ctx.fillText(
-    `${doc.width}x${doc.height} grid · ${sortedColors.length} colors · fan-made repaint reference`,
+    `${doc.width}x${doc.height} grid · ${formatCountLabel(sortedColors.length, "color")} · fan-made repaint reference`,
     24,
     56,
   );
@@ -312,7 +313,7 @@ export function exportPaletteSheetAsPng(doc: GridDocument): string {
 
     ctx.fillStyle = "#4A4A4A";
     ctx.textAlign = "right";
-    ctx.fillText(`${entry.count} cells`, width - 40, y + 28);
+    ctx.fillText(formatCountLabel(entry.count, "cell"), width - 40, y + 28);
     ctx.textAlign = "left";
   });
 

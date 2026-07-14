@@ -11,6 +11,16 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
+> **Deployment status (2026-07-14):** Exact staging source
+> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on
+> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) in standard read-only
+> mode. The account/community implementation and its local/CI tests are present
+> on this branch, but authenticated community writes are not yet enabled.
+> Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
+> Cloudflare Pages deployment until writable staging, merge, production
+> provisioning, cutover, and soak receive their independent approvals. See the
+> [sanitized staging record](docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md).
+
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
 ## Why this exists
@@ -39,7 +49,8 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 - Long-form articles on Mii creation, clearly labeled legacy 3DS daily-play basics, Tomodachishare recovery, QR codes + save backup
 
-**Island Workshop community** — opt-in only
+**Island Workshop community** — opt-in only; implemented on the branch and
+read-only staging, not yet enabled on production
 
 - Google OIDC accounts with generated avatars and private cloud projects
 - Explicit review before public or unlisted publishing; authentication never publishes work
@@ -54,7 +65,8 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 ## Tech stack
 
 - **Frontend:** Vite, React 19, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui/Radix primitives, wouter
-- **Edge runtime:** One Cloudflare Worker with Static Assets, built through the Cloudflare Vite plugin
+- **Target/staging edge runtime:** One Cloudflare Worker with Static Assets, built through the Cloudflare Vite plugin
+- **Current production runtime:** Cloudflare Pages, retained as the rollback surface through the approved Worker soak
 - **Community data:** D1 for relational state and FTS5; private R2 for immutable project revisions and generated media
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
 - **Authentication:** Google authorization-code OIDC, encrypted transaction cookies, and hashed opaque sessions
@@ -87,7 +99,12 @@ flowchart LR
     class REQ,CRAWL,USER terminal
 ```
 
-The Worker UA-sniffs known search crawlers and serves route-appropriate JSON-LD for legacy routes, plus safe canonical/Open Graph documents for public profiles and creations. Private account pages and unlisted work receive `noindex`. Real browsers continue to get the React app through Static Assets with SPA fallback; there is no separate SSR runtime.
+On the target Worker, known search crawlers receive route-appropriate JSON-LD
+for legacy routes plus safe canonical/Open Graph documents for public profiles
+and creations. Private account pages and unlisted work receive `noindex`. Real
+browsers receive the React app through Static Assets with SPA fallback; there
+is no separate SSR runtime. Until cutover, production Pages continues to use
+the retained `functions/_middleware.ts` compatibility path.
 
 See [`worker/documents.ts`](./worker/documents.ts) for the implementation.
 
@@ -167,10 +184,10 @@ client/                  Vite + React SPA
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
     lib/                 engine (JSON import/export, palette ops), breadcrumb, consent, stripeUrl
   public/                Static assets (original WebP artwork, community social card, PWA icons, sitemap, robots, headers)
-worker/                  Unified Cloudflare Worker (API, auth, documents, jobs)
+worker/                  Unified staging/target Worker (API, auth, documents, jobs)
 migrations/              Forward-only D1 migrations
 shared/                  Shared validation and legacy contracts
-functions/               Legacy Pages rollback reference; not the active runtime
+functions/               Current production Pages and retained rollback compatibility
   api/
     ai/[[path]].ts       KV-cached model list; chat fails closed without Worker auth/rate limits
     stripe/[[path]].ts   Checkout + session verification + products

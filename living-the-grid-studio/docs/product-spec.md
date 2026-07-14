@@ -1,7 +1,7 @@
-# Product Specification — Living The Grid Repaint Studio
+# Product Specification — Tomodachi Studio
 
-**Version:** 1.0 MVP  
-**Last Updated:** 2026-04-27
+**Version:** 1.1
+**Last Updated:** 2026-07-14
 
 ---
 
@@ -10,6 +10,14 @@
 Living The Grid Repaint Studio is a **browser-first reference studio** for _Tomodachi Life: Living the Dream_ face paint, Palette House workshop creations, and other creative pixel builds. It bridges image conversion with manual copy guides for user-supplied character references, face photos, logos, brand-style marks, memes, clothing graphics, books, decor, and other fun player-made designs. The core insight is that existing tools convert images into pixel grids, but they do not optimize those grids for the actual task of recreating them with the game's own creation tools. This studio closes that gap without modifying game files.
 
 The strongest product angle: **not just "turn image into pixels," but "make this actually repaintable by hand."**
+
+The local Studio workflow below is implemented and remains available without an
+account. The Island Workshop account, cloud-project, publishing, discovery,
+social, and moderation surfaces are also implemented and locally/CI tested.
+Exact source `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on the
+isolated staging Worker in standard read-only mode; authenticated writable
+staging and production launch are still approval-gated. Production
+`tomodachi.pw` remains on Cloudflare Pages.
 
 ## Target User
 
@@ -27,7 +35,12 @@ The studio follows a linear pipeline that the user controls at every step:
 6. **Create or touch up** by painting cells, erasing, picking colors, filling connected regions, using an accepted AI sketch, or resampling the canvas to a higher pixel count.
 7. **Edit** the palette: view usage counts, lock colors, manually merge similar colors.
 8. **Optimize** with deterministic passes: color merging, island removal, single-cell cleanup, palette limiting.
-9. **Export** a repaint reference pack: labeled PNG guide, palette sheet, and project JSON.
+9. **Export** a repaint reference pack: labeled and clean PNG guides, palette
+   sheet, paint-order CSV, project JSON, source notes, manifest, and HTML.
+10. **Optionally save to an account** by explicitly creating the first private
+    cloud copy; authentication alone never uploads the local project.
+11. **Optionally publish** only after reviewing the title, description, tags,
+    preview, visibility, comments, and project-download permission.
 
 ## MVP Feature Set
 
@@ -46,19 +59,19 @@ The studio follows a linear pipeline that the user controls at every step:
 | Repaint optimizer  | Deterministic multi-pass optimization                                                                                                                                                                                                       | P1       |
 | Paint-by-numbers   | Number labels on each cell, color highlighting                                                                                                                                                                                              | P1       |
 | PNG export         | Download labeled guide image                                                                                                                                                                                                                | P1       |
-| Reference pack     | Download JSON + PNG + HTML reference                                                                                                                                                                                                        | P2       |
+| Reference pack     | Download a ZIP with JSON, labeled/clean PNG guides, palette sheet, paint order, notes, manifest, and HTML                                                                                                                                    | P2       |
 | Undo/redo          | Full history with Ctrl+Z / Ctrl+Shift+Z                                                                                                                                                                                                     | P0       |
 
 ## Advanced Features (Post-MVP)
 
-| Feature                            | Description                                                                               | Phase     |
-| ---------------------------------- | ----------------------------------------------------------------------------------------- | --------- |
-| Living The Grid native JSON import | Parse the actual LTG save format                                                          | Phase 0-1 |
-| Crop and region selection          | Select a sub-region of the imported image                                                 | Phase 4   |
-| Brightness/contrast adjustment     | Pre-processing before palette mapping                                                     | Phase 4   |
-| OpenRouter AI chat/sketch          | Chat with model presets, optional visual grid context, and apply generated pixel sketches | Phase 6   |
-| AI color suggestions               | Suggest optimal merges (suggestion layer only)                                            | Phase 6   |
-| Collaborative sharing              | Share project links with other players                                                    | Future    |
+| Feature                            | Description                                                                                             | Delivery state                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| Living The Grid native JSON import | Parse the supported LTG v2 indexed-palette format                                                       | Implemented                    |
+| Crop and region selection          | Draggable crop rectangle, framing shortcuts, and subject-focus controls                                 | Implemented; refinements open  |
+| Brightness/contrast adjustment     | Non-destructive pre-processing before palette mapping                                                   | Implemented                    |
+| OpenRouter AI chat/sketch          | Model presets, optional visual grid context, reviewed validated sketches, and one-step undoable apply   | Implemented                    |
+| AI color suggestions               | Suggest optimal merges and contrast changes without applying them automatically                         | Optional refinement            |
+| Collaborative sharing              | Private cloud projects, reviewed publish flow, public/unlisted links, discovery, and social interactions | Implemented; writable gated    |
 
 ## Non-Goals
 

@@ -4,6 +4,27 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-07-14
+
+- **Studio count and ARIA follow-up (branch only):** corrected singular color and
+  cell labels across the Studio and exports, preserved literal spacing in the
+  canvas coordinate readout, moved slider labels to the actual slider thumbs,
+  and gave named avatar and quick-color collections supported group semantics.
+  New unit, Axe incomplete-finding, slider-name, stroke/coordinate, and direct
+  Chromium 200 percent page-scale regressions pass locally. These changes are
+  not part of the accepted `4d905038` staging deployment and require a new
+  exact-SHA gate before they can be described as hosted.
+- **Exact-head read-only staging closeout:** deployed and accepted exact source
+  `4d905038d755cf4ffd0860bee02037f647ddfc0a` on the isolated staging Worker with
+  community mutations and consult sales disabled. The guarded 571-assertion
+  API/security/crawler run, 20-scenario cross-engine browser matrix, focused
+  CSP/font checks, zero-write D1 comparison, and retained rollback evidence are
+  recorded in
+  [`docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md`](./docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md).
+  Production, DNS, OAuth settings, migrations, secrets, roles, and application
+  data were unchanged; production remains on Pages while writable staging,
+  cross-user acceptance, merge, and production cutover remain separately gated.
+
 ### 2026-07-13
 
 - **Read-only staging evidence and acceptance fixes:** deployed the approved
@@ -14,10 +35,11 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
   [`docs/release-evidence/2026-07-13-staging-gate-3a-replacement.md`](./docs/release-evidence/2026-07-13-staging-gate-3a-replacement.md).
   The hosted audit exposed low-contrast secondary text, a blocked Google Fonts
   preconnect, an orphaned Trusted Types report-only policy, and staging crawler
-  files that advertised production URLs. The undeployed follow-up fixes those
-  findings with AA-safe semantic inks, exact-origin CSP rules, an agent-safe
-  `llms.txt`, and staging-only noindex crawler responses; production and the
-  approved hosted revision remain unchanged pending a new gate.
+  files that advertised production URLs. A later exact-SHA follow-up fixed and
+  accepted those findings with AA-safe semantic inks, exact-origin CSP rules,
+  an agent-safe `llms.txt`, and staging-only noindex crawler responses. This
+  entry remains the historical record for the earlier deployed source; the
+  2026-07-14 record above is authoritative for the accepted follow-up.
 - **Fast, accessible mobile navigation:** replaced the header's scroll-locking
   drawer with a native modal dialog that keeps the background inert, traps
   keyboard focus, closes by Escape, backdrop, navigation, or desktop resize,

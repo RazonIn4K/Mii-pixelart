@@ -13,6 +13,7 @@ import {
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
 import type { GridDocument } from "@/lib/engine/grid";
+import { formatCountLabel } from "@/lib/format-count";
 
 export type PaintTool = "inspect" | "pencil" | "eraser" | "eyedropper" | "fill";
 
@@ -150,7 +151,7 @@ export default function CreationPanel({
                     </span>
                     <span className="block font-mono text-[0.65rem] text-muted-foreground">
                       {template.width}x{template.height} ·{" "}
-                      {doc.usedColors.length} colors
+                      {formatCountLabel(doc.usedColors.length, "color")}
                     </span>
                   </button>
                 ))}

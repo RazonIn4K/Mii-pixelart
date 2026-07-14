@@ -30,6 +30,7 @@ import { GoogleSignIn } from "@/components/community/RequireAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
+import { formatCountLabel } from "@/lib/format-count";
 import {
   Select,
   SelectContent,
@@ -884,7 +885,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                 <p className="font-mono text-[0.68rem] text-muted-foreground">
                   {pendingSketch.width}x{pendingSketch.height}
                   {pendingPreview
-                    ? ` / ${pendingPreview.colorCount} palette colors`
+                    ? ` / ${formatCountLabel(pendingPreview.colorCount, "palette color")}`
                     : ""}
                 </p>
               </div>

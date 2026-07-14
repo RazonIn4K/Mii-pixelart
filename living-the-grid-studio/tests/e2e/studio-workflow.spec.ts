@@ -284,7 +284,7 @@ test("AI applies one validated document revision that Undo removes in one step",
   await expect(page.getByText("AI edit", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
 
-  await expect(page.getByText("8×8 · 1 colors", { exact: true })).toBeVisible();
+  await expect(page.getByText("8×8 · 1 color", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
     page.getByText("64×64 · 0 colors", { exact: true }),
@@ -397,7 +397,7 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
   await expect(
-    page.getByText("64×64 · 1 colors", { exact: true }),
+    page.getByText("64×64 · 1 color", { exact: true }),
   ).toBeVisible();
 });
 
@@ -513,7 +513,7 @@ test("AI provider failure leaves manual painting available", async ({
   await canvas.focus();
   await canvas.press("Enter");
   await expect(
-    page.getByText("64×64 · 1 colors", { exact: true }),
+    page.getByText("64×64 · 1 color", { exact: true }),
   ).toBeVisible();
 });
 
