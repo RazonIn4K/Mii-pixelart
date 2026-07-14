@@ -94,9 +94,9 @@ function persistAiConsent(userId: string): void {
 // wire shape.
 
 const STARTER_PROMPTS = [
-  "Draw a 32x32 spooky mascot head with clear eyes and teeth.",
+  "Draw a 16x16 spooky mascot head with clear eyes and teeth.",
   "Draw a 16x16 mushroom badge using fewer than 8 colors.",
-  "Draw a 32x32 friendly island robot with a simple silhouette.",
+  "Draw a 16x16 friendly island robot with a simple silhouette.",
 ];
 
 type AiWorkflow = "create" | "refine" | "advice";
@@ -189,8 +189,8 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   );
   const canRefineDimensions = Boolean(
     currentDoc &&
-      currentDoc.width <= AI_SKETCH_LIMITS.maxDimension &&
-      currentDoc.height <= AI_SKETCH_LIMITS.maxDimension,
+    currentDoc.width <= AI_SKETCH_LIMITS.maxDimension &&
+    currentDoc.height <= AI_SKETCH_LIMITS.maxDimension,
   );
   const canRefine = Boolean(currentDoc && canRefineDimensions && visionPreset);
   const workflow: AiWorkflow = !requestSketch
@@ -954,9 +954,11 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               filename are never sent.{" "}
               {getDataCollectionConsentText(dataCollectionPolicy)} Provider
               policies can differ, so treat anything you send as leaving this
-              device and do not include sensitive information. Deterministic
-              image import never uses AI. This choice is stored only for this
-              signed-in account on this browser.
+              device and do not include sensitive information. For a text-only
+              sketch request, the server may send one validator-generated
+              correction with the same prompt context when the first grid is
+              malformed. Deterministic image import never uses AI. This choice
+              is stored only for this signed-in account on this browser.
             </p>
             <div className="flex gap-2">
               <Button
@@ -1065,7 +1067,7 @@ function createLocalSessionId(): string {
   }
 
   const randomBytes = crypto.getRandomValues(new Uint8Array(16));
-  return `session-${Array.from(randomBytes, byte =>
+  return `session-${Array.from(randomBytes, (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("")}`;
 }

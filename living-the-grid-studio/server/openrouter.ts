@@ -51,6 +51,17 @@ interface OpenRouterResponse {
   };
 }
 
+interface OpenRouterCompletionAttempt {
+  payload: OpenRouterResponse | null;
+  response: Response;
+}
+
+interface ParsedOpenRouterCompletion {
+  reply: string;
+  sketch: AiGridSketch | null;
+  warning?: string;
+}
+
 export interface ApiResult {
   body: unknown;
   status: number;
@@ -90,6 +101,12 @@ const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 // budgets); chat gets a generous ceiling while the models catalog stays snappy.
 const OPENROUTER_CHAT_TIMEOUT_MS = 90_000;
 const OPENROUTER_MODELS_TIMEOUT_MS = 15_000;
+// A correction is useful only when there is enough of the original request
+// deadline left for the provider to finish. Both attempts share the same
+// 90-second ceiling so a malformed first response cannot double request time.
+const OPENROUTER_REPAIR_MIN_REMAINING_MS = 10_000;
+const OPENROUTER_REPAIR_SUCCESS_WARNING =
+  "The first grid failed validation; one corrected grid passed review.";
 const ALLOWED_MODEL_IDS = new Set(
   OPENROUTER_MODEL_PRESETS.map((preset) => preset.id),
 );
@@ -276,41 +293,21 @@ export async function sendOpenRouterChat(
     ...normalized.messages,
   ];
 
-  let response: Response;
+  const deadlineAt = Date.now() + OPENROUTER_CHAT_TIMEOUT_MS;
+
+  let firstAttempt: OpenRouterCompletionAttempt;
   try {
-    response = await fetch(OPENROUTER_CHAT_URL, {
-      method: "POST",
-      headers: getOpenRouterHeaders(true, apiKey, env),
-      // A hung upstream must not pin the Worker (or the user's request) open
-      // indefinitely; surface a clean, retryable timeout instead.
-      signal: AbortSignal.timeout(OPENROUTER_CHAT_TIMEOUT_MS),
-      body: JSON.stringify({
-        // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
-        // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
-        // tokens for rows alone, plus a few hundred tokens of wrapping JSON +
-        // commentary. 3000 was the old budget and it was truncating mid-row,
-        // which is why DeepSeek + Claude both spat out partial/invalid grids.
-        // 16000 fits even 32x32 with room to breathe.
-        max_tokens: normalized.requestSketch
-          ? getSketchOutputTokenLimit(normalized.model)
-          : 1200,
-        messages,
-        model: normalized.model,
-        response_format: normalized.requestSketch
-          ? { type: "json_object" }
-          : undefined,
-        session_id: normalized.sessionId,
-        // Lower temperature for sketches — we want deterministic structure, not
-        // creative reinterpretation of the schema. 0.2 keeps it on-grid.
-        temperature: normalized.requestSketch ? 0.2 : 0.7,
-        // Privacy: constrain OpenRouter routing by data-collection policy. With
-        // "deny" (default), OpenRouter routes only to providers it identifies as
-        // not collecting user data.
-        provider: { data_collection: getOpenRouterDataCollection(env) },
-      }),
-    });
+    firstAttempt = await requestOpenRouterCompletion(
+      normalized,
+      messages,
+      apiKey,
+      env,
+      deadlineAt,
+    );
   } catch (error) {
-    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    const timedOut =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
     return {
       status: 504,
       body: {
@@ -323,23 +320,143 @@ export async function sendOpenRouterChat(
     };
   }
 
-  const payload = (await response
-    .json()
-    .catch(() => null)) as OpenRouterResponse | null;
-
-  if (!response.ok) {
+  if (!firstAttempt.response.ok) {
     return {
-      status: response.status,
+      status: firstAttempt.response.status,
       body: {
         configured: true,
         model: normalized.model,
         reply:
-          payload?.error?.message ??
-          `OpenRouter request failed with status ${response.status}.`,
+          firstAttempt.payload?.error?.message ??
+          `OpenRouter request failed with status ${firstAttempt.response.status}.`,
       } satisfies AiChatResponse,
     };
   }
 
+  const firstParsed = parseOpenRouterCompletion(
+    firstAttempt.payload,
+    normalized,
+  );
+  let selectedAttempt = firstAttempt;
+  let selectedParsed = firstParsed;
+  let repairAttempted = false;
+  let repairSucceeded = false;
+
+  // Only text-only create requests get an automatic correction. Refinements
+  // may contain a canvas image or summary, so silently retransmitting them
+  // would exceed the user's consent and could spend the full provider budget
+  // twice. Advice, provider errors, and first-attempt timeouts never retry.
+  const canRepair =
+    normalized.requestSketch &&
+    !firstParsed.sketch &&
+    !normalized.currentDocument &&
+    !normalized.currentGridImage &&
+    deadlineAt - Date.now() >= OPENROUTER_REPAIR_MIN_REMAINING_MS;
+  if (canRepair) {
+    repairAttempted = true;
+    const repairMessages: OpenRouterMessage[] = [
+      ...messages,
+      {
+        role: "user",
+        content: buildSketchRepairMessage(firstParsed.warning),
+      },
+    ];
+    try {
+      const repairAttempt = await requestOpenRouterCompletion(
+        normalized,
+        repairMessages,
+        apiKey,
+        env,
+        deadlineAt,
+      );
+      if (repairAttempt.response.ok) {
+        const repaired = parseOpenRouterCompletion(
+          repairAttempt.payload,
+          normalized,
+        );
+        if (repaired.sketch) {
+          selectedAttempt = repairAttempt;
+          selectedParsed = {
+            ...repaired,
+            warning: repaired.warning
+              ? `${OPENROUTER_REPAIR_SUCCESS_WARNING} ${repaired.warning}`
+              : OPENROUTER_REPAIR_SUCCESS_WARNING,
+          };
+          repairSucceeded = true;
+        }
+      }
+    } catch {
+      // Keep the first safe, non-applyable result. A correction is best-effort
+      // and must never turn a successful first provider response into a 5xx.
+    }
+  }
+
+  return {
+    status: 200,
+    body: {
+      configured: true,
+      model: selectedAttempt.payload?.model ?? normalized.model,
+      reply: selectedParsed.reply,
+      sketch: selectedParsed.sketch,
+      // A retried request has two usage records. Omit the field instead of
+      // reporting only one attempt and understating provider consumption.
+      usage:
+        !repairAttempted && selectedAttempt.payload?.usage
+          ? {
+              completionTokens: selectedAttempt.payload.usage.completion_tokens,
+              promptTokens: selectedAttempt.payload.usage.prompt_tokens,
+              totalTokens: selectedAttempt.payload.usage.total_tokens,
+            }
+          : undefined,
+      warning: repairSucceeded ? selectedParsed.warning : firstParsed.warning,
+    } satisfies AiChatResponse,
+  };
+}
+
+async function requestOpenRouterCompletion(
+  normalized: NormalizedAiRequest,
+  messages: OpenRouterMessage[],
+  apiKey: string,
+  env: OpenRouterEnv | undefined,
+  deadlineAt: number,
+): Promise<OpenRouterCompletionAttempt> {
+  // Both the first request and optional correction consume one shared deadline.
+  // A minimum of 1 ms keeps AbortSignal.timeout within its valid range if the
+  // clock crosses the deadline immediately before fetch begins.
+  const remainingMs = Math.max(1, Math.ceil(deadlineAt - Date.now()));
+  const response = await fetch(OPENROUTER_CHAT_URL, {
+    method: "POST",
+    headers: getOpenRouterHeaders(true, apiKey, env),
+    signal: AbortSignal.timeout(remainingMs),
+    body: JSON.stringify({
+      // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
+      // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
+      // tokens for rows alone, plus wrapping JSON and commentary.
+      max_tokens: normalized.requestSketch
+        ? getSketchOutputTokenLimit(normalized.model)
+        : 1200,
+      messages,
+      model: normalized.model,
+      response_format: normalized.requestSketch
+        ? { type: "json_object" }
+        : undefined,
+      session_id: normalized.sessionId,
+      temperature: normalized.requestSketch ? 0.2 : 0.7,
+      // Privacy: constrain every attempt to the same provider collection
+      // policy. The default routes only to providers marked as non-collecting.
+      provider: { data_collection: getOpenRouterDataCollection(env) },
+    }),
+  });
+  const payload = (await response
+    .json()
+    .catch(() => null)) as OpenRouterResponse | null;
+  return { payload, response };
+}
+
+function parseOpenRouterCompletion(
+  payload: OpenRouterResponse | null,
+  normalized: NormalizedAiRequest,
+): ParsedOpenRouterCompletion {
   const content = payload?.choices?.[0]?.message?.content?.trim() ?? "";
   const parsed = normalized.requestSketch
     ? parseSketchContent(content, !normalized.preserveDimensions)
@@ -356,28 +473,31 @@ export async function sendOpenRouterChat(
     (parsed.sketch.width !== expectedDimensions.width ||
       parsed.sketch.height !== expectedDimensions.height),
   );
-  const sketch = dimensionsChanged ? null : (parsed?.sketch ?? null);
-  const warning = dimensionsChanged
-    ? `The model returned ${parsed?.sketch?.width}x${parsed?.sketch?.height}, but this refinement must remain ${expectedDimensions?.width}x${expectedDimensions?.height}. Nothing was applied.`
-    : parsed?.warning;
-
   return {
-    status: 200,
-    body: {
-      configured: true,
-      model: payload?.model ?? normalized.model,
-      reply,
-      sketch,
-      usage: payload?.usage
-        ? {
-            completionTokens: payload.usage.completion_tokens,
-            promptTokens: payload.usage.prompt_tokens,
-            totalTokens: payload.usage.total_tokens,
-          }
-        : undefined,
-      warning,
-    } satisfies AiChatResponse,
+    reply,
+    sketch: dimensionsChanged ? null : (parsed?.sketch ?? null),
+    warning: dimensionsChanged
+      ? `The model returned ${parsed?.sketch?.width}x${parsed?.sketch?.height}, but this refinement must remain ${expectedDimensions?.width}x${expectedDimensions?.height}. Nothing was applied.`
+      : parsed?.warning,
   };
+}
+
+function buildSketchRepairMessage(warning?: string): string {
+  // The provider's raw response is deliberately excluded. The retry receives
+  // only a bounded server-generated validation reason and the original prompt
+  // context, preventing untrusted model text from becoming a new instruction.
+  const validationReason =
+    warning?.replace(/\s+/g, " ").trim().slice(0, 300) ||
+    "The response did not include a validated sketch.";
+  return [
+    "Your first grid did not pass server validation.",
+    `Validation result: ${validationReason}`,
+    "Return only one corrected JSON object using the required shape.",
+    "Do not omit, abbreviate, or partially fill the rows array.",
+    "Use 16x16 unless the user's original request explicitly names another supported size.",
+    "Every row must contain exactly width cells, the rows array must contain exactly height rows, and at least one cell must be painted.",
+    "Use multiple allowlisted palette colors and keep null for transparent cells.",
+  ].join(" ");
 }
 
 function getOpenRouterApiKey(env?: OpenRouterEnv): string {

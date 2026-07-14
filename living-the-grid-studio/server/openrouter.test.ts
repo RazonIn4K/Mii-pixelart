@@ -13,6 +13,11 @@ import {
   sendOpenRouterChat,
 } from "./openrouter";
 
+interface OpenRouterTestMessage {
+  content?: unknown;
+  role?: string;
+}
+
 const request = (model: string): AiChatRequest => ({
   messages: [{ content: "Reply with pong.", role: "user" }],
   model,
@@ -127,17 +132,26 @@ describe("OpenRouter untrusted response hardening", () => {
     Array.from({ length: 8 }, (_, x) => (x === y ? "R10C1" : null)),
   );
 
-  const upstreamReplying = (content: unknown) =>
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            choices: [{ message: { content: JSON.stringify(content) } }],
-            model: "test/free",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+  const openRouterResponse = (content: unknown, status = 200) =>
+    new Response(
+      JSON.stringify(
+        status >= 400
+          ? { error: { message: String(content) } }
+          : {
+              choices: [{ message: { content: JSON.stringify(content) } }],
+              model: "test/free",
+              usage: {
+                completion_tokens: 10,
+                prompt_tokens: 20,
+                total_tokens: 30,
+              },
+            },
+      ),
+      { status, headers: { "Content-Type": "application/json" } },
     );
+
+  const upstreamReplying = (content: unknown) =>
+    vi.fn(async () => openRouterResponse(content));
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -182,13 +196,11 @@ describe("OpenRouter untrusted response hardening", () => {
   });
 
   it("forwards a model sketch only after validation", async () => {
-    vi.stubGlobal(
-      "fetch",
-      upstreamReplying({
-        reply: "Done.",
-        sketch: { name: "Mushroom", width: 8, height: 8, rows: validRows },
-      }),
-    );
+    const fetchMock = upstreamReplying({
+      reply: "Done.",
+      sketch: { name: "Mushroom", width: 8, height: 8, rows: validRows },
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const result = await sendOpenRouterChat(sketchRequest(), {
       OPENROUTER_API_KEY: "test-shared-key",
     });
@@ -196,6 +208,98 @@ describe("OpenRouter untrusted response hardening", () => {
     const body = result.body as { sketch?: unknown; warning?: string };
     expect(body.sketch).toMatchObject({ width: 8, height: 8 });
     expect(body.warning).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("repairs one malformed text-only sketch without replaying raw model output", async () => {
+    const rawMarker = "RAW_FIRST_RESPONSE_MUST_NOT_BE_REPLAYED";
+    const malformedRows = validRows.slice(0, 5);
+    const responses = [
+      openRouterResponse({
+        reply: rawMarker,
+        sketch: {
+          height: 8,
+          name: "Short",
+          rows: malformedRows,
+          width: 8,
+        },
+      }),
+      openRouterResponse({
+        reply: "Corrected.",
+        sketch: {
+          height: 8,
+          name: "Corrected mushroom",
+          rows: validRows,
+          width: 8,
+        },
+      }),
+    ];
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) =>
+      responses.shift()!,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      { ...sketchRequest(), sessionId: "session-for-repair" },
+      {
+        OPENROUTER_API_KEY: "test-shared-key",
+        OPENROUTER_DATA_COLLECTION: "allow",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.body).toMatchObject({
+      reply: "Corrected.",
+      sketch: { height: 8, name: "Corrected mushroom", width: 8 },
+      warning:
+        "The first grid failed validation; one corrected grid passed review.",
+    });
+    expect((result.body as { usage?: unknown }).usage).toBeUndefined();
+
+    const sentBodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse(String((call[1] as RequestInit | undefined)?.body ?? "{}")),
+    ) as Array<{
+      messages: OpenRouterTestMessage[];
+      model: string;
+      provider: { data_collection: string };
+      session_id: string;
+    }>;
+    for (const sent of sentBodies) {
+      expect(sent.model).toBe(sketchRequest().model);
+      expect(sent.provider.data_collection).toBe("allow");
+      expect(sent.session_id).toBe("session-for-repair");
+    }
+    const repairInstruction = String(sentBodies[1]?.messages.at(-1)?.content);
+    expect(repairInstruction).toContain("did not pass server validation");
+    expect(repairInstruction).toContain("exactly 8 rows");
+    expect(repairInstruction).not.toContain(rawMarker);
+  });
+
+  it("returns the first safe warning when the one correction is also invalid", async () => {
+    const invalid = {
+      reply: "Still trying.",
+      sketch: {
+        height: 8,
+        name: "Short",
+        rows: validRows.slice(0, 5),
+        width: 8,
+      },
+    };
+    const fetchMock = upstreamReplying(invalid);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(sketchRequest(), {
+      OPENROUTER_API_KEY: "test-shared-key",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.body).toMatchObject({
+      reply: "Still trying.",
+      sketch: null,
+      warning:
+        "The model returned an invalid sketch (Sketch must contain exactly 8 rows.). Ask it to try again.",
+    });
+    expect((result.body as { usage?: unknown }).usage).toBeUndefined();
   });
 
   it("normalizes bare allowlisted palette tokens from otherwise valid JSON", async () => {
@@ -232,16 +336,14 @@ describe("OpenRouter untrusted response hardening", () => {
   });
 
   it("returns a useful fallback when the provider reply is empty", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({ choices: [{ message: { content: "" } }] }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: "" } }] }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
     );
+    vi.stubGlobal("fetch", fetchMock);
     const result = await sendOpenRouterChat(
       request(OPENROUTER_MODEL_PRESETS[0].id),
       {
@@ -250,6 +352,44 @@ describe("OpenRouter untrusted response hardening", () => {
     );
     expect(result.body).toMatchObject({
       reply: "The model returned an empty response. Try a different model.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a provider rejection", async () => {
+    const fetchMock = vi.fn(async () =>
+      openRouterResponse("Rate limited", 429),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(sketchRequest(), {
+      OPENROUTER_API_KEY: "test-shared-key",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      body: { reply: "Rate limited" },
+      status: 429,
+    });
+  });
+
+  it("does not retry when the first provider attempt times out", async () => {
+    const timeout = Object.assign(new Error("upstream timed out"), {
+      name: "TimeoutError",
+    });
+    const fetchMock = vi.fn(async () => {
+      throw timeout;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(sketchRequest(), {
+      OPENROUTER_API_KEY: "test-shared-key",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      body: { reply: expect.stringContaining("timed out") },
+      status: 504,
     });
   });
 
@@ -294,13 +434,11 @@ describe("OpenRouter untrusted response hardening", () => {
   });
 
   it("rejects a refinement that changes the current canvas dimensions", async () => {
-    vi.stubGlobal(
-      "fetch",
-      upstreamReplying({
-        reply: "Done.",
-        sketch: { name: "Shrunk", width: 8, height: 8, rows: validRows },
-      }),
-    );
+    const fetchMock = upstreamReplying({
+      reply: "Done.",
+      sketch: { name: "Shrunk", width: 8, height: 8, rows: validRows },
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const result = await sendOpenRouterChat(
       {
         ...sketchRequest(),
@@ -317,6 +455,7 @@ describe("OpenRouter untrusted response hardening", () => {
     const body = result.body as { sketch?: unknown; warning?: string };
     expect(body.sketch).toBeNull();
     expect(body.warning).toContain("must remain 16x16");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("uses attached-image dimensions when a refinement summary is absent", async () => {
