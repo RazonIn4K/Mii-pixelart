@@ -849,6 +849,7 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
   const status = await cdpClient.evaluate<{
     configured?: boolean;
     envVar?: string;
+    unavailableReason?: string;
   }>(
     `fetch('/api/ai/status')
       .then((response) => response.json())
@@ -859,7 +860,20 @@ async function verifyAiPanel(cdpClient: CdpClient): Promise<void> {
     "boolean",
     "AI status should report whether OpenRouter is configured",
   );
-  assert.equal(status.envVar, "OPENROUTER_API_KEY");
+  if (status.envVar === undefined) {
+    assert.equal(
+      status.configured,
+      false,
+      "AI status may omit envVar only when the Pages preview is disconnected",
+    );
+    assert.equal(
+      status.unavailableReason,
+      "AI Draw requires the authenticated community Worker.",
+      "A disconnected Pages preview should explain its exact AI boundary",
+    );
+  } else {
+    assert.equal(status.envVar, "OPENROUTER_API_KEY");
+  }
 
   const models = await cdpClient.evaluate<{
     presets?: { available?: boolean; id?: string }[];
