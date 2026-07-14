@@ -7,24 +7,32 @@ import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Terms() {
   useDocumentTitle("Terms");
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Terms", href: "/terms" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Terms", href: "/terms" },
+    ]),
+  ]);
 
   return (
     <LegalLayout
       title="Terms of Service"
-      lastUpdated="July 13, 2026"
+      lastUpdated="July 14, 2026"
       intro="These Terms govern your use of Tomodachi, a service operated by David Ortiz. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
       <p>
         Tomodachi is a browser-based Mii pixel-art studio paired with
-        breach-recovery tools and guides. We provide free tools (the studio,
-        the AI assistant, the password breach-check) and may also sell paid
-        digital products and consult bookings through the Site.
+        breach-recovery tools and guides. We provide free tools (the studio, the
+        AI assistant, the password breach-check) and may also sell paid digital
+        products and consult bookings through the Site.
       </p>
 
       <h2>2. Acceptable use</h2>
-      <p>You must be at least 13 years old to create an account or use community features.</p>
+      <p>
+        You must be at least 13 years old to create an account or use community
+        features.
+      </p>
       <p>You agree not to:</p>
       <ul>
         <li>
@@ -46,37 +54,38 @@ export default function Terms() {
 
       <h2>3. Accounts, projects, and publishing</h2>
       <p>
-        Editing and export remain available without an account. Signing in
-        does not upload or publish your local work. The first cloud save is an
+        Editing and export remain available without an account. Signing in does
+        not upload or publish your local work. The first cloud save is an
         explicit private action, and publishing requires a separate review of
         the title, description, tags, visibility, comments, and download
-        permission. You may separately attach up to four showcase images to a
-        cloud creation; doing so is an explicit upload and is never inferred
-        from a local Studio import. Unlisted links are not secret access
-        controls.
+        permission. You may separately choose one profile image and attach up to
+        four showcase images to a cloud creation; each is an explicit upload and
+        is never inferred from Google sign-in or a local Studio import. Unlisted
+        links are not secret access controls.
       </p>
 
       <h2>4. Community content and moderation</h2>
       <p>
         You keep ownership of content you create. You grant us a limited,
         non-exclusive license to store, transform into previews, display, and
-        distribute project content and selected showcase images only as needed
-        to operate the visibility and sharing choices you make. You represent
-        that you have permission to share every person and work depicted. We
-        may hide content, lock comments, or suspend accounts to enforce these
-        Terms and the Community Guidelines. Automated systems may help
-        prioritize, summarize, and recommend a response, but they do not make
-        or execute enforcement decisions. An authorized human reviewer must
-        approve each moderation action. Reports and copyright notices must be
-        made in good faith.
+        distribute project content, your selected profile image, and selected
+        showcase images only as needed to operate the identity, visibility, and
+        sharing choices you make. You represent that you have permission to
+        share every person and work depicted. We may remove an image, hide
+        content, lock comments, or suspend accounts to enforce these Terms and
+        the Community Guidelines. Automated systems may help prioritize,
+        summarize, and recommend a response, but they do not make or execute
+        enforcement decisions. An authorized human reviewer must approve each
+        moderation action. Reports and copyright notices must be made in good
+        faith.
       </p>
 
       <h2>5. No professional advice</h2>
       <p>
         The breach recovery guidance and AI assistant output is informational
         only. It is not legal, security, medical, or financial advice. For an
-        incident affecting your business or personal safety, consult a
-        qualified professional.
+        incident affecting your business or personal safety, consult a qualified
+        professional.
       </p>
 
       <h2>6. AI output</h2>
@@ -93,8 +102,8 @@ export default function Terms() {
       <h2>7. Paid services</h2>
       <p>
         Where the Site offers paid downloads, paid guides, or consult bookings,
-        the price, scope, and refund policy will be displayed at checkout.
-        David Ortiz, operating Tomodachi, is the merchant of record for these
+        the price, scope, and refund policy will be displayed at checkout. David
+        Ortiz, operating Tomodachi, is the merchant of record for these
         purchases, and Stripe acts as the payment processor. Stripe Tax may
         calculate tax at checkout, but that automation does not transfer the
         operator&apos;s responsibility for required tax registrations, filings,
@@ -105,14 +114,13 @@ export default function Terms() {
 
       <h2>8. Intellectual property</h2>
       <p>
-        The Site, including code, design, and original written content, is
-        owned by or licensed to David Ortiz and protected by
-        intellectual-property laws. References to third-party games, products,
-        palettes, or compatibility targets identify the subject of this
-        unofficial fan-made tool; all associated trademarks and copyrighted
-        material remain the property of their respective owners. We do not
-        bundle official game assets or claim affiliation with Nintendo or any
-        other rights holder.
+        The Site, including code, design, and original written content, is owned
+        by or licensed to David Ortiz and protected by intellectual-property
+        laws. References to third-party games, products, palettes, or
+        compatibility targets identify the subject of this unofficial fan-made
+        tool; all associated trademarks and copyrighted material remain the
+        property of their respective owners. We do not bundle official game
+        assets or claim affiliation with Nintendo or any other rights holder.
       </p>
 
       <h2>9. Disclaimers</h2>
@@ -128,8 +136,8 @@ export default function Terms() {
         Tomodachi, is not liable for indirect, incidental, special,
         consequential, or punitive damages, or any loss of data or profits,
         arising from your use of the Site. Our total liability for any claim
-        related to the Site will not exceed the amount you paid us in the
-        twelve months preceding the claim, or USD 50 if you paid us nothing.
+        related to the Site will not exceed the amount you paid us in the twelve
+        months preceding the claim, or USD 50 if you paid us nothing.
       </p>
 
       <h2>11. Termination and deletion</h2>
@@ -144,8 +152,8 @@ export default function Terms() {
       <p>
         These Terms are governed by the laws of the State of Illinois and
         applicable United States federal law, without regard to conflict-of-law
-        rules. This choice does not limit any mandatory consumer protection
-        that applies in your place of residence.
+        rules. This choice does not limit any mandatory consumer protection that
+        applies in your place of residence.
       </p>
 
       <h2>13. Changes</h2>
@@ -157,8 +165,8 @@ export default function Terms() {
       <h2>14. Contact</h2>
       <p>
         The operator and postal contact for legal notices and service is David
-        Ortiz, 122 W Taylor St, DeKalb, Illinois 60115, United States. Questions:{" "}
-        <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
+        Ortiz, 122 W Taylor St, DeKalb, Illinois 60115, United States.
+        Questions: <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
       </p>
     </LegalLayout>
   );

@@ -9,11 +9,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Hand } from "lucide-react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
+  canvasToCell,
+  gridStepForDensity,
   renderGrid,
   shouldRenderGridLines,
-  canvasToCell,
-  type RenderOptions,
-  DEFAULT_RENDER_OPTIONS,
+  type GridDensity,
 } from "@/lib/engine/canvas-renderer";
 import { bresenhamLine, getCell } from "@/lib/engine/grid";
 import { formatCountLabel } from "@/lib/format-count";
@@ -21,9 +21,9 @@ import { formatCountLabel } from "@/lib/format-count";
 interface CanvasViewerProps {
   doc: GridDocument;
   highlightColorId: string | null;
-  showGrid: boolean;
+  gridDensity: GridDensity;
   showLabels: boolean;
-  /** Draw a local-only vertical guide through the document's center axis. */
+  /** Draw local-only horizontal and vertical guides through the center. */
   showCenterGuide?: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
   onCellDrag?: (x: number, y: number, colorId: string | null) => void;
@@ -60,7 +60,7 @@ const TAP_MOVE_TOLERANCE = 5;
 export default function CanvasViewer({
   doc,
   highlightColorId,
-  showGrid,
+  gridDensity,
   showLabels,
   showCenterGuide = false,
   onCellClick,
@@ -177,12 +177,18 @@ export default function CanvasViewer({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
 
+    const renderGridStep = gridStepForDensity(gridDensity);
+    const renderGridLines =
+      renderGridStep !== null &&
+      shouldRenderGridLines(true, metrics.cellSize, zoom, renderGridStep);
+
     renderGrid(ctx, doc, {
       cellSize: metrics.cellSize,
       zoom,
       panX: metrics.panX,
       panY: metrics.panY,
-      showGrid: shouldRenderGridLines(showGrid, metrics.cellSize, zoom),
+      showGrid: renderGridLines,
+      gridStep: renderGridStep ?? 1,
       showLabels,
       highlightColorId,
       gridBackground: "#fffef9",
@@ -195,6 +201,9 @@ export default function CanvasViewer({
     if (showCenterGuide) {
       const scaledSize = metrics.cellSize * zoom;
       const centerX = metrics.panX + (doc.width * scaledSize) / 2;
+      const centerY = metrics.panY + (doc.height * scaledSize) / 2;
+      const left = metrics.panX;
+      const right = metrics.panX + doc.width * scaledSize;
       const top = metrics.panY;
       const bottom = metrics.panY + doc.height * scaledSize;
 
@@ -204,6 +213,8 @@ export default function CanvasViewer({
       ctx.lineWidth = 4;
       ctx.moveTo(centerX, top);
       ctx.lineTo(centerX, bottom);
+      ctx.moveTo(left, centerY);
+      ctx.lineTo(right, centerY);
       ctx.stroke();
 
       ctx.beginPath();
@@ -212,6 +223,8 @@ export default function CanvasViewer({
       ctx.lineWidth = 2;
       ctx.moveTo(centerX, top);
       ctx.lineTo(centerX, bottom);
+      ctx.moveTo(left, centerY);
+      ctx.lineTo(right, centerY);
       ctx.stroke();
       ctx.restore();
     }
@@ -238,7 +251,7 @@ export default function CanvasViewer({
   }, [
     doc,
     zoom,
-    showGrid,
+    gridDensity,
     showLabels,
     showCenterGuide,
     highlightColorId,
@@ -624,16 +637,16 @@ export default function CanvasViewer({
       ? "cursor-crosshair"
       : "cursor-cell";
   const currentRenderMetrics = getRenderMetrics();
-  const gridLinesVisible = shouldRenderGridLines(
-    showGrid,
-    currentRenderMetrics.cellSize,
-    zoom,
-  );
-  const gridLineState = !showGrid
-    ? "hidden"
-    : gridLinesVisible
-      ? "visible"
-      : "suppressed";
+  const gridStep = gridStepForDensity(gridDensity);
+  const gridLinesVisible =
+    gridStep !== null &&
+    shouldRenderGridLines(true, currentRenderMetrics.cellSize, zoom, gridStep);
+  const gridLineState =
+    gridDensity === "off"
+      ? "hidden"
+      : gridLinesVisible
+        ? "visible"
+        : "suppressed";
 
   return (
     <div
@@ -647,7 +660,7 @@ export default function CanvasViewer({
         cursor, Enter or Space to activate a cell, plus and minus to zoom, and
         zero to fit the whole canvas. Press 2 to zoom to an easier painting
         scale. Press M to mirror pencil and eraser strokes left to right, and G
-        to toggle the center-axis guide.
+        to toggle the horizontal and vertical center guides.
       </p>
       <p id={statusId} className="sr-only" role="status" aria-live="polite">
         {statusMessage}
@@ -716,13 +729,13 @@ export default function CanvasViewer({
       </div>
 
       {/* Grid info + live coordinate readout */}
-      <div className="absolute bottom-3 left-3 z-10 rounded-sm border border-border bg-card/90 px-2 py-1 backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-sm border border-border bg-card/90 px-2 py-1 backdrop-blur-sm">
         <span className="text-xs font-mono text-muted-foreground">
           {doc.width}×{doc.height} ·{" "}
           {formatCountLabel(doc.usedColors.length, "color")}
           {hoverCell && (
             <span className="text-foreground">
-              {" · "}x:{hoverCell.x} y:{hoverCell.y}
+              {" · "}column {hoverCell.x + 1} · row {hoverCell.y + 1}
             </span>
           )}
         </span>
@@ -751,6 +764,7 @@ export default function CanvasViewer({
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G"
         data-grid-width={doc.width}
         data-grid-height={doc.height}
+        data-grid-density={gridDensity}
         data-grid-lines={gridLineState}
         data-document-modified-at={doc.meta.modifiedAt}
         data-center-guide={showCenterGuide ? "visible" : "hidden"}

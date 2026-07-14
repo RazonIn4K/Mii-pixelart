@@ -275,7 +275,8 @@ export default function UserProfile() {
             <section className="community-profile-header">
               <IslandAvatar
                 seed={profile.user.avatarSeed}
-                label={`${profile.user.displayName}'s generated avatar`}
+                imageUrl={profile.user.avatarUrl}
+                label={`${profile.user.displayName}'s profile picture`}
                 className="h-24 w-24 sm:h-32 sm:w-32"
               />
               <div className="min-w-0 flex-1">

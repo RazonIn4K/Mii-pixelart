@@ -10,6 +10,7 @@ import {
 import { CompactEncrypt, compactDecrypt } from "jose";
 import { z } from "zod";
 import { GoogleAuthStartSchema } from "../shared/community";
+import { profileAvatarUrl } from "./db";
 
 import {
   isStrongRuntimeSecret,
@@ -87,6 +88,7 @@ export interface GoogleOidcProvider {
 }
 
 interface SessionRow {
+  avatar_image_id: string | null;
   avatar_seed: string;
   bio: string;
   created_at: number;
@@ -119,6 +121,7 @@ export interface AuthenticatedSession {
   role: "admin" | "moderator" | "user";
   user: {
     avatarSeed: string;
+    avatarUrl: string | null;
     bio: string;
     createdAt: number;
     deletionDueAt: number | null;
@@ -172,8 +175,12 @@ export function registerAuthRoutes(
   provider: GoogleOidcProvider = googleOidcProvider,
 ): void {
   router
-    .add("POST", "/api/auth/google/start", (context) => startGoogleLogin(context, provider))
-    .add("GET", "/api/auth/google/callback", (context) => finishGoogleLogin(context, provider))
+    .add("POST", "/api/auth/google/start", (context) =>
+      startGoogleLogin(context, provider),
+    )
+    .add("GET", "/api/auth/google/callback", (context) =>
+      finishGoogleLogin(context, provider),
+    )
     .add("GET", "/api/auth/session", getAuthSession)
     .add("POST", "/api/auth/logout", logout)
     .add("POST", "/api/auth/revoke-all", revokeAllSessions);
@@ -184,9 +191,15 @@ async function startGoogleLogin(
   provider: GoogleOidcProvider,
 ): Promise<Response> {
   assertOidcConfigured(context.env);
-  await enforceRateLimit(context.env.AUTH_RATE_LIMITER, await clientKey(context.env, context.request));
-  const { intent, returnTo: requestedReturnTo } = await readLoginStart(context.request);
-  const currentSession = intent === "reauth" ? await requireSession(context) : null;
+  await enforceRateLimit(
+    context.env.AUTH_RATE_LIMITER,
+    await clientKey(context.env, context.request),
+  );
+  const { intent, returnTo: requestedReturnTo } = await readLoginStart(
+    context.request,
+  );
+  const currentSession =
+    intent === "reauth" ? await requireSession(context) : null;
 
   const state = randomState();
   const nonce = randomNonce();
@@ -215,15 +228,28 @@ async function startGoogleLogin(
     state,
   });
 
-  const encryptedTransaction = await encryptTransaction(transaction, context.env);
-  const isFormNavigation = context.request.headers.get("content-type")
-    ?.toLowerCase()
-    .startsWith("application/x-www-form-urlencoded") ?? false;
-  const headers = new Headers(isFormNavigation ? { Location: authorizationUrl.href } : undefined);
-  headers.append("Set-Cookie", transactionCookie(context.env, encryptedTransaction));
+  const encryptedTransaction = await encryptTransaction(
+    transaction,
+    context.env,
+  );
+  const isFormNavigation =
+    context.request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/x-www-form-urlencoded") ?? false;
+  const headers = new Headers(
+    isFormNavigation ? { Location: authorizationUrl.href } : undefined,
+  );
+  headers.append(
+    "Set-Cookie",
+    transactionCookie(context.env, encryptedTransaction),
+  );
   if (isFormNavigation) return new Response(null, { status: 303, headers });
-  const response = success(context.requestId, { authorizationUrl: authorizationUrl.href });
-  for (const value of headers.getSetCookie()) response.headers.append("Set-Cookie", value);
+  const response = success(context.requestId, {
+    authorizationUrl: authorizationUrl.href,
+  });
+  for (const value of headers.getSetCookie())
+    response.headers.append("Set-Cookie", value);
   return response;
 }
 
@@ -232,20 +258,40 @@ async function finishGoogleLogin(
   provider: GoogleOidcProvider,
 ): Promise<Response> {
   assertOidcConfigured(context.env);
-  await enforceRateLimit(context.env.AUTH_RATE_LIMITER, await clientKey(context.env, context.request));
-  const encrypted = parseCookies(context.request).get(transactionCookieName(context.env));
+  await enforceRateLimit(
+    context.env.AUTH_RATE_LIMITER,
+    await clientKey(context.env, context.request),
+  );
+  const encrypted = parseCookies(context.request).get(
+    transactionCookieName(context.env),
+  );
   if (!encrypted) {
-    throw callbackError(context.env, 400, "invalid_oidc_transaction", "Login transaction is missing or expired.");
+    throw callbackError(
+      context.env,
+      400,
+      "invalid_oidc_transaction",
+      "Login transaction is missing or expired.",
+    );
   }
 
   let transaction: z.output<typeof OidcTransactionSchema>;
   try {
     transaction = await decryptTransaction(encrypted, context.env);
   } catch {
-    throw callbackError(context.env, 400, "invalid_oidc_transaction", "Login transaction is invalid.");
+    throw callbackError(
+      context.env,
+      400,
+      "invalid_oidc_transaction",
+      "Login transaction is invalid.",
+    );
   }
   if (transaction.expiresAt < Date.now()) {
-    throw callbackError(context.env, 400, "expired_oidc_transaction", "Login transaction has expired.");
+    throw callbackError(
+      context.env,
+      400,
+      "expired_oidc_transaction",
+      "Login transaction has expired.",
+    );
   }
 
   let claims: GoogleIdentityClaims;
@@ -264,27 +310,36 @@ async function finishGoogleLogin(
     );
   }
   if (!claims.subject) {
-    throw callbackError(context.env, 400, "invalid_identity", "Google did not return a valid subject.");
+    throw callbackError(
+      context.env,
+      400,
+      "invalid_identity",
+      "Google did not return a valid subject.",
+    );
   }
   const email = claims.email.trim().toLowerCase();
   if (!email || !claims.emailVerified) {
-    throw callbackError(context.env, 403, "email_not_verified", "A verified Google email is required.");
+    throw callbackError(
+      context.env,
+      403,
+      "email_not_verified",
+      "A verified Google email is required.",
+    );
   }
-  const displayName =
-    claims.name?.trim()
-      ? claims.name.trim().slice(0, 50)
-      : email.split("@")[0].slice(0, 50);
+  const displayName = claims.name?.trim()
+    ? claims.name.trim().slice(0, 50)
+    : email.split("@")[0].slice(0, 50);
 
   let session: { token: string };
   let userId: string;
   if (transaction.intent === "reauth") {
     const currentSession = await optionalSession(context);
     if (
-      !currentSession
-      || currentSession.id !== transaction.sessionId
-      || currentSession.user.id !== transaction.expectedUserId
-      || currentSession.providerSubject !== transaction.expectedProviderSubject
-      || claims.subject !== transaction.expectedProviderSubject
+      !currentSession ||
+      currentSession.id !== transaction.sessionId ||
+      currentSession.user.id !== transaction.expectedUserId ||
+      currentSession.providerSubject !== transaction.expectedProviderSubject ||
+      claims.subject !== transaction.expectedProviderSubject
     ) {
       throw callbackError(
         context.env,
@@ -305,9 +360,10 @@ async function finishGoogleLogin(
     session = await createSession(context, userId);
   }
   const user = await loadUser(context.env, userId);
-  const destination = transaction.intent === "reauth" || user?.username
-    ? transaction.returnTo
-    : `/me/setup?returnTo=${encodeURIComponent(transaction.returnTo)}`;
+  const destination =
+    transaction.intent === "reauth" || user?.username
+      ? transaction.returnTo
+      : `/me/setup?returnTo=${encodeURIComponent(transaction.returnTo)}`;
 
   const headers = new Headers({ Location: destination });
   headers.append("Set-Cookie", sessionCookie(context.env, session.token));
@@ -315,29 +371,34 @@ async function finishGoogleLogin(
   return new Response(null, { status: 303, headers });
 }
 
-async function getAuthSession(context: WorkerRequestContext): Promise<Response> {
+async function getAuthSession(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await optionalSession(context);
   const capabilities = {
     communityMutationsEnabled:
       context.env.COMMUNITY_MUTATIONS_ENABLED === "true",
   };
-  return success(context.requestId, session
-    ? {
-        capabilities,
-        user: {
-          ...session.user,
-          requiredTermsVersion: context.env.TERMS_VERSION,
-          role: session.role,
-        },
-        session: {
-          createdAt: session.createdAt,
-          current: true,
-          expiresAt: session.expiresAt,
-          id: session.id,
-          lastSeenAt: session.lastSeenAt,
-        },
-      }
-    : { capabilities, user: null, session: null });
+  return success(
+    context.requestId,
+    session
+      ? {
+          capabilities,
+          user: {
+            ...session.user,
+            requiredTermsVersion: context.env.TERMS_VERSION,
+            role: session.role,
+          },
+          session: {
+            createdAt: session.createdAt,
+            current: true,
+            expiresAt: session.expiresAt,
+            id: session.id,
+            lastSeenAt: session.lastSeenAt,
+          },
+        }
+      : { capabilities, user: null, session: null },
+  );
 }
 
 async function logout(context: WorkerRequestContext): Promise<Response> {
@@ -345,19 +406,25 @@ async function logout(context: WorkerRequestContext): Promise<Response> {
   if (session) {
     await context.env.DB.prepare(
       "UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
-    ).bind(Date.now(), session.id).run();
+    )
+      .bind(Date.now(), session.id)
+      .run();
   }
   const response = success(context.requestId, { loggedOut: true });
   response.headers.append("Set-Cookie", clearSessionCookie(context.env));
   return response;
 }
 
-async function revokeAllSessions(context: WorkerRequestContext): Promise<Response> {
+async function revokeAllSessions(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireSession(context);
   const now = Date.now();
   await context.env.DB.prepare(
     "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-  ).bind(now, session.user.id).run();
+  )
+    .bind(now, session.user.id)
+    .run();
   const response = success(context.requestId, { revokedAt: now });
   response.headers.append("Set-Cookie", clearSessionCookie(context.env));
   return response;
@@ -366,7 +433,9 @@ async function revokeAllSessions(context: WorkerRequestContext): Promise<Respons
 export async function optionalSession(
   context: WorkerRequestContext,
 ): Promise<AuthenticatedSession | null> {
-  const token = parseCookies(context.request).get(sessionCookieName(context.env));
+  const token = parseCookies(context.request).get(
+    sessionCookieName(context.env),
+  );
   if (!token || token.length > 256) return null;
   const tokenHash = await sha256(`${sessionPepper(context.env)}:${token}`);
   const now = Date.now();
@@ -374,7 +443,8 @@ export async function optionalSession(
     `SELECT
        s.id AS session_id, s.last_authenticated_at, s.created_at, s.last_seen_at,
        s.expires_at, u.id AS user_id, u.username, u.display_name, u.bio,
-       u.role, u.status, u.avatar_seed, u.terms_accepted_at, u.terms_version,
+       u.role, u.status, u.avatar_seed, u.avatar_image_id,
+       u.terms_accepted_at, u.terms_version,
        u.deletion_due_at, u.created_at AS user_created_at,
        u.updated_at AS user_updated_at, ei.email,
        ei.provider_subject
@@ -383,14 +453,19 @@ export async function optionalSession(
      JOIN external_identities ei ON ei.user_id = u.id AND ei.provider = 'google'
      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
      LIMIT 1`,
-  ).bind(tokenHash, now).first<SessionRow>();
+  )
+    .bind(tokenHash, now)
+    .first<SessionRow>();
   if (!row || row.status === "deleted") return null;
 
   if (now - row.last_seen_at >= 60 * 60 * 1_000) {
     context.executionCtx.waitUntil(
       context.env.DB.prepare(
         "UPDATE sessions SET last_seen_at = ? WHERE id = ? AND last_seen_at = ?",
-      ).bind(now, row.session_id, row.last_seen_at).run().then(() => undefined),
+      )
+        .bind(now, row.session_id, row.last_seen_at)
+        .run()
+        .then(() => undefined),
     );
   }
 
@@ -405,6 +480,7 @@ export async function optionalSession(
     role: row.role,
     user: {
       avatarSeed: row.avatar_seed,
+      avatarUrl: profileAvatarUrl(row.user_id, row.avatar_image_id),
       bio: row.bio,
       createdAt: row.user_created_at,
       deletionDueAt: row.deletion_due_at,
@@ -413,7 +489,8 @@ export async function optionalSession(
       id: row.user_id,
       status: row.status,
       termsAccepted:
-        row.terms_accepted_at !== null && row.terms_version === context.env.TERMS_VERSION,
+        row.terms_accepted_at !== null &&
+        row.terms_version === context.env.TERMS_VERSION,
       termsAcceptedAt: row.terms_accepted_at,
       termsVersion: row.terms_version,
       updatedAt: row.user_updated_at,
@@ -426,7 +503,8 @@ export async function requireSession(
   context: WorkerRequestContext,
 ): Promise<AuthenticatedSession> {
   const session = await optionalSession(context);
-  if (!session) throw new HttpError(401, "authentication_required", "Sign in is required.");
+  if (!session)
+    throw new HttpError(401, "authentication_required", "Sign in is required.");
   return session;
 }
 
@@ -435,10 +513,18 @@ export async function requireOnboardedSession(
 ): Promise<AuthenticatedSession> {
   const session = await requireSession(context);
   if (session.user.status !== "active") {
-    throw new HttpError(403, "account_not_active", "Restore the account before continuing.");
+    throw new HttpError(
+      403,
+      "account_not_active",
+      "Restore the account before continuing.",
+    );
   }
   if (!session.user.username || !session.user.termsAccepted) {
-    throw new HttpError(403, "profile_setup_required", "Finish account setup before continuing.");
+    throw new HttpError(
+      403,
+      "profile_setup_required",
+      "Finish account setup before continuing.",
+    );
   }
   return session;
 }
@@ -448,7 +534,11 @@ export async function requireFreshSession(
 ): Promise<AuthenticatedSession> {
   const session = await requireSession(context);
   if (!session.fresh) {
-    throw new HttpError(401, "fresh_authentication_required", "Sign in again to continue.");
+    throw new HttpError(
+      401,
+      "fresh_authentication_required",
+      "Sign in again to continue.",
+    );
   }
   return session;
 }
@@ -458,15 +548,26 @@ export async function requireModerator(
 ): Promise<AuthenticatedSession> {
   const session = await requireSession(context);
   if (session.user.status !== "active") {
-    throw new HttpError(403, "account_not_active", "Restore the account before continuing.");
+    throw new HttpError(
+      403,
+      "account_not_active",
+      "Restore the account before continuing.",
+    );
   }
   if (session.role !== "moderator" && session.role !== "admin") {
-    throw new HttpError(403, "moderator_required", "Moderator access is required.");
+    throw new HttpError(
+      403,
+      "moderator_required",
+      "Moderator access is required.",
+    );
   }
   return session;
 }
 
-export async function enforceRateLimit(limiter: RateLimit, key: string): Promise<void> {
+export async function enforceRateLimit(
+  limiter: RateLimit,
+  key: string,
+): Promise<void> {
   const outcome = await limiter.limit({ key });
   if (!outcome.success) {
     throw new HttpError(
@@ -486,21 +587,27 @@ export async function clientKey(env: Env, request: Request): Promise<string> {
 }
 
 async function googleConfiguration(env: Env) {
-  return discovery(GOOGLE_ISSUER, env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  return discovery(
+    GOOGLE_ISSUER,
+    env.GOOGLE_CLIENT_ID,
+    env.GOOGLE_CLIENT_SECRET,
+  );
 }
 
 function assertOidcConfigured(env: Env): void {
   if (
-    !isConfiguredCredential(env.GOOGLE_CLIENT_ID, env.ENVIRONMENT)
-    || !isConfiguredCredential(env.GOOGLE_CLIENT_SECRET, env.ENVIRONMENT)
-    || !isValidOidcCookieKey(env.OIDC_COOKIE_KEY)
-    || !isStrongRuntimeSecret(env.SESSION_PEPPER, env.ENVIRONMENT)
-    || (
-      env.ENVIRONMENT !== "local"
-      && !isStrongRuntimeSecret(env.PSEUDONYM_KEY, env.ENVIRONMENT)
-    )
+    !isConfiguredCredential(env.GOOGLE_CLIENT_ID, env.ENVIRONMENT) ||
+    !isConfiguredCredential(env.GOOGLE_CLIENT_SECRET, env.ENVIRONMENT) ||
+    !isValidOidcCookieKey(env.OIDC_COOKIE_KEY) ||
+    !isStrongRuntimeSecret(env.SESSION_PEPPER, env.ENVIRONMENT) ||
+    (env.ENVIRONMENT !== "local" &&
+      !isStrongRuntimeSecret(env.PSEUDONYM_KEY, env.ENVIRONMENT))
   ) {
-    throw new HttpError(503, "oidc_not_configured", "Google sign-in is not configured.");
+    throw new HttpError(
+      503,
+      "oidc_not_configured",
+      "Google sign-in is not configured.",
+    );
   }
 }
 
@@ -510,12 +617,16 @@ async function provisionGoogleUser(
 ): Promise<string> {
   const existing = await env.DB.prepare(
     "SELECT user_id FROM external_identities WHERE provider = 'google' AND provider_subject = ?",
-  ).bind(identity.subject).first<{ user_id: string }>();
+  )
+    .bind(identity.subject)
+    .first<{ user_id: string }>();
   const now = Date.now();
   if (existing) {
     await env.DB.prepare(
       "UPDATE external_identities SET email = ?, email_verified = 1, updated_at = ? WHERE provider = 'google' AND provider_subject = ?",
-    ).bind(identity.email, now, identity.subject).run();
+    )
+      .bind(identity.email, now, identity.subject)
+      .run();
     return existing.user_id;
   }
 
@@ -544,13 +655,24 @@ async function createSession(
   const token = randomToken();
   const now = Date.now();
   const tokenHash = await sha256(`${sessionPepper(context.env)}:${token}`);
-  const userAgentLabel = normalizeUserAgent(context.request.headers.get("user-agent"));
+  const userAgentLabel = normalizeUserAgent(
+    context.request.headers.get("user-agent"),
+  );
   await context.env.DB.batch([
     context.env.DB.prepare(
       `INSERT INTO sessions
        (id, user_id, token_hash, ua_label, last_authenticated_at, created_at, last_seen_at, expires_at, revoked_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-    ).bind(id, userId, tokenHash, userAgentLabel, now, now, now, now + SESSION_TTL_MS),
+    ).bind(
+      id,
+      userId,
+      tokenHash,
+      userAgentLabel,
+      now,
+      now,
+      now,
+      now + SESSION_TTL_MS,
+    ),
     context.env.DB.prepare(
       `UPDATE sessions SET revoked_at = ?
        WHERE user_id = ? AND revoked_at IS NULL AND id IN (
@@ -572,15 +694,17 @@ async function rotateSession(
   const result = await context.env.DB.prepare(
     `UPDATE sessions SET token_hash = ?, last_authenticated_at = ?, last_seen_at = ?,
      expires_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?`,
-  ).bind(
-    tokenHash,
-    now,
-    now,
-    now + SESSION_TTL_MS,
-    session.id,
-    session.user.id,
-    now,
-  ).run();
+  )
+    .bind(
+      tokenHash,
+      now,
+      now,
+      now + SESSION_TTL_MS,
+      session.id,
+      session.user.id,
+      now,
+    )
+    .run();
   if ((result.meta.changes ?? 0) !== 1) {
     throw callbackError(
       context.env,
@@ -601,7 +725,9 @@ async function updateGoogleIdentityEmail(
   const result = await env.DB.prepare(
     `UPDATE external_identities SET email = ?, email_verified = 1, updated_at = ?
      WHERE user_id = ? AND provider = 'google' AND provider_subject = ?`,
-  ).bind(email, Date.now(), userId, subject).run();
+  )
+    .bind(email, Date.now(), userId, subject)
+    .run();
   if ((result.meta.changes ?? 0) !== 1) {
     throw callbackError(
       env,
@@ -612,7 +738,10 @@ async function updateGoogleIdentityEmail(
   }
 }
 
-async function loadUser(env: Env, id: string): Promise<{ username: string | null } | null> {
+async function loadUser(
+  env: Env,
+  id: string,
+): Promise<{ username: string | null } | null> {
   return env.DB.prepare("SELECT username FROM users WHERE id = ?")
     .bind(id)
     .first<{ username: string | null }>();
@@ -623,20 +752,31 @@ async function encryptTransaction(
   env: Env,
 ): Promise<string> {
   const key = secretKey(env.OIDC_COOKIE_KEY);
-  return new CompactEncrypt(new TextEncoder().encode(JSON.stringify(transaction)))
+  return new CompactEncrypt(
+    new TextEncoder().encode(JSON.stringify(transaction)),
+  )
     .setProtectedHeader({ alg: "dir", enc: "A256GCM", typ: "JWT" })
     .encrypt(key);
 }
 
 async function decryptTransaction(value: string, env: Env) {
   try {
-    const { plaintext } = await compactDecrypt(value, secretKey(env.OIDC_COOKIE_KEY));
-    const parsed = OidcTransactionSchema.safeParse(JSON.parse(new TextDecoder().decode(plaintext)));
+    const { plaintext } = await compactDecrypt(
+      value,
+      secretKey(env.OIDC_COOKIE_KEY),
+    );
+    const parsed = OidcTransactionSchema.safeParse(
+      JSON.parse(new TextDecoder().decode(plaintext)),
+    );
     if (parsed.success) return parsed.data;
   } catch {
     // Normalize crypto and JSON failures to one safe public error.
   }
-  throw new HttpError(400, "invalid_oidc_transaction", "Login transaction is invalid.");
+  throw new HttpError(
+    400,
+    "invalid_oidc_transaction",
+    "Login transaction is invalid.",
+  );
 }
 
 function sessionPepper(env: Env): string {
@@ -655,7 +795,9 @@ function isConfiguredCredential(
   if (environment === "local") return true;
   if (trimmed.length < 16) return false;
   const normalized = trimmed.toLowerCase();
-  return !PLACEHOLDER_CREDENTIAL_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  return !PLACEHOLDER_CREDENTIAL_PREFIXES.some((prefix) =>
+    normalized.startsWith(prefix),
+  );
 }
 
 const PLACEHOLDER_CREDENTIAL_PREFIXES = [
@@ -703,11 +845,17 @@ function transactionCookie(env: Env, value: string): string {
 }
 
 function clearSessionCookie(env: Env): string {
-  return cookie(sessionCookieName(env), "", { maxAge: 0, secure: secureCookies(env) });
+  return cookie(sessionCookieName(env), "", {
+    maxAge: 0,
+    secure: secureCookies(env),
+  });
 }
 
 function clearTransactionCookie(env: Env): string {
-  return cookie(transactionCookieName(env), "", { maxAge: 0, secure: secureCookies(env) });
+  return cookie(transactionCookieName(env), "", {
+    maxAge: 0,
+    secure: secureCookies(env),
+  });
 }
 
 function callbackError(
@@ -739,7 +887,11 @@ async function readLoginStart(request: Request) {
   if (contentType.startsWith("application/x-www-form-urlencoded")) {
     const declaredLength = Number(request.headers.get("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > 10_000) {
-      throw new HttpError(413, "payload_too_large", "Request body is too large.");
+      throw new HttpError(
+        413,
+        "payload_too_large",
+        "Request body is too large.",
+      );
     }
     const text = await readText(request, 10_000);
     const form = new URLSearchParams(text);
@@ -748,7 +900,15 @@ async function readLoginStart(request: Request) {
       returnTo: form.get("returnTo") ?? undefined,
     });
     if (parsed.success) return parsed.data;
-    throw new HttpError(400, "validation_error", "Login return path is invalid.");
+    throw new HttpError(
+      400,
+      "validation_error",
+      "Login return path is invalid.",
+    );
   }
-  throw new HttpError(415, "unsupported_media_type", "Use a form or JSON request.");
+  throw new HttpError(
+    415,
+    "unsupported_media_type",
+    "Use a form or JSON request.",
+  );
 }

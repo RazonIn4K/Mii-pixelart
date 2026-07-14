@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IslandAvatar } from "@/components/community/IslandAvatar";
 import { AvatarRegenerationButton } from "@/components/community/AvatarRegenerationButton";
+import { ProfileImageManager } from "@/components/community/ProfileImageManager";
 import { RequireAuth } from "@/components/community/RequireAuth";
 import { CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
@@ -133,7 +134,9 @@ export default function SettingsPage() {
                 className="rounded-3xl border-2 border-amber-500 bg-amber-50 p-6 text-amber-950"
                 role="status"
               >
-                <h2 className="text-xl font-black">Profile changes are paused</h2>
+                <h2 className="text-xl font-black">
+                  Profile changes are paused
+                </h2>
                 <p className="mt-2 text-sm leading-6">
                   Session, export, and account-safety controls remain available,
                   but profile and community writes are read-only right now.
@@ -188,17 +191,23 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4">
                   <IslandAvatar
                     seed={user?.avatarSeed ?? "islander"}
-                    label="Your generated Island Workshop avatar"
+                    imageUrl={user?.avatarUrl}
+                    label="Your profile picture"
                     className="h-16 w-16"
                   />
                   <div className="min-w-0 flex-1">
                     <h2 className="text-xl font-black">Public profile</h2>
                     <p className="text-xs text-muted-foreground">
-                      Generated avatar · no image upload · updates everywhere
+                      {user?.avatarUrl
+                        ? "Your custom photo · updates everywhere"
+                        : "Generated Island avatar · updates everywhere"}
                     </p>
-                    <AvatarRegenerationButton className="mt-3" />
+                    {!user?.avatarUrl ? (
+                      <AvatarRegenerationButton className="mt-3" />
+                    ) : null}
                   </div>
                 </div>
+                <ProfileImageManager />
                 <div className="mt-6 space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="settings-name">Display name</Label>
@@ -230,7 +239,11 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <Button type="submit" className="mt-5" disabled={saving || !communityMutationsEnabled}>
+                <Button
+                  type="submit"
+                  className="mt-5"
+                  disabled={saving || !communityMutationsEnabled}
+                >
                   <Save /> {saving ? "Saving…" : "Save profile"}
                 </Button>
               </form>

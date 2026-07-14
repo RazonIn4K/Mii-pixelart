@@ -23,7 +23,15 @@ export interface StoredShowcaseObject {
   sha256: string;
 }
 
+export interface StoredProfileImageObject {
+  byteSize: number;
+  contentType: "image/webp";
+  key: string;
+  sha256: string;
+}
+
 const SHOWCASE_OUTPUT_LIMIT = 8 * 1024 * 1024;
+const PROFILE_IMAGE_OUTPUT_LIMIT = 2 * 1024 * 1024;
 const REVISION_OUTPUT_LIMIT = 8 * 1024 * 1024;
 const GRID_PREVIEW_SIZE = 640;
 
@@ -253,6 +261,61 @@ export async function storeShowcaseObjects(
     return stored;
   } catch (error) {
     await env.PROJECTS.delete(Object.values(keys));
+    throw error;
+  }
+}
+
+/**
+ * Normalize one user-selected raster into a bounded square WebP. The source
+ * bytes are decoded by Images and never written to R2; the user-controlled
+ * focus point only influences the fixed cover crop.
+ */
+export async function storeProfileImageObject(
+  env: Env,
+  userId: string,
+  imageId: string,
+  sourceBytes: Uint8Array,
+  sourceContentType: string,
+  focusX: number,
+  focusY: number,
+): Promise<StoredProfileImageObject> {
+  const key = `private/users/${userId}/avatar/${imageId}/avatar.webp`;
+  try {
+    const source = blobFromBytes(sourceBytes, sourceContentType);
+    const transformed = await env.IMAGES.input(source.stream())
+      .transform({
+        fit: "cover",
+        gravity: {
+          mode: "box-center",
+          x: focusX / 100,
+          y: focusY / 100,
+        },
+        height: 256,
+        width: 256,
+      })
+      .output({ anim: false, format: "image/webp", quality: 84 });
+    const response = transformed.response();
+    if (!response.ok) throw new Error("profile_image_transform_failed");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (
+      bytes.byteLength === 0 ||
+      bytes.byteLength > PROFILE_IMAGE_OUTPUT_LIMIT ||
+      !hasImageSignature(bytes, "image/webp")
+    ) {
+      throw new Error("profile_image_output_invalid");
+    }
+    await env.PROJECTS.put(key, bytes, {
+      httpMetadata: { contentType: "image/webp" },
+      customMetadata: { imageId, kind: "profile_avatar", userId },
+    });
+    return {
+      byteSize: bytes.byteLength,
+      contentType: "image/webp",
+      key,
+      sha256: await sha256(bytes),
+    };
+  } catch (error) {
+    await env.PROJECTS.delete(key);
     throw error;
   }
 }

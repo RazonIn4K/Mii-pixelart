@@ -24,7 +24,6 @@ import {
   Compass,
   FolderOpen,
   Grid2x2Plus,
-  Grid3X3,
   Hash,
   Home,
   ImageUp,
@@ -48,6 +47,7 @@ import {
   CanvasPaintToolbar,
   type BrushSize,
 } from "@/components/studio/CanvasPaintToolbar";
+import { ReferenceDock } from "@/components/studio/ReferenceDock";
 import {
   StudioWorkflowNav,
   type StudioPanel,
@@ -62,6 +62,8 @@ import {
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
 import type { GridDocument } from "@/lib/engine/grid";
+import type { GridDensity } from "@/lib/engine/canvas-renderer";
+import type { ImageImportOptions } from "@/lib/engine/image-import";
 import { buildPaintCells } from "@/lib/engine/paint-assists";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
@@ -112,7 +114,7 @@ export default function Studio() {
   } = useGridDocument();
 
   const [highlightColorId, setHighlightColorId] = useState<string | null>(null);
-  const [showGrid, setShowGrid] = useState(true);
+  const [gridDensity, setGridDensity] = useState<GridDensity>("cell");
   const [showLabels, setShowLabels] = useState(false);
   const [horizontalMirror, setHorizontalMirror] = useState(false);
   const [showCenterGuide, setShowCenterGuide] = useState(false);
@@ -121,8 +123,42 @@ export default function Studio() {
   const [brushSize, setBrushSize] = useState<BrushSize>(1);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const [referenceSourceUrl, setReferenceSourceUrl] = useState<string | null>(
+    null,
+  );
   const imagePickerRequestRef = useRef(0);
+  const referenceFileRef = useRef<File | null>(null);
+  const referenceSourceUrlRef = useRef<string | null>(null);
   const visibleDoc = imagePreview ?? doc;
+
+  useEffect(() => {
+    if (!referenceSourceUrl) return;
+    return () => URL.revokeObjectURL(referenceSourceUrl);
+  }, [referenceSourceUrl]);
+
+  const rememberLocalReference = useCallback((file: File) => {
+    if (referenceFileRef.current === file && referenceSourceUrlRef.current) {
+      return;
+    }
+    const nextUrl = URL.createObjectURL(file);
+    referenceFileRef.current = file;
+    referenceSourceUrlRef.current = nextUrl;
+    setReferenceSourceUrl(nextUrl);
+  }, []);
+
+  const clearLocalReference = useCallback(() => {
+    referenceFileRef.current = null;
+    referenceSourceUrlRef.current = null;
+    setReferenceSourceUrl(null);
+  }, []);
+
+  const handlePreviewImage = useCallback(
+    (file: File, options?: Partial<ImageImportOptions>) => {
+      rememberLocalReference(file);
+      previewFromImage(file, options);
+    },
+    [previewFromImage, rememberLocalReference],
+  );
 
   const confirmImportReplacement = useCallback(() => {
     if (!doc?.cells.some((cell) => cell !== null)) return true;
@@ -561,27 +597,6 @@ export default function Studio() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setShowGrid((v) => !v)}
-                className={`p-1.5 rounded-sm transition-colors ${
-                  showGrid
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                aria-label="Toggle grid lines"
-                aria-pressed={showGrid}
-                title="Toggle grid lines"
-              >
-                <Grid3X3 className="w-3.5 h-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Toggle grid lines</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
                 onClick={() => setShowLabels((v) => !v)}
                 className={`p-1.5 rounded-sm transition-colors ${
                   showLabels
@@ -650,7 +665,9 @@ export default function Studio() {
         <div
           className={
             visibleDoc
-              ? "h-[56svh] min-h-[24rem] min-w-0 flex-none p-3 sm:h-[60svh] md:h-auto md:min-h-0 md:flex-1"
+              ? referenceSourceUrl
+                ? "h-[82svh] min-h-[40rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
+                : "h-[68svh] min-h-[31rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
               : "min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
           }
         >
@@ -661,10 +678,12 @@ export default function Studio() {
                   activeTool={paintTool}
                   brushSize={brushSize}
                   doc={doc}
+                  gridDensity={gridDensity}
                   horizontalMirror={horizontalMirror}
                   selectedColorId={selectedPaintColorId}
                   showCenterGuide={showCenterGuide}
                   onBrushSizeChange={setBrushSize}
+                  onGridDensityChange={setGridDensity}
                   onHorizontalMirrorChange={(enabled) => {
                     setHorizontalMirror(enabled);
                     if (enabled) setShowCenterGuide(true);
@@ -682,28 +701,42 @@ export default function Studio() {
                   Preview mode · commit or cancel from Import
                 </div>
               )}
-              <div className="min-h-0 flex-1">
-                <CanvasViewer
-                  doc={visibleDoc}
-                  highlightColorId={highlightColorId}
-                  showGrid={showGrid}
-                  showLabels={showLabels}
-                  showCenterGuide={showCenterGuide}
-                  onCellClick={handleCellClick}
-                  onCellDrag={
-                    paintTool === "pencil" || paintTool === "eraser"
-                      ? handleCellDrag
-                      : undefined
-                  }
-                  onCellDragSegment={
-                    paintTool === "pencil" || paintTool === "eraser"
-                      ? handleCellDragSegment
-                      : undefined
-                  }
-                  onCellHover={handleCellHover}
-                  onStrokeBegin={handleStrokeBegin}
-                  onStrokeEnd={handleStrokeEnd}
-                />
+              <div
+                className={
+                  referenceSourceUrl
+                    ? "grid min-h-0 flex-1 grid-rows-[minmax(10rem,0.38fr)_minmax(16rem,1fr)] gap-2 md:grid-cols-[minmax(11rem,0.32fr)_minmax(0,1fr)] md:grid-rows-1"
+                    : "min-h-0 flex-1"
+                }
+              >
+                {referenceSourceUrl ? (
+                  <ReferenceDock
+                    sourceUrl={referenceSourceUrl}
+                    onClear={clearLocalReference}
+                  />
+                ) : null}
+                <div className="h-full min-h-0 min-w-0">
+                  <CanvasViewer
+                    doc={visibleDoc}
+                    highlightColorId={highlightColorId}
+                    gridDensity={gridDensity}
+                    showLabels={showLabels}
+                    showCenterGuide={showCenterGuide}
+                    onCellClick={handleCellClick}
+                    onCellDrag={
+                      paintTool === "pencil" || paintTool === "eraser"
+                        ? handleCellDrag
+                        : undefined
+                    }
+                    onCellDragSegment={
+                      paintTool === "pencil" || paintTool === "eraser"
+                        ? handleCellDragSegment
+                        : undefined
+                    }
+                    onCellHover={handleCellHover}
+                    onStrokeBegin={handleStrokeBegin}
+                    onStrokeEnd={handleStrokeEnd}
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -816,7 +849,7 @@ export default function Studio() {
                 <TabsContent value="import" className="mt-0">
                   <ImportPanel
                     previewDoc={imagePreview}
-                    onPreviewImage={previewFromImage}
+                    onPreviewImage={handlePreviewImage}
                     onCommitPreview={handleCommitImagePreview}
                     onCancelPreview={handleCancelImagePreview}
                     onImportJson={handleImportJson}

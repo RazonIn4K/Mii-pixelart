@@ -9,6 +9,10 @@ const SESSION_PEPPER = "test-only-session-pepper";
 describe("account export streaming", () => {
   beforeEach(async () => {
     await env.DB.exec(`
+      DELETE FROM profile_image_report_evidence;
+      DELETE FROM profile_image_objects;
+      DELETE FROM profile_images;
+      DELETE FROM profile_image_upload_attempts;
       DELETE FROM creation_showcase_objects;
       DELETE FROM creation_showcase_images;
       DELETE FROM comments;
@@ -28,6 +32,7 @@ describe("account export streaming", () => {
     const userId = crypto.randomUUID();
     const creationId = crypto.randomUUID();
     const imageId = crypto.randomUUID();
+    const profileImageId = crypto.randomUUID();
     const token = "export-session-token";
 
     await env.DB.batch([
@@ -36,7 +41,7 @@ describe("account export streaming", () => {
          (id, username, display_name, bio, role, status, avatar_seed,
           terms_version, terms_accepted_at, created_at, updated_at)
          VALUES (?, 'exporter', 'Exporter', '', 'user', 'active', ?,
-          '2026-07-13', ?, ?, ?)`,
+          '2026-07-14', ?, ?, ?)`,
       ).bind(userId, userId, now, now, now),
       env.DB.prepare(
         `INSERT INTO external_identities
@@ -85,7 +90,12 @@ describe("account export streaming", () => {
 
     const imageKey = `private/creations/${creationId}/showcase/${imageId}/display.webp`;
     const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    const profileImageKey = `private/users/${userId}/avatar/${profileImageId}/avatar.webp`;
+    const profileImageBytes = new Uint8Array([5, 6, 7, 8]);
     await env.PROJECTS.put(imageKey, imageBytes, {
+      httpMetadata: { contentType: "image/webp" },
+    });
+    await env.PROJECTS.put(profileImageKey, profileImageBytes, {
       httpMetadata: { contentType: "image/webp" },
     });
     await env.DB.batch([
@@ -112,6 +122,32 @@ describe("account export streaming", () => {
         now,
         now,
       ),
+      env.DB.prepare(
+        `INSERT INTO profile_images
+         (id, user_id, upload_token_hash, expected_content_type,
+          expected_byte_size, focus_x, focus_y, detected_content_type,
+          source_byte_size, source_width, source_height, status, expires_at,
+          created_at, updated_at, ready_at)
+         VALUES (?, ?, NULL, 'image/png', 4, 35, 65, 'image/png', 4, 16, 16,
+          'ready', ?, ?, ?, ?)`,
+      ).bind(profileImageId, userId, now + 60_000, now, now, now),
+      env.DB.prepare(
+        `INSERT INTO profile_image_objects
+         (id, image_id, user_id, object_key, content_type, byte_size, sha256,
+          status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'image/webp', 4, ?, 'ready', ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        profileImageId,
+        userId,
+        profileImageKey,
+        "2".repeat(64),
+        now,
+        now,
+      ),
+      env.DB.prepare(
+        "UPDATE users SET avatar_image_id = ? WHERE id = ?",
+      ).bind(profileImageId, userId),
     ]);
 
     const response = await SELF.fetch(`${ORIGIN}/api/me/export`, {
@@ -167,6 +203,26 @@ describe("account export streaming", () => {
         dataBase64: "AQIDBA==",
         imageId,
         kind: "display",
+        sequence: 0,
+      }),
+    ]);
+    expect(records.filter((record) => record.type === "profile_image")).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          byteSize: 4,
+          contentType: "image/webp",
+          focusX: 35,
+          focusY: 65,
+          id: profileImageId,
+        }),
+      }),
+    ]);
+    expect(
+      records.filter((record) => record.type === "profile_image_object_chunk"),
+    ).toEqual([
+      expect.objectContaining({
+        dataBase64: "BQYHCA==",
+        imageId: profileImageId,
         sequence: 0,
       }),
     ]);

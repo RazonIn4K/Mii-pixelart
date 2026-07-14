@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CanonicalGridDocumentSchema,
   CreateCreationImageUploadSchema,
+  CreateProfileImageUploadSchema,
   GridDocumentV1Schema,
   ProfileUpdateSchema,
   UpdateCreationImagesSchema,
@@ -78,8 +79,12 @@ describe("community helpers", () => {
     expect(ProfileUpdateSchema.parse({ regenerateAvatar: true })).toEqual({
       regenerateAvatar: true,
     });
-    expect(ProfileUpdateSchema.safeParse({ regenerateAvatar: false }).success).toBe(false);
-    expect(ProfileUpdateSchema.safeParse({ avatarSeed: "chosen-by-client" }).success).toBe(false);
+    expect(
+      ProfileUpdateSchema.safeParse({ regenerateAvatar: false }).success,
+    ).toBe(false);
+    expect(
+      ProfileUpdateSchema.safeParse({ avatarSeed: "chosen-by-client" }).success,
+    ).toBe(false);
     expect(ProfileUpdateSchema.safeParse({}).success).toBe(false);
   });
 
@@ -95,23 +100,27 @@ describe("community helpers", () => {
       "image/png",
       "image/webp",
       "image/heic",
-      "image/heif",
     ]) {
-      expect(CreateCreationImageUploadSchema.safeParse({
-        ...valid,
-        contentType,
-      }).success).toBe(true);
+      expect(
+        CreateCreationImageUploadSchema.safeParse({
+          ...valid,
+          contentType,
+        }).success,
+      ).toBe(true);
     }
     for (const contentType of [
       "image/svg+xml",
       "image/gif",
       "image/avif",
       "image/bmp",
+      "image/heif",
     ]) {
-      expect(CreateCreationImageUploadSchema.safeParse({
-        ...valid,
-        contentType,
-      }).success).toBe(false);
+      expect(
+        CreateCreationImageUploadSchema.safeParse({
+          ...valid,
+          contentType,
+        }).success,
+      ).toBe(false);
     }
     expect(
       CreateCreationImageUploadSchema.safeParse({
@@ -125,6 +134,42 @@ describe("community helpers", () => {
         altText: "   ",
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts only bounded raster profile image tickets with integer focal points", () => {
+    const valid = {
+      byteSize: 8 * 1024 * 1024,
+      contentType: "image/png",
+      focusX: 35,
+      focusY: 65,
+    };
+    expect(CreateProfileImageUploadSchema.parse(valid)).toEqual(valid);
+    for (const contentType of [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+    ]) {
+      expect(
+        CreateProfileImageUploadSchema.safeParse({
+          ...valid,
+          contentType,
+        }).success,
+      ).toBe(true);
+    }
+    for (const input of [
+      { ...valid, byteSize: valid.byteSize + 1 },
+      { ...valid, contentType: "image/svg+xml" },
+      { ...valid, contentType: "image/heif" },
+      { ...valid, focusX: -1 },
+      { ...valid, focusY: 101 },
+      { ...valid, focusX: 12.5 },
+      { ...valid, clientFilename: "private-photo.png" },
+    ]) {
+      expect(CreateProfileImageUploadSchema.safeParse(input).success).toBe(
+        false,
+      );
+    }
   });
 
   it("requires a unique ordered showcase list containing its cover", () => {
@@ -153,7 +198,9 @@ describe("community helpers", () => {
   it("normalizes valid usernames and rejects reserved or ambiguous names", () => {
     expect(UsernameSchema.parse("  Pixel-Friend ")).toBe("pixel-friend");
     expect(UsernameSchema.safeParse("admin").success).toBe(false);
-    expect(UsernameSchema.safeParse("affiliate-disclosure").success).toBe(false);
+    expect(UsernameSchema.safeParse("affiliate-disclosure").success).toBe(
+      false,
+    );
     expect(UsernameSchema.safeParse("moderator").success).toBe(false);
     expect(UsernameSchema.safeParse("pixel__friend").success).toBe(false);
     expect(UsernameSchema.safeParse("piñata").success).toBe(false);

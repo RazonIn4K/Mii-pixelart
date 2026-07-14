@@ -17,6 +17,7 @@ import {
 import { registerLegacyRoutes } from "./legacy";
 import { formatRequestLog } from "./logging";
 import { registerModerationRoutes } from "./moderation";
+import { registerProfileImageRoutes } from "./profile-images";
 import { Router } from "./router";
 import { runScheduledMaintenance } from "./scheduled";
 import { registerSocialRoutes } from "./social";
@@ -26,17 +27,16 @@ registerAuthRoutes(router);
 registerAccountRoutes(router);
 registerCreationRoutes(router);
 registerCreationImageRoutes(router);
+registerProfileImageRoutes(router);
 registerDiscoveryRoutes(router);
 registerSocialRoutes(router);
 registerModerationRoutes(router);
 registerLegacyRoutes(router);
 
 const app = new Hono<{ Bindings: Env }>();
-app.all("*", (context) => handleRequest(
-  context.req.raw,
-  context.env,
-  context.executionCtx,
-));
+app.all("*", (context) =>
+  handleRequest(context.req.raw, context.env, context.executionCtx),
+);
 
 const CRAWLER_CONTROL_PATHS = new Set([
   "/robots.txt",
@@ -71,20 +71,30 @@ async function handleRequest(
 
   try {
     if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
-      response = new Response(null, { status: 204, headers: { Allow: "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS" } });
+      response = new Response(null, {
+        status: 204,
+        headers: { Allow: "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS" },
+      });
     } else {
       assertSafeOrigin(context);
       if (url.pathname.startsWith("/api/")) {
         assertCommunityMutationAllowed(context);
-        response = (await router.dispatch(context))
-          ?? failure(requestId, 404, "route_not_found", "API route was not found.");
+        response =
+          (await router.dispatch(context)) ??
+          failure(
+            requestId,
+            404,
+            "route_not_found",
+            "API route was not found.",
+          );
       } else {
         // API route matching decodes parameters. Document routing must stay on
         // the raw URL so malformed public slugs become safe 404/noindex pages
         // and never reach a decoding path that can throw URIError.
-        response = (await crawlerControlAsset(request, env))
-          ?? (await dynamicDocument(context))
-          ?? await assetOrSpa(request, env);
+        response =
+          (await crawlerControlAsset(request, env)) ??
+          (await dynamicDocument(context)) ??
+          (await assetOrSpa(request, env));
       }
     }
   } catch (error) {
@@ -100,12 +110,14 @@ async function handleRequest(
     statusText: response.statusText,
   });
   response = applySecurityHeaders(response, requestId);
-  console.log(formatRequestLog(request, {
-    duration: Date.now() - startedAt,
-    environment: env.ENVIRONMENT,
-    requestId,
-    status: response.status,
-  }));
+  console.log(
+    formatRequestLog(request, {
+      duration: Date.now() - startedAt,
+      environment: env.ENVIRONMENT,
+      requestId,
+      status: response.status,
+    }),
+  );
   return response;
 }
 
@@ -143,10 +155,12 @@ async function assetOrSpa(request: Request, env: Env): Promise<Response> {
   // deployed Static Assets may also expose `/index.html`. Using `/` works in
   // both runtimes and avoids recursively routing through this Worker.
   const indexUrl = new URL("/", request.url);
-  return env.ASSETS.fetch(new Request(indexUrl, {
-    headers: request.headers,
-    method: request.method === "HEAD" ? "HEAD" : "GET",
-  }));
+  return env.ASSETS.fetch(
+    new Request(indexUrl, {
+      headers: request.headers,
+      method: request.method === "HEAD" ? "HEAD" : "GET",
+    }),
+  );
 }
 
 export default {
@@ -154,8 +168,8 @@ export default {
     if (hasMalformedPathEncoding(request)) {
       const pathname = new URL(request.url).pathname;
       if (
-        (request.method === "GET" || request.method === "HEAD")
-        && !pathname.startsWith("/api/")
+        (request.method === "GET" || request.method === "HEAD") &&
+        !pathname.startsWith("/api/")
       ) {
         // Hono decodes route segments before invoking a wildcard handler. Let
         // the raw document renderer produce its safe 404/noindex response for
@@ -183,15 +197,22 @@ function hasMalformedPathEncoding(request: Request): boolean {
 function malformedApiPath(request: Request, env: Env): Promise<Response> {
   const requestId = crypto.randomUUID();
   const url = new URL(request.url);
-  const response = failure(requestId, 400, "invalid_path", "Request path encoding is invalid.");
+  const response = failure(
+    requestId,
+    400,
+    "invalid_path",
+    "Request path encoding is invalid.",
+  );
   response.headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
   applyEnvironmentCrawlerPolicy(response.headers, env);
-  console.log(formatRequestLog(request, {
-    duration: 0,
-    environment: env.ENVIRONMENT,
-    requestId,
-    status: 400,
-  }));
+  console.log(
+    formatRequestLog(request, {
+      duration: 0,
+      environment: env.ENVIRONMENT,
+      requestId,
+      status: 400,
+    }),
+  );
   return Promise.resolve(applySecurityHeaders(response, requestId));
 }
 

@@ -18,9 +18,7 @@ export default function AuthenticatedAccountMenu() {
   const { user, logout } = useAuth();
   if (!user) return null;
 
-  const profileComplete = Boolean(
-    user.username && user.termsAccepted === true,
-  );
+  const profileComplete = Boolean(user.username && user.termsAccepted === true);
   const profilePath = profileComplete
     ? `/u/${encodeURIComponent(user.username!)}`
     : "/me/setup";
@@ -41,7 +39,8 @@ export default function AuthenticatedAccountMenu() {
           <span className="relative">
             <IslandAvatar
               seed={user.avatarSeed}
-              label={`${user.displayName}'s generated avatar`}
+              imageUrl={user.avatarUrl}
+              label={`${user.displayName}'s profile picture`}
               className="h-8 w-8"
             />
             {!profileComplete ? (

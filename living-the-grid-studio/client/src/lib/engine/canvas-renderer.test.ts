@@ -1,15 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createGridDocument } from "./grid";
-import { exportGridAsPng, shouldRenderGridLines } from "./canvas-renderer";
+import {
+  exportGridAsPng,
+  gridStepForDensity,
+  renderGrid,
+  shouldRenderGridLines,
+} from "./canvas-renderer";
 
 function installCanvasDouble() {
   const fillRect = vi.fn();
+  const lineTo = vi.fn();
+  const moveTo = vi.fn();
   const context = {
     beginPath: vi.fn(),
     canvas: { height: 0, width: 0 },
     clearRect: vi.fn(),
     fillRect,
+    lineTo,
+    moveTo,
     restore: vi.fn(),
     save: vi.fn(),
     stroke: vi.fn(),
@@ -24,7 +33,7 @@ function installCanvasDouble() {
   vi.stubGlobal("document", {
     createElement: vi.fn(() => canvas),
   });
-  return { canvas, fillRect };
+  return { canvas, context, fillRect, lineTo, moveTo };
 }
 
 describe("canvas export rendering", () => {
@@ -68,5 +77,33 @@ describe("interactive grid visibility", () => {
     expect(shouldRenderGridLines(true, 2, 1.5)).toBe(false);
     expect(shouldRenderGridLines(true, 4, 1)).toBe(true);
     expect(shouldRenderGridLines(false, 16, 2)).toBe(false);
+  });
+
+  it("maps copy density presets to render-only cell intervals", () => {
+    expect(gridStepForDensity("off")).toBeNull();
+    expect(gridStepForDensity("coarse")).toBe(8);
+    expect(gridStepForDensity("medium")).toBe(4);
+    expect(gridStepForDensity("cell")).toBe(1);
+
+    expect(shouldRenderGridLines(true, 1, 1, 8)).toBe(true);
+    expect(shouldRenderGridLines(true, 1, 1, 4)).toBe(true);
+    expect(shouldRenderGridLines(true, 1, 1, 1)).toBe(false);
+  });
+
+  it("renders interval boundaries without changing the document", () => {
+    const { context, moveTo } = installCanvasDouble();
+    const doc = createGridDocument(10, 9);
+    const before = JSON.stringify(doc);
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 4,
+      gridStep: 4,
+      showGrid: true,
+    });
+
+    expect(moveTo).toHaveBeenCalledTimes(8);
+    expect(moveTo).toHaveBeenCalledWith(40, 0);
+    expect(moveTo).toHaveBeenCalledWith(0, 36);
+    expect(JSON.stringify(doc)).toBe(before);
   });
 });

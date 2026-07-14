@@ -89,6 +89,7 @@ export function CreationCard({
               >
                 <IslandAvatar
                   seed={creation.owner.avatarSeed}
+                  imageUrl={creation.owner.avatarUrl}
                   className="h-6 w-6"
                 />
                 <span className="truncate">

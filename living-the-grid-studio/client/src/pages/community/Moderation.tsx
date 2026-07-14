@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   EyeOff,
   Eye,
+  ImageOff,
   LockKeyhole,
   MessageCircle,
   RotateCcw,
@@ -32,6 +33,7 @@ type TargetAction =
   | "restore_comment"
   | "suspend_user"
   | "restore_user"
+  | "remove_profile_image"
   | "lock_comments"
   | "unlock_comments";
 
@@ -57,6 +59,12 @@ interface ModerationTarget {
   owner?: { displayName: string; id: string; username?: string | null };
   author?: { displayName: string; id: string; username?: string | null };
   creation?: { id: string; slug: string; state: string; title: string };
+  profileImageEvidence?: {
+    capturedAt: number;
+    imageId: string;
+    mediaUrl: string;
+    sha256: string;
+  } | null;
 }
 
 interface ModerationContext {
@@ -65,15 +73,16 @@ interface ModerationContext {
   target: ModerationTarget;
 }
 
-const TARGET_ACTIONS: Record<TargetAction, { path: (id: string) => string; success: string }> = {
-  hide_creation: { path: (id) => `/api/moderation/creations/${id}/hide`, success: "Creation hidden" },
-  restore_creation: { path: (id) => `/api/moderation/creations/${id}/restore`, success: "Creation restored as a private draft" },
-  hide_comment: { path: (id) => `/api/moderation/comments/${id}/hide`, success: "Comment hidden" },
-  restore_comment: { path: (id) => `/api/moderation/comments/${id}/restore`, success: "Comment restored" },
-  suspend_user: { path: (id) => `/api/moderation/users/${id}/suspend`, success: "User suspended and sessions revoked" },
-  restore_user: { path: (id) => `/api/moderation/users/${id}/restore`, success: "User restored" },
-  lock_comments: { path: (id) => `/api/moderation/creations/${id}/lock-comments`, success: "Creation comments locked" },
-  unlock_comments: { path: (id) => `/api/moderation/creations/${id}/unlock-comments`, success: "Creation comments unlocked" },
+const TARGET_ACTIONS: Record<TargetAction, { path: (report: ReportRecord) => string; success: string }> = {
+  hide_creation: { path: (report) => `/api/moderation/creations/${report.targetId}/hide`, success: "Creation hidden" },
+  restore_creation: { path: (report) => `/api/moderation/creations/${report.targetId}/restore`, success: "Creation restored as a private draft" },
+  hide_comment: { path: (report) => `/api/moderation/comments/${report.targetId}/hide`, success: "Comment hidden" },
+  restore_comment: { path: (report) => `/api/moderation/comments/${report.targetId}/restore`, success: "Comment restored" },
+  suspend_user: { path: (report) => `/api/moderation/users/${report.targetId}/suspend`, success: "User suspended and sessions revoked" },
+  restore_user: { path: (report) => `/api/moderation/users/${report.targetId}/restore`, success: "User restored" },
+  remove_profile_image: { path: (report) => `/api/moderation/reports/${report.id}/remove-profile-image`, success: "Reported profile photo removed" },
+  lock_comments: { path: (report) => `/api/moderation/creations/${report.targetId}/lock-comments`, success: "Creation comments locked" },
+  unlock_comments: { path: (report) => `/api/moderation/creations/${report.targetId}/unlock-comments`, success: "Creation comments unlocked" },
 };
 
 export default function Moderation() {
@@ -202,7 +211,7 @@ export default function Moderation() {
     setWorkingId(report.id);
     try {
       const definition = TARGET_ACTIONS[action];
-      await communityApi(definition.path(report.targetId), {
+      await communityApi(definition.path(report), {
         method: "POST",
         body: jsonBody({ action, reason }),
       });
@@ -297,6 +306,22 @@ export default function Moderation() {
                                   <div className="flex gap-2"><Badge variant="outline">{reviewed.target.type}</Badge><Badge variant="secondary">{reviewed.target.state}</Badge></div>
                                 </div>
                                 {reviewed.target.description || reviewed.target.body || reviewed.target.bio ? <p className="mt-3 whitespace-pre-line rounded-xl bg-white p-3 text-sm leading-6">{reviewed.target.description ?? reviewed.target.body ?? reviewed.target.bio}</p> : null}
+                                {reviewed.target.type === "user" && reviewed.target.profileImageEvidence ? (
+                                  <figure className="mt-3 overflow-hidden rounded-xl border border-amber-300 bg-white p-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                      <img
+                                        src={reviewed.target.profileImageEvidence.mediaUrl}
+                                        alt="Report-time profile photo evidence"
+                                        className="h-28 w-28 shrink-0 rounded-xl border border-[var(--island-ink)]/15 object-cover"
+                                      />
+                                      <figcaption className="min-w-0 text-xs leading-5 text-muted-foreground">
+                                        <strong className="block text-sm text-foreground">Private report-time photo</strong>
+                                        Captured {formatCommunityDate(reviewed.target.profileImageEvidence.capturedAt)}. This normalized copy is visible only to moderators and is released after the report is decided.
+                                        <span className="mt-1 block break-all font-mono text-[0.65rem]">SHA-256 {reviewed.target.profileImageEvidence.sha256}</span>
+                                      </figcaption>
+                                    </div>
+                                  </figure>
+                                ) : null}
                                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold text-muted-foreground">
                                   {reviewed.target.visibility ? <span>Visibility: {reviewed.target.visibility}</span> : null}
                                   {reviewed.target.role ? <span>Role: {reviewed.target.role}</span> : null}
@@ -329,7 +354,7 @@ export default function Moderation() {
                                 <Button type="button" variant="outline" disabled={!reason || busy || !reviewed} onClick={() => void decide(report, "resolve_report")}><CheckCircle2 /> Resolve, no removal</Button>
                                 {report.targetType === "creation" ? <><Button type="button" variant="destructive" disabled={!reason || busy || !reviewed} onClick={() => void targetAction(report, "hide_creation", true)}><EyeOff /> Hide & resolve</Button><Button type="button" variant="outline" disabled={!reason || busy || !reviewed} onClick={() => void targetAction(report, "lock_comments", true)}><LockKeyhole /> Lock comments & resolve</Button></> : null}
                                 {report.targetType === "comment" ? <Button type="button" variant="destructive" disabled={!reason || busy || !reviewed} onClick={() => void targetAction(report, "hide_comment", true)}><EyeOff /> Hide & resolve</Button> : null}
-                                {report.targetType === "user" ? <Button type="button" variant="destructive" disabled={!reason || busy || !reviewed} onClick={() => void targetAction(report, "suspend_user", true)}><UserRoundX /> Suspend & resolve</Button> : null}
+                                {report.targetType === "user" ? <><Button type="button" variant="destructive" disabled={!reason || busy || !reviewed || !reviewed.target.profileImageEvidence} onClick={() => void targetAction(report, "remove_profile_image", true)}><ImageOff /> Remove reported photo & resolve</Button><Button type="button" variant="destructive" disabled={!reason || busy || !reviewed} onClick={() => void targetAction(report, "suspend_user", true)}><UserRoundX /> Suspend & resolve</Button></> : null}
                               </>
                             ) : (
                               <>

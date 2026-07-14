@@ -1,6 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const requestId = "browser-test-request";
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lceV8QAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 function user(overrides: Record<string, unknown> = {}) {
   return {
@@ -9,11 +13,11 @@ function user(overrides: Record<string, unknown> = {}) {
     createdAt: 1_700_000_000_000,
     displayName: "Test Islander",
     id: "00000000-0000-4000-8000-000000000001",
-    requiredTermsVersion: "2026-07-13",
+    requiredTermsVersion: "2026-07-14",
     role: "user",
     status: "active",
     termsAccepted: true,
-    termsVersion: "2026-07-13",
+    termsVersion: "2026-07-14",
     username: "test-islander",
     ...overrides,
   };
@@ -128,6 +132,28 @@ test("authenticated header lazy-loads the complete account menu", async ({
     name: /Test Islander/i,
   });
   await expect(accountTrigger).toBeVisible();
+  const compactAvatar = accountTrigger.getByRole("img", {
+    name: "Test Islander's profile picture",
+  });
+  await expect(compactAvatar).toBeVisible();
+  const avatarBoxes = await compactAvatar.evaluate((element) => {
+    const host = element.getBoundingClientRect();
+    const graphic = element.querySelector("svg, img")?.getBoundingClientRect();
+    return graphic
+      ? {
+          graphicHeight: graphic.height,
+          graphicWidth: graphic.width,
+          hostHeight: host.height,
+          hostWidth: host.width,
+        }
+      : null;
+  });
+  expect(avatarBoxes).toEqual({
+    graphicHeight: 32,
+    graphicWidth: 32,
+    hostHeight: 32,
+    hostWidth: 32,
+  });
   await accountTrigger.click();
 
   await expect(page.getByRole("menuitem", { name: /Profile/i })).toBeVisible();
@@ -197,7 +223,7 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
     bio: "Tiny portraits and paint guides.",
     confirmsAge13OrOlder: true,
     displayName: "Tiny Islander",
-    termsVersion: "2026-07-13",
+    termsVersion: "2026-07-14",
     username: "tiny-islander",
   });
 });
@@ -252,7 +278,7 @@ test("onboarding can regenerate its avatar without losing unsaved identity field
   await page.getByLabel("Display name").fill("Unsaved Islander");
   await page.getByLabel("Bio (optional)").fill("This draft must stay here.");
   const avatar = page.getByRole("img", {
-    name: "Your generated Island Workshop avatar",
+    name: "Your profile picture",
   });
   const originalAvatar = await avatar.innerHTML();
   await page.getByRole("button", { name: "Try another avatar" }).click();
@@ -437,7 +463,7 @@ test("settings regenerates an avatar and exposes recoverable session loading", a
   await page.getByLabel("Display name").fill("Unsaved Settings Name");
   await page.getByLabel("Bio").fill("Unsaved settings bio.");
   const avatar = page.getByRole("img", {
-    name: "Your generated Island Workshop avatar",
+    name: "Your profile picture",
   });
   const originalAvatar = await avatar.innerHTML();
   await page.getByRole("button", { name: "Try another avatar" }).click();
@@ -449,6 +475,121 @@ test("settings regenerates an avatar and exposes recoverable session loading", a
   await expect.poll(() => avatar.innerHTML()).not.toBe(originalAvatar);
 });
 
+test("settings uploads, displays, and removes an optional profile photo", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared profile-image ticket and fallback UI.",
+  );
+
+  const userId = "00000000-0000-4000-8000-000000000001";
+  const imageId = "00000000-0000-4000-8000-000000000077";
+  const avatarUrl = `/api/users/${userId}/avatar/${imageId}`;
+  const account = user({ avatarUrl: null, id: userId });
+  let ticketInput: Record<string, unknown> | null = null;
+  let rawUpload: {
+    authorization?: string;
+    byteSize: number;
+    cookie?: string;
+    contentType?: string;
+  } | null = null;
+  let removeRequested = false;
+
+  await mockSession(page, account);
+  await page.route("**/api/me/sessions", (route) =>
+    fulfillJson(route, { data: [], requestId }),
+  );
+  await page.route("**/api/me/avatar/uploads", async (route) => {
+    ticketInput = route.request().postDataJSON() as Record<string, unknown>;
+    await fulfillJson(
+      route,
+      {
+        data: {
+          expiresAt: Date.now() + 600_000,
+          maximumBytes: 8 * 1024 * 1024,
+          uploadId: imageId,
+          uploadToken: "a".repeat(43),
+          uploadUrl: `/api/avatar-uploads/${imageId}/content`,
+        },
+        requestId,
+      },
+      201,
+    );
+  });
+  await page.route(
+    `**/api/avatar-uploads/${imageId}/content`,
+    async (route) => {
+      const headers = route.request().headers();
+      rawUpload = {
+        authorization: headers.authorization,
+        byteSize: route.request().postDataBuffer()?.byteLength ?? 0,
+        cookie: headers.cookie,
+        contentType: headers["content-type"],
+      };
+      await fulfillJson(
+        route,
+        { data: { ...account, avatarUrl }, requestId },
+        201,
+      );
+    },
+  );
+  await page.route(`**${avatarUrl}`, (route) =>
+    route.fulfill({ body: TINY_PNG, contentType: "image/png", status: 200 }),
+  );
+  await page.route("**/api/me/avatar", async (route) => {
+    removeRequested = true;
+    await fulfillJson(route, {
+      data: { ...account, avatarUrl: null },
+      requestId,
+    });
+  });
+
+  await page.goto("/me/settings");
+  const fileInput = page.locator('input[type="file"][accept*="image/heic"]');
+  await fileInput.setInputFiles({
+    buffer: TINY_PNG,
+    mimeType: "image/png",
+    name: "my-profile.png",
+  });
+  await page.getByRole("slider", { name: /Horizontal focus/ }).fill("35");
+  await page.getByRole("slider", { name: /Vertical focus/ }).fill("65");
+  await page.getByRole("button", { name: "Upload photo" }).click();
+
+  await expect(page.getByText("Profile photo updated").first()).toBeVisible();
+  await expect
+    .poll(() => ticketInput)
+    .toEqual({
+      byteSize: TINY_PNG.byteLength,
+      contentType: "image/png",
+      focusX: 35,
+      focusY: 65,
+    });
+  await expect
+    .poll(() => rawUpload)
+    .toEqual({
+      authorization: `Bearer ${"a".repeat(43)}`,
+      byteSize: TINY_PNG.byteLength,
+      cookie: undefined,
+      contentType: "image/png",
+    });
+
+  const profilePicture = page.getByRole("img", {
+    name: "Your profile picture",
+  });
+  await expect(profilePicture.locator("img")).toHaveAttribute("src", avatarUrl);
+  await expect(
+    page.getByRole("button", { name: "Try another avatar" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Use generated avatar" }).click();
+  await expect.poll(() => removeRequested).toBe(true);
+  await expect(
+    page.getByText("Generated avatar restored").first(),
+  ).toBeVisible();
+  await expect(profilePicture.locator("svg")).toHaveCount(1);
+});
+
 test("an existing username reviews newer terms without changing identity", async ({
   page,
 }) => {
@@ -457,7 +598,7 @@ test("an existing username reviews newer terms without changing identity", async
     user({
       displayName: "Returning Islander",
       termsAccepted: accepted,
-      termsVersion: accepted ? "2026-07-13" : "2026-07-10",
+      termsVersion: accepted ? "2026-07-14" : "2026-07-10",
       username: "returning-islander",
     });
   await page.route("**/api/auth/session", (route) =>
@@ -479,7 +620,7 @@ test("an existing username reviews newer terms without changing identity", async
   await page.route("**/api/me/setup", async (route) => {
     const submitted = route.request().postDataJSON() as Record<string, unknown>;
     expect(submitted.username).toBe("returning-islander");
-    expect(submitted.termsVersion).toBe("2026-07-13");
+    expect(submitted.termsVersion).toBe("2026-07-14");
     accepted = true;
     await fulfillJson(route, { data: returningUser(), requestId });
   });
@@ -1562,15 +1703,11 @@ test("Studio selection controls expose their current state", async ({
   await mockSession(page, null);
   await page.goto("/studio");
 
-  const gridToggle = page.getByRole("button", { name: "Toggle grid lines" });
   const labelToggle = page.getByRole("button", {
     name: "Toggle paint-by-numbers labels",
   });
-  await expect(gridToggle).toHaveAttribute("aria-pressed", "true");
   await expect(labelToggle).toHaveAttribute("aria-pressed", "false");
-  await gridToggle.click();
   await labelToggle.click();
-  await expect(gridToggle).toHaveAttribute("aria-pressed", "false");
   await expect(labelToggle).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: "Start blank" }).click();
@@ -1578,6 +1715,14 @@ test("Studio selection controls expose their current state", async ({
     page.getByText("Created Untitled Canvas", { exact: false }),
   ).toBeHidden();
   await page.getByRole("tab", { name: "Create" }).click();
+  const cellGrid = page.getByRole("button", { name: "Grid density: Cell" });
+  const hiddenGrid = page.getByRole("button", { name: "Grid density: Off" });
+  await expect(cellGrid).toHaveAttribute("aria-pressed", "true");
+  await expect(hiddenGrid).toHaveAttribute("aria-pressed", "false");
+  await hiddenGrid.click();
+  await expect(cellGrid).toHaveAttribute("aria-pressed", "false");
+  await expect(hiddenGrid).toHaveAttribute("aria-pressed", "true");
+
   const inspectTool = page.getByRole("button", { name: "Inspect tool" });
   const pencilTool = page.getByRole("button", { name: "Pencil tool" });
   const eraserTool = page.getByRole("button", { name: "Eraser tool" });
@@ -1868,6 +2013,134 @@ test("moderation actions remain disabled until target context and history are re
   await expect(
     page.getByRole("button", { name: "Hide & resolve" }),
   ).toBeEnabled();
+});
+
+test("moderators can inspect and remove only the report-time profile photo", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the private moderation evidence workflow.",
+  );
+  await mockSession(page, user({ role: "admin", username: "admin-islander" }));
+  const report = {
+    createdAt: 1_700_000_000_000,
+    details: "The public profile photo needs review.",
+    id: "00000000-0000-4000-8000-000000000032",
+    reason: "other",
+    status: "open",
+    targetId: "00000000-0000-4000-8000-000000000033",
+    targetType: "user",
+  };
+  const imageId = "00000000-0000-4000-8000-000000000034";
+  let removalBody: Record<string, unknown> | null = null;
+  let resolutionBody: Record<string, unknown> | null = null;
+
+  await page.route("**/api/moderation/reports?**", (route) =>
+    fulfillJson(route, {
+      data: [report],
+      meta: { nextCursor: null },
+      requestId,
+    }),
+  );
+  await page.route("**/api/moderation/stats", (route) =>
+    fulfillJson(route, {
+      data: {
+        hiddenComments: 0,
+        hiddenCreations: 0,
+        openReports: 1,
+        suspendedUsers: 0,
+      },
+      requestId,
+    }),
+  );
+  await page.route(`**/api/moderation/reports/${report.id}?**`, (route) =>
+    fulfillJson(route, {
+      data: {
+        actions: [],
+        report,
+        target: {
+          bio: "Profile with a reported custom photo.",
+          id: report.targetId,
+          label: "Reported profile owner",
+          profileImageEvidence: {
+            capturedAt: 1_700_000_000_000,
+            imageId,
+            mediaUrl: `/api/moderation/reports/${report.id}/profile-image`,
+            sha256: "a".repeat(64),
+          },
+          role: "user",
+          state: "active",
+          type: "user",
+          username: "reported-owner",
+        },
+      },
+      meta: { hasMore: false, limit: 50, nextCursor: null },
+      requestId,
+    }),
+  );
+  await page.route(
+    `**/api/moderation/reports/${report.id}/profile-image`,
+    (route) =>
+      route.fulfill({
+        body: TINY_PNG,
+        contentType: "image/png",
+        headers: { "Cache-Control": "private, no-store" },
+        status: 200,
+      }),
+  );
+  await page.route(
+    `**/api/moderation/reports/${report.id}/remove-profile-image`,
+    async (route) => {
+      removalBody = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, {
+        data: {
+          avatarUrl: null,
+          id: report.targetId,
+          removedImageId: imageId,
+          reportId: report.id,
+        },
+        requestId,
+      });
+    },
+  );
+  await page.route(
+    `**/api/moderation/reports/${report.id}/actions`,
+    async (route) => {
+      resolutionBody = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      await fulfillJson(route, {
+        data: { id: report.id, status: "resolved" },
+        requestId,
+      });
+    },
+  );
+
+  await page.goto("/moderation");
+  await page.getByRole("button", { name: "Review target context" }).click();
+  await expect(
+    page.getByRole("img", { name: "Report-time profile photo evidence" }),
+  ).toBeVisible();
+  await expect(page.getByText("Private report-time photo")).toBeVisible();
+  await page
+    .getByLabel("Moderator rationale")
+    .fill("Reviewed the held image and confirmed it violates the guidelines.");
+  await page
+    .getByRole("button", { name: "Remove reported photo & resolve" })
+    .click();
+
+  await expect
+    .poll(() => removalBody)
+    .toMatchObject({
+      action: "remove_profile_image",
+    });
+  await expect
+    .poll(() => resolutionBody)
+    .toMatchObject({
+      action: "resolve_report",
+    });
 });
 
 test("deletion-pending accounts can cancel during the grace period", async ({

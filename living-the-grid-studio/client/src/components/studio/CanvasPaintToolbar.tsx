@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  AlignCenterVertical,
+  Crosshair,
   Eraser,
   FlipHorizontal2,
   MousePointer2,
@@ -24,6 +24,7 @@ import type { PaintTool } from "@/components/studio/CreationPanel";
 import type { GridDocument } from "@/lib/engine/grid";
 import type { BrushSize } from "@/lib/engine/paint-assists";
 import { getPaletteColor, TOMODACHI_PALETTE } from "@/lib/engine/palette";
+import type { GridDensity } from "@/lib/engine/canvas-renderer";
 
 export type { BrushSize } from "@/lib/engine/paint-assists";
 
@@ -51,14 +52,37 @@ const FALLBACK_QUICK_COLORS = [
   "R8C3",
 ] as const;
 
+const GRID_DENSITY_PRESETS: ReadonlyArray<{
+  density: GridDensity;
+  label: string;
+  title: string;
+}> = [
+  { density: "off", label: "Off", title: "Hide copy grid" },
+  { density: "coarse", label: "Coarse", title: "Guide every 8 cells" },
+  { density: "medium", label: "Medium", title: "Guide every 4 cells" },
+  { density: "cell", label: "Cell", title: "Guide every cell" },
+];
+
+// The base palette is modeled as 11 hue families with 7 shades each. Sort by
+// shade first so the popover presents an 11-column by 7-row matrix, followed
+// by the separate saturated color rail.
+const BASE_PALETTE_MATRIX = TOMODACHI_PALETTE.filter(
+  (color) => !color.isSaturated,
+).sort((a, b) => a.col - b.col || a.row - b.row);
+const SATURATED_PALETTE_RAIL = TOMODACHI_PALETTE.filter(
+  (color) => color.isSaturated,
+).sort((a, b) => a.col - b.col);
+
 export function CanvasPaintToolbar({
   activeTool,
   brushSize,
   doc,
+  gridDensity,
   horizontalMirror,
   selectedColorId,
   showCenterGuide,
   onBrushSizeChange,
+  onGridDensityChange,
   onHorizontalMirrorChange,
   onSelectedColorChange,
   onShowCenterGuideChange,
@@ -67,10 +91,12 @@ export function CanvasPaintToolbar({
   activeTool: PaintTool;
   brushSize: BrushSize;
   doc: GridDocument;
+  gridDensity: GridDensity;
   horizontalMirror: boolean;
   selectedColorId: string;
   showCenterGuide: boolean;
   onBrushSizeChange: (size: BrushSize) => void;
+  onGridDensityChange: (density: GridDensity) => void;
   onHorizontalMirrorChange: (enabled: boolean) => void;
   onSelectedColorChange: (colorId: string) => void;
   onShowCenterGuideChange: (enabled: boolean) => void;
@@ -101,6 +127,65 @@ export function CanvasPaintToolbar({
       className="shrink-0 rounded-xl border border-border bg-background/95 p-2 shadow-sm backdrop-blur"
       aria-label="Canvas paint controls"
     >
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 px-1 pb-2">
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-primary">
+            Guided Copy
+          </p>
+          <p className="text-[0.68rem] font-medium text-muted-foreground">
+            View-only guides · coordinates start at 1
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <div
+            className="flex min-w-0 items-center rounded-lg border border-border bg-white p-0.5"
+            role="group"
+            aria-label="Grid density"
+          >
+            {GRID_DENSITY_PRESETS.map(({ density, label, title }) => (
+              <button
+                key={density}
+                type="button"
+                className={`h-9 rounded-md px-2 text-[0.68rem] font-bold transition-colors sm:px-2.5 ${
+                  gridDensity === density
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+                aria-label={`Grid density: ${label}`}
+                aria-pressed={gridDensity === density}
+                title={title}
+                onClick={() => onGridDensityChange(density)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={`inline-flex size-10 items-center justify-center rounded-lg border transition-colors ${
+                  showCenterGuide
+                    ? "border-primary bg-accent text-foreground"
+                    : "border-border bg-white text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+                aria-keyshortcuts="G"
+                aria-label="Show center guides"
+                aria-pressed={showCenterGuide}
+                title="Show horizontal and vertical center guides (G)"
+                onClick={() => onShowCenterGuideChange(!showCenterGuide)}
+              >
+                <Crosshair className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Center crosshair · G</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
       <div className="flex min-w-0 flex-col gap-1.5 pb-1 sm:flex-row sm:items-center">
         <div
           className="flex shrink-0 items-center gap-1"
@@ -164,7 +249,7 @@ export function CanvasPaintToolbar({
           <div
             className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-white p-0.5"
             role="group"
-            aria-label="Face assist"
+            aria-label="Symmetry assist"
           >
             <Tooltip>
               <TooltipTrigger asChild>
@@ -186,29 +271,6 @@ export function CanvasPaintToolbar({
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">Mirror pencil and eraser · M</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={`inline-flex size-11 items-center justify-center rounded-md transition-colors ${
-                    showCenterGuide
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                  aria-keyshortcuts="G"
-                  aria-label="Show center-axis guide"
-                  aria-pressed={showCenterGuide}
-                  title="Show center-axis guide (G)"
-                  onClick={() => onShowCenterGuideChange(!showCenterGuide)}
-                >
-                  <AlignCenterVertical className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">Center-axis guide · G</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -234,7 +296,7 @@ export function CanvasPaintToolbar({
             </PopoverTrigger>
             <PopoverContent
               align="start"
-              className="max-h-[min(60vh,30rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-3"
+              className="max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto p-3"
               aria-label="Complete paint palette"
             >
               <div className="mb-3">
@@ -243,23 +305,66 @@ export function CanvasPaintToolbar({
                   Selecting a color switches back to the pencil when needed.
                 </p>
               </div>
-              <div className="grid grid-cols-7 gap-1.5">
-                {TOMODACHI_PALETTE.map((color) => (
-                  <button
-                    key={color.id}
-                    type="button"
-                    className={`aspect-square min-h-9 rounded-md border ${
-                      selectedColorId === color.id
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-black/15"
-                    }`}
-                    style={{ backgroundColor: color.hex }}
-                    aria-label={`Select ${color.id} ${color.name}`}
-                    aria-pressed={selectedColorId === color.id}
-                    title={`${color.id} · ${color.name}`}
-                    onClick={() => selectColor(color.id)}
-                  />
-                ))}
+              <div className="overflow-x-auto pb-1">
+                <div className="grid min-w-[34rem] grid-cols-[minmax(0,1fr)_auto] gap-3">
+                  <div>
+                    <p className="mb-1.5 text-[0.68rem] font-bold text-muted-foreground">
+                      Working shades · 11 families × 7 shades
+                    </p>
+                    <div
+                      className="grid grid-cols-11 gap-1.5"
+                      role="group"
+                      aria-label="11 by 7 Studio color matrix"
+                      data-testid="studio-palette-matrix"
+                    >
+                      {BASE_PALETTE_MATRIX.map((color) => (
+                        <button
+                          key={color.id}
+                          type="button"
+                          className={`aspect-square min-h-8 rounded-md border ${
+                            selectedColorId === color.id
+                              ? "border-primary ring-2 ring-primary/30"
+                              : "border-black/15"
+                          }`}
+                          style={{ backgroundColor: color.hex }}
+                          aria-label={`Select ${color.id} ${color.name}`}
+                          aria-pressed={selectedColorId === color.id}
+                          title={`${color.id} · ${color.name}`}
+                          onClick={() => selectColor(color.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-l border-border pl-3">
+                    <p className="mb-1.5 text-center text-[0.68rem] font-bold text-muted-foreground">
+                      Vivid
+                    </p>
+                    <div
+                      className="grid grid-cols-1 gap-1.5"
+                      role="group"
+                      aria-label="Saturated color rail"
+                      data-testid="studio-saturated-color-rail"
+                    >
+                      {SATURATED_PALETTE_RAIL.map((color) => (
+                        <button
+                          key={color.id}
+                          type="button"
+                          className={`size-8 rounded-md border ${
+                            selectedColorId === color.id
+                              ? "border-primary ring-2 ring-primary/30"
+                              : "border-black/15"
+                          }`}
+                          style={{ backgroundColor: color.hex }}
+                          aria-label={`Select ${color.id} ${color.name}`}
+                          aria-pressed={selectedColorId === color.id}
+                          title={`${color.id} · ${color.name}`}
+                          onClick={() => selectColor(color.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </PopoverContent>
           </Popover>

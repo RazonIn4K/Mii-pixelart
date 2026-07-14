@@ -2,7 +2,7 @@
 
 **Status:** Product direction for the Studio overhaul
 **Scope:** Local creation, manual reference workflows, AI-assisted editing, and community reuse
-**Last updated:** 2026-07-13
+**Last updated:** 2026-07-14
 
 ## Purpose
 
@@ -232,9 +232,9 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 
 ## Delivery order
 
-1. Consolidate the current Pixel workspace around one authoritative canvas and remove duplicate-grid/input paths.
+1. **Implemented:** consolidate the current Pixel workspace around one authoritative canvas and remove duplicate-grid/input paths.
 2. Add the shared command layer and expand pointer, keyboard, touch, pen, and undo tests.
-3. Ship the new-project chooser, reference dock, prior-work/remix start, and review step.
+3. **In progress:** ship the new-project chooser, browser-local reference dock, prior-work/remix start, and review step. The first slice now includes the persistent read-only reference, four grid-density presets, two-axis center guides, one-based coordinates, and an 11-by-7 shade matrix with a separate vivid rail.
 4. Add Copy Guide v1 for Pixel projects.
 5. Add local Sketch mode and explicit conversion to `GridDocumentV1`.
 6. Add Sketch copy guides and multi-panel project navigation.

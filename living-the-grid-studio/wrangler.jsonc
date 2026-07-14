@@ -46,7 +46,7 @@
     "ENVIRONMENT": "local",
     "PUBLIC_SITE_URL": "http://localhost:3000",
     "GOOGLE_OIDC_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
-    "TERMS_VERSION": "2026-07-13",
+    "TERMS_VERSION": "2026-07-14",
     "COMMUNITY_MUTATIONS_ENABLED": "true",
     "CONSULT_SALES_ENABLED": "false"
   },
@@ -123,7 +123,7 @@
         "ENVIRONMENT": "staging",
         "PUBLIC_SITE_URL": "https://staging.tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://staging.tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-13",
+        "TERMS_VERSION": "2026-07-14",
         "COMMUNITY_MUTATIONS_ENABLED": "true",
         "CONSULT_SALES_ENABLED": "false"
       },
@@ -170,7 +170,7 @@
         "ENVIRONMENT": "production",
         "PUBLIC_SITE_URL": "https://tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-13",
+        "TERMS_VERSION": "2026-07-14",
         "COMMUNITY_MUTATIONS_ENABLED": "false",
         "CONSULT_SALES_ENABLED": "false"
       },

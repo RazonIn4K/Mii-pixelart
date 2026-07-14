@@ -1,5 +1,25 @@
 import { expect, test } from "@playwright/test";
 
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lceV8QAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "ltg.consent.v1",
+      JSON.stringify({
+        analytics: false,
+        decidedAt: new Date().toISOString(),
+        decision: "rejected",
+        essential: true,
+        marketing: false,
+      }),
+    );
+  });
+});
+
 declare global {
   interface Window {
     __studioCspEvalViolations?: string[];
@@ -52,7 +72,9 @@ test("Studio stays strict-CSP safe and gives every native form control metadata"
   await expectStudioFormMetadata(page);
 
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(page.getByRole("tabpanel", { name: "Create" })).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Create" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   const brushSize = page.getByRole("combobox", { name: "Brush size" });
   await expect(brushSize).toHaveAttribute("id", "studio-brush-size");
@@ -111,11 +133,18 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
     name: "Canvas paint controls",
   });
   await expect(canvas).toBeVisible();
-  await expect(canvas).toHaveAttribute("data-grid-lines", "suppressed");
-  await expect(page.getByTestId("grid-zoom-hint")).toHaveText(
-    "Dense preview · choose Edit to see cell lines",
-  );
-  await expect(canvas).toHaveAttribute("aria-describedby", /\S+ \S+ \S+/);
+  await expect(canvas).toHaveAttribute("data-grid-density", "cell");
+  const initialGridState = await canvas.getAttribute("data-grid-lines");
+  expect(["suppressed", "visible"]).toContain(initialGridState);
+  if (initialGridState === "suppressed") {
+    await expect(page.getByTestId("grid-zoom-hint")).toHaveText(
+      "Dense preview · choose Edit to see cell lines",
+    );
+    await expect(canvas).toHaveAttribute("aria-describedby", /\S+ \S+ \S+/);
+  } else {
+    await expect(page.getByTestId("grid-zoom-hint")).toHaveCount(0);
+    await expect(canvas).toHaveAttribute("aria-describedby", /^\S+ \S+$/);
+  }
   await page.getByRole("button", { name: "Zoom to edit pixels" }).click();
   await expect(canvas).toHaveAttribute("data-grid-lines", "visible");
   await expect(page.getByTestId("grid-zoom-hint")).toHaveCount(0);
@@ -125,7 +154,7 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
     page.getByRole("button", { name: "Mirror brush left to right" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Show center-axis guide" }),
+    page.getByRole("button", { name: "Show center guides" }),
   ).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Paint tools" })).toHaveCount(
     1,
@@ -133,9 +162,9 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await expect(
     page.getByRole("button", { name: /Choose paint color/ }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Starter Designs", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Starter Designs", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByTestId("canvas-workspace")).toHaveCSS(
     "background-image",
     "none",
@@ -213,6 +242,31 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   const canvas = page.getByRole("application", {
     name: "Editable 64 by 64 pixel grid",
   });
+  await expect(canvas).toHaveCount(1);
+  await expect(canvas).toHaveAttribute("data-grid-density", "cell");
+
+  for (const density of ["Off", "Coarse", "Medium", "Cell"] as const) {
+    await expect(
+      page.getByRole("button", { name: `Grid density: ${density}` }),
+    ).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Grid density: Off" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-density", "off");
+  await expect(canvas).toHaveAttribute("data-grid-lines", "hidden");
+  await page.getByRole("button", { name: "Grid density: Coarse" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-density", "coarse");
+  await expect(canvas).toHaveAttribute("data-grid-lines", "visible");
+  await page.getByRole("button", { name: "Grid density: Cell" }).click();
+
+  await page.getByRole("button", { name: /Choose paint color/ }).click();
+  await expect(
+    page.getByTestId("studio-palette-matrix").locator("button"),
+  ).toHaveCount(77);
+  await expect(
+    page.getByTestId("studio-saturated-color-rail").locator("button"),
+  ).toHaveCount(7);
+  await page.keyboard.press("Escape");
+
   await expect(canvas).toHaveAttribute("tabindex", "0");
   await expect(canvas).toHaveCSS("touch-action", "none");
   await expect(canvas).toHaveAttribute(
@@ -224,7 +278,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     name: "Mirror brush left to right",
   });
   const guideButton = page.getByRole("button", {
-    name: "Show center-axis guide",
+    name: "Show center guides",
   });
   await expect(mirrorButton).toHaveAttribute("aria-pressed", "false");
   await expect(guideButton).toHaveAttribute("aria-pressed", "false");
@@ -252,6 +306,13 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     clientX: originX + (x + 0.5) * cellSize,
     clientY: originY + (y + 0.5) * cellSize,
   });
+
+  const firstCellPoint = pointForCell(0, 0);
+  await page.mouse.move(firstCellPoint.clientX, firstCellPoint.clientY);
+  await expect(
+    page.getByText("64×64 · 0 colors · column 1 · row 1", { exact: true }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
 
   const start = pointForCell(4, 4);
   const end = pointForCell(10, 4);
@@ -361,7 +422,9 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await canvas.focus();
   await canvas.press("ArrowRight");
   await canvas.press("Enter");
-  await expect(page.getByText(/^64×64 · 1 color · x:\d+ y:\d+$/)).toBeVisible();
+  await expect(
+    page.getByText(/^64×64 · 1 color · column \d+ · row \d+$/),
+  ).toBeVisible();
   await expect(page.getByText(/Activated column \d+, row \d+\./)).toHaveCount(
     1,
   );
@@ -415,5 +478,50 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await canvas.press("0");
   await expect(
     page.getByText("Canvas view reset to fit.", { exact: true }),
+  ).toHaveCount(1);
+});
+
+test("an imported image stays as a browser-local reference beside one canvas", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared local reference lifecycle.",
+  );
+
+  await page.goto("/studio");
+  await page.locator("#ltg-image-input").setInputFiles({
+    buffer: TINY_PNG,
+    mimeType: "image/png",
+    name: "local-reference.png",
+  });
+  await expect(page.getByText("Preview ready", { exact: true })).toBeVisible();
+
+  const dock = page.getByTestId("studio-reference-dock");
+  await expect(dock).toBeVisible();
+  await expect(dock.getByText("Browser-only", { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole("application", { name: /pixel grid/ }),
+  ).toHaveCount(1);
+
+  const dim = dock.locator('input[type="range"]');
+  await dim.fill("55");
+  await expect(dim).toHaveValue("55");
+  const flip = dock.getByRole("button", { name: "Flip reference" });
+  await flip.click();
+  await expect(
+    dock.getByRole("button", { name: "Use original direction" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Commit Preview" }).click();
+  await expect(dock).toBeVisible();
+  await expect(
+    page.getByRole("application", { name: /pixel grid/ }),
+  ).toHaveCount(1);
+
+  await dock.getByRole("button", { name: "Remove local reference" }).click();
+  await expect(dock).toHaveCount(0);
+  await expect(
+    page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);
 });

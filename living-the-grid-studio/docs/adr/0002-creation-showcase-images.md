@@ -29,10 +29,11 @@ private cloud creation during publishing review.
 - The cookie-authenticated JSON route issues a random, one-use upload ticket
   that expires after ten minutes. The browser then sends raw bytes with a
   Bearer ticket, `credentials: omit`, and the exact configured Origin.
-- Accept JPEG, PNG, WebP, HEIC, and HEIF input only. Limit each request to 8
-  MiB, 8192 pixels per side, and 25 megapixels. HEIC/HEIF remains a staging
-  acceptance gate because decoder support must be verified on the bound Images
-  plan.
+- Accept JPEG, PNG, WebP, and HEIC input only. Limit each request to 8 MiB,
+  8192 pixels per side, and 25 megapixels. HEIC remains a staging acceptance
+  gate because decoder support must be verified on the bound Images plan.
+  Generic HEIF is no longer advertised because the provider contract names
+  HEIC specifically.
 - Decode through the Cloudflare Images binding, disable animation, and retain
   only normalized `display.webp`, `thumb.webp`, and `social.jpg` outputs in
   private R2. Never retain raw bytes, EXIF, filenames, embedded profiles,

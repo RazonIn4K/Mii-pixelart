@@ -2,7 +2,8 @@
 
 This document complements
 [`ADR 0001`](adr/0001-workers-community-platform.md) and the
-[`showcase-image decision`](adr/0002-creation-showcase-images.md), plus the
+[`showcase-image decision`](adr/0002-creation-showcase-images.md), the
+[`profile-image decision`](adr/0004-optional-profile-images.md), plus the
 [`threat model`](community-threat-model.md). D1 is authoritative for identity,
 ownership, visibility, and object manifests. R2 never decides access.
 
@@ -25,7 +26,7 @@ flowchart LR
   Worker <-->|"authorization code OIDC"| Google
   Worker <-->|"binding"| D1
   Worker <-->|"binding"| R2
-  Worker -->|"generated pixels or bounded showcase input"| Images
+  Worker -->|"generated pixels or bounded showcase/profile input"| Images
   Images -->|"transcoded bytes"| Worker
   Worker <-->|"binding"| KV
   Scheduler --> D1
@@ -160,6 +161,40 @@ image-only post. Public, unlisted, and private reads always derive access from
 the parent creation in D1. A failed Images/R2/D1 step cleans generated objects
 without changing the current project revision.
 
+## Optional profile-image flow
+
+```mermaid
+sequenceDiagram
+  participant B as Onboarded browser
+  participant W as Worker
+  participant D as D1
+  participant X as Images
+  participant R as Private R2
+
+  B->>W: POST profile-image ticket JSON with cookie
+  W->>W: Authenticate, exact Origin, limits and rate controls
+  W->>D: Reserve quota; store hash of ten-minute one-use ticket
+  W-->>B: Bearer ticket + same-origin upload URL
+  B->>W: PUT raw bytes (credentials omit, Bearer ticket)
+  W->>D: Atomically consume ticket
+  W->>X: Decode, inspect, fixed square crop; animation disabled
+  X-->>W: 256 by 256 WebP
+  W->>R: PUT generated-key normalized object
+  W->>D: Atomically commit manifest and current account pointer
+  W-->>B: Updated account with versioned avatar URL
+  Note over W,R: Raw bytes, filename, metadata, and Google photo are not retained
+```
+
+The generated avatar remains the permanent fallback. Removing a custom image
+clears the D1 pointer before asynchronous object cleanup, while replacement
+uses a compare-and-swap pointer guard so an older upload cannot overwrite a
+newer choice. Public media reads authorize from the active account and its
+current image ID, never from URL opacity or the R2 key. Previously onboarded
+active profiles continue serving their current image across a Terms-version
+change; current Terms acceptance remains a separate mutation requirement.
+Replacing an image reserves its full output size because the prior R2 object
+remains physical until deletion succeeds.
+
 ## Reports, moderation, and deletion
 
 ```mermaid
@@ -173,14 +208,30 @@ sequenceDiagram
 
   U->>W: POST /api/reports
   W->>D: Enforce daily limit + one open duplicate
+  D-->>D: For a user target, snapshot exact current image manifest in same transaction
   M->>W: Review queue and submit reasoned action
+  W->>D: Read held image evidence by report ID
+  W->>R: Stream report-time WebP privately with no-store
+  M->>W: POST report-scoped remove-profile-image with reason
+  W->>D: Require live pointer equals report evidence image
+  alt Reported image is still live
+    W->>D: Clear pointer + append report-linked remove_profile_image action
+  else Owner already replaced it
+    W-->>M: 409; newer image remains untouched
+  end
+  Note over D,R: Open/reviewing report keeps removed bytes private and undeletable
   W->>D: Role check + state mutation + append audit action
+  M->>W: Resolve or dismiss report
+  W->>D: Release evidence hold
+  C->>R: Delete released object; one item failure does not stop later cleanup
   C->>D: Purge resolved free text after 90 days
 
   U->>W: DELETE /api/me with fresh session
   W->>D: deletion_pending, private visibility, revoke all sessions
   Note over U,D: Seven-day cancellation window
   C->>D: Select due account and manifested object keys
+  C->>D: Atomically claim deletion_pending to deleted
+  Note over C,D: Cancellation that wins before claim prevents all R2 work
   C->>R: Delete every manifested object idempotently
   C->>D: Delete user; cascade owned/social content
   C->>D: Retain only pseudonymized moderation metadata until two years
@@ -197,11 +248,20 @@ sequenceDiagram
   order, cover, ticket state, and lifecycle state. `creation_showcase_objects`
   records each generated variant key, hash, content type, and byte size. Raw
   source objects do not exist.
-- A user may own at most 100 creations and 50 MiB across all manifested cloud
-  objects; a single canonical project JSON is at most 2 MiB.
+- `profile_images` records one-use ticket and normalized lifecycle data;
+  `profile_image_objects` records the single generated WebP key, hash, content
+  type, and size. Only one ready profile image may exist per account, and the
+  `users.avatar_image_id` pointer must reference that account's ready row.
+- `profile_image_report_evidence` immutably maps a user report to the exact
+  normalized image manifest visible at report time. Open/reviewing reports
+  block object deletion; resolution releases the hold, and final account
+  erasure explicitly removes it.
+- A user may own at most 100 creations and 50 MiB across all physically present
+  manifested cloud objects. Profile-image rows in `deleting` state still count
+  until R2 confirms deletion. A single canonical project JSON is at most 2 MiB.
 - The Worker streams account NDJSON export records and never buffers the full
   account quota.
 - Generated avatars derive from `avatar_seed` and the original Island Workshop
-  palette. Profile-image uploads remain unsupported. Optional showcase images
-  are explicit attachments to an existing cloud creation, not avatar or
-  general-purpose file uploads.
+  palette. An owner may explicitly replace that visual with one normalized
+  profile image and return to the generated fallback at any time. Profile and
+  showcase images are separate bounded paths, not general-purpose file uploads.

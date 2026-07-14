@@ -38,6 +38,7 @@ const ROUTE_SOURCE_FILES = [
   "worker/accounts.ts",
   "worker/creations.ts",
   "worker/creation-images.ts",
+  "worker/profile-images.ts",
   "worker/discovery.ts",
   "worker/social.ts",
   "worker/moderation.ts",

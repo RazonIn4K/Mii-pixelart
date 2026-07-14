@@ -22,6 +22,11 @@ export const COMMUNITY_LIMITS = {
   gridDocumentBytes: 2 * 1024 * 1024,
   pageSizeDefault: 24,
   pageSizeMaximum: 50,
+  profileImageDimensionMaximum: 8_192,
+  profileImageInputBytes: 8 * 1024 * 1024,
+  profileImageMaximumPixels: 25_000_000,
+  profileImageOutputBytes: 2 * 1024 * 1024,
+  profileImageUploadsPerDay: 10,
   reportDetailsCharacters: 2_000,
   tagsPerCreation: 5,
   usernameMaximum: 24,
@@ -69,7 +74,8 @@ const RESERVED_USERNAME_SET = new Set<string>(RESERVED_USERNAMES);
 const PALETTE_ID_PATTERN = /^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$/;
 const USERNAME_PATTERN =
   /^[a-z0-9](?:[a-z0-9]|[-_](?=[a-z0-9])){1,22}[a-z0-9]$/;
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const CONTROL_CHARACTER_PATTERN =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 export const PaletteColorIdSchema = z
   .string()
@@ -161,13 +167,15 @@ export const CreationObjectKindSchema = z.enum([
   "thumb",
   "social",
 ]);
-export const CreationImageContentTypeSchema = z.enum([
+export const COMMUNITY_IMAGE_CONTENT_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/heic",
-  "image/heif",
-]);
+] as const;
+export const CreationImageContentTypeSchema = z.enum(
+  COMMUNITY_IMAGE_CONTENT_TYPES,
+);
 export const CommentStatusSchema = z.enum(["active", "hidden", "deleted"]);
 export const ReportReasonSchema = z.enum([
   "spam",
@@ -184,11 +192,7 @@ export const ReportStatusSchema = z.enum([
   "resolved",
   "dismissed",
 ]);
-export const ReportTargetTypeSchema = z.enum([
-  "creation",
-  "comment",
-  "user",
-]);
+export const ReportTargetTypeSchema = z.enum(["creation", "comment", "user"]);
 export const ModerationActionSchema = z.enum([
   "hide_creation",
   "restore_creation",
@@ -196,6 +200,7 @@ export const ModerationActionSchema = z.enum([
   "restore_comment",
   "suspend_user",
   "restore_user",
+  "remove_profile_image",
   "lock_comments",
   "unlock_comments",
   "resolve_report",
@@ -216,11 +221,13 @@ const SourcePaletteMappingSchema = z
   .object({
     sourceIndex: z.number().int().min(0).max(255),
     sourceHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
-    sourceRgb: z.tuple([
-      z.number().int().min(0).max(255),
-      z.number().int().min(0).max(255),
-      z.number().int().min(0).max(255),
-    ]).optional(),
+    sourceRgb: z
+      .tuple([
+        z.number().int().min(0).max(255),
+        z.number().int().min(0).max(255),
+        z.number().int().min(0).max(255),
+      ])
+      .optional(),
     sourcePress: z
       .object({
         h: z.number().finite(),
@@ -248,10 +255,7 @@ const GridMetaV1Schema = z
       .array(SourcePaletteMappingSchema)
       .max(84)
       .optional(),
-    importWarnings: z
-      .array(normalizedPlainText(500, 1))
-      .max(32)
-      .optional(),
+    importWarnings: z.array(normalizedPlainText(500, 1)).max(32).optional(),
     notes: normalizedPlainText(5_000).optional(),
   })
   .strict();
@@ -463,7 +467,9 @@ export type CanonicalGridDocument = z.output<
   typeof CanonicalGridDocumentSchema
 >;
 
-export function canonicalizeGridDocument(input: unknown): CanonicalGridDocument {
+export function canonicalizeGridDocument(
+  input: unknown,
+): CanonicalGridDocument {
   return CanonicalGridDocumentSchema.parse(input);
 }
 
@@ -528,6 +534,19 @@ export const CreateCreationImageUploadSchema = z
       .max(COMMUNITY_LIMITS.creationImageInputBytes),
     contentType: CreationImageContentTypeSchema,
     replaceImageId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const CreateProfileImageUploadSchema = z
+  .object({
+    byteSize: z
+      .number()
+      .int()
+      .min(1)
+      .max(COMMUNITY_LIMITS.profileImageInputBytes),
+    contentType: CreationImageContentTypeSchema,
+    focusX: z.number().int().min(0).max(100),
+    focusY: z.number().int().min(0).max(100),
   })
   .strict();
 

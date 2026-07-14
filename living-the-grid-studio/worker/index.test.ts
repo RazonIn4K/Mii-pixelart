@@ -369,7 +369,7 @@ describe("community Worker integration", () => {
         acceptsTerms: true,
         confirmsAge13OrOlder: true,
         displayName: "New Islander",
-        termsVersion: "2026-07-13",
+        termsVersion: "2026-07-14",
         username: "taken-name",
       }),
       headers,
@@ -393,7 +393,7 @@ describe("community Worker integration", () => {
         bio: "Building tiny island portraits.",
         confirmsAge13OrOlder: true,
         displayName: "Atomic Islander",
-        termsVersion: "2026-07-13",
+        termsVersion: "2026-07-14",
         username: "atomic-islander",
       }),
       headers,
@@ -403,7 +403,7 @@ describe("community Worker integration", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         bio: "Building tiny island portraits.",
-        termsVersion: "2026-07-13",
+        termsVersion: "2026-07-14",
         username: "atomic-islander",
       },
     });
@@ -411,7 +411,7 @@ describe("community Worker integration", () => {
       "SELECT username, bio, terms_version FROM users WHERE id = ?",
     ).bind(newcomer.id).first()).resolves.toMatchObject({
       bio: "Building tiny island portraits.",
-      terms_version: "2026-07-13",
+      terms_version: "2026-07-14",
       username: "atomic-islander",
     });
   });
@@ -446,7 +446,7 @@ describe("community Worker integration", () => {
     expect(regeneratedBody.data).toMatchObject({
       bio: "Keep this profile text.",
       displayName: "Avatar Owner",
-      requiredTermsVersion: "2026-07-13",
+      requiredTermsVersion: "2026-07-14",
       termsAccepted: true,
     });
     expect(regeneratedBody.data.avatarSeed).toMatch(
@@ -502,7 +502,7 @@ describe("community Worker integration", () => {
         acceptsTerms: true,
         confirmsAge13OrOlder: true,
         displayName: "Returning Islander",
-        termsVersion: "2026-07-13",
+        termsVersion: "2026-07-14",
         username: "different-islander",
       }),
       headers,
@@ -516,7 +516,7 @@ describe("community Worker integration", () => {
         bio: "Still making tiny portraits.",
         confirmsAge13OrOlder: true,
         displayName: "Returning Islander",
-        termsVersion: "2026-07-13",
+        termsVersion: "2026-07-14",
         username: "returning-islander",
       }),
       headers,
@@ -528,7 +528,7 @@ describe("community Worker integration", () => {
         .bind(returning.id)
         .first(),
     ).resolves.toMatchObject({
-      terms_version: "2026-07-13",
+      terms_version: "2026-07-14",
       username: "returning-islander",
     });
   });
@@ -1426,7 +1426,7 @@ async function seedUser(
     `INSERT INTO users
      (id, username, display_name, bio, role, status, avatar_seed,
       terms_version, terms_accepted_at, created_at, updated_at)
-     VALUES (?, ?, ?, '', ?, 'active', ?, '2026-07-13', ?, ?, ?)`,
+     VALUES (?, ?, ?, '', ?, 'active', ?, '2026-07-14', ?, ?, ?)`,
   ).bind(id, username, username, role, id, now, now, now).run();
   await env.DB.prepare(
     `INSERT INTO external_identities

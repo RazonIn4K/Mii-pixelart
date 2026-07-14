@@ -2,6 +2,7 @@ import { ModerationDecisionSchema, decodeCursor, encodeCursor, type ModerationAc
 import { requireModerator } from "./auth";
 import { pseudonymize } from "./crypto";
 import { HttpError, normalizeLimit, parseJson, success, type WorkerRequestContext } from "./http";
+import { deleteProfileImageObjects } from "./profile-images";
 import type { Router } from "./router";
 
 interface ModerationReportRow {
@@ -24,6 +25,8 @@ export function registerModerationRoutes(router: Router): void {
     .add("GET", "/api/moderation/stats", moderationStats)
     .add("GET", "/api/moderation/reports", listReports)
     .add("GET", "/api/moderation/reports/:id", getReport)
+    .add("GET", "/api/moderation/reports/:id/profile-image", getReportedProfileImage)
+    .add("POST", "/api/moderation/reports/:id/remove-profile-image", removeReportedProfileImage)
     .add("POST", "/api/moderation/reports/:id/actions", decideReport)
     .add("POST", "/api/moderation/users/:id/suspend", suspendUser)
     .add("POST", "/api/moderation/users/:id/restore", restoreUser)
@@ -83,7 +86,12 @@ async function getReport(context: WorkerRequestContext): Promise<Response> {
         targetType: action.target_type,
       })),
       report: reportToApi(report),
-      target: await reportTargetSummary(context.env, report.target_type, report.target_id),
+      target: await reportTargetSummary(
+        context.env,
+        report.id,
+        report.target_type,
+        report.target_id,
+      ),
     },
     200,
     {
@@ -165,6 +173,7 @@ function reportToApi(row: ModerationReportRow) {
 
 async function reportTargetSummary(
   env: Env,
+  reportId: string,
   targetType: ModerationReportRow["target_type"],
   targetId: string,
 ): Promise<Record<string, unknown>> {
@@ -269,22 +278,73 @@ async function reportTargetSummary(
       status: string;
       username: string | null;
     }>();
-  return row
-    ? {
+  if (!row) return unavailableTarget(targetType, targetId);
+  const evidence = await env.DB.prepare(
+    `SELECT image_id, sha256, created_at
+     FROM profile_image_report_evidence WHERE report_id = ? LIMIT 1`,
+  )
+    .bind(reportId)
+    .first<{ created_at: number; image_id: string; sha256: string }>();
+  return {
         bio: row.bio,
         createdAt: row.created_at,
         id: row.id,
         label: row.display_name,
+        profileImageEvidence: evidence
+          ? {
+              capturedAt: evidence.created_at,
+              imageId: evidence.image_id,
+              mediaUrl: `/api/moderation/reports/${reportId}/profile-image`,
+              sha256: evidence.sha256,
+            }
+          : null,
         role: row.role,
         state: row.status,
         type: "user",
         username: row.username,
-      }
-    : unavailableTarget(targetType, targetId);
+      };
 }
 
 function unavailableTarget(type: string, id: string): Record<string, unknown> {
   return { id, label: "Target unavailable", state: "unavailable", type };
+}
+
+async function getReportedProfileImage(
+  context: WorkerRequestContext,
+): Promise<Response> {
+  await requireModerator(context);
+  const evidence = await context.env.DB.prepare(
+    `SELECT evidence.object_key, evidence.content_type
+     FROM profile_image_report_evidence evidence
+     JOIN reports report ON report.id = evidence.report_id
+     WHERE evidence.report_id = ? AND report.target_type = 'user'
+       AND report.target_id = evidence.user_id
+     LIMIT 1`,
+  )
+    .bind(context.params.id)
+    .first<{ content_type: string; object_key: string }>();
+  if (!evidence) {
+    throw new HttpError(
+      404,
+      "profile_image_evidence_not_found",
+      "Profile image evidence was not found.",
+    );
+  }
+  const object = await context.env.PROJECTS.get(evidence.object_key);
+  if (!object) {
+    throw new HttpError(
+      404,
+      "profile_image_evidence_not_found",
+      "Profile image evidence was not found.",
+    );
+  }
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("Content-Type", "image/webp");
+  headers.set("ETag", object.httpEtag);
+  headers.set("Cache-Control", "private, no-store");
+  headers.set("Content-Disposition", "inline");
+  return new Response(object.body, { headers });
 }
 
 async function decideReport(context: WorkerRequestContext): Promise<Response> {
@@ -332,6 +392,13 @@ async function decideReport(context: WorkerRequestContext): Promise<Response> {
     audit.statement,
   ]);
   assertTransitionAudited(results, reportDecisionConflict());
+  context.executionCtx.waitUntil(
+    cleanupReleasedProfileImageEvidence(context.env, report.id).catch(() => {
+      console.error(
+        JSON.stringify({ message: "profile_image_evidence_cleanup_failed" }),
+      );
+    }),
+  );
   return success(context.requestId, {
     id: report.id,
     resolvedAt: now,
@@ -411,6 +478,161 @@ async function restoreUser(context: WorkerRequestContext): Promise<Response> {
     id: context.params.id,
     status: "active",
   });
+}
+
+async function removeReportedProfileImage(
+  context: WorkerRequestContext,
+): Promise<Response> {
+  const moderator = await requireModerator(context);
+  const target = await context.env.DB.prepare(
+    `SELECT report.id AS report_id, report.status AS report_status,
+      evidence.image_id, evidence.user_id, user.avatar_image_id,
+      user.role, user.status AS account_status
+     FROM reports report
+     JOIN profile_image_report_evidence evidence
+       ON evidence.report_id = report.id
+     JOIN users user
+       ON user.id = evidence.user_id AND user.id = report.target_id
+     WHERE report.id = ? AND report.target_type = 'user'
+     LIMIT 1`,
+  )
+    .bind(context.params.id)
+    .first<{
+      account_status: string;
+      avatar_image_id: string | null;
+      image_id: string;
+      report_id: string;
+      report_status: string;
+      role: "admin" | "moderator" | "user";
+      user_id: string;
+    }>();
+  if (!target) {
+    throw new HttpError(
+      404,
+      "profile_image_evidence_not_found",
+      "Profile image evidence was not found.",
+    );
+  }
+  if (target.report_status !== "open" && target.report_status !== "reviewing") {
+    throw reportDecisionConflict();
+  }
+  if (target.user_id === moderator.user.id) {
+    throw new HttpError(
+      400,
+      "cannot_moderate_self",
+      "Use your account settings to remove your own profile image.",
+    );
+  }
+  if (moderator.role === "moderator" && target.role !== "user") {
+    throw new HttpError(
+      403,
+      "role_hierarchy",
+      "Moderators cannot act on elevated accounts.",
+    );
+  }
+  if (
+    target.account_status !== "active" &&
+    target.account_status !== "suspended"
+  ) {
+    throw new HttpError(
+      409,
+      "invalid_user_state",
+      "User must be active or suspended for this action.",
+    );
+  }
+  if (target.avatar_image_id !== target.image_id) {
+    throw reportedProfileImageChanged();
+  }
+  const input = await exactAction(context, "remove_profile_image");
+  const imageId = target.image_id;
+  const now = Date.now();
+  const audit = await actionStatement(
+    context.env,
+    moderator.user.id,
+    {
+      action: input.action,
+      reason: input.reason,
+      reportId: target.report_id,
+      targetId: target.user_id,
+      targetType: "user",
+    },
+    now,
+  );
+  const results = await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE profile_images SET status = 'deleting', deleted_at = ?, updated_at = ?
+       WHERE id = ? AND user_id = ? AND status = 'ready'
+         AND EXISTS (
+           SELECT 1
+           FROM users user
+           JOIN profile_image_report_evidence evidence
+             ON evidence.user_id = user.id AND evidence.image_id = ?
+           JOIN reports report ON report.id = evidence.report_id
+           WHERE report.id = ? AND report.status IN ('open', 'reviewing')
+             AND user.id = ? AND user.avatar_image_id = evidence.image_id
+             AND user.status IN ('active', 'suspended')
+         )`,
+    ).bind(
+      now,
+      now,
+      imageId,
+      target.user_id,
+      imageId,
+      target.report_id,
+      target.user_id,
+    ),
+    audit.statement,
+    context.env.DB.prepare(
+      `UPDATE profile_image_objects SET status = 'deleting', updated_at = ?
+       WHERE image_id = ? AND user_id = ? AND status = 'ready'
+         AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, imageId, target.user_id, audit.id),
+    context.env.DB.prepare(
+      `UPDATE users SET avatar_image_id = NULL, updated_at = ?
+       WHERE id = ? AND avatar_image_id = ?
+         AND EXISTS (SELECT 1 FROM moderation_actions WHERE id = ?)`,
+    ).bind(now, target.user_id, imageId, audit.id),
+  ]);
+  assertTransitionAudited(results, reportedProfileImageChanged());
+  if (
+    (results[2]?.meta.changes ?? 0) !== 1 ||
+    (results[3]?.meta.changes ?? 0) !== 1
+  ) {
+    throw new Error("Profile image moderation transition invariant failed.");
+  }
+  context.executionCtx.waitUntil(
+    deleteProfileImageObjects(context.env, target.user_id, imageId).catch(() => {
+      console.error(
+        JSON.stringify({ message: "moderated_profile_image_cleanup_failed" }),
+      );
+    }),
+  );
+  return success(context.requestId, {
+    avatarUrl: null,
+    id: target.user_id,
+    reportId: target.report_id,
+    removedImageId: imageId,
+  });
+}
+
+async function cleanupReleasedProfileImageEvidence(
+  env: Env,
+  reportId: string,
+): Promise<void> {
+  const image = await env.DB.prepare(
+    `SELECT evidence.image_id, evidence.user_id
+     FROM profile_image_report_evidence evidence
+     JOIN profile_images image ON image.id = evidence.image_id
+     JOIN reports report ON report.id = evidence.report_id
+     WHERE evidence.report_id = ? AND image.status = 'deleting'
+       AND report.status IN ('resolved', 'dismissed')
+     LIMIT 1`,
+  )
+    .bind(reportId)
+    .first<{ image_id: string; user_id: string }>();
+  if (image) {
+    await deleteProfileImageObjects(env, image.user_id, image.image_id);
+  }
 }
 
 async function hideCreation(context: WorkerRequestContext): Promise<Response> {
@@ -678,6 +900,14 @@ function reportDecisionConflict(): HttpError {
 
 function userStateConflict(expected: "active" | "suspended"): HttpError {
   return new HttpError(409, "invalid_user_state", `User must be ${expected} for this action.`);
+}
+
+function reportedProfileImageChanged(): HttpError {
+  return new HttpError(
+    409,
+    "reported_profile_image_changed",
+    "The reported profile image is no longer the user's current image.",
+  );
 }
 
 function creationStateConflict(expected: "hidden" | "published"): HttpError {

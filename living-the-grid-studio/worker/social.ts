@@ -5,12 +5,9 @@ import {
   decodeCursor,
   encodeCursor,
 } from "../shared/community";
-import {
-  enforceRateLimit,
-  requireOnboardedSession,
-} from "./auth";
+import { enforceRateLimit, requireOnboardedSession } from "./auth";
 import { pseudonymize } from "./crypto";
-import { getCreationById } from "./db";
+import { getCreationById, profileAvatarUrl } from "./db";
 import {
   HttpError,
   normalizeLimit,
@@ -22,6 +19,7 @@ import type { Router } from "./router";
 
 interface CommentRow {
   author_user_id: string;
+  avatar_image_id: string | null;
   avatar_seed: string;
   body: string;
   creation_id: string;
@@ -51,28 +49,38 @@ async function likeCreation(context: WorkerRequestContext): Promise<Response> {
   await requirePublishedCreation(context);
   const result = await context.env.DB.prepare(
     "INSERT OR IGNORE INTO likes (user_id, creation_id, created_at) VALUES (?, ?, ?)",
-  ).bind(session.user.id, context.params.id, Date.now()).run();
+  )
+    .bind(session.user.id, context.params.id, Date.now())
+    .run();
   const changed = (result.meta.changes ?? 0) === 1;
   if (changed) {
     await context.env.DB.prepare(
       "UPDATE creation_stats SET like_count = like_count + 1, updated_at = ? WHERE creation_id = ?",
-    ).bind(Date.now(), context.params.id).run();
+    )
+      .bind(Date.now(), context.params.id)
+      .run();
   }
   return success(context.requestId, { changed, liked: true });
 }
 
-async function unlikeCreation(context: WorkerRequestContext): Promise<Response> {
+async function unlikeCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   await enforceRateLimit(context.env.SOCIAL_RATE_LIMITER, session.user.id);
   const result = await context.env.DB.prepare(
     "DELETE FROM likes WHERE user_id = ? AND creation_id = ?",
-  ).bind(session.user.id, context.params.id).run();
+  )
+    .bind(session.user.id, context.params.id)
+    .run();
   const changed = (result.meta.changes ?? 0) === 1;
   if (changed) {
     await context.env.DB.prepare(
       `UPDATE creation_stats SET like_count = MAX(0, like_count - 1), updated_at = ?
        WHERE creation_id = ?`,
-    ).bind(Date.now(), context.params.id).run();
+    )
+      .bind(Date.now(), context.params.id)
+      .run();
   }
   return success(context.requestId, { changed, liked: false });
 }
@@ -89,20 +97,23 @@ async function listComments(context: WorkerRequestContext): Promise<Response> {
   values.push(limit + 1);
   const rows = await context.env.DB.prepare(
     `SELECT c.id, c.creation_id, c.author_user_id, c.body, c.status, c.created_at, c.updated_at,
-      u.username, u.display_name, u.avatar_seed
+      u.username, u.display_name, u.avatar_seed, u.avatar_image_id
      FROM comments c JOIN users u ON u.id = c.author_user_id
      WHERE c.creation_id = ? AND c.status = 'active' AND u.status = 'active' ${cursorClause}
      ORDER BY c.created_at ASC, c.id ASC LIMIT ?`,
-  ).bind(...values).all<CommentRow>();
+  )
+    .bind(...values)
+    .all<CommentRow>();
   const hasMore = rows.results.length > limit;
   const page = rows.results.slice(0, limit);
   const last = page.at(-1);
   return success(context.requestId, page.map(commentToApi), 200, {
     hasMore,
     limit,
-    nextCursor: hasMore && last
-      ? encodeCursor({ id: last.id, sortValue: last.created_at })
-      : null,
+    nextCursor:
+      hasMore && last
+        ? encodeCursor({ id: last.id, sortValue: last.created_at })
+        : null,
   });
 }
 
@@ -111,10 +122,18 @@ async function createComment(context: WorkerRequestContext): Promise<Response> {
   await enforceRateLimit(context.env.COMMENT_RATE_LIMITER, session.user.id);
   const creation = await requirePublishedCreation(context);
   if (creation.comments_locked) {
-    throw new HttpError(409, "comments_locked", "A moderator locked comments for this creation.");
+    throw new HttpError(
+      409,
+      "comments_locked",
+      "A moderator locked comments for this creation.",
+    );
   }
   if (!creation.comments_enabled) {
-    throw new HttpError(409, "comments_disabled", "Comments are disabled for this creation.");
+    throw new HttpError(
+      409,
+      "comments_disabled",
+      "Comments are disabled for this creation.",
+    );
   }
   const input = await parseJson(context.request, CommentCreateSchema, 10_000);
   const id = crypto.randomUUID();
@@ -142,12 +161,21 @@ async function updateComment(context: WorkerRequestContext): Promise<Response> {
     throw new HttpError(404, "comment_not_found", "Comment was not found.");
   }
   if (existing.author_user_id !== session.user.id) {
-    throw new HttpError(403, "comment_forbidden", "You cannot edit this comment.");
+    throw new HttpError(
+      403,
+      "comment_forbidden",
+      "You cannot edit this comment.",
+    );
   }
   await context.env.DB.prepare(
     "UPDATE comments SET body = ?, updated_at = ? WHERE id = ? AND status = 'active'",
-  ).bind(input.body, Date.now(), existing.id).run();
-  return success(context.requestId, commentToApi((await loadComment(context.env, existing.id))!));
+  )
+    .bind(input.body, Date.now(), existing.id)
+    .run();
+  return success(
+    context.requestId,
+    commentToApi((await loadComment(context.env, existing.id))!),
+  );
 }
 
 async function deleteComment(context: WorkerRequestContext): Promise<Response> {
@@ -155,17 +183,23 @@ async function deleteComment(context: WorkerRequestContext): Promise<Response> {
   await enforceRateLimit(context.env.COMMENT_RATE_LIMITER, session.user.id);
   const existing = await context.env.DB.prepare(
     "SELECT id, creation_id, author_user_id, status FROM comments WHERE id = ?",
-  ).bind(context.params.id).first<{
-    author_user_id: string;
-    creation_id: string;
-    id: string;
-    status: string;
-  }>();
+  )
+    .bind(context.params.id)
+    .first<{
+      author_user_id: string;
+      creation_id: string;
+      id: string;
+      status: string;
+    }>();
   if (!existing || existing.status !== "active") {
     throw new HttpError(404, "comment_not_found", "Comment was not found.");
   }
   if (existing.author_user_id !== session.user.id) {
-    throw new HttpError(403, "comment_forbidden", "You cannot delete this comment.");
+    throw new HttpError(
+      403,
+      "comment_forbidden",
+      "You cannot delete this comment.",
+    );
   }
   const now = Date.now();
   await context.env.DB.batch([
@@ -183,36 +217,66 @@ async function deleteComment(context: WorkerRequestContext): Promise<Response> {
 async function createReport(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const input = await parseJson(context.request, ReportCreateSchema, 15_000);
-  if (!(await reportTargetExists(context.env, input.targetType, input.targetId))) {
-    throw new HttpError(404, "report_target_not_found", "Report target was not found.");
+  if (
+    !(await reportTargetExists(context.env, input.targetType, input.targetId))
+  ) {
+    throw new HttpError(
+      404,
+      "report_target_not_found",
+      "Report target was not found.",
+    );
   }
   const now = Date.now();
   const id = crypto.randomUUID();
-  const reporterPseudonym = (await pseudonymize(
-    context.env,
-    "reporter",
-    session.user.id,
-  )).slice(0, 24);
+  const reporterPseudonym = (
+    await pseudonymize(context.env, "reporter", session.user.id)
+  ).slice(0, 24);
   try {
-    await context.env.DB.prepare(
-      `INSERT INTO reports
-       (id, reporter_user_id, reporter_pseudonym, target_type, target_id, reason,
-        details, status, created_at, updated_at, retain_until)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
-    ).bind(
-      id,
-      session.user.id,
-      reporterPseudonym,
-      input.targetType,
-      input.targetId,
-      input.reason,
-      input.details,
-      now,
-      now,
-      now + 2 * 365 * 24 * 60 * 60 * 1_000,
-    ).run();
+    const statements: D1PreparedStatement[] = [
+      context.env.DB.prepare(
+        `INSERT INTO reports
+         (id, reporter_user_id, reporter_pseudonym, target_type, target_id, reason,
+          details, status, created_at, updated_at, retain_until)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
+      ).bind(
+        id,
+        session.user.id,
+        reporterPseudonym,
+        input.targetType,
+        input.targetId,
+        input.reason,
+        input.details,
+        now,
+        now,
+        now + 2 * 365 * 24 * 60 * 60 * 1_000,
+      ),
+    ];
+    if (input.targetType === "user") {
+      // Capture the exact normalized profile image shown when the report was
+      // filed. The evidence hold is immutable and survives owner replacement
+      // or moderator removal until the report is decided.
+      statements.push(
+        context.env.DB.prepare(
+          `INSERT INTO profile_image_report_evidence
+           (report_id, image_id, user_id, object_key, content_type, byte_size,
+            sha256, created_at)
+           SELECT ?, pi.id, u.id, pio.object_key, pio.content_type,
+            pio.byte_size, pio.sha256, ?
+           FROM users u
+           JOIN profile_images pi ON pi.id = u.avatar_image_id
+           JOIN profile_image_objects pio ON pio.image_id = pi.id
+           WHERE u.id = ? AND pi.user_id = u.id AND pi.status = 'ready'
+             AND pio.user_id = u.id AND pio.status = 'ready'
+           LIMIT 1`,
+        ).bind(id, now, input.targetId),
+      );
+    }
+    await context.env.DB.batch(statements);
   } catch (error) {
-    if (error instanceof Error && /report_daily_quota_exceeded/iu.test(error.message)) {
+    if (
+      error instanceof Error &&
+      /report_daily_quota_exceeded/iu.test(error.message)
+    ) {
       throw new HttpError(
         429,
         "report_rate_limited",
@@ -223,27 +287,39 @@ async function createReport(context: WorkerRequestContext): Promise<Response> {
       );
     }
     if (error instanceof Error && /unique constraint/iu.test(error.message)) {
-      throw new HttpError(409, "duplicate_report", "You already have an open report for this item.");
+      throw new HttpError(
+        409,
+        "duplicate_report",
+        "You already have an open report for this item.",
+      );
     }
     throw error;
   }
-  return success(context.requestId, {
-    createdAt: now,
-    details: input.details,
-    id,
-    reason: input.reason,
-    resolutionNote: null,
-    resolvedAt: null,
-    status: "open",
-    targetId: input.targetId,
-    targetType: input.targetType,
-    updatedAt: now,
-  }, 201);
+  return success(
+    context.requestId,
+    {
+      createdAt: now,
+      details: input.details,
+      id,
+      reason: input.reason,
+      resolutionNote: null,
+      resolvedAt: null,
+      status: "open",
+      targetId: input.targetId,
+      targetType: input.targetType,
+      updatedAt: now,
+    },
+    201,
+  );
 }
 
 async function requirePublishedCreation(context: WorkerRequestContext) {
   const creation = await getCreationById(context.env, context.params.id);
-  if (!creation || creation.state !== "published" || creation.visibility === "private") {
+  if (
+    !creation ||
+    creation.state !== "published" ||
+    creation.visibility === "private"
+  ) {
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
   return creation;
@@ -252,15 +328,18 @@ async function requirePublishedCreation(context: WorkerRequestContext) {
 async function loadComment(env: Env, id: string): Promise<CommentRow | null> {
   return env.DB.prepare(
     `SELECT c.id, c.creation_id, c.author_user_id, c.body, c.status, c.created_at, c.updated_at,
-      u.username, u.display_name, u.avatar_seed
+      u.username, u.display_name, u.avatar_seed, u.avatar_image_id
      FROM comments c JOIN users u ON u.id = c.author_user_id WHERE c.id = ? LIMIT 1`,
-  ).bind(id).first<CommentRow>();
+  )
+    .bind(id)
+    .first<CommentRow>();
 }
 
 function commentToApi(row: CommentRow) {
   return {
     author: {
       avatarSeed: row.avatar_seed,
+      avatarUrl: profileAvatarUrl(row.author_user_id, row.avatar_image_id),
       displayName: row.display_name,
       id: row.author_user_id,
       username: row.username,
@@ -280,18 +359,25 @@ async function reportTargetExists(
   id: string,
 ): Promise<boolean> {
   const queries = {
-    comment: "SELECT 1 AS found FROM comments WHERE id = ? AND status = 'active'",
-    creation: "SELECT 1 AS found FROM creations WHERE id = ? AND state = 'published'",
+    comment:
+      "SELECT 1 AS found FROM comments WHERE id = ? AND status = 'active'",
+    creation:
+      "SELECT 1 AS found FROM creations WHERE id = ? AND state = 'published'",
     user: "SELECT 1 AS found FROM users WHERE id = ? AND status != 'deleted'",
   } as const;
-  return Boolean(await env.DB.prepare(queries[type]).bind(id).first<{ found: number }>());
+  return Boolean(
+    await env.DB.prepare(queries[type]).bind(id).first<{ found: number }>(),
+  );
 }
 
-function parseCommentCursor(value: string | null): { id: string; sortValue: number } | null {
+function parseCommentCursor(
+  value: string | null,
+): { id: string; sortValue: number } | null {
   if (!value) return null;
   try {
     const cursor = decodeCursor(value);
-    if (typeof cursor.sortValue !== "number") throw new Error("Invalid comment cursor");
+    if (typeof cursor.sortValue !== "number")
+      throw new Error("Invalid comment cursor");
     return { id: cursor.id, sortValue: cursor.sortValue };
   } catch {
     throw new HttpError(400, "invalid_cursor", "Pagination cursor is invalid.");

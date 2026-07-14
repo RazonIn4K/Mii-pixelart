@@ -7,12 +7,17 @@ import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Privacy() {
   useDocumentTitle("Privacy");
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Privacy", href: "/privacy" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Privacy", href: "/privacy" },
+    ]),
+  ]);
 
   return (
     <LegalLayout
       title="Privacy Policy"
-      lastUpdated="July 13, 2026"
+      lastUpdated="July 14, 2026"
       intro="Tomodachi is a local-first pixel-art workshop with an optional account and community layer. Local editing and export do not require an account; cloud saving and publishing are deliberate choices."
     >
       <h2>1. Who we are</h2>
@@ -20,8 +25,7 @@ export default function Privacy() {
         David Ortiz operates Tomodachi (&quot;we,&quot; &quot;us,&quot;
         &quot;our&quot;) and the websites at <code>tomodachi.pw</code> and{" "}
         <code>tomodachi.brave</code> (collectively, the &quot;Site&quot;). You
-        can reach us by email at{" "}
-        <code>privacy@tomodachi.pw</code>.
+        can reach us by email at <code>privacy@tomodachi.pw</code>.
       </p>
 
       <h2>2. What we collect</h2>
@@ -35,22 +39,20 @@ export default function Privacy() {
           access, refresh, or ID tokens after account provisioning.
         </li>
         <li>
-          Your username, display name, bio, private cloud projects, publication
-          choices, optional showcase images and their descriptions, comments,
-          likes, follows, and reports.
+          Your username, display name, bio, optional profile image, private
+          cloud projects, publication choices, optional showcase images and
+          their descriptions, comments, likes, follows, and reports.
         </li>
         <li>
-          Text prompts and grid JSON you deliberately send through an AI
-          feature transit our Worker to OpenRouter and the selected model
-          provider. They are not treated as community projects unless you
-          separately choose to save the resulting project.
+          Text prompts and grid JSON you deliberately send through an AI feature
+          transit our Worker to OpenRouter and the selected model provider. They
+          are not treated as community projects unless you separately choose to
+          save the resulting project.
         </li>
+        <li>Newsletter email address, if you choose to subscribe.</li>
         <li>
-          Newsletter email address, if you choose to subscribe.
-        </li>
-        <li>
-          Payment details processed by Stripe. We do not receive your full
-          card number, but we receive transaction records needed to fulfill a
+          Payment details processed by Stripe. We do not receive your full card
+          number, but we receive transaction records needed to fulfill a
           purchase, handle support, and meet tax and accounting obligations.
         </li>
       </ul>
@@ -58,18 +60,18 @@ export default function Privacy() {
       <h3>2.2 Information we collect automatically</h3>
       <ul>
         <li>
-          Approximate location derived from IP at the Cloudflare edge, used
-          only to serve the site from a nearby data center.
+          Approximate location derived from IP at the Cloudflare edge, used only
+          to serve the site from a nearby data center.
         </li>
         <li>
-          Redacted operational metadata: request ID, coarse route group,
-          method, status, duration, and environment. Application logs do not
-          contain raw paths or queries, IP addresses, user identity, cookies,
-          tokens, request bodies, prompts, or project content.
+          Redacted operational metadata: request ID, coarse route group, method,
+          status, duration, and environment. Application logs do not contain raw
+          paths or queries, IP addresses, user identity, cookies, tokens,
+          request bodies, prompts, or project content.
         </li>
         <li>
-          Aggregate usage events from privacy-respecting analytics, but only
-          if you have consented via the cookie banner.
+          Aggregate usage events from privacy-respecting analytics, but only if
+          you have consented via the cookie banner.
         </li>
       </ul>
 
@@ -78,10 +80,12 @@ export default function Privacy() {
         <li>
           Source images used for imports stay in your browser and are not sent
           to Tomodachi or included in cloud saves automatically. If you
-          separately choose a photo or screenshot as a showcase image, we
-          remove its filename and metadata, retain only optimized WebP/JPEG
-          variants, and associate them with that cloud creation. Profile-image
-          uploads are not supported.
+          separately choose a photo or screenshot as a showcase image, we remove
+          its filename and metadata, retain only optimized WebP/JPEG variants,
+          and associate them with that cloud creation. If you separately choose
+          a profile image in Settings, we retain one normalized square WebP and
+          use it wherever your public identity is shown. We never copy your
+          Google profile photo automatically.
         </li>
         <li>
           Tomodachi never receives your password, its hash, or its prefix. The
@@ -89,19 +93,15 @@ export default function Privacy() {
           sends only the first five hash characters directly from your browser
           to the haveibeenpwned API.
         </li>
-        <li>
-          We do not sell personal information.
-        </li>
+        <li>We do not sell personal information.</li>
       </ul>
 
       <h2>3. Why we use your data</h2>
-      <p>
-        Each category of data is processed for a specific purpose:
-      </p>
+      <p>Each category of data is processed for a specific purpose:</p>
       <ul>
         <li>
-          <strong>Operate the Site.</strong> Serving pages, routing AI
-          requests, returning password-breach results, processing payments.
+          <strong>Operate the Site.</strong> Serving pages, routing AI requests,
+          returning password-breach results, processing payments.
         </li>
         <li>
           <strong>Improve the Site.</strong> Diagnosing errors and measuring
@@ -118,14 +118,13 @@ export default function Privacy() {
       </ul>
 
       <h2>4. Service providers</h2>
-      <p>
-        We share the minimum data needed with the following providers:
-      </p>
+      <p>We share the minimum data needed with the following providers:</p>
       <ul>
         <li>
           <strong>Cloudflare</strong> for Workers hosting, DNS/CDN, D1 account
           and community records, private R2 project/media objects, and image
-          transformations for generated previews and optional showcase images.
+          transformations for generated previews and optional profile or
+          showcase images.
         </li>
         <li>
           <strong>Google</strong> for optional OpenID Connect sign-in. We ask
@@ -144,47 +143,48 @@ export default function Privacy() {
           and remittance remain the operator&apos;s responsibility.
         </li>
         <li>
-          <strong>Google AdSense</strong> for advertising, if you have
-          accepted marketing cookies.
+          <strong>Google AdSense</strong> for advertising, if you have accepted
+          marketing cookies.
         </li>
         <li>
-          <strong>haveibeenpwned</strong> for the password-breach prefix
-          lookup. Your browser sends the five-character prefix directly to
+          <strong>haveibeenpwned</strong> for the password-breach prefix lookup.
+          Your browser sends the five-character prefix directly to
           haveibeenpwned; it does not pass through Tomodachi servers.
         </li>
       </ul>
 
       <h2>5. Visibility and retention</h2>
       <p>
-        Cloud saves begin private. Public creations appear in discovery,
-        search, and profiles. Unlisted creations stay out of those surfaces but
-        can be viewed by anyone with the link. Session records expire after 30
-        days. Optional showcase variants follow the visibility and deletion of
-        their parent creation and count toward the account storage quota. Raw
-        image uploads are discarded after transformation. Account deletion
-        hides content and revokes sessions immediately,
-        provides a seven-day cancellation window, and then removes account and
-        project data. Resolved report free-text is purged after 90 days; minimal
-        pseudonymized moderation records are retained for two years and then
-        deleted.
+        Cloud saves begin private. Public creations appear in discovery, search,
+        and profiles. Unlisted creations stay out of those surfaces but can be
+        viewed by anyone with the link. Session records expire after 30 days. An
+        optional profile image is publicly visible with your active profile
+        until you remove or replace it; suspension makes it unavailable.
+        Optional showcase variants follow the visibility and deletion of their
+        parent creation. Normalized profile and showcase images count toward the
+        account storage quota, while raw uploads are discarded after
+        transformation. Account deletion hides content and revokes sessions
+        immediately, provides a seven-day cancellation window, and then removes
+        account and project data. Resolved report free-text is purged after 90
+        days; minimal pseudonymized moderation records are retained for two
+        years and then deleted.
       </p>
 
       <h2>6. Your rights and controls</h2>
       <p>
-        Depending on where you live, you may have the right to access,
-        correct, delete, port, or object to the processing of your personal
-        data. To exercise these rights, contact{" "}
-        <code>privacy@tomodachi.pw</code>. We respond within 30 days. You can
-        also stream an account-data export from Settings, revoke all sessions,
-        delete your account, or withdraw consent by clearing the cookie banner
-        choices in your browser&apos;s site data.
+        Depending on where you live, you may have the right to access, correct,
+        delete, port, or object to the processing of your personal data. To
+        exercise these rights, contact <code>privacy@tomodachi.pw</code>. We
+        respond within 30 days. You can also stream an account-data export from
+        Settings, revoke all sessions, delete your account, or withdraw consent
+        by clearing the cookie banner choices in your browser&apos;s site data.
       </p>
 
       <h2>7. Children</h2>
       <p>
-        The Site is not directed to children under 13 (or the equivalent
-        minimum age in your jurisdiction). We do not knowingly collect
-        personal information from children.
+        The Site is not directed to children under 13 (or the equivalent minimum
+        age in your jurisdiction). We do not knowingly collect personal
+        information from children.
       </p>
 
       <h2>8. Changes</h2>

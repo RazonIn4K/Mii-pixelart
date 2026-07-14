@@ -1,4 +1,5 @@
 export interface CreationRow {
+  avatar_image_id: string | null;
   avatar_seed: string;
   bytes_total: number;
   comment_count: number;
@@ -27,6 +28,7 @@ export interface CreationRow {
 }
 
 export interface PublicUserRow {
+  avatar_image_id: string | null;
   avatar_seed: string;
   bio: string;
   created_at: number;
@@ -55,7 +57,7 @@ export const CREATION_SELECT = `
   SELECT c.id, c.owner_user_id, c.slug, c.title, c.description, c.state,
     c.visibility, c.comments_enabled, c.comments_locked, c.project_download_enabled,
     c.current_revision_id, c.bytes_total, c.published_at, c.created_at,
-    c.updated_at, u.username, u.display_name, u.avatar_seed,
+    c.updated_at, u.username, u.display_name, u.avatar_seed, u.avatar_image_id,
     COALESCE(cs.like_count, 0) AS like_count,
     COALESCE(cs.comment_count, 0) AS comment_count,
     COALESCE(cs.popularity_score, 0) AS popularity_score,
@@ -105,12 +107,14 @@ export function creationToApi(row: CreationRow) {
     mediaSource: cover ? "showcase" : "generated",
     owner: {
       avatarSeed: row.avatar_seed,
+      avatarUrl: profileAvatarUrl(row.owner_user_id, row.avatar_image_id),
       displayName: row.display_name,
       id: row.owner_user_id,
       username: row.username,
     },
     publishedAt: row.published_at,
-    primaryImageUrl: cover?.displayUrl ?? `/api/creations/${row.id}/media/preview`,
+    primaryImageUrl:
+      cover?.displayUrl ?? `/api/creations/${row.id}/media/preview`,
     revision: row.revision_number,
     slug: row.slug,
     state: row.state,
@@ -136,48 +140,54 @@ export function showcaseImagesToApi(
       if (!entry || typeof entry !== "object") return [];
       const image = entry as Record<string, unknown>;
       if (
-        typeof image.id !== "string"
-        || typeof image.altText !== "string"
-        || !Number.isInteger(image.sortOrder)
-        || typeof image.isCover !== "number"
-        || !Number.isInteger(image.width)
-        || !Number.isInteger(image.height)
-        || !Number.isInteger(image.createdAt)
-        || !Number.isInteger(image.updatedAt)
-      ) return [];
+        typeof image.id !== "string" ||
+        typeof image.altText !== "string" ||
+        !Number.isInteger(image.sortOrder) ||
+        typeof image.isCover !== "number" ||
+        !Number.isInteger(image.width) ||
+        !Number.isInteger(image.height) ||
+        !Number.isInteger(image.createdAt) ||
+        !Number.isInteger(image.updatedAt)
+      )
+        return [];
       const encodedCreationId = encodeURIComponent(creationId);
       const encodedImageId = encodeURIComponent(image.id);
       const prefix = `/api/creations/${encodedCreationId}/images/${encodedImageId}`;
-      return [{
-        altText: image.altText,
-        createdAt: Number(image.createdAt),
-        displayUrl: `${prefix}/display`,
-        height: Number(image.height),
-        id: image.id,
-        isCover: Boolean(image.isCover),
-        socialImageUrl: `${prefix}/social`,
-        sortOrder: Number(image.sortOrder),
-        thumbnailUrl: `${prefix}/thumb`,
-        updatedAt: Number(image.updatedAt),
-        width: Number(image.width),
-      }];
+      return [
+        {
+          altText: image.altText,
+          createdAt: Number(image.createdAt),
+          displayUrl: `${prefix}/display`,
+          height: Number(image.height),
+          id: image.id,
+          isCover: Boolean(image.isCover),
+          socialImageUrl: `${prefix}/social`,
+          sortOrder: Number(image.sortOrder),
+          thumbnailUrl: `${prefix}/thumb`,
+          updatedAt: Number(image.updatedAt),
+          width: Number(image.width),
+        },
+      ];
     });
   } catch {
     return [];
   }
 }
 
-function parseTags(value: string): { description: string; name: string; slug: string }[] {
+function parseTags(
+  value: string,
+): { description: string; name: string; slug: string }[] {
   try {
     const parsed = JSON.parse(value) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((tag): tag is { description: string; name: string; slug: string } => (
-      Boolean(tag)
-      && typeof tag === "object"
-      && typeof (tag as Record<string, unknown>).description === "string"
-      && typeof (tag as Record<string, unknown>).name === "string"
-      && typeof (tag as Record<string, unknown>).slug === "string"
-    ));
+    return parsed.filter(
+      (tag): tag is { description: string; name: string; slug: string } =>
+        Boolean(tag) &&
+        typeof tag === "object" &&
+        typeof (tag as Record<string, unknown>).description === "string" &&
+        typeof (tag as Record<string, unknown>).name === "string" &&
+        typeof (tag as Record<string, unknown>).slug === "string",
+    );
   } catch {
     return [];
   }
@@ -186,6 +196,7 @@ function parseTags(value: string): { description: string; name: string; slug: st
 export function publicUserToApi(row: PublicUserRow) {
   return {
     avatarSeed: row.avatar_seed,
+    avatarUrl: profileAvatarUrl(row.id, row.avatar_image_id),
     bio: row.bio,
     createdAt: row.created_at,
     displayName: row.display_name,
@@ -196,8 +207,18 @@ export function publicUserToApi(row: PublicUserRow) {
   };
 }
 
+export function profileAvatarUrl(
+  userId: string,
+  imageId: string | null | undefined,
+): string | null {
+  if (!imageId) return null;
+  return `/api/users/${encodeURIComponent(userId)}/avatar/${encodeURIComponent(imageId)}`;
+}
+
 export function isUniqueConstraint(error: unknown): boolean {
-  return error instanceof Error && /unique constraint failed/iu.test(error.message);
+  return (
+    error instanceof Error && /unique constraint failed/iu.test(error.message)
+  );
 }
 
 export async function getCreationById(

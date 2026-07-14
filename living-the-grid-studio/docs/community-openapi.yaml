@@ -58,12 +58,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GoogleAuthStartInput'
+              $ref: "#/components/schemas/GoogleAuthStartInput"
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/GoogleAuthStartInput'
+              $ref: "#/components/schemas/GoogleAuthStartInput"
       responses:
-        '200':
+        "200":
           description: Authorization URL created
           headers:
             Set-Cookie:
@@ -71,18 +71,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthStartEnvelope'
-        '303':
+                $ref: "#/components/schemas/AuthStartEnvelope"
+        "303":
           description: Form navigation redirected to Google authorization
           headers:
             Location:
               required: true
-              schema: { type: string, format: uri, pattern: '^https://accounts\.google\.com/' }
+              schema:
+                {
+                  type: string,
+                  format: uri,
+                  pattern: '^https://accounts\.google\.com/',
+                }
             Set-Cookie:
               schema: { type: string }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /api/auth/google/callback:
     get:
@@ -102,16 +107,16 @@ paths:
           in: query
           schema: { type: string, maxLength: 200 }
       responses:
-        '303':
+        "303":
           description: Session created and browser returned to a validated relative path, or a safe auth error path
           headers:
             Location:
               required: true
-              schema: { type: string, pattern: '^/(?!/)' }
+              schema: { type: string, pattern: "^/(?!/)" }
             Set-Cookie:
               schema: { type: string }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /api/auth/session:
     get:
@@ -120,12 +125,12 @@ paths:
       summary: Return the current user/session or null
       security: []
       responses:
-        '200':
+        "200":
           description: Current authentication state
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionEnvelope'
+                $ref: "#/components/schemas/SessionEnvelope"
 
   /api/auth/logout:
     post:
@@ -133,14 +138,14 @@ paths:
       tags: [Auth]
       summary: Revoke the current session and clear its cookie
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Current session revoked and cookie cleared
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LogoutEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/LogoutEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
 
   /api/auth/revoke-all:
     post:
@@ -148,14 +153,14 @@ paths:
       tags: [Auth]
       summary: Revoke every session for the current account
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: All account sessions revoked
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SessionRevocationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/SessionRevocationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
 
   /api/me/setup:
     post:
@@ -167,16 +172,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SetupProfileInput'
+              $ref: "#/components/schemas/SetupProfileInput"
       responses:
-        '200':
+        "200":
           description: Setup completed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/me:
     get:
@@ -184,12 +189,12 @@ paths:
       tags: [Account]
       summary: Return private account details
       responses:
-        '200':
+        "200":
           description: Current account
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
     patch:
       operationId: updateCurrentAccount
       tags: [Account]
@@ -198,32 +203,32 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ProfileUpdateInput' }
+            schema: { $ref: "#/components/schemas/ProfileUpdateInput" }
       responses:
-        '200':
+        "200":
           description: Account updated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "429": { $ref: "#/components/responses/RateLimited" }
     delete:
       operationId: requestAccountDeletion
       tags: [Account]
       summary: Hide content, revoke sessions, and start the seven-day deletion grace period
       description: Requires a session authenticated less than 15 minutes ago.
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '202':
+        "202":
           description: Deletion scheduled
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeletionEnvelope'
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                $ref: "#/components/schemas/DeletionEnvelope"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/me/deletion/cancel:
     post:
@@ -231,15 +236,120 @@ paths:
       tags: [Account]
       summary: Cancel pending deletion after fresh Google authentication
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Account restored; prior creations remain private
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/me/avatar/uploads:
+    post:
+      operationId: createProfileImageUpload
+      tags: [Account]
+      summary: Reserve a one-use profile-image upload ticket
+      description: Requires an active onboarded account, exact Origin, and JSON. The returned Bearer token expires after ten minutes and is bound to the declared type, byte length, focal point, owner, and current profile-image pointer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/ProfileImageUploadTicketInput" }
+      responses:
+        "201":
+          description: One-use upload ticket reserved
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/ProfileImageUploadTicketEnvelope",
+                }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/me/avatar:
+    delete:
+      operationId: removeProfileImage
+      tags: [Account]
+      summary: Remove the custom profile image and resume the generated avatar
+      requestBody:
+        $ref: "#/components/requestBodies/EmptyJson"
+      responses:
+        "200":
+          description: Generated avatar restored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/avatar-uploads/{uploadId}/content:
+    put:
+      operationId: uploadProfileImageContent
+      tags: [Account]
+      summary: Consume a one-use ticket and normalize profile-image bytes
+      description: The browser must omit credentials/cookies and present only the upload Bearer token. Exact Origin and Content-Type are required, and the actual bounded byte count must equal the ticket. Raw bytes, filenames, and metadata are discarded; only a fixed 256 by 256 WebP is retained.
+      security:
+        - imageUploadTicket: []
+      parameters:
+        - $ref: "#/components/parameters/UploadId"
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { type: string, contentEncoding: binary }
+          image/png:
+            schema: { type: string, contentEncoding: binary }
+          image/webp:
+            schema: { type: string, contentEncoding: binary }
+          image/heic:
+            schema: { type: string, contentEncoding: binary }
+      responses:
+        "201":
+          description: Profile image decoded, normalized, and committed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "415": { $ref: "#/components/responses/BadRequest" }
+
+  /api/users/{userId}/avatar/{imageId}:
+    get:
+      operationId: getProfileImage
+      tags: [Account]
+      summary: Stream the current normalized image for an active public profile
+      description: A previously onboarded active user's public image remains readable after a Terms version change; current Terms acceptance is still required for authenticated account mutations.
+      security: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: imageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current normalized profile image
+          headers:
+            ETag:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/me/sessions:
     get:
@@ -247,13 +357,13 @@ paths:
       tags: [Account]
       summary: List the account's active sessions
       responses:
-        '200':
+        "200":
           description: Active sessions, newest first
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionsEnvelope'
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+                $ref: "#/components/schemas/SessionsEnvelope"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
 
   /api/me/export:
     get:
@@ -262,16 +372,20 @@ paths:
       summary: Stream the account data export as NDJSON
       description: Requires a session authenticated less than 15 minutes ago. The stream contains a manifest, profile, creations/project documents, comments, likes, follows, and moderation-visible account records.
       responses:
-        '200':
+        "200":
           description: One JSON object per line; never buffered as one account-sized object
           headers:
             Content-Disposition:
-              schema: { type: string, example: 'attachment; filename="tomodachi-export.ndjson"' }
+              schema:
+                {
+                  type: string,
+                  example: 'attachment; filename="tomodachi-export.ndjson"',
+                }
           content:
             application/x-ndjson:
               schema: { type: string }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/creations:
     get:
@@ -285,17 +399,22 @@ paths:
           schema: { type: string, const: me }
         - name: visibility
           in: query
-          schema: { type: string, enum: [all, private, unlisted, public], default: all }
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+          schema:
+            {
+              type: string,
+              enum: [all, private, unlisted, public],
+              default: all,
+            }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200':
+        "200":
           description: Cursor-paginated owned creations in any visibility
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationListEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/CreationListEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
     post:
       operationId: createPrivateCreation
       tags: [Creations]
@@ -305,39 +424,39 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateCreationInput' }
+            schema: { $ref: "#/components/schemas/CreateCreationInput" }
       responses:
-        '201':
+        "201":
           description: Private creation and first ready revision
           headers:
-            ETag: { $ref: '#/components/headers/RevisionEtag' }
+            ETag: { $ref: "#/components/headers/RevisionEtag" }
             Location:
               schema: { type: string }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '413': { $ref: '#/components/responses/PayloadTooLarge' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/creations/{creationId}:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     get:
       operationId: getOwnedCreation
       tags: [Creations]
       summary: Return an owned creation and current canonical project
       responses:
-        '200':
+        "200":
           description: Owned creation
           headers:
-            ETag: { $ref: '#/components/headers/RevisionEtag' }
+            ETag: { $ref: "#/components/headers/RevisionEtag" }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/OwnedCreationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/OwnedCreationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateCreationMetadata
       tags: [Creations]
@@ -346,34 +465,34 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateCreationInput' }
+            schema: { $ref: "#/components/schemas/UpdateCreationInput" }
       responses:
-        '200':
+        "200":
           description: Creation updated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: deleteCreation
       tags: [Creations]
       summary: Delete the creation and schedule all manifested objects for removal
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Creation soft-deleted
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ResourceDeletionEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/ResourceDeletionEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/project:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     put:
       operationId: saveCreationProject
       tags: [Creations]
@@ -381,30 +500,30 @@ paths:
       description: "If-Match is mandatory. It contains the last acknowledged revision ETag."
       x-rate-limit: 30 saves per minute per user
       parameters:
-        - $ref: '#/components/parameters/IfMatch'
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/SaveProjectInput' }
+            schema: { $ref: "#/components/schemas/SaveProjectInput" }
       responses:
-        '200':
+        "200":
           description: Revision saved
           headers:
-            ETag: { $ref: '#/components/headers/RevisionEtag' }
+            ETag: { $ref: "#/components/headers/RevisionEtag" }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
           description: Current revision differs; local content was not overwritten
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/RevisionConflictEnvelope' }
-        '413': { $ref: '#/components/responses/PayloadTooLarge' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/RevisionConflictEnvelope" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
     get:
       operationId: downloadCreationProject
       tags: [Creations]
@@ -414,21 +533,25 @@ paths:
         - cookieAuth: []
         - {}
       responses:
-        '200':
+        "200":
           description: Canonical GridDocument v1
           headers:
-            ETag: { $ref: '#/components/headers/RevisionEtag' }
+            ETag: { $ref: "#/components/headers/RevisionEtag" }
             Content-Disposition:
-              schema: { type: string, example: 'attachment; filename="my-creation.json"' }
+              schema:
+                {
+                  type: string,
+                  example: 'attachment; filename="my-creation.json"',
+                }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/GridDocumentV1' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/GridDocumentV1" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/publish:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     post:
       operationId: publishCreation
       tags: [Creations]
@@ -437,34 +560,34 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/PublishCreationInput' }
+            schema: { $ref: "#/components/schemas/PublishCreationInput" }
       responses:
-        '200':
+        "200":
           description: Published or republished creation
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/unpublish:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     post:
       operationId: unpublishCreation
       tags: [Creations]
       summary: Return a creation to a private draft and remove it from FTS/discovery
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Private draft
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/public/creations/{slug}:
     get:
@@ -473,14 +596,14 @@ paths:
       summary: Return a visible public or unlisted creation
       security: []
       parameters:
-        - $ref: '#/components/parameters/CreationSlug'
+        - $ref: "#/components/parameters/CreationSlug"
       responses:
-        '200':
+        "200":
           description: Published creation
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/slug/{slug}:
     get:
@@ -489,14 +612,14 @@ paths:
       summary: Return a visible public or unlisted creation by its canonical API route
       security: []
       parameters:
-        - $ref: '#/components/parameters/CreationSlug'
+        - $ref: "#/components/parameters/CreationSlug"
       responses:
-        '200':
+        "200":
           description: Published creation
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationEnvelope' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/media/{variant}:
     get:
@@ -508,13 +631,13 @@ paths:
         - cookieAuth: []
         - {}
       parameters:
-        - $ref: '#/components/parameters/CreationId'
+        - $ref: "#/components/parameters/CreationId"
         - name: variant
           in: path
           required: true
           schema: { type: string, enum: [preview, thumb, social, project] }
       responses:
-        '200':
+        "200":
           description: Generated media or canonical project JSON; cache policy depends on visibility and variant
           headers:
             ETag:
@@ -523,16 +646,20 @@ paths:
               schema: { type: string }
             Content-Disposition:
               description: Present for the project variant.
-              schema: { type: string, example: 'attachment; filename="my-creation.json"' }
+              schema:
+                {
+                  type: string,
+                  example: 'attachment; filename="my-creation.json"',
+                }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/GridDocumentV1' }
+              schema: { $ref: "#/components/schemas/GridDocumentV1" }
             image/webp:
               schema: { type: string, contentEncoding: binary }
             image/jpeg:
               schema: { type: string, contentEncoding: binary }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/images/uploads:
     post:
@@ -541,24 +668,25 @@ paths:
       summary: Reserve a one-use showcase-image upload ticket
       description: Requires the creation owner, exact Origin, and JSON. The returned Bearer token expires after ten minutes and is bound to the declared type, byte length, alt text, owner, and creation.
       parameters:
-        - $ref: '#/components/parameters/CreationId'
+        - $ref: "#/components/parameters/CreationId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ShowcaseUploadTicketInput' }
+            schema: { $ref: "#/components/schemas/ShowcaseUploadTicketInput" }
       responses:
-        '201':
+        "201":
           description: One-use upload ticket reserved
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ShowcaseUploadTicketEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '413': { $ref: '#/components/responses/PayloadTooLarge' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema:
+                { $ref: "#/components/schemas/ShowcaseUploadTicketEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/creation-image-uploads/{uploadId}/content:
     put:
@@ -569,7 +697,7 @@ paths:
       security:
         - imageUploadTicket: []
       parameters:
-        - $ref: '#/components/parameters/UploadId'
+        - $ref: "#/components/parameters/UploadId"
       requestBody:
         required: true
         content:
@@ -581,23 +709,22 @@ paths:
             schema: { type: string, contentEncoding: binary }
           image/heic:
             schema: { type: string, contentEncoding: binary }
-          image/heif:
-            schema: { type: string, contentEncoding: binary }
       responses:
-        '201':
+        "201":
           description: Image decoded and normalized variants committed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ShowcaseUploadResultEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '413': { $ref: '#/components/responses/PayloadTooLarge' }
-        '415': { $ref: '#/components/responses/BadRequest' }
+              schema:
+                { $ref: "#/components/schemas/ShowcaseUploadResultEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "415": { $ref: "#/components/responses/BadRequest" }
 
   /api/creations/{creationId}/images:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     get:
       operationId: listCreationShowcaseImages
       tags: [Creations]
@@ -606,12 +733,12 @@ paths:
         - cookieAuth: []
         - {}
       responses:
-        '200':
+        "200":
           description: Ordered showcase gallery
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ShowcaseImageListEnvelope' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/ShowcaseImageListEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateCreationShowcaseImages
       tags: [Creations]
@@ -620,17 +747,18 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ShowcaseGalleryUpdateInput' }
+            schema: { $ref: "#/components/schemas/ShowcaseGalleryUpdateInput" }
       responses:
-        '200':
+        "200":
           description: Updated showcase order and cover
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ShowcaseGalleryMutationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema:
+                { $ref: "#/components/schemas/ShowcaseGalleryMutationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/creations/{creationId}/images/{imageId}:
     delete:
@@ -638,18 +766,19 @@ paths:
       tags: [Creations]
       summary: Delete a normalized showcase image and its generated variants
       parameters:
-        - $ref: '#/components/parameters/CreationId'
-        - $ref: '#/components/parameters/ImageId'
+        - $ref: "#/components/parameters/CreationId"
+        - $ref: "#/components/parameters/ImageId"
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Showcase image deleted
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ShowcaseImageDeletionEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema:
+                { $ref: "#/components/schemas/ShowcaseImageDeletionEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/images/{imageId}/{imageVariant}:
     get:
@@ -660,21 +789,21 @@ paths:
         - cookieAuth: []
         - {}
       parameters:
-        - $ref: '#/components/parameters/CreationId'
-        - $ref: '#/components/parameters/ImageId'
+        - $ref: "#/components/parameters/CreationId"
+        - $ref: "#/components/parameters/ImageId"
         - name: imageVariant
           in: path
           required: true
           schema: { type: string, enum: [display, thumb, social] }
       responses:
-        '200':
+        "200":
           description: Normalized WebP or JPEG variant; cache policy follows the parent creation visibility
           content:
             image/webp:
               schema: { type: string, contentEncoding: binary }
             image/jpeg:
               schema: { type: string, contentEncoding: binary }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/discover/recent:
     get:
@@ -684,11 +813,11 @@ paths:
       security: []
       x-rate-limit: 120 discovery requests per minute per client
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/discover/popular:
     get:
@@ -698,11 +827,11 @@ paths:
       security: []
       x-rate-limit: 120 discovery requests per minute per client
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/discover/random:
     get:
@@ -713,12 +842,12 @@ paths:
       security: []
       x-rate-limit: 120 discovery requests per minute per client
       responses:
-        '200':
+        "200":
           description: A public published creation, or null when none exists
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/RandomCreationEnvelope' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/RandomCreationEnvelope" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/search:
     get:
@@ -734,13 +863,13 @@ paths:
           schema: { type: string, minLength: 1, maxLength: 120 }
         - name: tag
           in: query
-          schema: { $ref: '#/components/schemas/TagSlug' }
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+          schema: { $ref: "#/components/schemas/TagSlug" }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/tags:
     get:
@@ -749,11 +878,11 @@ paths:
       summary: List the governed active taxonomy
       security: []
       responses:
-        '200':
+        "200":
           description: Active tags
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TagsEnvelope' }
+              schema: { $ref: "#/components/schemas/TagsEnvelope" }
 
   /api/tags/{tagSlug}/creations:
     get:
@@ -765,12 +894,12 @@ paths:
         - name: tagSlug
           in: path
           required: true
-          schema: { $ref: '#/components/schemas/TagSlug' }
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+          schema: { $ref: "#/components/schemas/TagSlug" }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/tags/{tagSlug}:
     get:
@@ -782,12 +911,12 @@ paths:
         - name: tagSlug
           in: path
           required: true
-          schema: { $ref: '#/components/schemas/TagSlug' }
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+          schema: { $ref: "#/components/schemas/TagSlug" }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/{username}:
     get:
@@ -796,14 +925,14 @@ paths:
       summary: Return an active public profile and social counts
       security: []
       parameters:
-        - $ref: '#/components/parameters/Username'
+        - $ref: "#/components/parameters/Username"
       responses:
-        '200':
+        "200":
           description: Public profile
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PublicProfileEnvelope' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/PublicProfileEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/{username}/creations:
     get:
@@ -812,61 +941,61 @@ paths:
       summary: List the user's public creations only
       security: []
       parameters:
-        - $ref: '#/components/parameters/Username'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CreationList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/CreationList" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/{username}/follow:
     parameters:
-      - $ref: '#/components/parameters/Username'
+      - $ref: "#/components/parameters/Username"
     put:
       operationId: followUser
       tags: [Social]
       summary: Idempotently follow another active user
       x-rate-limit: 60 social mutations per minute per user
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Follow state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FollowMutationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/FollowMutationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: followUserPostAlias
       tags: [Social]
       summary: Idempotent POST alias used by the browser client to follow another active user
       x-rate-limit: 60 social mutations per minute per user
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Follow state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FollowMutationEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/FollowMutationEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: unfollowUser
       tags: [Social]
       summary: Idempotently remove a follow
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Follow state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FollowMutationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/FollowMutationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
 
   /api/users/{username}/followers:
     get:
@@ -875,12 +1004,12 @@ paths:
       summary: List public followers
       security: []
       parameters:
-        - $ref: '#/components/parameters/Username'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/UserList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/UserList" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/{username}/following:
     get:
@@ -889,74 +1018,74 @@ paths:
       summary: List public followed users
       security: []
       parameters:
-        - $ref: '#/components/parameters/Username'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/UserList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/UserList" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/creations/{creationId}/like:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     put:
       operationId: likeCreation
       tags: [Social]
       summary: Idempotently like a published visible creation
       x-rate-limit: 60 social mutations per minute per user
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Like state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LikeMutationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/LikeMutationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: likeCreationPostAlias
       tags: [Social]
       summary: Idempotent POST alias used by the browser client to like a visible creation
       x-rate-limit: 60 social mutations per minute per user
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Like state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LikeMutationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/LikeMutationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: unlikeCreation
       tags: [Social]
       summary: Idempotently remove a like
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Like state
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LikeMutationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
+              schema: { $ref: "#/components/schemas/LikeMutationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
 
   /api/creations/{creationId}/comments:
     parameters:
-      - $ref: '#/components/parameters/CreationId'
+      - $ref: "#/components/parameters/CreationId"
     get:
       operationId: listComments
       tags: [Social]
       summary: List active comments on a visible published creation
       security: []
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/CommentList' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        "200": { $ref: "#/components/responses/CommentList" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createComment
       tags: [Social]
@@ -966,21 +1095,21 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CommentInput' }
+            schema: { $ref: "#/components/schemas/CommentInput" }
       responses:
-        '201':
+        "201":
           description: Comment created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CommentEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '409': { $ref: '#/components/responses/CommentsDisabled' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/CommentEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/CommentsDisabled" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/comments/{commentId}:
     parameters:
-      - $ref: '#/components/parameters/CommentId'
+      - $ref: "#/components/parameters/CommentId"
     patch:
       operationId: updateComment
       tags: [Social]
@@ -989,51 +1118,51 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CommentInput' }
+            schema: { $ref: "#/components/schemas/CommentInput" }
       responses:
-        '200':
+        "200":
           description: Comment updated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CommentEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/CommentEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: deleteComment
       tags: [Social]
       summary: Soft-delete the current author's comment
       requestBody:
-        $ref: '#/components/requestBodies/EmptyJson'
+        $ref: "#/components/requestBodies/EmptyJson"
       responses:
-        '200':
+        "200":
           description: Comment soft-deleted by its author
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ResourceDeletionEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/ResourceDeletionEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/reports:
     post:
       operationId: createReport
       tags: [Social]
       summary: Report a creation, comment, or user
-      description: Limited to five reports per rolling 24-hour window per user, with one open report per reporter/target.
+      description: Limited to five reports per rolling 24-hour window per user, with one open report per reporter/target. A user report transactionally snapshots the exact current normalized profile image, when present, and holds that private evidence until the report is decided.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ReportInput' }
+            schema: { $ref: "#/components/schemas/ReportInput" }
       responses:
-        '201':
+        "201":
           description: Report accepted
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ReportEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: "#/components/schemas/ReportEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/moderation/reports:
     get:
@@ -1043,13 +1172,13 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { $ref: '#/components/schemas/ReportStatus' }
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+          schema: { $ref: "#/components/schemas/ReportStatus" }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200': { $ref: '#/components/responses/ReportList' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        "200": { $ref: "#/components/responses/ReportList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/moderation/stats:
     get:
@@ -1057,13 +1186,13 @@ paths:
       tags: [Moderation]
       summary: Return aggregate moderator dashboard counts
       responses:
-        '200':
+        "200":
           description: Current open, suspended, and hidden counts
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ModerationStatsEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+              schema: { $ref: "#/components/schemas/ModerationStatsEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/moderation/reports/{reportId}:
     get:
@@ -1071,18 +1200,41 @@ paths:
       tags: [Moderation]
       summary: Return one report and immutable action history
       parameters:
-        - $ref: '#/components/parameters/ReportId'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - $ref: "#/components/parameters/ReportId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
       responses:
-        '200':
+        "200":
           description: Report detail
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ReportDetailEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: "#/components/schemas/ReportDetailEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/moderation/reports/{reportId}/profile-image:
+    get:
+      operationId: getModerationReportProfileImage
+      tags: [Moderation]
+      summary: Stream immutable report-time profile-image evidence
+      description: Moderator-only, private, no-store evidence captured when the user report was created. Owner replacement, removal, or suspension does not change the held bytes.
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      responses:
+        "200":
+          description: Report-time normalized WebP evidence
+          headers:
+            ETag:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: "private, no-store" }
+          content:
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/moderation/reports/{reportId}/actions:
     post:
@@ -1090,23 +1242,23 @@ paths:
       tags: [Moderation]
       summary: Apply a reasoned report resolution/dismissal and optional target action
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        - $ref: "#/components/parameters/ReportId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
       responses:
-        '200':
+        "200":
           description: Report resolved or dismissed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ReportDecisionEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/ReportDecisionEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/moderation/creations/{creationId}/{moderationState}:
     post:
@@ -1115,7 +1267,7 @@ paths:
       summary: Hide or restore a creation, with an immutable audit action
       description: The request action must be `hide_creation` for the hide route and `restore_creation` for the restore route.
       parameters:
-        - $ref: '#/components/parameters/CreationId'
+        - $ref: "#/components/parameters/CreationId"
         - name: moderationState
           in: path
           required: true
@@ -1124,17 +1276,18 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
       responses:
-        '200':
+        "200":
           description: Creation moderation state applied
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CreationModerationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema:
+                { $ref: "#/components/schemas/CreationModerationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/moderation/creations/{creationId}/lock-comments:
     post:
@@ -1142,24 +1295,28 @@ paths:
       tags: [Moderation]
       summary: Lock new comments on a creation, with an immutable audit action
       parameters:
-        - $ref: '#/components/parameters/CreationId'
+        - $ref: "#/components/parameters/CreationId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
-            example: { action: lock_comments, reason: 'Temporarily locked during abuse review.' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
+            example:
+              {
+                action: lock_comments,
+                reason: "Temporarily locked during abuse review.",
+              }
       responses:
-        '200':
+        "200":
           description: Creation comments locked
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CommentLockEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/CommentLockEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/moderation/creations/{creationId}/unlock-comments:
     post:
@@ -1167,24 +1324,28 @@ paths:
       tags: [Moderation]
       summary: Remove a moderator comment lock, with an immutable audit action
       parameters:
-        - $ref: '#/components/parameters/CreationId'
+        - $ref: "#/components/parameters/CreationId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
-            example: { action: unlock_comments, reason: 'Review completed; owner setting applies again.' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
+            example:
+              {
+                action: unlock_comments,
+                reason: "Review completed; owner setting applies again.",
+              }
       responses:
-        '200':
+        "200":
           description: Creation comment lock removed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CommentLockEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/CommentLockEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/moderation/comments/{commentId}/{moderationState}:
     post:
@@ -1193,7 +1354,7 @@ paths:
       summary: Hide or restore a comment, with an immutable audit action
       description: The request action must be `hide_comment` for the hide route and `restore_comment` for the restore route.
       parameters:
-        - $ref: '#/components/parameters/CommentId'
+        - $ref: "#/components/parameters/CommentId"
         - name: moderationState
           in: path
           required: true
@@ -1202,17 +1363,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
       responses:
-        '200':
+        "200":
           description: Comment moderation state applied
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CommentModerationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/CommentModerationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/moderation/users/{userId}/{moderationState}:
     post:
@@ -1221,7 +1382,7 @@ paths:
       summary: Suspend or restore a user, revoke sessions, and append an audit action
       description: The request action must be `suspend_user` for the suspend route and `restore_user` for the restore route.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - $ref: "#/components/parameters/UserId"
         - name: moderationState
           in: path
           required: true
@@ -1230,17 +1391,50 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionInput' }
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
       responses:
-        '200':
+        "200":
           description: User moderation state applied
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserModerationEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema: { $ref: "#/components/schemas/UserModerationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/moderation/reports/{reportId}/remove-profile-image:
+    post:
+      operationId: removeReportedUserProfileImage
+      tags: [Moderation]
+      summary: Remove the still-live profile image captured by a user report
+      description: The request action must be `remove_profile_image`. D1 requires the target's current pointer to equal this report's immutable evidence image; if the owner already replaced it, the route returns 409 and never removes the newer image. The audit action links the report, the public pointer immediately returns to the generated avatar, and the private evidence hold remains until report resolution. Restoring a suspended user never restores the removed image.
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModerationDecisionInput" }
+            example:
+              {
+                action: remove_profile_image,
+                reason: "Removed after profile-image policy review.",
+              }
+      responses:
+        "200":
+          description: Custom profile image removed
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/ProfileImageModerationEnvelope",
+                }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   securitySchemes:
@@ -1289,12 +1483,18 @@ components:
       name: slug
       in: path
       required: true
-      schema: { type: string, minLength: 18, maxLength: 18, pattern: '^[A-Za-z0-9_-]{18}$' }
+      schema:
+        {
+          type: string,
+          minLength: 18,
+          maxLength: 18,
+          pattern: "^[A-Za-z0-9_-]{18}$",
+        }
     Username:
       name: username
       in: path
       required: true
-      schema: { $ref: '#/components/schemas/Username' }
+      schema: { $ref: "#/components/schemas/Username" }
     Cursor:
       name: cursor
       in: query
@@ -1334,69 +1534,69 @@ components:
       description: Cursor-paginated public creations
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/CreationListEnvelope' }
+          schema: { $ref: "#/components/schemas/CreationListEnvelope" }
     CommentList:
       description: Cursor-paginated active comments
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/CommentListEnvelope' }
+          schema: { $ref: "#/components/schemas/CommentListEnvelope" }
     UserList:
       description: Cursor-paginated public users
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/UserListEnvelope' }
+          schema: { $ref: "#/components/schemas/UserListEnvelope" }
     ReportList:
       description: Cursor-paginated moderator report queue
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ReportListEnvelope' }
+          schema: { $ref: "#/components/schemas/ReportListEnvelope" }
     BadRequest:
       description: Invalid JSON, query, or validation input
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     Unauthenticated:
       description: Missing, expired, or revoked session
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     Forbidden:
       description: Authenticated but not authorized, or fresh authentication required
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     CommentsDisabled:
       description: The owner disabled comments or a moderator locked the thread
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     NotFound:
       description: Resource is absent or intentionally concealed by authorization
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     Conflict:
       description: Unique, state-transition, or duplicate-open-report conflict
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     PayloadTooLarge:
       description: Body exceeds the route-specific cap (2 MiB canonical project or 8 MiB showcase input)
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     RateLimited:
       description: Rate or abuse limit exceeded
       headers:
-        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     ServiceUnavailable:
       description: Required upstream or binding temporarily unavailable
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
 
   schemas:
     RequestId:
@@ -1405,7 +1605,21 @@ components:
       maxLength: 128
     ErrorCode:
       type: string
-      enum: [BAD_REQUEST, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, VALIDATION_FAILED, RATE_LIMITED, QUOTA_EXCEEDED, COMMENTS_DISABLED, REVISION_CONFLICT, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+      enum:
+        [
+          BAD_REQUEST,
+          UNAUTHENTICATED,
+          FORBIDDEN,
+          NOT_FOUND,
+          CONFLICT,
+          VALIDATION_FAILED,
+          RATE_LIMITED,
+          QUOTA_EXCEEDED,
+          COMMENTS_DISABLED,
+          REVISION_CONFLICT,
+          INTERNAL_ERROR,
+          SERVICE_UNAVAILABLE,
+        ]
     ErrorEnvelope:
       type: object
       additionalProperties: false
@@ -1416,18 +1630,18 @@ components:
           additionalProperties: false
           required: [code, message]
           properties:
-            code: { $ref: '#/components/schemas/ErrorCode' }
+            code: { $ref: "#/components/schemas/ErrorCode" }
             message: { type: string, minLength: 1, maxLength: 500 }
             fields:
               type: object
               additionalProperties: { type: string, maxLength: 500 }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     PageMeta:
       type: object
       additionalProperties: false
       required: [nextCursor, hasMore, limit]
       properties:
-        nextCursor: { type: [string, 'null'], maxLength: 512 }
+        nextCursor: { type: [string, "null"], maxLength: 512 }
         hasMore: { type: boolean }
         limit: { type: integer, minimum: 1, maximum: 50 }
     LogoutEnvelope:
@@ -1441,7 +1655,7 @@ components:
           required: [loggedOut]
           properties:
             loggedOut: { type: boolean, const: true }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     SessionRevocationEnvelope:
       type: object
       additionalProperties: false
@@ -1453,7 +1667,7 @@ components:
           required: [revokedAt]
           properties:
             revokedAt: { type: integer }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ResourceDeletionEnvelope:
       type: object
       additionalProperties: false
@@ -1466,7 +1680,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             deletedAt: { type: integer }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     FollowMutationEnvelope:
       type: object
       additionalProperties: false
@@ -1479,7 +1693,7 @@ components:
           properties:
             following: { type: boolean }
             changed: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     LikeMutationEnvelope:
       type: object
       additionalProperties: false
@@ -1492,7 +1706,7 @@ components:
           properties:
             liked: { type: boolean }
             changed: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ReportDecisionEnvelope:
       type: object
       additionalProperties: false
@@ -1506,7 +1720,7 @@ components:
             id: { type: string, format: uuid }
             resolvedAt: { type: integer }
             status: { type: string, enum: [resolved, dismissed] }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CreationModerationEnvelope:
       type: object
       additionalProperties: false
@@ -1520,7 +1734,7 @@ components:
             id: { type: string, format: uuid }
             state: { type: string, enum: [hidden, draft] }
             visibility: { type: string, const: private }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CommentLockEnvelope:
       type: object
       additionalProperties: false
@@ -1534,7 +1748,7 @@ components:
             id: { type: string, format: uuid }
             commentsEnabled: { type: boolean }
             commentsLocked: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CommentModerationEnvelope:
       type: object
       additionalProperties: false
@@ -1547,7 +1761,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             status: { type: string, enum: [active, hidden] }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     UserModerationEnvelope:
       type: object
       additionalProperties: false
@@ -1560,14 +1774,29 @@ components:
           properties:
             id: { type: string, format: uuid }
             status: { type: string, enum: [active, suspended] }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
+    ProfileImageModerationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [id, reportId, avatarUrl, removedImageId]
+          properties:
+            id: { type: string, format: uuid }
+            reportId: { type: string, format: uuid }
+            avatarUrl: { type: "null" }
+            removedImageId: { type: string, format: uuid }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     GoogleAuthStartInput:
       type: object
       additionalProperties: false
       required: [returnTo]
       properties:
         intent: { type: string, enum: [login, reauth], default: login }
-        returnTo: { type: string, maxLength: 512, pattern: '^/(?!/)' }
+        returnTo: { type: string, maxLength: 512, pattern: "^/(?!/)" }
     AuthStartEnvelope:
       type: object
       additionalProperties: false
@@ -1578,14 +1807,19 @@ components:
           additionalProperties: false
           required: [authorizationUrl]
           properties:
-            authorizationUrl: { type: string, format: uri, pattern: '^https://accounts\.google\.com/' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+            authorizationUrl:
+              {
+                type: string,
+                format: uri,
+                pattern: '^https://accounts\.google\.com/',
+              }
+        requestId: { $ref: "#/components/schemas/RequestId" }
 
     Username:
       type: string
       minLength: 3
       maxLength: 24
-      pattern: '^[a-z0-9](?:[a-z0-9]|[-_](?=[a-z0-9])){1,22}[a-z0-9]$'
+      pattern: "^[a-z0-9](?:[a-z0-9]|[-_](?=[a-z0-9])){1,22}[a-z0-9]$"
     UserRole:
       type: string
       enum: [user, moderator, admin]
@@ -1595,22 +1829,41 @@ components:
     CompactUser:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, avatarSeed]
+      required: [id, username, displayName, avatarSeed, avatarUrl]
       properties:
         id: { type: string, format: uuid }
-        username: { $ref: '#/components/schemas/Username' }
+        username: { $ref: "#/components/schemas/Username" }
         displayName: { type: string, minLength: 1, maxLength: 50 }
         avatarSeed: { type: string }
+        avatarUrl:
+          type: [string, "null"]
+          pattern: "^/api/users/[0-9a-f-]+/avatar/[0-9a-f-]+$"
     PublicUser:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, bio, avatarSeed, followerCount, followingCount, creationCount, isFollowing, createdAt]
+      required:
+        [
+          id,
+          username,
+          displayName,
+          bio,
+          avatarSeed,
+          avatarUrl,
+          followerCount,
+          followingCount,
+          creationCount,
+          isFollowing,
+          createdAt,
+        ]
       properties:
         id: { type: string, format: uuid }
-        username: { $ref: '#/components/schemas/Username' }
+        username: { $ref: "#/components/schemas/Username" }
         displayName: { type: string, minLength: 1, maxLength: 50 }
         bio: { type: string, maxLength: 500 }
         avatarSeed: { type: string }
+        avatarUrl:
+          type: [string, "null"]
+          pattern: "^/api/users/[0-9a-f-]+/avatar/[0-9a-f-]+$"
         followerCount: { type: integer, minimum: 0 }
         followingCount: { type: integer, minimum: 0 }
         creationCount: { type: integer, minimum: 0 }
@@ -1619,34 +1872,62 @@ components:
     PrivateUser:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, bio, avatarSeed, role, status, email, requiredTermsVersion, termsVersion, termsAcceptedAt, termsAccepted, createdAt, updatedAt, deletionDueAt]
+      required:
+        [
+          id,
+          username,
+          displayName,
+          bio,
+          avatarSeed,
+          avatarUrl,
+          role,
+          status,
+          email,
+          requiredTermsVersion,
+          termsVersion,
+          termsAcceptedAt,
+          termsAccepted,
+          createdAt,
+          updatedAt,
+          deletionDueAt,
+        ]
       properties:
         id: { type: string, format: uuid }
         username:
           oneOf:
-            - { $ref: '#/components/schemas/Username' }
-            - { type: 'null' }
-        displayName: { type: [string, 'null'], minLength: 1, maxLength: 50 }
+            - { $ref: "#/components/schemas/Username" }
+            - { type: "null" }
+        displayName: { type: [string, "null"], minLength: 1, maxLength: 50 }
         bio: { type: string, maxLength: 500 }
         avatarSeed: { type: string }
-        role: { $ref: '#/components/schemas/UserRole' }
-        status: { $ref: '#/components/schemas/UserStatus' }
+        avatarUrl:
+          type: [string, "null"]
+          pattern: "^/api/users/[0-9a-f-]+/avatar/[0-9a-f-]+$"
+        role: { $ref: "#/components/schemas/UserRole" }
+        status: { $ref: "#/components/schemas/UserStatus" }
         email: { type: string, format: email }
         requiredTermsVersion: { type: string, minLength: 1, maxLength: 40 }
-        termsVersion: { type: [string, 'null'] }
-        termsAcceptedAt: { type: [integer, 'null'] }
+        termsVersion: { type: [string, "null"] }
+        termsAcceptedAt: { type: [integer, "null"] }
         termsAccepted: { type: boolean }
         createdAt: { type: integer }
         updatedAt: { type: integer }
-        deletionDueAt: { type: [integer, 'null'] }
+        deletionDueAt: { type: [integer, "null"] }
     SetupProfileInput:
       type: object
       additionalProperties: false
-      required: [username, displayName, termsVersion, acceptsTerms, confirmsAge13OrOlder]
+      required:
+        [
+          username,
+          displayName,
+          termsVersion,
+          acceptsTerms,
+          confirmsAge13OrOlder,
+        ]
       properties:
-        username: { $ref: '#/components/schemas/Username' }
+        username: { $ref: "#/components/schemas/Username" }
         displayName: { type: string, minLength: 1, maxLength: 50 }
-        bio: { type: string, maxLength: 500, default: '' }
+        bio: { type: string, maxLength: 500, default: "" }
         termsVersion: { type: string, minLength: 1, maxLength: 40 }
         acceptsTerms: { type: boolean, const: true }
         confirmsAge13OrOlder: { type: boolean, const: true }
@@ -1661,13 +1942,47 @@ components:
           type: boolean
           const: true
           description: Generate a new avatar seed on the server; clients cannot choose the seed.
+    ProfileImageContentType:
+      type: string
+      enum: [image/jpeg, image/png, image/webp, image/heic]
+    ProfileImageUploadTicketInput:
+      type: object
+      additionalProperties: false
+      required: [contentType, byteSize, focusX, focusY]
+      properties:
+        contentType: { $ref: "#/components/schemas/ProfileImageContentType" }
+        byteSize: { type: integer, minimum: 1, maximum: 8388608 }
+        focusX: { type: integer, minimum: 0, maximum: 100 }
+        focusY: { type: integer, minimum: 0, maximum: 100 }
+    ProfileImageUploadTicketEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [uploadId, uploadToken, uploadUrl, expiresAt, maximumBytes]
+          properties:
+            uploadId: { type: string, format: uuid }
+            uploadToken:
+              {
+                type: string,
+                minLength: 43,
+                maxLength: 43,
+                pattern: "^[A-Za-z0-9_-]+$",
+              }
+            uploadUrl: { type: string, pattern: "^/api/avatar-uploads/" }
+            expiresAt: { type: integer }
+            maximumBytes: { type: integer, const: 8388608 }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     UserEnvelope:
       type: object
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { $ref: '#/components/schemas/PrivateUser' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { $ref: "#/components/schemas/PrivateUser" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     PublicProfileEnvelope:
       type: object
       additionalProperties: false
@@ -1678,20 +1993,21 @@ components:
           additionalProperties: false
           required: [user, creations]
           properties:
-            user: { $ref: '#/components/schemas/PublicUser' }
+            user: { $ref: "#/components/schemas/PublicUser" }
             creations:
               type: array
               maxItems: 24
-              items: { $ref: '#/components/schemas/Creation' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+              items: { $ref: "#/components/schemas/Creation" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     UserListEnvelope:
       type: object
       additionalProperties: false
       required: [data, meta, requestId]
       properties:
-        data: { type: array, items: { $ref: '#/components/schemas/CompactUser' } }
-        meta: { $ref: '#/components/schemas/PageMeta' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data:
+          { type: array, items: { $ref: "#/components/schemas/CompactUser" } }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     Session:
       type: object
       additionalProperties: false
@@ -1699,7 +2015,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         current: { type: boolean }
-        uaLabel: { type: [string, 'null'], maxLength: 160 }
+        uaLabel: { type: [string, "null"], maxLength: 160 }
         userAgentLabel: { type: string, maxLength: 160 }
         lastAuthenticatedAt: { type: integer }
         createdAt: { type: integer }
@@ -1721,16 +2037,32 @@ components:
               required: [communityMutationsEnabled]
               properties:
                 communityMutationsEnabled: { type: boolean }
-            user: { oneOf: [{ $ref: '#/components/schemas/PrivateUser' }, { type: 'null' }] }
-            session: { oneOf: [{ $ref: '#/components/schemas/Session' }, { type: 'null' }] }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+            user:
+              {
+                oneOf:
+                  [
+                    { $ref: "#/components/schemas/PrivateUser" },
+                    { type: "null" },
+                  ],
+              }
+            session:
+              {
+                oneOf:
+                  [{ $ref: "#/components/schemas/Session" }, { type: "null" }],
+              }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     SessionsEnvelope:
       type: object
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { type: array, maxItems: 10, items: { $ref: '#/components/schemas/Session' } }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data:
+          {
+            type: array,
+            maxItems: 10,
+            items: { $ref: "#/components/schemas/Session" },
+          }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     DeletionEnvelope:
       type: object
       additionalProperties: false
@@ -1742,18 +2074,18 @@ components:
           required: [deletionDueAt]
           properties:
             deletionDueAt: { type: integer }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
 
     PaletteColorId:
       type: string
-      pattern: '^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$'
+      pattern: "^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$"
     SourcePaletteMapping:
       type: object
       additionalProperties: false
       required: [sourceIndex, sourceHex, colorId, exact, deltaE]
       properties:
         sourceIndex: { type: integer, minimum: 0, maximum: 255 }
-        sourceHex: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+        sourceHex: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
         sourceRgb:
           type: array
           minItems: 3
@@ -1767,7 +2099,7 @@ components:
             h: { type: number }
             s: { type: number }
             b: { type: number }
-        colorId: { $ref: '#/components/schemas/PaletteColorId' }
+        colorId: { $ref: "#/components/schemas/PaletteColorId" }
         exact: { type: boolean }
         deltaE: { type: number, minimum: 0 }
     GridMetaV1:
@@ -1778,12 +2110,37 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         createdAt: { type: string, format: date-time }
         modifiedAt: { type: string, format: date-time }
-        sourceImage: { type: string, maxLength: 255, description: Accepted from legacy local files but stripped before persistence. }
-        sourceJson: { type: string, maxLength: 255, description: Accepted from legacy local files but stripped before persistence. }
+        sourceImage:
+          {
+            type: string,
+            maxLength: 255,
+            description: Accepted from legacy local files but stripped before persistence.,
+          }
+        sourceJson:
+          {
+            type: string,
+            maxLength: 255,
+            description: Accepted from legacy local files but stripped before persistence.,
+          }
         sourceFormat: { type: string, maxLength: 80 }
-        sourceMetadata: { type: object, additionalProperties: true, description: Only bounded recognized keys survive canonicalization. }
-        sourcePaletteMappings: { type: array, maxItems: 84, items: { $ref: '#/components/schemas/SourcePaletteMapping' } }
-        importWarnings: { type: array, maxItems: 32, items: { type: string, minLength: 1, maxLength: 500 } }
+        sourceMetadata:
+          {
+            type: object,
+            additionalProperties: true,
+            description: Only bounded recognized keys survive canonicalization.,
+          }
+        sourcePaletteMappings:
+          {
+            type: array,
+            maxItems: 84,
+            items: { $ref: "#/components/schemas/SourcePaletteMapping" },
+          }
+        importWarnings:
+          {
+            type: array,
+            maxItems: 32,
+            items: { type: string, minLength: 1, maxLength: 500 },
+          }
         notes: { type: string, maxLength: 5000 }
     GridDocumentV1:
       type: object
@@ -1791,7 +2148,7 @@ components:
       required: [version, meta, width, height, cells, usedColors, lockedColors]
       properties:
         version: { type: integer, const: 1 }
-        meta: { $ref: '#/components/schemas/GridMetaV1' }
+        meta: { $ref: "#/components/schemas/GridMetaV1" }
         width: { type: integer, minimum: 8, maximum: 256 }
         height: { type: integer, minimum: 8, maximum: 256 }
         cells:
@@ -1799,20 +2156,20 @@ components:
           maxItems: 65536
           items:
             oneOf:
-              - { $ref: '#/components/schemas/PaletteColorId' }
-              - { type: 'null' }
+              - { $ref: "#/components/schemas/PaletteColorId" }
+              - { type: "null" }
           description: Must contain exactly width multiplied by height row-major cells.
         usedColors:
           type: array
           maxItems: 84
           uniqueItems: true
-          items: { $ref: '#/components/schemas/PaletteColorId' }
+          items: { $ref: "#/components/schemas/PaletteColorId" }
           description: Recomputed server-side from cells.
         lockedColors:
           type: array
           maxItems: 84
           uniqueItems: true
-          items: { $ref: '#/components/schemas/PaletteColorId' }
+          items: { $ref: "#/components/schemas/PaletteColorId" }
           description: Every locked color must occur in cells.
 
     CreationState:
@@ -1825,32 +2182,63 @@ components:
       type: string
       minLength: 2
       maxLength: 40
-      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
     Tag:
       type: object
       additionalProperties: false
       required: [slug, name, description]
       properties:
-        slug: { $ref: '#/components/schemas/TagSlug' }
+        slug: { $ref: "#/components/schemas/TagSlug" }
         name: { type: string, minLength: 2, maxLength: 50 }
         description: { type: string, maxLength: 300 }
     Creation:
       type: object
       additionalProperties: false
-      required: [id, slug, owner, title, description, state, visibility, commentsEnabled, commentsLocked, projectDownloadEnabled, revision, tags, stats, likedByViewer, images, mediaSource, primaryImageUrl, createdAt, updatedAt]
+      required:
+        [
+          id,
+          slug,
+          owner,
+          title,
+          description,
+          state,
+          visibility,
+          commentsEnabled,
+          commentsLocked,
+          projectDownloadEnabled,
+          revision,
+          tags,
+          stats,
+          likedByViewer,
+          images,
+          mediaSource,
+          primaryImageUrl,
+          createdAt,
+          updatedAt,
+        ]
       properties:
         id: { type: string, format: uuid }
         slug: { type: string, minLength: 18, maxLength: 18 }
-        owner: { $ref: '#/components/schemas/CompactUser' }
+        owner: { $ref: "#/components/schemas/CompactUser" }
         title: { type: string, minLength: 1, maxLength: 80 }
         description: { type: string, maxLength: 2000 }
-        state: { $ref: '#/components/schemas/CreationState' }
-        visibility: { $ref: '#/components/schemas/CreationVisibility' }
+        state: { $ref: "#/components/schemas/CreationState" }
+        visibility: { $ref: "#/components/schemas/CreationVisibility" }
         commentsEnabled: { type: boolean }
-        commentsLocked: { type: boolean, description: Moderator-controlled lock. When true, no new comment may be created regardless of the owner setting. }
+        commentsLocked:
+          {
+            type: boolean,
+            description: Moderator-controlled lock. When true,
+            no new comment may be created regardless of the owner setting.,
+          }
         projectDownloadEnabled: { type: boolean }
-        revision: { type: [integer, 'null'], minimum: 1 }
-        tags: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/Tag' } }
+        revision: { type: [integer, "null"], minimum: 1 }
+        tags:
+          {
+            type: array,
+            maxItems: 5,
+            items: { $ref: "#/components/schemas/Tag" },
+          }
         stats:
           type: object
           additionalProperties: false
@@ -1858,31 +2246,49 @@ components:
           properties:
             likes: { type: integer, minimum: 0 }
             comments: { type: integer, minimum: 0 }
-        likedByViewer: { type: boolean, description: False for an anonymous viewer. }
-        canEdit: { type: boolean, description: True only when the authenticated viewer owns this creation. Present on public creation detail responses. }
-        socialImageUrl: { type: string, pattern: '^/api/creations/' }
+        likedByViewer:
+          { type: boolean, description: False for an anonymous viewer. }
+        canEdit:
+          {
+            type: boolean,
+            description: True only when the authenticated viewer owns this creation. Present on public creation detail responses.,
+          }
+        socialImageUrl: { type: string, pattern: "^/api/creations/" }
         primaryImageUrl:
           type: string
-          pattern: '^/api/creations/'
+          pattern: "^/api/creations/"
           description: Selected showcase cover display URL, or the deterministic grid preview URL when no showcase image is ready.
         images:
           type: array
           maxItems: 4
-          items: { $ref: '#/components/schemas/CreationShowcaseImage' }
+          items: { $ref: "#/components/schemas/CreationShowcaseImage" }
         mediaSource:
           type: string
           enum: [generated, showcase]
           description: Identifies whether the primary image uses the deterministic grid preview or the selected showcase cover.
-        publishedAt: { type: [integer, 'null'] }
+        publishedAt: { type: [integer, "null"] }
         createdAt: { type: integer }
         updatedAt: { type: integer }
     ShowcaseContentType:
       type: string
-      enum: [image/jpeg, image/png, image/webp, image/heic, image/heif]
+      enum: [image/jpeg, image/png, image/webp, image/heic]
     CreationShowcaseImage:
       type: object
       additionalProperties: false
-      required: [id, altText, sortOrder, isCover, width, height, createdAt, updatedAt, displayUrl, thumbnailUrl, socialImageUrl]
+      required:
+        [
+          id,
+          altText,
+          sortOrder,
+          isCover,
+          width,
+          height,
+          createdAt,
+          updatedAt,
+          displayUrl,
+          thumbnailUrl,
+          socialImageUrl,
+        ]
       properties:
         id: { type: string, format: uuid }
         altText: { type: string, minLength: 1, maxLength: 200 }
@@ -1892,15 +2298,15 @@ components:
         height: { type: integer, minimum: 1, maximum: 8192 }
         createdAt: { type: integer }
         updatedAt: { type: integer }
-        displayUrl: { type: string, pattern: '^/api/creations/' }
-        thumbnailUrl: { type: string, pattern: '^/api/creations/' }
-        socialImageUrl: { type: string, pattern: '^/api/creations/' }
+        displayUrl: { type: string, pattern: "^/api/creations/" }
+        thumbnailUrl: { type: string, pattern: "^/api/creations/" }
+        socialImageUrl: { type: string, pattern: "^/api/creations/" }
     ShowcaseUploadTicketInput:
       type: object
       additionalProperties: false
       required: [contentType, byteSize, altText]
       properties:
-        contentType: { $ref: '#/components/schemas/ShowcaseContentType' }
+        contentType: { $ref: "#/components/schemas/ShowcaseContentType" }
         byteSize: { type: integer, minimum: 1, maximum: 8388608 }
         altText: { type: string, minLength: 1, maxLength: 200 }
         replaceImageId: { type: string, format: uuid }
@@ -1916,10 +2322,11 @@ components:
           properties:
             uploadId: { type: string, format: uuid }
             uploadToken: { type: string, minLength: 32 }
-            uploadUrl: { type: string, pattern: '^/api/creation-image-uploads/' }
+            uploadUrl:
+              { type: string, pattern: "^/api/creation-image-uploads/" }
             expiresAt: { type: integer }
             maximumBytes: { type: integer, const: 8388608 }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ShowcaseImageListEnvelope:
       type: object
       additionalProperties: false
@@ -1928,8 +2335,8 @@ components:
         data:
           type: array
           maxItems: 4
-          items: { $ref: '#/components/schemas/CreationShowcaseImage' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+          items: { $ref: "#/components/schemas/CreationShowcaseImage" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ShowcaseUploadResultEnvelope:
       type: object
       additionalProperties: false
@@ -1940,12 +2347,12 @@ components:
           additionalProperties: false
           required: [image, images]
           properties:
-            image: { $ref: '#/components/schemas/CreationShowcaseImage' }
+            image: { $ref: "#/components/schemas/CreationShowcaseImage" }
             images:
               type: array
               maxItems: 4
-              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+              items: { $ref: "#/components/schemas/CreationShowcaseImage" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ShowcaseGalleryUpdateInput:
       type: object
       additionalProperties: false
@@ -1971,8 +2378,8 @@ components:
             images:
               type: array
               maxItems: 4
-              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+              items: { $ref: "#/components/schemas/CreationShowcaseImage" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ShowcaseImageDeletionEnvelope:
       type: object
       additionalProperties: false
@@ -1987,21 +2394,21 @@ components:
             images:
               type: array
               maxItems: 4
-              items: { $ref: '#/components/schemas/CreationShowcaseImage' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+              items: { $ref: "#/components/schemas/CreationShowcaseImage" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CreateCreationInput:
       type: object
       additionalProperties: false
       required: [project]
       properties:
-        project: { $ref: '#/components/schemas/GridDocumentV1' }
+        project: { $ref: "#/components/schemas/GridDocumentV1" }
         title: { type: string, minLength: 1, maxLength: 80 }
     SaveProjectInput:
       type: object
       additionalProperties: false
       required: [project]
       properties:
-        project: { $ref: '#/components/schemas/GridDocumentV1' }
+        project: { $ref: "#/components/schemas/GridDocumentV1" }
     UpdateCreationInput:
       type: object
       additionalProperties: false
@@ -2014,21 +2421,39 @@ components:
     PublishCreationInput:
       type: object
       additionalProperties: false
-      required: [title, description, visibility, commentsEnabled, projectDownloadEnabled, tags]
+      required:
+        [
+          title,
+          description,
+          visibility,
+          commentsEnabled,
+          projectDownloadEnabled,
+          tags,
+        ]
       properties:
         title: { type: string, minLength: 1, maxLength: 80 }
         description: { type: string, maxLength: 2000 }
         visibility: { type: string, enum: [unlisted, public] }
-        commentsEnabled: { type: boolean, description: Defaults by UI to true for public and false for unlisted; the reviewed value is explicit. }
+        commentsEnabled:
+          {
+            type: boolean,
+            description: Defaults by UI to true for public and false for unlisted; the reviewed value is explicit.,
+          }
         projectDownloadEnabled: { type: boolean, default: false }
-        tags: { type: array, maxItems: 5, uniqueItems: true, items: { $ref: '#/components/schemas/TagSlug' } }
+        tags:
+          {
+            type: array,
+            maxItems: 5,
+            uniqueItems: true,
+            items: { $ref: "#/components/schemas/TagSlug" },
+          }
     CreationEnvelope:
       type: object
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { $ref: '#/components/schemas/Creation' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { $ref: "#/components/schemas/Creation" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     RandomCreationEnvelope:
       type: object
       additionalProperties: false
@@ -2036,9 +2461,9 @@ components:
       properties:
         data:
           oneOf:
-            - { $ref: '#/components/schemas/Creation' }
-            - { type: 'null' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+            - { $ref: "#/components/schemas/Creation" }
+            - { type: "null" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     OwnedCreationEnvelope:
       type: object
       additionalProperties: false
@@ -2049,24 +2474,29 @@ components:
           additionalProperties: false
           required: [creation, project]
           properties:
-            creation: { $ref: '#/components/schemas/Creation' }
-            project: { $ref: '#/components/schemas/GridDocumentV1' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+            creation: { $ref: "#/components/schemas/Creation" }
+            project: { $ref: "#/components/schemas/GridDocumentV1" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CreationListEnvelope:
       type: object
       additionalProperties: false
       required: [data, meta, requestId]
       properties:
-        data: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Creation' } }
-        meta: { $ref: '#/components/schemas/PageMeta' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data:
+          {
+            type: array,
+            maxItems: 50,
+            items: { $ref: "#/components/schemas/Creation" },
+          }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     TagsEnvelope:
       type: object
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { type: array, items: { $ref: '#/components/schemas/Tag' } }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { type: array, items: { $ref: "#/components/schemas/Tag" } }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     RevisionConflictEnvelope:
       type: object
       additionalProperties: false
@@ -2081,7 +2511,7 @@ components:
             message: { type: string }
             currentRevision: { type: integer, minimum: 1 }
             currentEtag: { type: string }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
 
     CommentStatus:
       type: string
@@ -2093,9 +2523,9 @@ components:
       properties:
         id: { type: string, format: uuid }
         creationId: { type: string, format: uuid }
-        author: { $ref: '#/components/schemas/CompactUser' }
+        author: { $ref: "#/components/schemas/CompactUser" }
         body: { type: string, minLength: 1, maxLength: 1000 }
-        status: { $ref: '#/components/schemas/CommentStatus' }
+        status: { $ref: "#/components/schemas/CommentStatus" }
         createdAt: { type: integer }
         updatedAt: { type: integer }
     CommentInput:
@@ -2109,20 +2539,34 @@ components:
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { $ref: '#/components/schemas/Comment' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { $ref: "#/components/schemas/Comment" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     CommentListEnvelope:
       type: object
       additionalProperties: false
       required: [data, meta, requestId]
       properties:
-        data: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Comment' } }
-        meta: { $ref: '#/components/schemas/PageMeta' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data:
+          {
+            type: array,
+            maxItems: 50,
+            items: { $ref: "#/components/schemas/Comment" },
+          }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
 
     ReportReason:
       type: string
-      enum: [spam, harassment, sexual_content, violence, personal_information, copyright, other]
+      enum:
+        [
+          spam,
+          harassment,
+          sexual_content,
+          violence,
+          personal_information,
+          copyright,
+          other,
+        ]
     ReportStatus:
       type: string
       enum: [open, reviewing, resolved, dismissed]
@@ -2133,8 +2577,8 @@ components:
       properties:
         targetType: { type: string, enum: [creation, comment, user] }
         targetId: { type: string, format: uuid }
-        reason: { $ref: '#/components/schemas/ReportReason' }
-        details: { type: string, maxLength: 2000, default: '' }
+        reason: { $ref: "#/components/schemas/ReportReason" }
+        details: { type: string, maxLength: 2000, default: "" }
     Report:
       type: object
       additionalProperties: false
@@ -2143,22 +2587,26 @@ components:
         id: { type: string, format: uuid }
         targetType: { type: string, enum: [creation, comment, user] }
         targetId: { type: string, format: uuid }
-        reason: { $ref: '#/components/schemas/ReportReason' }
+        reason: { $ref: "#/components/schemas/ReportReason" }
         details: { type: string, maxLength: 2000 }
-        status: { $ref: '#/components/schemas/ReportStatus' }
-        assignedModeratorId: { type: [string, 'null'], format: uuid }
-        reporterPseudonym: { type: string, description: Privacy-preserving keyed pseudonym visible only to moderators. }
-        resolutionNote: { type: [string, 'null'], maxLength: 2000 }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        assignedModeratorId: { type: [string, "null"], format: uuid }
+        reporterPseudonym:
+          {
+            type: string,
+            description: Privacy-preserving keyed pseudonym visible only to moderators.,
+          }
+        resolutionNote: { type: [string, "null"], maxLength: 2000 }
         createdAt: { type: integer }
         updatedAt: { type: integer }
-        resolvedAt: { type: [integer, 'null'] }
+        resolvedAt: { type: [integer, "null"] }
     ReportEnvelope:
       type: object
       additionalProperties: false
       required: [data, requestId]
       properties:
-        data: { $ref: '#/components/schemas/Report' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { $ref: "#/components/schemas/Report" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ModerationTargetSummary:
       type: object
       description: Current, plain-text target context. Type-specific owner, author, creation, visibility, role, body, bio, and description fields may also be present.
@@ -2173,19 +2621,37 @@ components:
         description: { type: string, maxLength: 2000 }
         body: { type: string, maxLength: 1000 }
         bio: { type: string, maxLength: 500 }
-        username: { type: [string, 'null'] }
-        role: { $ref: '#/components/schemas/UserRole' }
+        username: { type: [string, "null"] }
+        role: { $ref: "#/components/schemas/UserRole" }
+        profileImageEvidence:
+          oneOf:
+            - { $ref: "#/components/schemas/ProfileImageEvidence" }
+            - { type: "null" }
       additionalProperties: true
+    ProfileImageEvidence:
+      type: object
+      additionalProperties: false
+      required: [capturedAt, imageId, mediaUrl, sha256]
+      properties:
+        capturedAt: { type: integer }
+        imageId: { type: string, format: uuid }
+        mediaUrl:
+          {
+            type: string,
+            pattern: "^/api/moderation/reports/[0-9a-f-]+/profile-image$",
+          }
+        sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
     ModerationActionRecord:
       type: object
       additionalProperties: false
-      required: [id, actorPseudonym, targetType, targetId, action, reason, createdAt]
+      required:
+        [id, actorPseudonym, targetType, targetId, action, reason, createdAt]
       properties:
         id: { type: string, format: uuid }
         actorPseudonym: { type: string }
         targetType: { type: string, enum: [creation, comment, user, report] }
         targetId: { type: string }
-        action: { $ref: '#/components/schemas/ModerationAction' }
+        action: { $ref: "#/components/schemas/ModerationAction" }
         reason: { type: string, minLength: 1, maxLength: 1000 }
         createdAt: { type: integer }
     ModerationReportDetail:
@@ -2193,28 +2659,33 @@ components:
       additionalProperties: false
       required: [report, target, actions]
       properties:
-        report: { $ref: '#/components/schemas/Report' }
-        target: { $ref: '#/components/schemas/ModerationTargetSummary' }
+        report: { $ref: "#/components/schemas/Report" }
+        target: { $ref: "#/components/schemas/ModerationTargetSummary" }
         actions:
           type: array
           maxItems: 50
-          items: { $ref: '#/components/schemas/ModerationActionRecord' }
+          items: { $ref: "#/components/schemas/ModerationActionRecord" }
     ReportDetailEnvelope:
       type: object
       additionalProperties: false
       required: [data, meta, requestId]
       properties:
-        data: { $ref: '#/components/schemas/ModerationReportDetail' }
-        meta: { $ref: '#/components/schemas/PageMeta' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data: { $ref: "#/components/schemas/ModerationReportDetail" }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ReportListEnvelope:
       type: object
       additionalProperties: false
       required: [data, meta, requestId]
       properties:
-        data: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Report' } }
-        meta: { $ref: '#/components/schemas/PageMeta' }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        data:
+          {
+            type: array,
+            maxItems: 50,
+            items: { $ref: "#/components/schemas/Report" },
+          }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ModerationStatsEnvelope:
       type: object
       additionalProperties: false
@@ -2223,22 +2694,36 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [openReports, suspendedUsers, hiddenCreations, hiddenComments]
+          required:
+            [openReports, suspendedUsers, hiddenCreations, hiddenComments]
           properties:
             openReports: { type: integer, minimum: 0 }
             suspendedUsers: { type: integer, minimum: 0 }
             hiddenCreations: { type: integer, minimum: 0 }
             hiddenComments: { type: integer, minimum: 0 }
-        requestId: { $ref: '#/components/schemas/RequestId' }
+        requestId: { $ref: "#/components/schemas/RequestId" }
     ModerationAction:
       type: string
-      enum: [hide_creation, restore_creation, lock_comments, unlock_comments, hide_comment, restore_comment, suspend_user, restore_user, resolve_report, dismiss_report]
+      enum:
+        [
+          hide_creation,
+          restore_creation,
+          lock_comments,
+          unlock_comments,
+          hide_comment,
+          restore_comment,
+          suspend_user,
+          restore_user,
+          remove_profile_image,
+          resolve_report,
+          dismiss_report,
+        ]
     ModerationDecisionInput:
       type: object
       additionalProperties: false
       required: [action, reason]
       properties:
-        action: { $ref: '#/components/schemas/ModerationAction' }
+        action: { $ref: "#/components/schemas/ModerationAction" }
         reason: { type: string, minLength: 1, maxLength: 1000 }
 security:
   - cookieAuth: []

@@ -1,4 +1,8 @@
 import { deleteShowcaseImageObjects } from "./creation-images";
+import {
+  deleteAllProfileImageObjectsForUser,
+  deleteProfileImageObjects,
+} from "./profile-images";
 
 interface RevisionCleanupRow {
   creation_id: string;
@@ -8,6 +12,11 @@ interface RevisionCleanupRow {
 interface ShowcaseCleanupRow {
   creation_id: string;
   id: string;
+}
+
+interface ProfileImageCleanupRow {
+  id: string;
+  user_id: string;
 }
 
 export async function runScheduledMaintenance(
@@ -20,29 +29,51 @@ export async function runScheduledMaintenance(
 
   const purgedShowcaseAttempts = await env.DB.prepare(
     "DELETE FROM creation_showcase_upload_attempts WHERE created_at < ?",
-  ).bind(dayAgo).run();
+  )
+    .bind(dayAgo)
+    .run();
+  const purgedProfileImageAttempts = await env.DB.prepare(
+    "DELETE FROM profile_image_upload_attempts WHERE created_at < ?",
+  )
+    .bind(dayAgo)
+    .run();
 
-  await env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ? OR revoked_at <= ?")
+  await env.DB.prepare(
+    "DELETE FROM sessions WHERE expires_at <= ? OR revoked_at <= ?",
+  )
     .bind(now, dayAgo)
     .run();
 
   const staleUploads = await env.DB.prepare(
     "SELECT id, creation_id FROM creation_revisions WHERE status = 'uploading' AND created_at <= ? LIMIT 100",
-  ).bind(hourAgo).all<RevisionCleanupRow>();
+  )
+    .bind(hourAgo)
+    .all<RevisionCleanupRow>();
+  let staleUploadCleanupCount = 0;
   for (const revision of staleUploads.results) {
-    await deleteRevisionObjects(env, revision.creation_id, revision.id);
-    await env.DB.prepare(
-      "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
-    ).bind(revision.id).run();
+    const outcome = await runCleanupItem("stale_revision", async () => {
+      await deleteRevisionObjects(env, revision.creation_id, revision.id);
+      await env.DB.prepare(
+        "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
+      )
+        .bind(revision.id)
+        .run();
+    });
+    if (outcome.ok) staleUploadCleanupCount += 1;
   }
 
   const staleShowcaseUploads = await env.DB.prepare(
     `SELECT id, creation_id FROM creation_showcase_images
      WHERE status IN ('reserved', 'processing') AND expires_at <= ? LIMIT 100`,
-  ).bind(now).all<ShowcaseCleanupRow>();
+  )
+    .bind(now)
+    .all<ShowcaseCleanupRow>();
   let claimedStaleShowcaseUploads = 0;
   for (const image of staleShowcaseUploads.results) {
-    if (await cleanupExpiredShowcaseUpload(env, image, now)) {
+    const outcome = await runCleanupItem("stale_showcase_upload", () =>
+      cleanupExpiredShowcaseUpload(env, image, now),
+    );
+    if (outcome.ok && outcome.value) {
       claimedStaleShowcaseUploads += 1;
     }
   }
@@ -50,53 +81,121 @@ export async function runScheduledMaintenance(
   const failedShowcaseUploads = await env.DB.prepare(
     `SELECT id, creation_id FROM creation_showcase_images
      WHERE status = 'failed' AND updated_at <= ? LIMIT 100`,
-  ).bind(dayAgo).all<ShowcaseCleanupRow>();
+  )
+    .bind(dayAgo)
+    .all<ShowcaseCleanupRow>();
+  let failedShowcaseCleanupCount = 0;
   for (const image of failedShowcaseUploads.results) {
-    await deleteShowcaseImageObjects(env, image.creation_id, image.id);
+    const outcome = await runCleanupItem("failed_showcase_upload", () =>
+      deleteShowcaseImageObjects(env, image.creation_id, image.id),
+    );
+    if (outcome.ok) failedShowcaseCleanupCount += 1;
   }
 
   const deletingShowcaseImages = await env.DB.prepare(
     `SELECT id, creation_id FROM creation_showcase_images
      WHERE status = 'deleting' LIMIT 100`,
   ).all<ShowcaseCleanupRow>();
+  let showcaseDeleteCount = 0;
   for (const image of deletingShowcaseImages.results) {
-    await deleteShowcaseImageObjects(env, image.creation_id, image.id);
+    const outcome = await runCleanupItem("deleting_showcase_image", () =>
+      deleteShowcaseImageObjects(env, image.creation_id, image.id),
+    );
+    if (outcome.ok) showcaseDeleteCount += 1;
+  }
+
+  const staleProfileImageUploads = await env.DB.prepare(
+    `SELECT id, user_id FROM profile_images
+     WHERE status IN ('reserved', 'processing') AND expires_at <= ? LIMIT 100`,
+  )
+    .bind(now)
+    .all<ProfileImageCleanupRow>();
+  let claimedStaleProfileImageUploads = 0;
+  for (const image of staleProfileImageUploads.results) {
+    const outcome = await runCleanupItem("stale_profile_image_upload", () =>
+      cleanupExpiredProfileImageUpload(env, image, now),
+    );
+    if (outcome.ok && outcome.value) {
+      claimedStaleProfileImageUploads += 1;
+    }
+  }
+
+  const failedProfileImageUploads = await env.DB.prepare(
+    `SELECT id, user_id FROM profile_images
+     WHERE status = 'failed' AND updated_at <= ? LIMIT 100`,
+  )
+    .bind(dayAgo)
+    .all<ProfileImageCleanupRow>();
+  let failedProfileImageCleanupCount = 0;
+  for (const image of failedProfileImageUploads.results) {
+    const outcome = await runCleanupItem("failed_profile_image_upload", () =>
+      deleteProfileImageObjects(env, image.user_id, image.id),
+    );
+    if (outcome.ok && outcome.value) failedProfileImageCleanupCount += 1;
+  }
+
+  const deletingProfileImages = await env.DB.prepare(
+    `SELECT id, user_id FROM profile_images
+     WHERE status = 'deleting' LIMIT 100`,
+  ).all<ProfileImageCleanupRow>();
+  let profileImageDeleteCount = 0;
+  for (const image of deletingProfileImages.results) {
+    const outcome = await runCleanupItem("deleting_profile_image", () =>
+      deleteProfileImageObjects(env, image.user_id, image.id),
+    );
+    if (outcome.ok && outcome.value) profileImageDeleteCount += 1;
   }
 
   const obsolete = await env.DB.prepare(
     "SELECT id, creation_id FROM creation_revisions WHERE status = 'obsolete' AND obsolete_at <= ? LIMIT 100",
-  ).bind(dayAgo).all<RevisionCleanupRow>();
+  )
+    .bind(dayAgo)
+    .all<RevisionCleanupRow>();
+  let obsoleteRevisionCleanupCount = 0;
   for (const revision of obsolete.results) {
-    await deleteRevisionObjects(env, revision.creation_id, revision.id);
-    await env.DB.prepare("DELETE FROM creation_revisions WHERE id = ? AND status = 'obsolete'")
-      .bind(revision.id)
-      .run();
+    const outcome = await runCleanupItem("obsolete_revision", async () => {
+      await deleteRevisionObjects(env, revision.creation_id, revision.id);
+      await env.DB.prepare(
+        "DELETE FROM creation_revisions WHERE id = ? AND status = 'obsolete'",
+      )
+        .bind(revision.id)
+        .run();
+    });
+    if (outcome.ok) obsoleteRevisionCleanupCount += 1;
   }
 
   const deletedCreations = await env.DB.prepare(
     "SELECT id FROM creations WHERE state = 'deleted' AND deleted_at <= ? LIMIT 50",
-  ).bind(dayAgo).all<{ id: string }>();
+  )
+    .bind(dayAgo)
+    .all<{ id: string }>();
+  let deletedCreationCount = 0;
   for (const creation of deletedCreations.results) {
-    await deleteCreationObjects(env, creation.id);
-    await env.DB.prepare("DELETE FROM creations WHERE id = ? AND state = 'deleted'")
-      .bind(creation.id)
-      .run();
+    const outcome = await runCleanupItem("deleted_creation", async () => {
+      await deleteCreationObjects(env, creation.id);
+      await env.DB.prepare(
+        "DELETE FROM creations WHERE id = ? AND state = 'deleted'",
+      )
+        .bind(creation.id)
+        .run();
+    });
+    if (outcome.ok) deletedCreationCount += 1;
   }
 
   const dueAccounts = await env.DB.prepare(
     `SELECT id FROM users
-     WHERE status = 'deletion_pending' AND deletion_due_at <= ? LIMIT 25`,
-  ).bind(now).all<{ id: string }>();
+     WHERE (status = 'deletion_pending' AND deletion_due_at <= ?)
+       OR (status = 'deleted' AND updated_at <= ?)
+     LIMIT 25`,
+  )
+    .bind(now, hourAgo)
+    .all<{ id: string }>();
+  let deletedAccountCount = 0;
   for (const user of dueAccounts.results) {
-    const creations = await env.DB.prepare("SELECT id FROM creations WHERE owner_user_id = ?")
-      .bind(user.id)
-      .all<{ id: string }>();
-    for (const creation of creations.results) {
-      await deleteCreationObjects(env, creation.id);
-    }
-    await env.DB.prepare("DELETE FROM users WHERE id = ? AND status = 'deletion_pending'")
-      .bind(user.id)
-      .run();
+    const outcome = await runCleanupItem("due_account", () =>
+      cleanupDueAccount(env, user.id, now, hourAgo),
+    );
+    if (outcome.ok && outcome.value) deletedAccountCount += 1;
   }
 
   await env.DB.batch([
@@ -104,7 +203,9 @@ export async function runScheduledMaintenance(
       `UPDATE reports SET details = '', resolution_note = NULL,
        free_text_purge_at = NULL, updated_at = ? WHERE free_text_purge_at <= ?`,
     ).bind(now, now),
-    env.DB.prepare("DELETE FROM moderation_actions WHERE retain_until <= ?").bind(now),
+    env.DB.prepare(
+      "DELETE FROM moderation_actions WHERE retain_until <= ?",
+    ).bind(now),
     env.DB.prepare(
       "DELETE FROM reports WHERE status IN ('resolved', 'dismissed') AND retain_until <= ?",
     ).bind(now),
@@ -127,18 +228,116 @@ export async function runScheduledMaintenance(
     ).bind(now - 24 * 60 * 60 * 1_000, now - 7 * 24 * 60 * 60 * 1_000, now),
   ]);
 
-  console.log(JSON.stringify({
-    cron: controller.cron,
-    deletedAccounts: dueAccounts.results.length,
-    deletedCreations: deletedCreations.results.length,
-    message: "scheduled_maintenance_complete",
-    obsoleteRevisions: obsolete.results.length,
-    purgedShowcaseAttempts: purgedShowcaseAttempts.meta.changes ?? 0,
-    showcaseDeletes: deletingShowcaseImages.results.length,
-    showcaseFailedUploads: failedShowcaseUploads.results.length,
-    showcaseStaleUploads: claimedStaleShowcaseUploads,
-    staleUploads: staleUploads.results.length,
-  }));
+  console.log(
+    JSON.stringify({
+      cron: controller.cron,
+      deletedAccounts: deletedAccountCount,
+      deletedCreations: deletedCreationCount,
+      message: "scheduled_maintenance_complete",
+      obsoleteRevisions: obsoleteRevisionCleanupCount,
+      profileImageDeletes: profileImageDeleteCount,
+      profileImageFailedUploads: failedProfileImageCleanupCount,
+      profileImageStaleUploads: claimedStaleProfileImageUploads,
+      purgedProfileImageAttempts: purgedProfileImageAttempts.meta.changes ?? 0,
+      purgedShowcaseAttempts: purgedShowcaseAttempts.meta.changes ?? 0,
+      showcaseDeletes: showcaseDeleteCount,
+      showcaseFailedUploads: failedShowcaseCleanupCount,
+      showcaseStaleUploads: claimedStaleShowcaseUploads,
+      staleUploads: staleUploadCleanupCount,
+    }),
+  );
+}
+
+/**
+ * Claim final deletion before touching R2. Cancellation can race the SELECT
+ * that built the scheduled page; only the guarded state transition wins the
+ * right to destroy objects. A failed claimed cleanup remains `deleted` and is
+ * eligible for an idempotent retry after the one-hour lease expires.
+ */
+export async function cleanupDueAccount(
+  env: Env,
+  userId: string,
+  now: number,
+  retryBefore: number,
+): Promise<boolean> {
+  const claim = await env.DB.prepare(
+    `UPDATE users SET status = 'deleted', updated_at = ?
+     WHERE id = ? AND (
+       (status = 'deletion_pending' AND deletion_due_at <= ?)
+       OR (status = 'deleted' AND updated_at <= ?)
+     )`,
+  )
+    .bind(now, userId, now, retryBefore)
+    .run();
+  if ((claim.meta.changes ?? 0) !== 1) return false;
+
+  const creations = await env.DB.prepare(
+    "SELECT id FROM creations WHERE owner_user_id = ?",
+  )
+    .bind(userId)
+    .all<{ id: string }>();
+  for (const creation of creations.results) {
+    await deleteCreationObjects(env, creation.id);
+  }
+  await deleteAllProfileImageObjectsForUser(env, userId);
+
+  // Release held image evidence and delete the claimed account in one D1
+  // transaction. Pseudonymized report/action history follows its retention.
+  const deletion = await env.DB.batch([
+    env.DB.prepare(
+      `DELETE FROM profile_image_report_evidence
+       WHERE user_id = ? AND EXISTS (
+         SELECT 1 FROM users WHERE id = ? AND status = 'deleted'
+       )`,
+    ).bind(userId, userId),
+    env.DB.prepare(
+      "DELETE FROM users WHERE id = ? AND status = 'deleted'",
+    ).bind(userId),
+  ]);
+  if ((deletion[1]?.meta.changes ?? 0) !== 1) {
+    throw new Error("Claimed account deletion invariant failed.");
+  }
+  return true;
+}
+
+async function runCleanupItem<T>(
+  cleanup: string,
+  operation: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  try {
+    return { ok: true, value: await operation() };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        cleanup,
+        errorType: error instanceof Error ? error.name : typeof error,
+        message: "scheduled_cleanup_item_failed",
+      }),
+    );
+    return { ok: false };
+  }
+}
+
+/**
+ * Claim an expired profile-image ticket before touching R2. A foreground
+ * upload may have promoted the image since the cleanup page was selected, so
+ * a zero-change claim must leave the ready image untouched.
+ */
+export async function cleanupExpiredProfileImageUpload(
+  env: Env,
+  image: ProfileImageCleanupRow,
+  now: number,
+): Promise<boolean> {
+  const claimed = await env.DB.prepare(
+    `UPDATE profile_images SET status = 'failed', upload_token_hash = NULL,
+     failure_code = 'upload_expired', updated_at = ?
+     WHERE id = ? AND status IN ('reserved', 'processing') AND expires_at <= ?`,
+  )
+    .bind(now, image.id, now)
+    .run();
+  if ((claimed.meta.changes ?? 0) !== 1) return false;
+  await deleteProfileImageObjects(env, image.user_id, image.id);
+  return true;
 }
 
 /**
@@ -156,7 +355,9 @@ export async function cleanupExpiredShowcaseUpload(
     `UPDATE creation_showcase_images SET status = 'failed',
      upload_token_hash = NULL, failure_code = 'upload_expired', updated_at = ?
      WHERE id = ? AND status IN ('reserved', 'processing') AND expires_at <= ?`,
-  ).bind(now, image.id, now).run();
+  )
+    .bind(now, image.id, now)
+    .run();
   if ((claimed.meta.changes ?? 0) !== 1) return false;
   await deleteShowcaseImageObjects(env, image.creation_id, image.id);
   return true;
@@ -169,7 +370,9 @@ async function deleteRevisionObjects(
 ): Promise<void> {
   const rows = await env.DB.prepare(
     "SELECT object_key FROM creation_objects WHERE revision_id = ?",
-  ).bind(revisionId).all<{ object_key: string }>();
+  )
+    .bind(revisionId)
+    .all<{ object_key: string }>();
   const knownKeys = rows.results.map((row) => row.object_key);
   const deterministicKeys = [
     `private/creations/${creationId}/${revisionId}/project.json`,
@@ -177,13 +380,18 @@ async function deleteRevisionObjects(
     `private/creations/${creationId}/${revisionId}/thumb.webp`,
     `private/creations/${creationId}/${revisionId}/social.jpg`,
   ];
-  await env.PROJECTS.delete(Array.from(new Set([...knownKeys, ...deterministicKeys])));
+  await env.PROJECTS.delete(
+    Array.from(new Set([...knownKeys, ...deterministicKeys])),
+  );
   await env.DB.prepare("DELETE FROM creation_objects WHERE revision_id = ?")
     .bind(revisionId)
     .run();
 }
 
-async function deleteCreationObjects(env: Env, creationId: string): Promise<void> {
+async function deleteCreationObjects(
+  env: Env,
+  creationId: string,
+): Promise<void> {
   let cursor: string | undefined;
   do {
     const page = await env.PROJECTS.list({

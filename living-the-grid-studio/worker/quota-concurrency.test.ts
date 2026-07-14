@@ -14,6 +14,10 @@ describe("database-authoritative quota admission", () => {
     await clearR2();
     await env.DB.exec(`
       DELETE FROM quota_reservations;
+      DELETE FROM profile_image_report_evidence;
+      DELETE FROM profile_image_objects;
+      DELETE FROM profile_images;
+      DELETE FROM profile_image_upload_attempts;
       DELETE FROM moderation_actions;
       DELETE FROM reports;
       DELETE FROM follows;
@@ -163,6 +167,34 @@ describe("database-authoritative quota admission", () => {
         .first(),
     ).toBeNull();
   });
+
+  it("keeps deleting profile-image objects charged until cleanup removes the bytes", async () => {
+    const owner = await seedUser("profile-cleanup-owner");
+    const token = await seedSession(
+      owner.id,
+      "deleting-profile-storage-owner-token",
+    );
+    const profileBytes = COMMUNITY_LIMITS.profileImageOutputBytes;
+    await seedCommittedStorage(
+      owner.id,
+      COMMUNITY_LIMITS.cloudBytesPerUser - profileBytes,
+    );
+    await seedDeletingProfileObject(owner.id, profileBytes);
+
+    const response = await createCloudProject(
+      token,
+      "Deleting profile bytes remain charged",
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "QUOTA_EXCEEDED" },
+    });
+    await expect(activeReservationTotal(owner.id)).resolves.toMatchObject({
+      count: 0,
+      storage_bytes: 0,
+    });
+  });
 });
 
 describe("database-authoritative rolling report limit", () => {
@@ -280,7 +312,7 @@ async function seedUser(username: string): Promise<{ id: string }> {
       `INSERT INTO users
        (id, username, display_name, bio, role, status, avatar_seed,
         terms_version, terms_accepted_at, created_at, updated_at)
-       VALUES (?, ?, ?, '', 'user', 'active', ?, '2026-07-13', ?, ?, ?)`,
+       VALUES (?, ?, ?, '', 'user', 'active', ?, '2026-07-14', ?, ?, ?)`,
     ).bind(id, username, username, id, now, now, now),
     env.DB.prepare(
       `INSERT INTO external_identities
@@ -376,6 +408,38 @@ async function seedCommittedStorage(
       `private/creations/${creationId}/${revisionId}/project.json`,
       bytes,
       "1".repeat(64),
+      now,
+      now,
+    ),
+  ]);
+}
+
+async function seedDeletingProfileObject(
+  userId: string,
+  bytes: number,
+): Promise<void> {
+  const imageId = crypto.randomUUID();
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO profile_images
+       (id, user_id, upload_token_hash, expected_content_type,
+        expected_byte_size, focus_x, focus_y, status, expires_at,
+        created_at, updated_at, deleted_at)
+       VALUES (?, ?, NULL, 'image/png', 1, 50, 50, 'deleting', ?, ?, ?, ?)`,
+    ).bind(imageId, userId, now + HOUR_MS, now, now, now),
+    env.DB.prepare(
+      `INSERT INTO profile_image_objects
+       (id, image_id, user_id, object_key, content_type, byte_size, sha256,
+        status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'image/webp', ?, ?, 'deleting', ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      imageId,
+      userId,
+      `private/users/${userId}/avatar/${imageId}/avatar.webp`,
+      bytes,
+      "2".repeat(64),
       now,
       now,
     ),

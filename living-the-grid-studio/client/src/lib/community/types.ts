@@ -2,13 +2,12 @@ import type { GridDocument } from "@/lib/engine/grid";
 
 export type UserRole = "user" | "moderator" | "admin";
 export type UserStatus =
-  | "active"
-  | "suspended"
-  | "deletion_pending"
-  | "deleted";
+  "active" | "suspended" | "deletion_pending" | "deleted";
 export type CreationVisibility = "private" | "unlisted" | "public";
-export type CreationStatus = "uploading" | "draft" | "published" | "hidden" | "deleted";
-export type SaveState = "local" | "saving" | "saved" | "offline" | "conflict" | "error";
+export type CreationStatus =
+  "uploading" | "draft" | "published" | "hidden" | "deleted";
+export type SaveState =
+  "local" | "saving" | "saved" | "offline" | "conflict" | "error";
 
 export interface CommunityUser {
   id: string;
@@ -18,6 +17,7 @@ export interface CommunityUser {
   role: UserRole;
   status: UserStatus;
   avatarSeed: string;
+  avatarUrl?: string | null;
   createdAt: number;
   requiredTermsVersion?: string;
   termsAccepted?: boolean;
@@ -56,7 +56,10 @@ export interface CreationSummary {
   revision: number;
   publishedAt?: number | null;
   updatedAt: number;
-  owner: Pick<CommunityUser, "id" | "username" | "displayName" | "avatarSeed">;
+  owner: Pick<
+    CommunityUser,
+    "id" | "username" | "displayName" | "avatarSeed" | "avatarUrl"
+  >;
   tags: string[];
   likeCount: number;
   commentCount: number;
@@ -90,7 +93,10 @@ export interface CommunityComment {
   id: string;
   body: string;
   status: "active" | "hidden" | "deleted";
-  author: Pick<CommunityUser, "id" | "username" | "displayName" | "avatarSeed">;
+  author: Pick<
+    CommunityUser,
+    "id" | "username" | "displayName" | "avatarSeed" | "avatarUrl"
+  >;
   createdAt: number;
   updatedAt: number;
   canEdit?: boolean;
@@ -105,7 +111,10 @@ export interface ReportRecord {
   details?: string | null;
   status: "open" | "reviewing" | "resolved" | "dismissed";
   createdAt: number;
-  reporter?: Pick<CommunityUser, "id" | "username" | "displayName" | "avatarSeed">;
+  reporter?: Pick<
+    CommunityUser,
+    "id" | "username" | "displayName" | "avatarSeed" | "avatarUrl"
+  >;
   targetLabel?: string;
 }
 

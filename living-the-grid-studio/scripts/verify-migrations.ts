@@ -20,11 +20,28 @@ const REQUIRED_TABLES = [
   "follows",
   "likes",
   "moderation_actions",
+  "profile_image_objects",
+  "profile_image_report_evidence",
+  "profile_image_upload_attempts",
+  "profile_images",
   "quota_reservations",
   "reports",
   "sessions",
   "tags",
   "users",
+] as const;
+const REQUIRED_INDEXES = [
+  "profile_image_objects_cleanup_idx",
+  "profile_image_objects_user_idx",
+  "profile_image_report_evidence_image_idx",
+  "profile_image_report_evidence_user_idx",
+  "profile_image_upload_attempts_user_time_idx",
+  "profile_images_expiry_idx",
+  "profile_images_one_ready_per_user_idx",
+  "profile_images_replaces_idx",
+  "profile_images_user_status_idx",
+  "users_avatar_image_id_idx",
+  "users_deleted_cleanup_idx",
 ] as const;
 
 const migrationsDirectory = path.join(ROOT, "migrations");
@@ -94,6 +111,19 @@ try {
     );
   }
 
+  const indexRows = database
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'index'")
+    .all() as { name: string }[];
+  const indexNames = new Set(indexRows.map(({ name }) => name));
+  const missingIndexes = REQUIRED_INDEXES.filter(
+    (index) => !indexNames.has(index),
+  );
+  if (missingIndexes.length > 0) {
+    throw new Error(
+      `Required migrated indexes are missing: ${missingIndexes.join(", ")}`,
+    );
+  }
+
   const facePaintTag = database
     .prepare("SELECT slug, name, description FROM tags WHERE id = ?")
     .get("tag-face-masks") as
@@ -111,7 +141,7 @@ try {
   }
 
   console.log(
-    `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables.`,
+    `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables and ${REQUIRED_INDEXES.length} required profile-image indexes.`,
   );
 } finally {
   database.close();

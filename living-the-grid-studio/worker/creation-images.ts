@@ -725,7 +725,7 @@ async function inspectImage(
     throw new HttpError(
       415,
       "unsupported_image_type",
-      "Use a JPEG, PNG, WebP, HEIC, or HEIF image.",
+      "Use a JPEG, PNG, WebP, or HEIC image.",
     );
   }
   return { contentType, height: info.height, width: info.width };
@@ -735,22 +735,20 @@ function normalizeDetectedImageType(value: string): string | null {
   const normalized = value.trim().toLowerCase();
   const aliases: Record<string, string> = {
     heic: "image/heic",
-    heif: "image/heif",
     jpeg: "image/jpeg",
     jpg: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
   };
   const candidate = aliases[normalized] ?? normalized;
-  return ["image/heic", "image/heif", "image/jpeg", "image/png", "image/webp"]
+  return ["image/heic", "image/jpeg", "image/png", "image/webp"]
     .includes(candidate)
     ? candidate
     : null;
 }
 
 function sameImageFormat(expected: string, detected: string): boolean {
-  const heicFamily = new Set(["image/heic", "image/heif"]);
-  return expected === detected || (heicFamily.has(expected) && heicFamily.has(detected));
+  return expected === detected;
 }
 
 async function ownerDraftCreation(

@@ -86,7 +86,14 @@ export function failure(
         message,
         ...details,
         ...(fields
-          ? { fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value.join(" ")])) }
+          ? {
+              fields: Object.fromEntries(
+                Object.entries(fields).map(([key, value]) => [
+                  key,
+                  value.join(" "),
+                ]),
+              ),
+            }
           : {}),
       },
       requestId,
@@ -168,7 +175,10 @@ export async function readJson(
   }
 }
 
-export async function readText(request: Request, maxBytes: number): Promise<string> {
+export async function readText(
+  request: Request,
+  maxBytes: number,
+): Promise<string> {
   return new TextDecoder().decode(await readBoundedBody(request, maxBytes));
 }
 
@@ -196,7 +206,12 @@ export async function parseJson<TSchema extends z.ZodType>(
     const key = issue.path.length ? issue.path.join(".") : "body";
     (fields[key] ??= []).push(issue.message);
   }
-  throw new HttpError(400, "validation_error", "Request validation failed.", fields);
+  throw new HttpError(
+    400,
+    "validation_error",
+    "Request validation failed.",
+    fields,
+  );
 }
 
 async function readBoundedBody(
@@ -215,7 +230,11 @@ async function readBoundedBody(
       total += value.byteLength;
       if (total > maxBytes) {
         await reader.cancel("Request body exceeds configured limit.");
-        throw new HttpError(413, "payload_too_large", "Request body is too large.");
+        throw new HttpError(
+          413,
+          "payload_too_large",
+          "Request body is too large.",
+        );
       }
       chunks.push(value);
     }
@@ -242,13 +261,17 @@ export function assertSafeOrigin(context: WorkerRequestContext): void {
     throw new HttpError(403, "origin_mismatch", "Request origin was rejected.");
   }
 
-  const contentType = context.request.headers.get("content-type")?.toLowerCase() ?? "";
-  const isOidcFormStart = context.url.pathname === "/api/auth/google/start"
-    && contentType.startsWith("application/x-www-form-urlencoded");
-  const isRawCreationImageUpload = context.request.method === "PUT"
-    && /^\/api\/creation-image-uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/content\/?$/iu
-      .test(context.url.pathname);
-  if (isRawCreationImageUpload) {
+  const contentType =
+    context.request.headers.get("content-type")?.toLowerCase() ?? "";
+  const isOidcFormStart =
+    context.url.pathname === "/api/auth/google/start" &&
+    contentType.startsWith("application/x-www-form-urlencoded");
+  const isRawImageUpload =
+    context.request.method === "PUT" &&
+    /^\/api\/(?:creation-image-uploads|avatar-uploads)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/content\/?$/iu.test(
+      context.url.pathname,
+    );
+  if (isRawImageUpload) {
     if (context.request.headers.has("cookie")) {
       throw new HttpError(
         403,
@@ -256,30 +279,46 @@ export function assertSafeOrigin(context: WorkerRequestContext): void {
         "Image upload requests must not include browser credentials.",
       );
     }
-    if (!/^Bearer [A-Za-z0-9_-]{43}$/u.test(context.request.headers.get("authorization") ?? "")) {
-      throw new HttpError(401, "invalid_upload_ticket", "Image upload ticket is invalid or expired.");
+    if (
+      !/^Bearer [A-Za-z0-9_-]{43}$/u.test(
+        context.request.headers.get("authorization") ?? "",
+      )
+    ) {
+      throw new HttpError(
+        401,
+        "invalid_upload_ticket",
+        "Image upload ticket is invalid or expired.",
+      );
     }
-    if (![
-      "image/heic",
-      "image/heif",
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ].includes(contentType)) {
+    if (
+      ![
+        "image/heic",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ].includes(contentType)
+    ) {
       throw new HttpError(
         415,
         "unsupported_image_type",
-        "Use a JPEG, PNG, WebP, HEIC, or HEIF image.",
+        "Use a JPEG, PNG, WebP, or HEIC image.",
       );
     }
     return;
   }
   if (!isOidcFormStart && !contentType.startsWith("application/json")) {
-    throw new HttpError(415, "unsupported_media_type", "Unsafe requests must use application/json.");
+    throw new HttpError(
+      415,
+      "unsupported_media_type",
+      "Unsafe requests must use application/json.",
+    );
   }
 }
 
-export function applySecurityHeaders(response: Response, requestId: string): Response {
+export function applySecurityHeaders(
+  response: Response,
+  requestId: string,
+): Response {
   const headers = new Headers(response.headers);
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
@@ -290,8 +329,14 @@ export function applySecurityHeaders(response: Response, requestId: string): Res
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), interest-cohort=(), browsing-topics=()",
   );
-  if (!headers.has("Strict-Transport-Security") && headers.get("X-Worker-Scheme") === "https") {
-    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  if (
+    !headers.has("Strict-Transport-Security") &&
+    headers.get("X-Worker-Scheme") === "https"
+  ) {
+    headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
   }
   headers.delete("X-Worker-Scheme");
   if (!headers.has("Content-Security-Policy")) {

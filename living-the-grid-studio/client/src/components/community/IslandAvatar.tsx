@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   islandAvatarRecipe,
@@ -270,14 +271,18 @@ function Accessory({ recipe }: { recipe: IslandAvatarRecipe }) {
 
 export function IslandAvatar({
   seed,
+  imageUrl,
   label,
   className,
 }: {
   seed: string;
+  imageUrl?: string | null;
   label?: string;
   className?: string;
 }) {
   const recipe = islandAvatarRecipe(seed);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const showCustomImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
 
   return (
     <span
@@ -289,72 +294,87 @@ export function IslandAvatar({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <svg
-        viewBox="0 0 64 64"
-        className="h-full w-full"
-        focusable="false"
-        aria-hidden="true"
-      >
-        <rect width="64" height="64" fill={recipe.background} />
-        <AvatarBackground recipe={recipe} />
-        <Hair recipe={recipe} layer="back" />
-        <path
-          d="M7 65c2-15 12-23 25-23s23 8 25 23Z"
-          fill={recipe.shirt}
-          stroke="#20202a"
-          strokeWidth="2"
+      {showCustomImage ? (
+        <img
+          src={imageUrl!}
+          alt=""
+          className="-m-0.5 size-[calc(100%+4px)] max-w-none shrink-0 object-cover"
+          draggable={false}
+          aria-hidden="true"
+          onError={() => setFailedImageUrl(imageUrl!)}
         />
-        <path
-          d="m24 44 8 7 8-7 4 2-4 9H24l-4-9Z"
-          fill={recipe.accent}
-          opacity="0.92"
-        />
-        <circle
-          cx="13"
-          cy="30"
-          r="4"
-          fill={recipe.skin}
-          stroke="#20202a"
-          strokeWidth="1.3"
-        />
-        <circle
-          cx="51"
-          cy="30"
-          r="4"
-          fill={recipe.skin}
-          stroke="#20202a"
-          strokeWidth="1.3"
-        />
-        <circle
-          cx="32"
-          cy="28"
-          r="19"
-          fill={recipe.skin}
-          stroke="#20202a"
-          strokeWidth="1.6"
-        />
-        <Hair recipe={recipe} layer="front" />
-        <Eyes recipe={recipe} />
-        <path
-          d="M31 30.5 29.5 34H33"
-          fill="none"
-          stroke="#9c6956"
-          strokeWidth="1"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.65"
-        />
-        <Mouth recipe={recipe} />
-        <Accessory recipe={recipe} />
-        <circle
-          cx="32"
-          cy="57"
-          r="2.3"
-          fill={recipe.accent}
-          stroke="#20202a"
-          strokeWidth="1"
-        />
-      </svg>
+      ) : (
+        <>
+          {/* Explicit dimensions avoid Button's generic descendant `svg:size-4`
+              rule and extend beneath the two-pixel frame at compact sizes. */}
+          <svg
+            viewBox="0 0 64 64"
+            className="-m-0.5 size-[calc(100%+4px)] max-w-none shrink-0"
+            focusable="false"
+            aria-hidden="true"
+          >
+            <rect width="64" height="64" fill={recipe.background} />
+            <AvatarBackground recipe={recipe} />
+            <Hair recipe={recipe} layer="back" />
+            <path
+              d="M7 65c2-15 12-23 25-23s23 8 25 23Z"
+              fill={recipe.shirt}
+              stroke="#20202a"
+              strokeWidth="2"
+            />
+            <path
+              d="m24 44 8 7 8-7 4 2-4 9H24l-4-9Z"
+              fill={recipe.accent}
+              opacity="0.92"
+            />
+            <circle
+              cx="13"
+              cy="30"
+              r="4"
+              fill={recipe.skin}
+              stroke="#20202a"
+              strokeWidth="1.3"
+            />
+            <circle
+              cx="51"
+              cy="30"
+              r="4"
+              fill={recipe.skin}
+              stroke="#20202a"
+              strokeWidth="1.3"
+            />
+            <circle
+              cx="32"
+              cy="28"
+              r="19"
+              fill={recipe.skin}
+              stroke="#20202a"
+              strokeWidth="1.6"
+            />
+            <Hair recipe={recipe} layer="front" />
+            <Eyes recipe={recipe} />
+            <path
+              d="M31 30.5 29.5 34H33"
+              fill="none"
+              stroke="#9c6956"
+              strokeWidth="1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.65"
+            />
+            <Mouth recipe={recipe} />
+            <Accessory recipe={recipe} />
+            <circle
+              cx="32"
+              cy="57"
+              r="2.3"
+              fill={recipe.accent}
+              stroke="#20202a"
+              strokeWidth="1"
+            />
+          </svg>
+        </>
+      )}
     </span>
   );
 }

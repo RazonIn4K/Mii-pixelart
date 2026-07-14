@@ -26,6 +26,8 @@ export interface RenderOptions {
   cellSize: number;
   /** Show grid lines */
   showGrid: boolean;
+  /** Draw a boundary every N cells. One renders every cell boundary. */
+  gridStep: number;
   /** Show paint-by-numbers labels */
   showLabels: boolean;
   /** Color ID to highlight (all cells of this color get a border) */
@@ -48,6 +50,7 @@ export interface RenderOptions {
 export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   cellSize: 16,
   showGrid: true,
+  gridStep: 1,
   showLabels: false,
   highlightColorId: null,
   zoom: 1.0,
@@ -61,12 +64,33 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
 
 export const MIN_VISIBLE_GRID_CELL_SIZE = 4;
 
+/** Local-only guide density. Changing this never mutates the grid document. */
+export type GridDensity = "off" | "coarse" | "medium" | "cell";
+
+const GRID_DENSITY_STEPS: Readonly<
+  Record<Exclude<GridDensity, "off">, number>
+> = {
+  coarse: 8,
+  medium: 4,
+  cell: 1,
+};
+
+/** Resolve a user-facing density preset to its cell interval. */
+export function gridStepForDensity(density: GridDensity): number | null {
+  return density === "off" ? null : GRID_DENSITY_STEPS[density];
+}
+
 export function shouldRenderGridLines(
   showGrid: boolean,
   cellSize: number,
   zoom: number,
+  gridStep = 1,
 ): boolean {
-  return showGrid && cellSize * zoom >= MIN_VISIBLE_GRID_CELL_SIZE;
+  return (
+    showGrid &&
+    cellSize * zoom * Math.max(1, Math.floor(gridStep)) >=
+      MIN_VISIBLE_GRID_CELL_SIZE
+  );
 }
 
 /** Resolve a color ID to its hex value */
@@ -134,18 +158,27 @@ export function renderGrid(
 
   // Draw grid lines
   if (opts.showGrid) {
+    const gridStep = Math.max(1, Math.floor(opts.gridStep));
     ctx.strokeStyle = opts.gridColor;
     ctx.lineWidth = opts.gridWidth;
     ctx.beginPath();
-    for (let x = 0; x <= doc.width; x++) {
+    for (let x = 0; x <= doc.width; x += gridStep) {
       const px = x * scaledSize;
       ctx.moveTo(px, 0);
       ctx.lineTo(px, canvasH);
     }
-    for (let y = 0; y <= doc.height; y++) {
+    if (doc.width % gridStep !== 0) {
+      ctx.moveTo(canvasW, 0);
+      ctx.lineTo(canvasW, canvasH);
+    }
+    for (let y = 0; y <= doc.height; y += gridStep) {
       const py = y * scaledSize;
       ctx.moveTo(0, py);
       ctx.lineTo(canvasW, py);
+    }
+    if (doc.height % gridStep !== 0) {
+      ctx.moveTo(0, canvasH);
+      ctx.lineTo(canvasW, canvasH);
     }
     ctx.stroke();
   }

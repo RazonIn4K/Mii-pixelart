@@ -25,16 +25,22 @@ import type {
   ApiErrorEnvelope,
   CreationShowcaseImage,
 } from "@/lib/community/types";
+import {
+  COMMUNITY_IMAGE_CONTENT_TYPES,
+  COMMUNITY_LIMITS,
+} from "@shared/community";
 
-const MAX_SHOWCASE_IMAGES = 4;
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-]);
+const MAX_SHOWCASE_IMAGES = COMMUNITY_LIMITS.creationImagesPerCreation;
+const MAX_UPLOAD_BYTES = COMMUNITY_LIMITS.creationImageInputBytes;
+const ACCEPTED_TYPES = new Set<string>(COMMUNITY_IMAGE_CONTENT_TYPES);
+const SHOWCASE_IMAGE_ACCEPT = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ...COMMUNITY_IMAGE_CONTENT_TYPES,
+].join(",");
 
 interface UploadTicket {
   uploadId: string;
@@ -65,7 +71,6 @@ function normalizedContentType(file: File): string | null {
   if (extension === "png") return "image/png";
   if (extension === "webp") return "image/webp";
   if (extension === "heic") return "image/heic";
-  if (extension === "heif") return "image/heif";
   return null;
 }
 
@@ -93,14 +98,17 @@ async function uploadWithTicket(
     );
   }
 
-  const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
+  const isJson = (response.headers.get("content-type") ?? "").includes(
+    "application/json",
+  );
   const body = isJson
-    ? await response.json() as ApiEnvelope<UploadResult> | ApiErrorEnvelope
+    ? ((await response.json()) as ApiEnvelope<UploadResult> | ApiErrorEnvelope)
     : null;
   if (!response.ok || !body || "error" in body) {
     const error = body && "error" in body ? body.error : null;
     throw new CommunityApiError(
-      error?.message ?? "The image could not be processed. Try a different file.",
+      error?.message ??
+        "The image could not be processed. Try a different file.",
       {
         code: error?.code ?? `HTTP_${response.status}`,
         fields: error?.fields,
@@ -163,7 +171,9 @@ export function ShowcaseImageManager({
     let canceled = false;
     setLoading(true);
     setLoadError(null);
-    void communityApi<CreationShowcaseImage[]>(`/api/creations/${creationId}/images`)
+    void communityApi<CreationShowcaseImage[]>(
+      `/api/creations/${creationId}/images`,
+    )
       .then((result) => {
         if (!canceled) replaceImages(result.data);
       })
@@ -173,7 +183,9 @@ export function ShowcaseImageManager({
       .finally(() => {
         if (!canceled) setLoading(false);
       });
-    return () => { canceled = true; };
+    return () => {
+      canceled = true;
+    };
     // `replaceImages` intentionally remains a local state adapter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creationId, loadNonce]);
@@ -185,7 +197,7 @@ export function ShowcaseImageManager({
     }
     if (!normalizedContentType(nextFile)) {
       setFile(null);
-      toast.error("Choose a JPEG, PNG, WebP, HEIC, or HEIF image.");
+      toast.error("Choose a JPEG, PNG, WebP, or HEIC image.");
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -249,7 +261,10 @@ export function ShowcaseImageManager({
     }
   };
 
-  const saveOrder = async (ordered: CreationShowcaseImage[], coverImageId: string) => {
+  const saveOrder = async (
+    ordered: CreationShowcaseImage[],
+    coverImageId: string,
+  ) => {
     setUpdating(coverImageId);
     try {
       const result = await communityApi<GalleryMutationResult>(
@@ -274,8 +289,12 @@ export function ShowcaseImageManager({
     const target = index + offset;
     if (target < 0 || target >= images.length) return;
     const reordered = [...images];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    const cover = reordered.find((image) => image.isCover)?.id ?? reordered[0].id;
+    [reordered[index], reordered[target]] = [
+      reordered[target],
+      reordered[index],
+    ];
+    const cover =
+      reordered.find((image) => image.isCover)?.id ?? reordered[0].id;
     void saveOrder(reordered, cover);
   };
 
@@ -299,11 +318,18 @@ export function ShowcaseImageManager({
     <section className="space-y-3" aria-labelledby={`${inputId}-heading`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 id={`${inputId}-heading`} className="text-sm font-black text-[var(--island-ink)]">
-            Showcase images <span className="font-medium text-muted-foreground">(optional)</span>
+          <h3
+            id={`${inputId}-heading`}
+            className="text-sm font-black text-[var(--island-ink)]"
+          >
+            Showcase images{" "}
+            <span className="font-medium text-muted-foreground">
+              (optional)
+            </span>
           </h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Add up to four photos or screenshots. We remove metadata and keep optimized copies only.
+            Add up to four photos or screenshots. We remove metadata and keep
+            optimized copies only.
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-bold">
@@ -312,15 +338,28 @@ export function ShowcaseImageManager({
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-3 text-xs" role="status">
-          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Loading showcase images…
+        <div
+          className="flex items-center gap-2 rounded-xl bg-muted/60 p-3 text-xs"
+          role="status"
+        >
+          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />{" "}
+          Loading showcase images…
         </div>
       ) : null}
 
       {loadError ? (
-        <div className="rounded-xl border border-destructive/30 bg-red-50 p-3 text-xs text-red-950" role="alert">
+        <div
+          className="rounded-xl border border-destructive/30 bg-red-50 p-3 text-xs text-red-950"
+          role="alert"
+        >
           <p>The showcase gallery could not be loaded: {loadError}</p>
-          <Button type="button" size="sm" variant="outline" className="mt-2 bg-white" onClick={() => setLoadNonce((value) => value + 1)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-2 bg-white"
+            onClick={() => setLoadNonce((value) => value + 1)}
+          >
             Retry gallery
           </Button>
         </div>
@@ -329,7 +368,10 @@ export function ShowcaseImageManager({
       {images.length ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {images.map((image, index) => (
-            <article key={image.id} className="overflow-hidden rounded-xl border-2 border-[var(--island-ink)] bg-white">
+            <article
+              key={image.id}
+              className="overflow-hidden rounded-xl border-2 border-[var(--island-ink)] bg-white"
+            >
               <div className="relative aspect-[4/3] bg-[var(--island-paper)]">
                 <img
                   src={image.thumbnailUrl}
@@ -347,36 +389,91 @@ export function ShowcaseImageManager({
                 ) : null}
               </div>
               <div className="space-y-2 p-3">
-                <p className="line-clamp-2 min-h-8 text-xs font-medium leading-4">{image.altText}</p>
-                {!readOnly ? <div className="flex flex-wrap gap-1" aria-label={`Manage image ${index + 1}`}>
-                  <Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={index === 0 || updating !== null} onClick={() => move(index, -1)} aria-label="Move image earlier"><ArrowLeft /></Button>
-                  <Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={index === images.length - 1 || updating !== null} onClick={() => move(index, 1)} aria-label="Move image later"><ArrowRight /></Button>
-                  {!image.isCover ? <Button type="button" variant="outline" size="sm" className="h-8" disabled={updating !== null} onClick={() => void saveOrder(images, image.id)}><Star /> Make cover</Button> : null}
-                  <Button type="button" variant="ghost" size="icon" className="ml-auto h-8 w-8 text-destructive" disabled={updating !== null} onClick={() => void remove(image)} aria-label="Remove image"><Trash2 /></Button>
-                </div> : null}
+                <p className="line-clamp-2 min-h-8 text-xs font-medium leading-4">
+                  {image.altText}
+                </p>
+                {!readOnly ? (
+                  <div
+                    className="flex flex-wrap gap-1"
+                    aria-label={`Manage image ${index + 1}`}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={index === 0 || updating !== null}
+                      onClick={() => move(index, -1)}
+                      aria-label="Move image earlier"
+                    >
+                      <ArrowLeft />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={
+                        index === images.length - 1 || updating !== null
+                      }
+                      onClick={() => move(index, 1)}
+                      aria-label="Move image later"
+                    >
+                      <ArrowRight />
+                    </Button>
+                    {!image.isCover ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        disabled={updating !== null}
+                        onClick={() => void saveOrder(images, image.id)}
+                      >
+                        <Star /> Make cover
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="ml-auto h-8 w-8 text-destructive"
+                      disabled={updating !== null}
+                      onClick={() => void remove(image)}
+                      aria-label="Remove image"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </article>
           ))}
         </div>
       ) : !loading ? (
         <div className="rounded-xl border border-dashed border-[var(--island-ink)]/30 bg-[var(--island-paper)] p-4 text-center text-xs text-muted-foreground">
-          Your generated pixel preview will be used until you add a showcase image.
+          Your generated pixel preview will be used until you add a showcase
+          image.
         </div>
       ) : null}
 
       {readOnly ? (
         <p className="rounded-xl border border-[var(--island-blue)]/30 bg-[var(--island-blue-soft)] p-3 text-xs font-semibold leading-5 text-[var(--island-ink)]/70">
-          This gallery is live. Unpublish the creation from Your projects before adding, removing, or rearranging images, then publish again to review the complete gallery.
+          This gallery is live. Unpublish the creation from Your projects before
+          adding, removing, or rearranging images, then publish again to review
+          the complete gallery.
         </p>
       ) : images.length < MAX_SHOWCASE_IMAGES ? (
         <div className="space-y-3 rounded-xl border border-[var(--island-blue)]/30 bg-[var(--island-blue-soft)] p-3">
           <div className="space-y-2">
-            <Label htmlFor={`${inputId}-file`} className="sr-only">Choose a photo or screenshot</Label>
+            <Label htmlFor={`${inputId}-file`} className="sr-only">
+              Choose a photo or screenshot
+            </Label>
             <Input
               ref={fileRef}
               id={`${inputId}-file`}
               type="file"
-              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
+              accept={SHOWCASE_IMAGE_ACCEPT}
               disabled={uploading}
               className="sr-only"
               tabIndex={-1}
@@ -399,7 +496,11 @@ export function ShowcaseImageManager({
               onDragLeave={(event) => {
                 event.preventDefault();
                 const nextTarget = event.relatedTarget;
-                if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) setDragging(false);
+                if (
+                  !nextTarget ||
+                  !event.currentTarget.contains(nextTarget as Node)
+                )
+                  setDragging(false);
               }}
               onDrop={handleDrop}
               className={`flex min-h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--island-blue)]/35 disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -410,11 +511,21 @@ export function ShowcaseImageManager({
             >
               <UploadCloud className="h-7 w-7" aria-hidden="true" />
               <span className="text-sm font-black">
-                {dragging ? "Drop to use this image" : "Drop image here or choose a file"}
+                {dragging
+                  ? "Drop to use this image"
+                  : "Drop image here or choose a file"}
               </span>
-              <span className="text-xs font-medium text-muted-foreground">Native file picker works with keyboard and touch</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Native file picker works with keyboard and touch
+              </span>
             </button>
-            <p id={`${inputId}-file-help`} className="text-[0.7rem] leading-4 text-muted-foreground">JPEG, PNG, WebP, HEIC, or HEIF · maximum 8 MiB. Animations are flattened to a still; vector files are not accepted.</p>
+            <p
+              id={`${inputId}-file-help`}
+              className="text-[0.7rem] leading-4 text-muted-foreground"
+            >
+              JPEG, PNG, WebP, or HEIC · maximum 8 MiB. Animations are flattened
+              to a still; vector files are not accepted.
+            </p>
           </div>
           {file ? (
             <figure className="overflow-hidden rounded-xl border-2 border-[var(--island-ink)] bg-white shadow-[3px_3px_0_var(--island-ink)]">
@@ -427,9 +538,13 @@ export function ShowcaseImageManager({
                     onError={() => setPreviewFailed(true)}
                   />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-muted-foreground" role="status">
+                  <div
+                    className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs font-semibold text-muted-foreground"
+                    role="status"
+                  >
                     <FileImage className="h-7 w-7" aria-hidden="true" />
-                    This browser cannot preview this format locally, but it can still be securely optimized after upload.
+                    This browser cannot preview this format locally, but it can
+                    still be securely optimized after upload.
                   </div>
                 )}
                 <Button
@@ -445,8 +560,12 @@ export function ShowcaseImageManager({
                 </Button>
               </div>
               <figcaption className="flex min-w-0 items-center justify-between gap-3 border-t-2 border-[var(--island-ink)] px-3 py-2 text-xs">
-                <span className="truncate font-bold" title={file.name}>{file.name}</span>
-                <span className="shrink-0 font-mono text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MiB</span>
+                <span className="truncate font-bold" title={file.name}>
+                  {file.name}
+                </span>
+                <span className="shrink-0 font-mono text-muted-foreground">
+                  {(file.size / 1024 / 1024).toFixed(2)} MiB
+                </span>
               </figcaption>
             </figure>
           ) : null}
@@ -460,10 +579,20 @@ export function ShowcaseImageManager({
               disabled={uploading}
               onChange={(event) => setAltText(event.target.value.slice(0, 200))}
             />
-            <p className="text-right text-[0.7rem] text-muted-foreground">{altText.length}/200</p>
+            <p className="text-right text-[0.7rem] text-muted-foreground">
+              {altText.length}/200
+            </p>
           </div>
-          <Button type="button" onClick={() => void upload()} disabled={!file || !altText.trim() || uploading}>
-            {uploading ? <Loader2 className="animate-spin motion-reduce:animate-none" /> : <ImagePlus />}
+          <Button
+            type="button"
+            onClick={() => void upload()}
+            disabled={!file || !altText.trim() || uploading}
+          >
+            {uploading ? (
+              <Loader2 className="animate-spin motion-reduce:animate-none" />
+            ) : (
+              <ImagePlus />
+            )}
             {uploading ? "Optimizing image…" : "Add showcase image"}
           </Button>
         </div>

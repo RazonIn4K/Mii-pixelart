@@ -187,8 +187,8 @@ human-authorized moderation.
       limits, scheduled maintenance, dynamic documents, and legacy AI/Stripe
       parity
 - [x] Google authorization-code OIDC, onboarding, hashed opaque sessions,
-      generated avatars, avatar regeneration, profile/settings, export, and
-      deletion lifecycle
+      generated avatars, avatar regeneration, optional normalized profile
+      images, profile/settings, export, and deletion lifecycle
 - [x] Explicit first private save, IndexedDB resume/sync metadata, autosave,
       offline/conflict states, immutable project revisions, quotas, and media
       generation
@@ -198,7 +198,7 @@ human-authorized moderation.
 - [x] Likes, comments, follows, reports, reversible moderation, legal/community
       documents, structured redacted logs, and retention jobs
 - [x] ADRs, threat model, data-flow documentation, OpenAPI contract, forward-only
-      migrations `0001` through `0006`, release guards, Worker integration
+      migrations `0001` through `0007`, release guards, Worker integration
       tests, and responsive/accessibility coverage
 - [x] Direct local Chromium 200 percent page-scale regression with keyboard
       focus and no document-level overflow
@@ -217,7 +217,8 @@ human-authorized moderation.
 **Remaining approval gates:**
 
 - [ ] Deploy the current writable-staging candidate and complete authenticated
-      single-user acceptance for profile setup, avatars, cloud projects,
+      single-user acceptance for profile setup, generated/custom avatars,
+      current-Terms reacceptance, cloud projects,
       generated/uploaded media, publishing, conflicts, quotas, and cleanup
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
