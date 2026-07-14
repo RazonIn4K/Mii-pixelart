@@ -103,8 +103,8 @@ jobs:
       - name: Apply local D1 migrations
         run: pnpm db:migrate:local
 
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install browser engines
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Run browser acceptance suite
         run: pnpm test:e2e

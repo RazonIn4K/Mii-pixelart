@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Route } from "@playwright/test";
 
 const publicRoutes = [
@@ -100,7 +101,13 @@ test("Unlock keeps consult sales visibly paused and has no consult checkout acti
 
 test("mobile navigation exposes community and Studio destinations", async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(
+    !["small-phone", "minimum-phone", "mobile-webkit"].includes(
+      testInfo.project.name,
+    ),
+    "The mobile navigation contract is covered at the two narrowest Chromium viewports and a mobile WebKit viewport.",
+  );
   const accessibilityWarnings: string[] = [];
   page.on("console", (message) => {
     if (
@@ -110,9 +117,49 @@ test("mobile navigation exposes community and Studio destinations", async ({
       accessibilityWarnings.push(message.text());
     }
   });
-  await page.setViewportSize({ width: 360, height: 800 });
+  if (testInfo.project.name === "mobile-webkit") {
+    await page.route(
+      /^http:\/\/(?:127\.0\.0\.1|localhost):\d+\/discover(?:\?.*)?$/,
+      async (route) => {
+        const response = await route.fetch();
+        const headers = response.headers();
+        // WebKit correctly upgrades loopback subresources when it sees the
+        // production HTTPS policy. Strip only that directive from this
+        // local-only document so Vite's HTTP modules load while every other
+        // CSP protection remains active; the hosted policy is tested elsewhere.
+        const csp = headers["content-security-policy"];
+        if (csp) {
+          headers["content-security-policy"] = csp
+            .split(";")
+            .map((directive) => directive.trim())
+            .filter(
+              (directive) =>
+                directive.toLowerCase() !== "upgrade-insecure-requests",
+            )
+            .join("; ");
+        }
+        await route.fulfill({ response, headers });
+      },
+    );
+  }
   await page.goto("/discover");
-  await page.getByRole("button", { name: /open navigation/i }).click();
+  const navigationTrigger = page.getByRole("button", {
+    name: /open navigation/i,
+  });
+  const originalScrollStyles = await page.evaluate(() => ({
+    bodyOverflow: document.body.style.overflow,
+    rootOverflow: document.documentElement.style.overflow,
+    rootScrollbarGutter: document.documentElement.style.scrollbarGutter,
+  }));
+  await navigationTrigger.click();
+  const navigationDialog = page.getByRole("dialog", {
+    name: "Island menu",
+  });
+  await expect(navigationDialog).toBeVisible();
+  await expect(
+    navigationDialog.getByRole("button", { name: "Close navigation" }),
+  ).toBeFocused();
+  await expect(navigationTrigger).toHaveAttribute("aria-expanded", "true");
   const mobileNavigation = page.getByRole("navigation", {
     name: /mobile navigation/i,
   });
@@ -129,6 +176,105 @@ test("mobile navigation exposes community and Studio destinations", async ({
   await expect(
     mobileNavigation.getByRole("link", { name: "Studio", exact: true }),
   ).toBeVisible();
+  await expect
+    .poll(() => navigationDialog.evaluate((dialog) => dialog.matches(":modal")))
+    .toBe(true);
+  const accessibilityResults = await new AxeBuilder({ page })
+    .include("dialog[open]")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(accessibilityResults.violations).toEqual([]);
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        bodyOverflow: document.body.style.overflow,
+        rootOverflow: document.documentElement.style.overflow,
+      })),
+    )
+    .toEqual({ bodyOverflow: "hidden", rootOverflow: "hidden" });
+
+  const backgroundScrollPosition = await page.evaluate(() => window.scrollY);
+  if (testInfo.project.name !== "mobile-webkit") {
+    const navigationBounds = await navigationDialog.boundingBox();
+    expect(navigationBounds).not.toBeNull();
+    await page.mouse.move(
+      (navigationBounds?.x ?? 80) + (navigationBounds?.width ?? 240) / 2,
+      (navigationBounds?.y ?? 0) + (navigationBounds?.height ?? 760) / 2,
+    );
+    await page.mouse.wheel(0, 600);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBe(backgroundScrollPosition);
+    await page.mouse.move(20, 400);
+    await page.mouse.wheel(0, 600);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBe(backgroundScrollPosition);
+  }
+
+  await page.mouse.click(20, 400);
+  await expect(navigationDialog).toBeHidden();
+  await expect(navigationTrigger).toBeFocused();
+  expect(
+    await page.evaluate(() => ({
+      bodyOverflow: document.body.style.overflow,
+      rootOverflow: document.documentElement.style.overflow,
+      rootScrollbarGutter: document.documentElement.style.scrollbarGutter,
+    })),
+  ).toEqual(originalScrollStyles);
+  await navigationTrigger.click();
+  await expect(navigationDialog).toBeVisible();
+  await expect(
+    navigationDialog.getByRole("button", { name: "Close navigation" }),
+  ).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    navigationDialog.getByRole("button", { name: "Sign in with Google" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    navigationDialog.getByRole("button", { name: "Close navigation" }),
+  ).toBeFocused();
+
+  for (let index = 0; index < 10; index += 1) {
+    await page.keyboard.press("Tab");
+    await expect
+      .poll(() =>
+        navigationDialog.evaluate((dialog) =>
+          dialog.contains(document.activeElement),
+        ),
+      )
+      .toBe(true);
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(navigationDialog).toBeHidden();
+  await expect(navigationTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(navigationTrigger).toBeFocused();
+
+  const narrowViewport = page.viewportSize();
+  expect(narrowViewport).not.toBeNull();
+  await navigationTrigger.click();
+  await page.setViewportSize({
+    width: 768,
+    height: narrowViewport?.height ?? 800,
+  });
+  await expect(navigationDialog).toBeHidden();
+  await expect(
+    page
+      .getByRole("banner")
+      .getByRole("link", { name: "tomodachi.pw", exact: true }),
+  ).toBeFocused();
+  await page.setViewportSize(narrowViewport ?? { width: 360, height: 800 });
+  await expect(navigationTrigger).toBeVisible();
+
+  await navigationTrigger.click();
+  await mobileNavigation
+    .getByRole("link", { name: "Studio", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/studio$/);
+  await expect(navigationDialog).toBeHidden();
   expect(accessibilityWarnings).toEqual([]);
 });
 

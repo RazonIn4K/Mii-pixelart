@@ -16,8 +16,7 @@ Object.assign(process.env, {
   STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
 });
 
-const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
 const webServerCommand =
   process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ??
   "pnpm dev --host 127.0.0.1 --port 4173 --strictPort";
@@ -90,6 +89,15 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         hasTouch: true,
         viewport: { width: 320, height: 760 },
+      },
+    },
+    {
+      name: "mobile-webkit",
+      testMatch: /community\.spec\.ts/,
+      grep: /mobile navigation exposes community and Studio destinations/,
+      use: {
+        ...devices["iPhone 13"],
+        viewport: { width: 390, height: 844 },
       },
     },
   ],

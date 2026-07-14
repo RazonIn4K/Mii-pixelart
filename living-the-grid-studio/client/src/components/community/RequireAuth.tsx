@@ -9,7 +9,7 @@ export function GoogleSignIn({ returnTo }: { returnTo?: string }) {
   return (
     <form action="/api/auth/google/start" method="post">
       <input type="hidden" name="returnTo" value={destination} />
-      <button type="submit" className="island-button inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-black text-white">
+      <button type="submit" className="island-button inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-black">
         <LogIn className="h-4 w-4" /> Sign in with Google
       </button>
     </form>

@@ -264,14 +264,14 @@
 
   .island-button {
     border: 2px solid var(--island-ink);
-    background: var(--island-coral);
-    color: white;
+    background: var(--island-coral) !important;
+    color: var(--island-ink) !important;
     box-shadow: 3px 3px 0 var(--island-ink);
     transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
   }
 
   .island-button:hover {
-    background: #ee5d51;
+    background: #ee5d51 !important;
     transform: translate(1px, 1px);
     box-shadow: 2px 2px 0 var(--island-ink);
   }

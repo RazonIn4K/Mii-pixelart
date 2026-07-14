@@ -6,6 +6,16 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Fast, accessible mobile navigation:** replaced the header's scroll-locking
+  drawer with a native modal dialog that keeps the background inert, traps
+  keyboard focus, closes by Escape, backdrop, navigation, or desktop resize,
+  and returns focus to a visible header control. Automated coverage now checks
+  focus, dismissal, navigation, scroll locking, responsive closure, and an
+  open-dialog Axe scan at 360- and 320-pixel Chromium viewports plus a
+  390-pixel mobile WebKit viewport. Under the agreed 390-pixel Slow 4G / 4x CPU
+  lab profile, the exact local production candidate improved the menu
+  interaction from 293 ms to 83 ms INP while the homepage measured 0.52 s LCP
+  and 0.00 CLS.
 - **Account polish and legal-contact correction:** added safe owner-requested
   avatar regeneration without image uploads or client-selected seeds, made
   concurrent avatar/profile/setup responses mutation-scoped, made session
@@ -24,9 +34,9 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
   automation and associates the guidance with the canvas for assistive tools.
 - **Release-evidence sync:** reconciled the legal, Google, Stripe, migration,
   and read-only staging checklist with completed gates. Chrome DevTools tracing
-  is now operational and a saved prior-head mobile diagnostic is recorded, but
-  an exact-head cold trace and representative interaction/INP evidence remain
-  required before launch.
+  is now operational and saved cold-load and representative interaction traces
+  cover the local production candidate; the same measurements on the immutable
+  hosted revision remain required before launch.
 - **Staging CPU guardrail:** activated Workers Paid with owner approval and configured a staging-only 2-second CPU limit, enforced exactly in both source and generated release configuration; community writes and production remain unchanged pending live staging acceptance.
 - **Consult-sales containment:** consult checkout now fails closed in both the unified Worker and retained Pages path, stays out of the public catalog while disabled, and cannot be enabled by the release wrapper until an end-to-end fulfillment test is recorded. Recovery and support products remain available.
 - **Staging control-plane readiness:** completed the approved Google OAuth branding, isolated Stripe test-key/webhook setup, and forward-only `0006_align_game_taxonomy.sql` migration without deploying the Worker or changing DNS.
