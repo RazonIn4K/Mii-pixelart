@@ -6,15 +6,23 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-14
 
-- **Studio count and ARIA follow-up (branch only):** corrected singular color and
+- **Final-head Worker staging acceptance:** deployed and accepted exact source
+  `520d0f287d390ba14b0fef179a6394893a5ab92d` on the isolated staging Worker with
+  community mutations and consult sales disabled. Exact-source type, preflight,
+  Worker, schema, packaging, bundle-budget, API/security/crawler,
+  accessibility, responsive, Studio-input, D1 zero-write, production-isolation,
+  and mobile performance gates passed. The completion record is
+  [`docs/release-evidence/2026-07-14-staging-gate-final-head-520d0f28.md`](./docs/release-evidence/2026-07-14-staging-gate-final-head-520d0f28.md).
+  Production remains on Pages; writable staging, cross-user acceptance, merge,
+  cutover, rollback drill, and soak remain separately gated.
+- **Studio count and ARIA follow-up:** corrected singular color and
   cell labels across the Studio and exports, preserved literal spacing in the
   canvas coordinate readout, moved slider labels to the actual slider thumbs,
   and gave named avatar and quick-color collections supported group semantics.
   New unit, Axe incomplete-finding, slider-name, stroke/coordinate, and direct
-  Chromium 200 percent page-scale regressions pass locally. These changes are
-  not part of the accepted `4d905038` staging deployment and require a new
-  exact-SHA gate before they can be described as hosted.
-- **Exact-head read-only staging closeout:** deployed and accepted exact source
+  Chromium 200 percent page-scale regressions pass locally and on the accepted
+  final-head staging source above.
+- **Earlier read-only staging closeout:** deployed and accepted exact source
   `4d905038d755cf4ffd0860bee02037f647ddfc0a` on the isolated staging Worker with
   community mutations and consult sales disabled. The guarded 571-assertion
   API/security/crawler run, 20-scenario cross-engine browser matrix, focused
@@ -22,8 +30,8 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
   recorded in
   [`docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md`](./docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md).
   Production, DNS, OAuth settings, migrations, secrets, roles, and application
-  data were unchanged; production remains on Pages while writable staging,
-  cross-user acceptance, merge, and production cutover remain separately gated.
+  data were unchanged. This remains historical evidence for that exact source;
+  the final-head record above is authoritative for the active staging Worker.
 
 ### 2026-07-13
 

@@ -9,7 +9,7 @@ This document is the single source-of-truth overview for what the current projec
 > **Runtime status:** `codex/island-workshop-community` targets one Cloudflare
 > Worker (Hono) with Worker Static Assets, D1, private R2, KV, Images, rate-limit
 > bindings, and scheduled cleanup. Exact source
-> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on the isolated
+> `520d0f287d390ba14b0fef179a6394893a5ab92d` is accepted on the isolated
 > staging Worker in standard read-only mode. Production `tomodachi.pw` still
 > serves the rollback-safe Cloudflare Pages deployment; record its exact
 > immutable deployment and source at the production cutover gate rather than
@@ -112,7 +112,7 @@ flowchart TD
   Community --> R2["Private R2 projects/media"]
   Worker --> Headers["Dynamic + static security headers"]
 
-  Worker --> Staging["staging.tomodachi.pw\nread-only exact 4d905038"]
+  Worker --> Staging["staging.tomodachi.pw\nread-only exact 520d0f28"]
   LegacyPages["Current production and rollback\nCloudflare Pages"] --> Live["tomodachi.pw until approved cutover"]
 ```
 
@@ -1318,7 +1318,7 @@ These are the most useful next engineering targets.
 
 | Priority | Improvement                                                         | Why It Matters                                                                      |
 | -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| P0       | Complete approval-gated writable staging and current-source launch checks | Exact `4d905038` read-only staging is accepted and the branch passes a direct local 200 percent Chrome page-scale regression; authenticated writes, cross-user boundaries, hosted current-source acceptance, and final performance evidence remain before production cutover |
+| P0       | Complete approval-gated writable staging and launch checks | Exact `520d0f28` read-only Worker staging, hosted accessibility/Studio acceptance, direct 200 percent page-scale regression, and final mobile performance evidence pass; authenticated writes, cross-user boundaries, merge, and production cutover remain independently gated |
 | P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
 | P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
 | P2       | Validate Studio colors against documented, legally usable references | Improves manual matching without claiming proprietary game data                      |

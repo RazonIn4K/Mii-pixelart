@@ -12,14 +12,14 @@
 </p>
 
 > **Deployment status (2026-07-14):** Exact staging source
-> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on
+> `520d0f287d390ba14b0fef179a6394893a5ab92d` is accepted on
 > [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) in standard read-only
 > mode. The account/community implementation and its local/CI tests are present
 > on this branch, but authenticated community writes are not yet enabled.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
 > Cloudflare Pages deployment until writable staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
-> [sanitized staging record](docs/release-evidence/2026-07-14-staging-gate-3a-follow-up.md).
+> [sanitized staging record](docs/release-evidence/2026-07-14-staging-gate-final-head-520d0f28.md).
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 

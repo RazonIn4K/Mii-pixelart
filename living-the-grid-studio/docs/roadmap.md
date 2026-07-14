@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
-| 7     | Island Workshop Community  | Read-only staging       | Source and CI complete; exact `e5d49d13` read-only staging accepted; authenticated writes and launch gated    |
+| 7     | Island Workshop Community  | Read-only staging       | Source and CI complete; exact `520d0f28` Worker staging accepted; authenticated writes and launch gated       |
 
 ---
 
@@ -205,11 +205,14 @@ human-authorized moderation.
 
 **Accepted on isolated staging:**
 
-- [x] Exact source `e5d49d13c5ee07cfd0640e989c48aeb796d5d412`
+- [x] Exact source `520d0f287d390ba14b0fef179a6394893a5ab92d`
       deployed in standard read-only mode
 - [x] Anonymous API/security/crawler, CSP/font, responsive browser,
       accessibility, local-only Studio stroke/undo, zero-write D1, and rollback
       checks
+- [x] Worker-hosted final mobile performance closeout: 2,395 ms median LCP,
+      0.00 CLS, 129 ms menu INP, and 100 Accessibility/Best Practices
+      Lighthouse scores
 
 **Remaining approval gates:**
 
@@ -217,8 +220,8 @@ human-authorized moderation.
       generated/uploaded media, publishing, conflicts, quotas, and cleanup
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
-- [x] Hosted `ab6a62e1` Pages-preview browser and performance closeout; the
-      evidence-only follow-up must retain its measured JS/CSS bytes
+- [x] Immutable preview and Worker asset-byte parity for the accepted
+      `520d0f28` source
 - [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
