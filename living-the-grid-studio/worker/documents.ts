@@ -81,8 +81,11 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
 };
 
 const LEGACY_ROUTE_ALIASES: Readonly<Record<string, string>> = {
-  "/disclosure": "/about",
   "/donate": "/support",
+};
+
+const STATIC_ROUTE_ALIASES: Readonly<Record<string, string>> = {
+  "/disclosure": "/affiliate-disclosure",
 };
 
 const STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
@@ -229,10 +232,11 @@ async function metadataForRequest(
     };
   }
 
-  const staticMetadata = STATIC_METADATA[path];
+  const staticPath = STATIC_ROUTE_ALIASES[path] ?? path;
+  const staticMetadata = STATIC_METADATA[staticPath];
   if (staticMetadata) {
     return {
-      canonicalPath: path,
+      canonicalPath: staticPath,
       description: staticMetadata.description,
       noindex: staticMetadata.noindex ?? false,
       title: staticMetadata.title,

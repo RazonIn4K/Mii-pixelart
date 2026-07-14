@@ -17,7 +17,7 @@ import { communityApi, jsonBody, messageFromError, queryString } from "@/lib/com
 import type { CreationSummary } from "@/lib/community/types";
 
 export default function Projects() {
-  useDocumentTitle("Your projects");
+  useDocumentTitle("Your projects", undefined, { noindex: true });
   const [items, setItems] = useState<CreationSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

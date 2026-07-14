@@ -17,7 +17,7 @@ import { formatCommunityDate } from "@/lib/community/format";
 import type { CommunityUser, SessionInfo } from "@/lib/community/types";
 
 export default function SettingsPage() {
-  useDocumentTitle("Account settings");
+  useDocumentTitle("Account settings", undefined, { noindex: true });
   const { applyAccountUpdate, user, refresh, revokeAll, getSessions } =
     useAuth();
   const [, navigate] = useLocation();
@@ -63,7 +63,13 @@ export default function SettingsPage() {
         method: "PATCH",
         body: jsonBody({ displayName: displayName.trim(), bio: bio.trim() }),
       });
-      applyAccountUpdate(result.data);
+      // A simultaneous avatar regeneration owns avatarSeed; profile save owns
+      // only these editable text fields.
+      applyAccountUpdate({
+        id: result.data.id,
+        displayName: result.data.displayName,
+        bio: result.data.bio,
+      });
       toast.success("Profile saved");
     } catch (error) {
       toast.error(messageFromError(error));
@@ -225,7 +231,7 @@ export default function SettingsPage() {
                 </div>
                 <KeyRound className="text-primary" />
               </div>
-              <div className="mt-5 divide-y" aria-live="polite">
+              <div className="mt-5 divide-y">
                 {sessionsStatus === "loading" || sessionsStatus === "idle" ? (
                   <p
                     className="py-3 text-sm text-muted-foreground"

@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Me() {
-  useDocumentTitle("Your account");
+  useDocumentTitle("Your account", undefined, { noindex: true });
   const { user } = useAuth();
   return (
     <CommunityShell>

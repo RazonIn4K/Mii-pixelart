@@ -16,7 +16,7 @@ function currentQuery(): string {
 }
 
 export default function Search() {
-  useDocumentTitle("Search community");
+  useDocumentTitle("Search community", undefined, { noindex: true });
   const [location, navigate] = useLocation();
   const searchParams = useSearch();
   const [query, setQuery] = useState(currentQuery);

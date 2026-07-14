@@ -191,11 +191,7 @@ export function IslandHeader({ fixed = false }: { fixed?: boolean }) {
       )}
     >
       <div className="container flex h-16 items-center justify-between gap-4">
-        <Link
-          href="/"
-          className="group flex items-center gap-3"
-          aria-label="Tomodachi home"
-        >
+        <Link href="/" className="group flex items-center gap-3">
           <span className="brand-mark" aria-hidden="true">
             <span />
             <span />

@@ -45,6 +45,23 @@ describe("Worker route documents", () => {
     expect(html).not.toContain("og-image.png");
   });
 
+  it("canonicalizes retained disclosure and support aliases", async () => {
+    const disclosure = await dynamicDocument(
+      context("/disclosure", "Mozilla/5.0"),
+    );
+    const disclosureHtml = await disclosure!.text();
+    expect(disclosureHtml).toContain(
+      '<link rel="canonical" href="http://localhost:3000/affiliate-disclosure">',
+    );
+    expect(disclosureHtml).toContain("Affiliate disclosure · Tomodachi");
+
+    const donate = await dynamicDocument(context("/donate", "Mozilla/5.0"));
+    const donateHtml = await donate!.text();
+    expect(donateHtml).toContain(
+      '<link rel="canonical" href="http://localhost:3000/support">',
+    );
+  });
+
   it("escapes creation text in both HTML metadata and JSON-LD", async () => {
     const creation = creationRow({
       description: '"><img src=x onerror=alert(1)>',

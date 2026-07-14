@@ -20,7 +20,7 @@ import { setupCompletionReturnTo } from "@/lib/community/return-to";
 import type { CommunityUser } from "@/lib/community/types";
 
 export default function Setup() {
-  useDocumentTitle("Set up your profile");
+  useDocumentTitle("Set up your profile", undefined, { noindex: true });
   const { applyAccountUpdate, user } = useAuth();
   const [, navigate] = useLocation();
   const [username, setUsername] = useState(user?.username ?? "");
@@ -71,7 +71,18 @@ export default function Setup() {
           confirmsAge13OrOlder: true,
         }),
       });
-      applyAccountUpdate(result.data);
+      // Setup owns identity and Terms fields, not the avatar. Keeping this
+      // patch operation-specific prevents a concurrent avatar response from
+      // restoring a stale pre-setup account snapshot (or vice versa).
+      applyAccountUpdate({
+        id: result.data.id,
+        username: result.data.username,
+        displayName: result.data.displayName,
+        bio: result.data.bio,
+        termsAccepted: result.data.termsAccepted,
+        termsVersion: result.data.termsVersion,
+        requiredTermsVersion: result.data.requiredTermsVersion,
+      });
       toast.success("Your island profile is ready");
       const hasResumeDraft = await hasAuthResumeDraft();
       navigate(setupCompletionReturnTo() ?? (hasResumeDraft ? "/studio" : "/me/projects"));

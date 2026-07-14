@@ -18,7 +18,9 @@ interface AuthContextValue {
   serviceMessage: string | null;
   serviceAvailable: boolean;
   isAuthenticated: boolean;
-  applyAccountUpdate: (user: CommunityUser) => void;
+  applyAccountUpdate: (
+    update: Pick<CommunityUser, "id"> & Partial<Omit<CommunityUser, "id">>,
+  ) => void;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
   revokeAll: () => Promise<void>;
@@ -49,13 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CommunityUser | null>(null);
   const [serviceMessage, setServiceMessage] = useState<string | null>(null);
 
-  const applyAccountUpdate = useCallback((nextUser: CommunityUser) => {
-    setUser((currentUser) =>
-      currentUser?.id === nextUser.id
-        ? { ...currentUser, ...nextUser }
-        : currentUser,
-    );
-  }, []);
+  const applyAccountUpdate = useCallback(
+    (
+      nextUser: Pick<CommunityUser, "id"> & Partial<Omit<CommunityUser, "id">>,
+    ) => {
+      setUser((currentUser) =>
+        currentUser?.id === nextUser.id
+          ? { ...currentUser, ...nextUser }
+          : currentUser,
+      );
+    },
+    [],
+  );
 
   const refresh = useCallback(async () => {
     try {

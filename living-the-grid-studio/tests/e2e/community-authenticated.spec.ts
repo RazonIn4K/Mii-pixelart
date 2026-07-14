@@ -197,6 +197,85 @@ test("onboarding can regenerate its avatar without losing unsaved identity field
   await expect.poll(() => avatar.innerHTML()).not.toBe(originalAvatar);
 });
 
+test("a late avatar response cannot restore the pre-setup account snapshot", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The account-state race is viewport-independent.",
+  );
+
+  let avatarRequested = false;
+  let releaseAvatar: (() => void) | null = null;
+  const avatarGate = new Promise<void>((resolve) => {
+    releaseAvatar = resolve;
+  });
+  const initialUser = user({
+    bio: "",
+    displayName: "New Islander",
+    termsAccepted: false,
+    termsVersion: null,
+    username: null,
+  });
+
+  await mockSession(page, initialUser);
+  await page.route("**/api/me", async (route) => {
+    avatarRequested = true;
+    await avatarGate;
+    await fulfillJson(route, {
+      data: user({
+        avatarSeed: "00000000-0000-4000-8000-000000000099",
+        bio: "",
+        displayName: "New Islander",
+        termsAccepted: false,
+        termsVersion: null,
+        username: null,
+      }),
+      requestId,
+    });
+  });
+  await page.route("**/api/me/setup", (route) =>
+    fulfillJson(route, {
+      data: user({
+        bio: "Configured while the avatar was loading.",
+        displayName: "Race Islander",
+        username: "race-islander",
+      }),
+      requestId,
+    }),
+  );
+  await page.route("**/api/creations?**", (route) =>
+    fulfillJson(route, {
+      data: [],
+      meta: { nextCursor: null },
+      requestId,
+    }),
+  );
+
+  await page.goto("/me/setup");
+  await page.getByRole("button", { name: "Try another avatar" }).click();
+  await expect.poll(() => avatarRequested).toBe(true);
+  await page.getByLabel("Username").fill("race-islander");
+  await page.getByLabel("Display name").fill("Race Islander");
+  await page
+    .getByLabel("Bio (optional)")
+    .fill("Configured while the avatar was loading.");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page).toHaveURL(/\/me\/projects$/);
+  await expect(
+    page.getByRole("heading", { name: "Your private shelf." }),
+  ).toBeVisible();
+
+  expect(releaseAvatar).not.toBeNull();
+  releaseAvatar?.();
+  await expect(page.getByText("New avatar generated").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/me\/projects$/);
+  await expect(
+    page.getByRole("heading", { name: "Your private shelf." }),
+  ).toBeVisible();
+});
+
 test("settings regenerates an avatar and exposes recoverable session loading", async ({
   page,
 }, testInfo) => {
@@ -1701,4 +1780,99 @@ test("deletion-pending accounts can cancel during the grace period", async ({
   await expect(
     page.getByRole("button", { name: "Confirm identity with Google" }),
   ).toBeVisible();
+});
+
+test("a late follow failure cannot replace the next creator profile", async ({
+  page,
+}) => {
+  await mockSession(page, user());
+  let releaseFollow = () => {};
+  const followGate = new Promise<void>((resolve) => {
+    releaseFollow = resolve;
+  });
+  let markFollowStarted = () => {};
+  const followStarted = new Promise<void>((resolve) => {
+    markFollowStarted = resolve;
+  });
+  const creator = (username: string, displayName: string) => ({
+    avatarSeed: `${username}-avatar-seed`,
+    bio: "",
+    createdAt: 1_700_000_000_000,
+    creationCount: 0,
+    displayName,
+    followerCount: 4,
+    followingCount: 2,
+    id: `${username}-id`,
+    isFollowing: false,
+    role: "user",
+    status: "active",
+    username,
+  });
+
+  await page.route("**/api/users/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/users/alpha-maker/follow") {
+      markFollowStarted();
+      await followGate;
+      await fulfillJson(
+        route,
+        {
+          error: { code: "SERVICE_UNAVAILABLE", message: "Follow failed" },
+          requestId,
+        },
+        503,
+      );
+      return;
+    }
+    const username = path.includes("beta-maker") ? "beta-maker" : "alpha-maker";
+    const displayName =
+      username === "beta-maker" ? "Beta Maker" : "Alpha Maker";
+    if (path.endsWith("/creations")) {
+      await fulfillJson(route, {
+        data: [],
+        meta: { nextCursor: null },
+        requestId,
+      });
+      return;
+    }
+    await fulfillJson(route, {
+      data: { creations: [], user: creator(username, displayName) },
+      requestId,
+    });
+  });
+
+  await page.goto("/u/alpha-maker");
+  await expect(
+    page.getByRole("heading", { name: "Alpha Maker", exact: true }),
+  ).toBeVisible();
+  const delayedFailure = page.waitForResponse((response) =>
+    response.url().endsWith("/api/users/alpha-maker/follow"),
+  );
+  await page.getByRole("button", { name: "Follow", exact: true }).click();
+  await followStarted;
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/u/beta-maker");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(
+    page.getByRole("heading", { name: "Beta Maker", exact: true }),
+  ).toBeVisible();
+
+  releaseFollow();
+  await delayedFailure;
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => resolve()),
+        ),
+      ),
+  );
+  await expect(page).toHaveURL(/\/u\/beta-maker$/);
+  await expect(page).toHaveTitle("Beta Maker (@beta-maker) · Tomodachi");
+  await expect(
+    page.getByRole("heading", { name: "Alpha Maker", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Follow failed", { exact: true })).toHaveCount(0);
 });

@@ -25,7 +25,13 @@ export function AvatarRegenerationButton({
         method: "PATCH",
         body: jsonBody({ regenerateAvatar: true }),
       });
-      applyAccountUpdate(result.data);
+      // Apply only the field this mutation owns. A profile/setup request may
+      // be in flight at the same time, and its response must not be replaced
+      // by an older full-account snapshot.
+      applyAccountUpdate({
+        id: result.data.id,
+        avatarSeed: result.data.avatarSeed,
+      });
       const message =
         "New avatar generated. It now appears on your profile, creations, and comments.";
       setAnnouncement(message);

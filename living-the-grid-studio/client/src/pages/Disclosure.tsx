@@ -9,7 +9,9 @@ import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Disclosure() {
-  useDocumentTitle("Affiliate Disclosure");
+  useDocumentTitle("Affiliate Disclosure", undefined, {
+    canonicalPath: "/affiliate-disclosure",
+  });
   useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Affiliate Disclosure", href: "/affiliate-disclosure" }])]);
 
   return (

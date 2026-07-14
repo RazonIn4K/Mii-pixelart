@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, Heart, MessageCircle, Pencil, Save, Trash2, X } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
@@ -31,12 +31,38 @@ export default function CreationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useDocumentTitle(creation?.title ?? "Community creation");
+  const loadRequestRef = useRef(0);
+  const metadataDescription = error
+    ? "This community creation is unavailable."
+    : creation
+      ? creation.description?.trim() ||
+        `Pixel-art project by ${creation.owner.displayName}.`
+      : undefined;
+  useDocumentTitle(
+    error ? "Creation unavailable" : creation?.title ?? "Community creation",
+    metadataDescription,
+    {
+      canonicalPath: `/creation/${encodeURIComponent(creation?.slug ?? slug)}`,
+      image: creation?.socialImageUrl,
+      noindex: error
+        ? true
+        : creation
+          ? creation.visibility === "unlisted"
+          : null,
+      ogType: "article",
+    },
+  );
 
-  const loadComments = useCallback(async (creationId: string, nextCursor?: string) => {
+  const loadComments = useCallback(async (
+    creationId: string,
+    requestId: number,
+    nextCursor?: string,
+  ) => {
+    const isCurrent = () => loadRequestRef.current === requestId;
     if (nextCursor) setCommentsLoadingMore(true);
     try {
       const commentResult = await communityApi<CommunityComment[]>(`/api/creations/${creationId}/comments${nextCursor ? `?cursor=${encodeURIComponent(nextCursor)}` : ""}`);
+      if (!isCurrent()) return;
       setComments((current) => {
         if (!nextCursor) return commentResult.data;
         const unique = new Map([...current, ...commentResult.data].map((comment) => [comment.id, comment]));
@@ -45,29 +71,45 @@ export default function CreationDetailPage() {
       setCommentsCursor(commentResult.meta?.nextCursor ?? null);
       setCommentsError(null);
     } catch (commentError) {
-      setCommentsError(messageFromError(commentError));
+      if (isCurrent()) setCommentsError(messageFromError(commentError));
     } finally {
-      setCommentsLoadingMore(false);
+      if (isCurrent()) setCommentsLoadingMore(false);
     }
   }, []);
 
   const load = useCallback(async () => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+    const isCurrent = () => loadRequestRef.current === requestId;
     setLoading(true);
+    setCreation(null);
+    setComments([]);
+    setCommentsCursor(null);
+    setCommentsError(null);
+    setCommentsLoadingMore(false);
+    setBody("");
+    setEditingId(null);
+    setEditBody("");
+    setSubmitting(false);
+    setError(null);
     try {
       const result = await communityApi<CreationDetail>(`/api/public/creations/${encodeURIComponent(slug)}`);
+      if (!isCurrent()) return;
       setCreation(result.data);
-      setComments([]);
-      setCommentsCursor(null);
-      setError(null);
-      await loadComments(result.data.id);
+      await loadComments(result.data.id, requestId);
     } catch (loadError) {
-      setError(messageFromError(loadError));
+      if (isCurrent()) setError(messageFromError(loadError));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [loadComments, slug]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => {
+      loadRequestRef.current += 1;
+    };
+  }, [load]);
 
   const toggleLike = async () => {
     if (!creation) return;
@@ -76,13 +118,20 @@ export default function CreationDetailPage() {
       return;
     }
     if (!ensureCommunityMutationReady(user)) return;
+    const requestId = loadRequestRef.current;
     const liked = !creation.isLiked;
     setCreation({ ...creation, isLiked: liked, likeCount: Math.max(0, creation.likeCount + (liked ? 1 : -1)) });
     try {
       await communityApi(`/api/creations/${creation.id}/like`, { method: liked ? "POST" : "DELETE", body: jsonBody({}) });
     } catch (likeError) {
-      setCreation(creation);
-      toast.error(messageFromError(likeError));
+      if (loadRequestRef.current === requestId) {
+        setCreation((current) =>
+          current?.id === creation.id
+            ? { ...current, isLiked: creation.isLiked, likeCount: creation.likeCount }
+            : current,
+        );
+        toast.error(messageFromError(likeError));
+      }
     }
   };
 
@@ -90,19 +139,21 @@ export default function CreationDetailPage() {
     event.preventDefault();
     if (!creation || !body.trim()) return;
     if (user && !ensureCommunityMutationReady(user)) return;
+    const requestId = loadRequestRef.current;
     setSubmitting(true);
     try {
       const result = await communityApi<CommunityComment>(`/api/creations/${creation.id}/comments`, {
         method: "POST",
         body: jsonBody({ body: body.trim() }),
       });
+      if (loadRequestRef.current !== requestId) return;
       setComments((current) => [...current, result.data].sort((left, right) => left.createdAt - right.createdAt));
       setCreation((current) => current ? { ...current, commentCount: current.commentCount + 1 } : current);
       setBody("");
     } catch (commentError) {
-      toast.error(messageFromError(commentError));
+      if (loadRequestRef.current === requestId) toast.error(messageFromError(commentError));
     } finally {
-      setSubmitting(false);
+      if (loadRequestRef.current === requestId) setSubmitting(false);
     }
   };
 
@@ -110,36 +161,40 @@ export default function CreationDetailPage() {
     const nextBody = editBody.trim();
     if (!nextBody) return;
     if (user && !ensureCommunityMutationReady(user)) return;
+    const requestId = loadRequestRef.current;
     setSubmitting(true);
     try {
       const result = await communityApi<CommunityComment>(`/api/comments/${comment.id}`, {
         method: "PATCH",
         body: jsonBody({ body: nextBody }),
       });
+      if (loadRequestRef.current !== requestId) return;
       setComments((current) => current.map((item) => item.id === comment.id ? result.data : item));
       setEditingId(null);
       setEditBody("");
       toast.success("Comment updated");
     } catch (editError) {
-      toast.error(messageFromError(editError));
+      if (loadRequestRef.current === requestId) toast.error(messageFromError(editError));
     } finally {
-      setSubmitting(false);
+      if (loadRequestRef.current === requestId) setSubmitting(false);
     }
   };
 
   const deleteComment = async (comment: CommunityComment) => {
     if (user && !ensureCommunityMutationReady(user)) return;
     if (!window.confirm("Delete your comment? This cannot be undone.")) return;
+    const requestId = loadRequestRef.current;
     try {
       await communityApi(`/api/comments/${comment.id}`, {
         method: "DELETE",
         body: jsonBody({}),
       });
+      if (loadRequestRef.current !== requestId) return;
       setComments((current) => current.filter((item) => item.id !== comment.id));
       setCreation((current) => current ? { ...current, commentCount: Math.max(0, current.commentCount - 1) } : current);
       toast.success("Comment deleted");
     } catch (deleteError) {
-      toast.error(messageFromError(deleteError));
+      if (loadRequestRef.current === requestId) toast.error(messageFromError(deleteError));
     }
   };
 
@@ -237,8 +292,8 @@ export default function CreationDetailPage() {
                         </article>
                       );
                 }) : <p className="py-8 text-center text-sm text-[var(--island-ink)]/50">No comments yet.</p>}
-                {commentsError ? <div className="rounded-2xl border border-destructive/30 bg-red-50 p-4 text-sm text-red-950" role="alert"><p>{commentsError}</p><Button type="button" size="sm" variant="outline" className="mt-3 bg-white" onClick={() => void loadComments(creation.id)}>Retry comments</Button></div> : null}
-                {commentsCursor ? <div className="pt-4 text-center"><Button type="button" variant="outline" className="rounded-full" disabled={commentsLoadingMore} onClick={() => void loadComments(creation.id, commentsCursor)}>{commentsLoadingMore ? "Loading…" : "Load more comments"}</Button></div> : null}
+                {commentsError ? <div className="rounded-2xl border border-destructive/30 bg-red-50 p-4 text-sm text-red-950" role="alert"><p>{commentsError}</p><Button type="button" size="sm" variant="outline" className="mt-3 bg-white" onClick={() => void loadComments(creation.id, loadRequestRef.current)}>Retry comments</Button></div> : null}
+                {commentsCursor ? <div className="pt-4 text-center"><Button type="button" variant="outline" className="rounded-full" disabled={commentsLoadingMore} onClick={() => void loadComments(creation.id, loadRequestRef.current, commentsCursor)}>{commentsLoadingMore ? "Loading…" : "Load more comments"}</Button></div> : null}
               </div>
             </section>
           </>

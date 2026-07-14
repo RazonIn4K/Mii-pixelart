@@ -62,7 +62,11 @@ function useQueryParam(name: string): string | null {
 }
 
 export default function Support() {
-  useDocumentTitle("Support", "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.");
+  useDocumentTitle(
+    "Support",
+    "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.",
+    { canonicalPath: "/support" },
+  );
   useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Support", href: "/support" }])]);
 
   const [products, setProducts] = useState<PublicProduct[]>([]);

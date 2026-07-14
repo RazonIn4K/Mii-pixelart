@@ -37,6 +37,21 @@ async function fulfill(route: Route, data: unknown, requestId: string) {
   });
 }
 
+async function rejectNotFound(
+  route: Route,
+  message: string,
+  requestId: string,
+) {
+  await route.fulfill({
+    body: JSON.stringify({
+      error: { code: "NOT_FOUND", message },
+      requestId,
+    }),
+    contentType: "application/json",
+    status: 404,
+  });
+}
+
 async function openFiltersWhenCollapsed(page: Page, accessibleName: string) {
   const trigger = page.getByRole("button", {
     name: accessibleName,
@@ -146,7 +161,10 @@ test("discovery search, feeds, and tags stay URL-backed without mobile overflow"
 test("desktop quick search navigates to current community results", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "The compact header search appears at the desktop breakpoint.");
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The compact header search appears at the desktop breakpoint.",
+  );
   await page.route("**/api/search?**", async (route) => {
     const params = new URL(route.request().url()).searchParams;
     expect(params.get("q")).toBe("moon lantern");
@@ -171,7 +189,9 @@ test("desktop quick search navigates to current community results", async ({
 test("surprise discovery opens a public creation without exposing filtered work", async ({
   page,
 }) => {
-  await page.route("**/api/tags", (route) => fulfill(route, [], "tags-empty-e2e"));
+  await page.route("**/api/tags", (route) =>
+    fulfill(route, [], "tags-empty-e2e"),
+  );
   await page.route("**/api/discover/recent?**", (route) =>
     fulfill(route, [creation()], "recent-surprise-e2e"),
   );
@@ -186,6 +206,256 @@ test("surprise discovery opens a public creation without exposing filtered work"
   await page.getByRole("button", { name: "Surprise me", exact: true }).click();
 
   await expect(page).toHaveURL(/\/creation\/coral-tide-chart$/);
+});
+
+test("creation metadata cannot retain a previous public creation after an unavailable SPA navigation", async ({
+  page,
+}) => {
+  await page.route("**/api/public/creations/public-alpha", (route) =>
+    fulfill(
+      route,
+      creation({
+        canEdit: false,
+        commentsEnabled: true,
+        commentsLocked: false,
+        description: "",
+        downloadEnabled: false,
+        id: "public-alpha-id",
+        images: [],
+        slug: "public-alpha",
+        socialImageUrl: "/community-og.jpg",
+        title: "Public alpha",
+      }),
+      "public-alpha-e2e",
+    ),
+  );
+  await page.route("**/api/creations/public-alpha-id/comments**", (route) =>
+    fulfill(route, [], "public-alpha-comments-e2e"),
+  );
+  await page.route("**/api/public/creations/private-beta", (route) =>
+    rejectNotFound(route, "Creation not found", "private-beta-e2e"),
+  );
+
+  await page.goto("/creation/public-alpha");
+  await expect(
+    page.getByRole("heading", { name: "Public alpha", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle("Public alpha · Tomodachi");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "Pixel-art project by Island Maker.",
+  );
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "index,follow",
+  );
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/creation/private-beta");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByText("Creation not found", { exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle("Creation unavailable · Tomodachi");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "This community creation is unavailable.",
+  );
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex,nofollow",
+  );
+  await expect
+    .poll(
+      async () =>
+        new URL(
+          (await page.locator('link[rel="canonical"]').getAttribute("href")) ??
+            "invalid:/",
+        ).pathname,
+    )
+    .toBe("/creation/private-beta");
+});
+
+test("late paginated comments cannot cross creation route generations", async ({
+  page,
+}) => {
+  let releaseAlphaPage = () => {};
+  const alphaPageGate = new Promise<void>((resolve) => {
+    releaseAlphaPage = resolve;
+  });
+  let markAlphaPageStarted = () => {};
+  const alphaPageStarted = new Promise<void>((resolve) => {
+    markAlphaPageStarted = resolve;
+  });
+
+  for (const [slug, id, title] of [
+    ["public-alpha", "public-alpha-id", "Public alpha"],
+    ["public-beta", "public-beta-id", "Public beta"],
+  ] as const) {
+    await page.route(`**/api/public/creations/${slug}`, (route) =>
+      fulfill(
+        route,
+        creation({
+          canEdit: false,
+          commentsEnabled: true,
+          commentsLocked: false,
+          downloadEnabled: false,
+          id,
+          images: [],
+          slug,
+          title,
+        }),
+        `${slug}-detail-e2e`,
+      ),
+    );
+  }
+
+  await page.route(
+    "**/api/creations/public-alpha-id/comments**",
+    async (route) => {
+      const cursor = new URL(route.request().url()).searchParams.get("cursor");
+      if (!cursor) {
+        await route.fulfill({
+          body: JSON.stringify({
+            data: [],
+            meta: { nextCursor: "alpha-next-page" },
+            requestId: "alpha-comments-e2e",
+          }),
+          contentType: "application/json",
+          status: 200,
+        });
+        return;
+      }
+      markAlphaPageStarted();
+      await alphaPageGate;
+      await fulfill(
+        route,
+        [
+          {
+            author: creation().owner,
+            body: "OLD ALPHA COMMENT",
+            createdAt: 1_700_000_000_001,
+            id: "old-alpha-comment",
+            status: "active",
+            updatedAt: 1_700_000_000_001,
+          },
+        ],
+        "alpha-comments-page-e2e",
+      );
+    },
+  );
+  await page.route("**/api/creations/public-beta-id/comments**", (route) =>
+    fulfill(route, [], "beta-comments-e2e"),
+  );
+
+  await page.goto("/creation/public-alpha");
+  const delayedResponse = page.waitForResponse((response) =>
+    response.url().includes("cursor=alpha-next-page"),
+  );
+  await page.getByRole("button", { name: "Load more comments" }).click();
+  await alphaPageStarted;
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/creation/public-beta");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(
+    page.getByRole("heading", { name: "Public beta", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No comments yet.", { exact: true }),
+  ).toBeVisible();
+
+  releaseAlphaPage();
+  await delayedResponse;
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => resolve()),
+        ),
+      ),
+  );
+  await expect(
+    page.getByText("OLD ALPHA COMMENT", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("No comments yet.", { exact: true }),
+  ).toBeVisible();
+});
+
+test("profile metadata normalizes public profiles and noindexes unavailable SPA targets", async ({
+  page,
+}) => {
+  const profileUser = {
+    avatarSeed: "island-maker-seed",
+    bio: "",
+    createdAt: 1_690_000_000_000,
+    creationCount: 0,
+    displayName: "Island Maker",
+    followerCount: 20,
+    followingCount: 4,
+    id: "maker-id",
+    isFollowing: false,
+    role: "user",
+    status: "active",
+    username: "island-maker",
+  };
+  await page.route("**/api/users/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.includes("does-not-exist")) {
+      await rejectNotFound(route, "Profile not found", "missing-profile-e2e");
+      return;
+    }
+    if (path.endsWith("/creations")) {
+      await fulfill(route, [], "empty-profile-creations-e2e");
+      return;
+    }
+    await fulfill(
+      route,
+      { creations: [], user: profileUser },
+      "public-profile-e2e",
+    );
+  });
+
+  await page.goto("/u/Island-Maker");
+  await expect(
+    page.getByRole("heading", { name: "Island Maker", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle("Island Maker (@island-maker) · Tomodachi");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "See Island Maker's public Island Workshop creations.",
+  );
+  await expect
+    .poll(
+      async () =>
+        new URL(
+          (await page.locator('link[rel="canonical"]').getAttribute("href")) ??
+            "invalid:/",
+        ).pathname,
+    )
+    .toBe("/u/island-maker");
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/u/does-not-exist");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByText("Profile not found", { exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle("Profile unavailable · Tomodachi");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex,nofollow",
+  );
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "This community profile is unavailable.",
+  );
 });
 
 test("profile creation filters are reusable, URL-backed, and keep creator links intact", async ({

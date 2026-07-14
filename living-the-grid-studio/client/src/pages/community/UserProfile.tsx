@@ -72,8 +72,30 @@ export default function UserProfile() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
   const loadRequestRef = useRef(0);
-  useDocumentTitle(profile?.user.displayName ?? `@${username}`);
+  const profileDescription = error
+    ? "This community profile is unavailable."
+    : profile
+      ? profile.user.bio?.trim() ||
+        `See ${profile.user.displayName}'s public Island Workshop creations.`
+      : undefined;
+  useDocumentTitle(
+    error
+      ? "Profile unavailable"
+      : (profile?.user.displayName ?? `@${username}`),
+    profileDescription,
+    {
+      canonicalPath: `/u/${encodeURIComponent(
+        (profile?.user.username ?? username).toLowerCase(),
+      )}`,
+      fullTitle: profile
+        ? `${profile.user.displayName} (@${profile.user.username}) · Tomodachi`
+        : undefined,
+      noindex: error ? true : profile ? false : null,
+      ogType: "profile",
+    },
+  );
 
   const applyFilters = useCallback(
     (filters: ProfileFilters) => {
@@ -92,6 +114,7 @@ export default function UserProfile() {
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
     setLoading(true);
+    setFollowPending(false);
     try {
       const [result, creations] = await Promise.all([
         communityApi<ProfileResult>(
@@ -122,7 +145,9 @@ export default function UserProfile() {
     setCursor(null);
     setError(null);
     void load();
-    return () => { loadRequestRef.current += 1; };
+    return () => {
+      loadRequestRef.current += 1;
+    };
   }, [load, username]);
 
   useEffect(() => {
@@ -175,7 +200,8 @@ export default function UserProfile() {
       );
       setCursor(result.meta?.nextCursor ?? null);
     } catch (loadError) {
-      if (loadRequestRef.current === requestId) toast.error(messageFromError(loadError));
+      if (loadRequestRef.current === requestId)
+        toast.error(messageFromError(loadError));
     } finally {
       if (loadRequestRef.current === requestId) setLoadingMore(false);
     }
@@ -188,7 +214,11 @@ export default function UserProfile() {
       return;
     }
     if (!ensureCommunityMutationReady(viewer)) return;
+    const requestId = loadRequestRef.current;
+    const profileId = profile.user.id;
+    const previousFollowerCount = profile.user.followerCount ?? 0;
     const next = !following;
+    setFollowPending(true);
     setFollowing(next);
     setProfile((current) =>
       current
@@ -210,9 +240,23 @@ export default function UserProfile() {
         body: jsonBody({}),
       });
     } catch (followError) {
-      setFollowing(!next);
-      toast.error(messageFromError(followError));
-      void load();
+      if (loadRequestRef.current === requestId) {
+        setFollowing(!next);
+        setProfile((current) =>
+          current?.user.id === profileId
+            ? {
+                ...current,
+                user: {
+                  ...current.user,
+                  followerCount: previousFollowerCount,
+                },
+              }
+            : current,
+        );
+        toast.error(messageFromError(followError));
+      }
+    } finally {
+      if (loadRequestRef.current === requestId) setFollowPending(false);
     }
   };
 
@@ -260,6 +304,7 @@ export default function UserProfile() {
                           type="button"
                           variant={following ? "outline" : "default"}
                           className="rounded-full"
+                          disabled={followPending}
                           onClick={toggleFollow}
                         >
                           <UserPlus /> {following ? "Following" : "Follow"}

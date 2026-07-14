@@ -77,7 +77,7 @@ const TARGET_ACTIONS: Record<TargetAction, { path: (id: string) => string; succe
 };
 
 export default function Moderation() {
-  useDocumentTitle("Moderation queue");
+  useDocumentTitle("Moderation queue", undefined, { noindex: true });
   const { user } = useAuth();
   const [filter, setFilter] = useState<ReportFilter>("open");
   const [reports, setReports] = useState<ReportRecord[]>([]);

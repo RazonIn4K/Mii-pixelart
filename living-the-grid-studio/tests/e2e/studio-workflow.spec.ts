@@ -259,7 +259,7 @@ test("AI applies one validated document revision that Undo removes in one step",
 
   await page.goto("/studio");
   const essentialCookies = page.getByRole("button", {
-    name: "Essential cookies only",
+    name: "Essential only",
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
@@ -368,7 +368,7 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
 
   await page.goto("/studio");
   const essentialCookies = page.getByRole("button", {
-    name: "Essential cookies only",
+    name: "Essential only",
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
@@ -490,7 +490,7 @@ test("AI provider failure leaves manual painting available", async ({
 
   await page.goto("/studio");
   const essentialCookies = page.getByRole("button", {
-    name: "Essential cookies only",
+    name: "Essential only",
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
@@ -578,7 +578,7 @@ test("AI history and consent stay isolated between signed-in users", async ({
 
   await page.goto("/studio");
   const essentialCookies = page.getByRole("button", {
-    name: "Essential cookies only",
+    name: "Essential only",
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();

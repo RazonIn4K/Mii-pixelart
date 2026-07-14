@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Compass } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -40,19 +39,11 @@ const SUGGESTIONS: Array<{
 
 export default function NotFound() {
   const [path] = useLocation();
-  useDocumentTitle("Page not found", "The page you're looking for doesn't exist. Try the studio, the free guides, or the recovery checklist.");
-
-  // SPA returns HTTP 200 for unmatched routes; inject a noindex hint so
-  // Googlebot doesn't accidentally index 404 URLs as real pages.
-  useEffect(() => {
-    const meta = document.createElement("meta");
-    meta.name = "robots";
-    meta.content = "noindex, follow";
-    document.head.appendChild(meta);
-    return () => {
-      meta.parentNode?.removeChild(meta);
-    };
-  }, []);
+  useDocumentTitle(
+    "Page not found",
+    "The page you're looking for doesn't exist. Try the studio, the free guides, or the recovery checklist.",
+    { noindex: true },
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">

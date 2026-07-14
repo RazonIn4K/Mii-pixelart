@@ -64,11 +64,13 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   FCP was 1.62 s, LCP was 1.62 s, CLS was 0.003, and the mobile-menu interaction
   measured 72 ms with no console warnings, errors, or horizontal overflow.
   The observed diagnostic values are within the plan's numerical thresholds,
-  but one menu timing is not a finalized INP result. The configured Chrome
-  DevTools trace connector was not exposed to the active Codex task, and Chrome
-  extension tracing detached when recording, so the performance gate remains
-  pending: a saved DevTools load trace and insights report are mandatory before
-  launch.
+  but one menu timing is not a finalized INP result. Chrome DevTools tracing is
+  now available: a saved 390×844 Slow 4G / 4× CPU trace of prior head `8f43aae`
+  measured LCP 1.055 s and CLS 0.0018. That trace included cache hits and no
+  EventTiming/INP sample, so it is diagnostic evidence only. After every source
+  change, capture a cold trace from the new immutable exact-head preview and a
+  representative interaction trace before treating the launch performance gate
+  as complete.
   See [Core Web Vitals thresholds](https://web.dev/articles/defining-core-web-vitals-thresholds)
   and [Chrome performance traces](https://developer.chrome.com/docs/devtools/performance/reference/).
 

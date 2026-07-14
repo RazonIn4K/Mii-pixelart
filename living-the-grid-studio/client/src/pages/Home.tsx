@@ -18,6 +18,7 @@ import { IslandHeader } from "@/components/layout/IslandHeader";
 import { IslandFooter } from "@/components/layout/IslandFooter";
 import { GoogleSignIn } from "@/components/community/RequireAuth";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   AlertTriangle,
   ArrowRight,
@@ -158,6 +159,16 @@ function pickFirstAvailableModel(presets: AiModelPreset[]): string {
 
 export default function Home() {
   preload(HERO_IMG, { as: "image", fetchPriority: "high" });
+  useDocumentTitle(
+    "",
+    "Turn faces, characters, logos, and sketches into clear, paintable pixel guides with an unofficial browser-first creator studio for Tomodachi fans.",
+    {
+      canonicalPath: "/",
+      fullTitle: "Tomodachi.pw · Turn Ideas Into Paintable Pixel Guides",
+      noindex: false,
+      ogType: "website",
+    },
+  );
   const { serviceMessage, status: authStatus, user } = useAuth();
 
   const [incidentPrompt, setIncidentPrompt] = useState("");
@@ -554,17 +565,23 @@ export default function Home() {
                   <Search className="h-6 w-6 shrink-0 text-primary" />
                 </div>
                 <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Your full password never leaves the browser. Only the first five characters of its SHA-1 hash are sent to the HIBP range API.</p>
-                <div className="mt-7 space-y-3">
+                <form
+                  className="mt-7 space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void checkPasswordForBreaches();
+                  }}
+                >
                   <Label htmlFor="password-leak-check" className="text-xs font-bold">Password to test</Label>
                   <Input id="password-leak-check" type="password" autoComplete="off" placeholder="Do not paste a current critical credential" value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} className="h-12 rounded-xl border-[var(--island-ink)]/15 bg-white" />
-                  <Button onClick={checkPasswordForBreaches} disabled={passwordCheck.status === "checking"} className="island-button h-12 w-full rounded-xl font-bold">
+                  <Button type="submit" disabled={passwordCheck.status === "checking"} className="island-button h-12 w-full rounded-xl font-bold">
                     <Search className="mr-2 h-4 w-4" />
                     {passwordCheck.status === "checking" ? "Checking…" : "Check exposure"}
                   </Button>
                   <p aria-live="polite" className={`min-h-10 rounded-xl p-3 text-xs font-semibold leading-5 ${passwordCheck.status === "found" || passwordCheck.status === "error" ? "bg-red-50 text-red-800" : passwordCheck.status === "safe" ? "bg-emerald-50 text-emerald-800" : "bg-[var(--island-paper)] text-[var(--island-ink)]/48"}`}>
                     {passwordCheck.message || "Use this as a signal—not proof that a password is safe."}
                   </p>
-                </div>
+                </form>
               </article>
 
               <article className="island-tool-card">
