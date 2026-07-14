@@ -18,6 +18,14 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
     name: "Canvas paint controls",
   });
   await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-grid-lines", "suppressed");
+  await expect(page.getByTestId("grid-zoom-hint")).toHaveText(
+    "Dense preview · choose Edit to see cell lines",
+  );
+  await expect(canvas).toHaveAttribute("aria-describedby", /\S+ \S+ \S+/);
+  await page.getByRole("button", { name: "Zoom to edit pixels" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-lines", "visible");
+  await expect(page.getByTestId("grid-zoom-hint")).toHaveCount(0);
   await expect(paintControls).toBeVisible();
   await expect(page.getByRole("button", { name: "Pencil tool" })).toBeVisible();
   await expect(

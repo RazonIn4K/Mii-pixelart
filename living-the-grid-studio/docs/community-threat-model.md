@@ -114,11 +114,11 @@ authorization and is outside this API.
 
 ## Launch blockers
 
-- Operator David Ortiz, Illinois governing law, and the copyright intake
-  process are identified. A complete mail-ready postal address and confirmed
-  monitoring for every published contact inbox remain launch blockers; no
-  missing address component may be inferred or a partial residential address
-  published.
+- Operator David Ortiz, Illinois governing law, the complete operator-approved
+  postal address, and the copyright intake process are identified and published.
+  David Ortiz confirmed ownership of every published contact channel on
+  2026-07-13. Live delivery, coverage-cadence, and escalation tests for those
+  channels remain launch blockers; do not infer or substitute address details.
 - David Ortiz is the accountable admin and final human moderation reviewer. His
   internal user ID must be assigned after the first approved sign-in, and the
   abuse inbox must be monitored. A separate moderator is optional. AI may

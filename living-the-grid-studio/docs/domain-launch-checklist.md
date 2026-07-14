@@ -85,11 +85,16 @@ Do not overload the trust pages with ads. Put heavier monetization on guides, pa
 
 ## Launch follow-up gates
 
-1. Complete the staging readiness record, eight-secret bootstrap, pending D1
-   migration, Worker deployment, and authenticated acceptance suite.
-2. Approve a complete public service address and confirm the monitored legal,
-   privacy, security, help, and abuse inboxes.
-3. Complete Google consent branding and Stripe test-mode webhook acceptance.
+1. Staging resources, the eight-secret bootstrap, migrations `0001` through
+   `0006`, and the read-only Worker are complete. Redeploy the exact reviewed
+   head and run the authenticated writable acceptance suite under its separate
+   approvals.
+2. The complete public service address is approved and published, and David
+   Ortiz confirmed ownership of the legal, privacy, security, help, abuse, and
+   consult channels. Verify live delivery and escalation for each channel.
+3. Google staging consent branding and the isolated Stripe test key/webhook are
+   complete. Run the real staging Google sign-in and signed Stripe acceptance
+   probes without altering production.
 4. Capture the mandatory real Chrome performance trace; fallback Lighthouse
    measurements are diagnostic evidence, not the launch gate.
 5. Add `ads.txt` only after ad approval.

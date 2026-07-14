@@ -68,8 +68,8 @@ rather than deleting audit history.
 - Keep production community mutations disabled if no accountable human is
   available to monitor reports and appeals.
 
-The operator name and governing jurisdiction are recorded. Production still
-requires a confirmed mail-ready postal address containing city, state, ZIP
-code, and country, plus confirmation that every public contact inbox is
-monitored. Do not infer missing address fields or publish an incomplete home
-address.
+The operator name, governing jurisdiction, and complete operator-approved
+mail-ready postal address are recorded and published. David Ortiz confirmed on
+2026-07-13 that he monitors every public contact channel. Production still
+requires live delivery, coverage-cadence, and escalation verification for each
+channel. Do not infer or substitute address fields.

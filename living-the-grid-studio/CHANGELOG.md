@@ -6,6 +6,14 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Mobile canvas clarity:** when dense cell lines are intentionally suppressed,
+  the canvas now explains that it is a preview and points to Edit zoom; the
+  canvas also exposes a stable visible/suppressed/hidden grid state for browser
+  automation and associates the guidance with the canvas for assistive tools.
+- **Release-evidence sync:** reconciled the legal, Google, Stripe, migration,
+  and read-only staging checklist with completed gates, and recorded
+  within-threshold Chrome mobile diagnostics while retaining the saved-trace
+  requirement.
 - **Staging CPU guardrail:** activated Workers Paid with owner approval and configured a staging-only 2-second CPU limit, enforced exactly in both source and generated release configuration; community writes and production remain unchanged pending live staging acceptance.
 - **Consult-sales containment:** consult checkout now fails closed in both the unified Worker and retained Pages path, stays out of the public catalog while disabled, and cannot be enabled by the release wrapper until an end-to-end fulfillment test is recorded. Recovery and support products remain available.
 - **Staging control-plane readiness:** completed the approved Google OAuth branding, isolated Stripe test-key/webhook setup, and forward-only `0006_align_game_taxonomy.sql` migration without deploying the Worker or changing DNS.

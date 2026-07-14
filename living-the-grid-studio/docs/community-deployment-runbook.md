@@ -58,6 +58,19 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   an approved writable acceptance run measures full-request image generation,
   the scheduled cleanup handler, quotas, derivatives, cleanup, and cost. See
   [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+- A real Chrome 150 diagnostic on 2026-07-13 exercised the live read-only
+  staging homepage at 390×844 with cache disabled, 4× CPU slowdown, 150 ms
+  latency, 1.6 Mbps downstream, and 750 Kbps upstream. The measured cold-load
+  FCP was 1.62 s, LCP was 1.62 s, CLS was 0.003, and the mobile-menu interaction
+  measured 72 ms with no console warnings, errors, or horizontal overflow.
+  The observed diagnostic values are within the plan's numerical thresholds,
+  but one menu timing is not a finalized INP result. The configured Chrome
+  DevTools trace connector was not exposed to the active Codex task, and Chrome
+  extension tracing detached when recording, so the performance gate remains
+  pending: a saved DevTools load trace and insights report are mandatory before
+  launch.
+  See [Core Web Vitals thresholds](https://web.dev/articles/defining-core-web-vitals-thresholds)
+  and [Chrome performance traces](https://developer.chrome.com/docs/devtools/performance/reference/).
 
 ## Local preflight (no remote side effects)
 

@@ -81,6 +81,7 @@ export default function CanvasViewer({
   const lastDragCellRef = useRef<{ x: number; y: number } | null>(null);
   const instructionsId = useId();
   const statusId = useId();
+  const zoomHintId = useId();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
@@ -621,6 +622,17 @@ export default function CanvasViewer({
     : onCellDrag || onCellDragSegment
       ? "cursor-crosshair"
       : "cursor-cell";
+  const currentRenderMetrics = getRenderMetrics();
+  const gridLinesVisible = shouldRenderGridLines(
+    showGrid,
+    currentRenderMetrics.cellSize,
+    zoom,
+  );
+  const gridLineState = !showGrid
+    ? "hidden"
+    : gridLinesVisible
+      ? "visible"
+      : "suppressed";
 
   return (
     <div
@@ -712,6 +724,17 @@ export default function CanvasViewer({
             </span>
           )}
         </span>
+        {gridLineState === "suppressed" ? (
+          <span
+            id={zoomHintId}
+            className="mt-0.5 block text-[0.68rem] font-semibold text-foreground"
+            data-testid="grid-zoom-hint"
+            role="status"
+            aria-live="polite"
+          >
+            Dense preview · choose Edit to see cell lines
+          </span>
+        ) : null}
       </div>
 
       <canvas
@@ -720,10 +743,13 @@ export default function CanvasViewer({
         role="application"
         aria-label={`Editable ${doc.width} by ${doc.height} pixel grid`}
         aria-roledescription="pixel art canvas"
-        aria-describedby={`${instructionsId} ${statusId}`}
+        aria-describedby={`${instructionsId} ${statusId}${
+          gridLineState === "suppressed" ? ` ${zoomHintId}` : ""
+        }`}
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G"
         data-grid-width={doc.width}
         data-grid-height={doc.height}
+        data-grid-lines={gridLineState}
         data-document-modified-at={doc.meta.modifiedAt}
         data-center-guide={showCenterGuide ? "visible" : "hidden"}
         tabIndex={0}
