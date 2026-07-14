@@ -6,6 +6,13 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Account polish and legal-contact correction:** added safe owner-requested
+  avatar regeneration without image uploads or client-selected seeds, made
+  session loading failures recoverable, prevented anonymous report requests,
+  and corrected the operator-confirmed postal address consistently across
+  Terms, Privacy, and Copyright. This same-day postal correction is
+  administrative, keeps the Terms version at `2026-07-13`, and does not alter
+  the policies or user obligations.
 - **Mobile canvas clarity:** when dense cell lines are intentionally suppressed,
   the canvas now explains that it is a preview and points to Edit zoom; the
   canvas also exposes a stable visible/suppressed/hidden grid state for browser

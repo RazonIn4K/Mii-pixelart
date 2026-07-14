@@ -41,7 +41,13 @@ describe("community Worker integration", () => {
     const auth = await SELF.fetch(`${ORIGIN}/api/auth/session`, { headers });
     expect(auth.status).toBe(200);
     await expect(auth.json()).resolves.toMatchObject({
-      data: { user: { id: owner.id, username: "islander" } },
+      data: {
+        user: {
+          id: owner.id,
+          updatedAt: expect.any(Number),
+          username: "islander",
+        },
+      },
     });
 
     const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
@@ -407,6 +413,73 @@ describe("community Worker integration", () => {
       bio: "Building tiny island portraits.",
       terms_version: "2026-07-13",
       username: "atomic-islander",
+    });
+  });
+
+  it("regenerates avatars server-side without accepting a client-selected seed", async () => {
+    const owner = await seedUser("avatar-owner");
+    await env.DB.prepare(
+      "UPDATE users SET display_name = 'Avatar Owner', bio = 'Keep this profile text.' WHERE id = ?",
+    ).bind(owner.id).run();
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "avatar-owner-token"),
+    );
+    const before = await env.DB.prepare(
+      "SELECT avatar_seed FROM users WHERE id = ?",
+    ).bind(owner.id).first<{ avatar_seed: string }>();
+
+    const regenerated = await SELF.fetch(`${ORIGIN}/api/me`, {
+      body: JSON.stringify({ regenerateAvatar: true }),
+      headers,
+      method: "PATCH",
+    });
+    expect(regenerated.status).toBe(200);
+    const regeneratedBody = await regenerated.json() as {
+      data: {
+        avatarSeed: string;
+        bio: string;
+        displayName: string;
+        requiredTermsVersion: string;
+        termsAccepted: boolean;
+      };
+    };
+    expect(regeneratedBody.data).toMatchObject({
+      bio: "Keep this profile text.",
+      displayName: "Avatar Owner",
+      requiredTermsVersion: "2026-07-13",
+      termsAccepted: true,
+    });
+    expect(regeneratedBody.data.avatarSeed).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+    expect(regeneratedBody.data.avatarSeed).not.toBe(before?.avatar_seed);
+
+    await expect(env.DB.prepare(
+      "SELECT avatar_seed, display_name, bio FROM users WHERE id = ?",
+    ).bind(owner.id).first()).resolves.toEqual({
+      avatar_seed: regeneratedBody.data.avatarSeed,
+      bio: "Keep this profile text.",
+      display_name: "Avatar Owner",
+    });
+    const refreshedSession = await SELF.fetch(`${ORIGIN}/api/auth/session`, { headers });
+    await expect(refreshedSession.json()).resolves.toMatchObject({
+      data: { user: { avatarSeed: regeneratedBody.data.avatarSeed } },
+    });
+    const publicProfile = await SELF.fetch(`${ORIGIN}/api/users/avatar-owner`);
+    await expect(publicProfile.json()).resolves.toMatchObject({
+      data: { user: { avatarSeed: regeneratedBody.data.avatarSeed } },
+    });
+
+    const rejected = await SELF.fetch(`${ORIGIN}/api/me`, {
+      body: JSON.stringify({ avatarSeed: "client-selected-seed" }),
+      headers,
+      method: "PATCH",
+    });
+    expect(rejected.status).toBe(400);
+    await expect(env.DB.prepare(
+      "SELECT avatar_seed FROM users WHERE id = ?",
+    ).bind(owner.id).first()).resolves.toEqual({
+      avatar_seed: regeneratedBody.data.avatarSeed,
     });
   });
 

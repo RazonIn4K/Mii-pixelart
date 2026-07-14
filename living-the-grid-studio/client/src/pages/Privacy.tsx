@@ -197,7 +197,7 @@ export default function Privacy() {
 
       <h2>9. Contact</h2>
       <p>
-        The operator is David Ortiz, 1110 S 9th st, DeKalb, Illinois 60115,
+        The operator is David Ortiz, 122 W Taylor St, DeKalb, Illinois 60115,
         United States. Questions, requests, and postal privacy notices:{" "}
         <a href="mailto:privacy@tomodachi.pw">privacy@tomodachi.pw</a>.
       </p>

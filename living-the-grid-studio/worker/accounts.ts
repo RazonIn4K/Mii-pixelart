@@ -177,6 +177,11 @@ async function updateMe(context: WorkerRequestContext): Promise<Response> {
     updates.push("bio = ?");
     bindings.push(input.bio);
   }
+  if (input.regenerateAvatar) {
+    await enforceRateLimit(context.env.SAVE_RATE_LIMITER, session.user.id);
+    updates.push("avatar_seed = ?");
+    bindings.push(crypto.randomUUID());
+  }
   updates.push("updated_at = ?");
   bindings.push(Date.now(), session.user.id);
 
@@ -659,10 +664,10 @@ async function getAccount(env: Env, userId: string): Promise<ReturnType<typeof a
        ON ei.user_id = u.id AND ei.provider = 'google'
      WHERE u.id = ? AND u.status != 'deleted' LIMIT 1`,
   ).bind(userId).first<AccountRow>();
-  return row ? accountToApi(row) : null;
+  return row ? accountToApi(row, env.TERMS_VERSION) : null;
 }
 
-function accountToApi(row: AccountRow) {
+function accountToApi(row: AccountRow, requiredTermsVersion: string) {
   return {
     avatarSeed: row.avatar_seed,
     bio: row.bio,
@@ -673,6 +678,9 @@ function accountToApi(row: AccountRow) {
     id: row.id,
     role: row.role,
     status: row.status,
+    requiredTermsVersion,
+    termsAccepted:
+      row.terms_accepted_at !== null && row.terms_version === requiredTermsVersion,
     termsAcceptedAt: row.terms_accepted_at,
     termsVersion: row.terms_version,
     updatedAt: row.updated_at,

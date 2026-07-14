@@ -43,8 +43,16 @@ export function ReportDialog({
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const reporterReady = () => {
+    if (!user) {
+      toast.info("Sign in when you need to report community content.");
+      return false;
+    }
+    return ensureCommunityMutationReady(user);
+  };
+
   const submit = async () => {
-    if (user && !ensureCommunityMutationReady(user)) return;
+    if (!reporterReady()) return;
     setSubmitting(true);
     try {
       await communityApi("/api/reports", {
@@ -65,7 +73,7 @@ export function ReportDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (nextOpen && user && !ensureCommunityMutationReady(user)) return;
+        if (nextOpen && !reporterReady()) return;
         setOpen(nextOpen);
       }}
     >

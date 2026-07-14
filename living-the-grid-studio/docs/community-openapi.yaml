@@ -193,7 +193,7 @@ paths:
     patch:
       operationId: updateCurrentAccount
       tags: [Account]
-      summary: Update display name or bio; username is immutable in v1
+      summary: Update display name or bio, or request a server-generated avatar; username is immutable in v1
       requestBody:
         required: true
         content:
@@ -207,6 +207,7 @@ paths:
               schema: { $ref: '#/components/schemas/UserEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
     delete:
       operationId: requestAccountDeletion
       tags: [Account]
@@ -1618,7 +1619,7 @@ components:
     PrivateUser:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, bio, avatarSeed, role, status, email, requiredTermsVersion, termsVersion, termsAcceptedAt, createdAt]
+      required: [id, username, displayName, bio, avatarSeed, role, status, email, requiredTermsVersion, termsVersion, termsAcceptedAt, termsAccepted, createdAt, updatedAt, deletionDueAt]
       properties:
         id: { type: string, format: uuid }
         username:
@@ -1656,6 +1657,10 @@ components:
       properties:
         displayName: { type: string, minLength: 1, maxLength: 50 }
         bio: { type: string, maxLength: 500 }
+        regenerateAvatar:
+          type: boolean
+          const: true
+          description: Generate a new avatar seed on the server; clients cannot choose the seed.
     UserEnvelope:
       type: object
       additionalProperties: false

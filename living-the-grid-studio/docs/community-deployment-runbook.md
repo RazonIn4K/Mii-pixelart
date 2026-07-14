@@ -24,10 +24,10 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 ## Launch blockers outside infrastructure
 
 - Operator David Ortiz and Illinois, United States governing law are recorded
-  in the public legal pages. On 2026-07-13, the operator approved the complete
-  Stripe-verified address for public legal and service use; Terms, Privacy, and
-  Copyright publish it verbatim. Confirm that each published email address is
-  deliverable before launch.
+  in the public legal pages. On 2026-07-13, the operator confirmed the complete
+  public legal and service address; Terms, Privacy, and Copyright publish it
+  verbatim. Confirm the address against the intended merchant records and each
+  published email address is deliverable before launch.
 - David Ortiz is the accountable admin and final human moderation reviewer; a
   separate moderator is optional. Assign his internal user ID after the first
   approved sign-in. On 2026-07-13, he confirmed that he actively monitors

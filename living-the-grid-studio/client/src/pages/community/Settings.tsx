@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IslandAvatar } from "@/components/community/IslandAvatar";
+import { AvatarRegenerationButton } from "@/components/community/AvatarRegenerationButton";
 import { RequireAuth } from "@/components/community/RequireAuth";
 import { CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,11 +18,16 @@ import type { CommunityUser, SessionInfo } from "@/lib/community/types";
 
 export default function SettingsPage() {
   useDocumentTitle("Account settings");
-  const { user, refresh, revokeAll, getSessions } = useAuth();
+  const { applyAccountUpdate, user, refresh, revokeAll, getSessions } =
+    useAuth();
   const [, navigate] = useLocation();
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionsStatus, setSessionsStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [sessionsError, setSessionsError] = useState("");
   const [deleteText, setDeleteText] = useState("");
   const [saving, setSaving] = useState(false);
   const accountSetupRequired = Boolean(
@@ -31,28 +37,33 @@ export default function SettingsPage() {
   useEffect(() => {
     setDisplayName(user?.displayName ?? "");
     setBio(user?.bio ?? "");
-  }, [user]);
+  }, [user?.bio, user?.displayName]);
 
   const loadSessions = useCallback(async () => {
+    setSessionsStatus("loading");
+    setSessionsError("");
     try {
       setSessions(await getSessions());
+      setSessionsStatus("ready");
     } catch (error) {
-      toast.error(messageFromError(error));
+      setSessions([]);
+      setSessionsError(messageFromError(error));
+      setSessionsStatus("error");
     }
   }, [getSessions]);
   useEffect(() => {
     if (user) void loadSessions();
-  }, [loadSessions, user]);
+  }, [loadSessions, user?.id]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await communityApi<CommunityUser>("/api/me", {
+      const result = await communityApi<CommunityUser>("/api/me", {
         method: "PATCH",
         body: jsonBody({ displayName: displayName.trim(), bio: bio.trim() }),
       });
-      await refresh();
+      applyAccountUpdate(result.data);
       toast.success("Profile saved");
     } catch (error) {
       toast.error(messageFromError(error));
@@ -153,13 +164,15 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4">
                   <IslandAvatar
                     seed={user?.avatarSeed ?? "islander"}
+                    label="Your generated Island Workshop avatar"
                     className="h-16 w-16"
                   />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h2 className="text-xl font-black">Public profile</h2>
                     <p className="text-xs text-muted-foreground">
-                      Generated avatar · no image upload
+                      Generated avatar · no image upload · updates everywhere
                     </p>
+                    <AvatarRegenerationButton className="mt-3" />
                   </div>
                 </div>
                 <div className="mt-6 space-y-4">
@@ -212,8 +225,36 @@ export default function SettingsPage() {
                 </div>
                 <KeyRound className="text-primary" />
               </div>
-              <div className="mt-5 divide-y">
-                {sessions.length ? (
+              <div className="mt-5 divide-y" aria-live="polite">
+                {sessionsStatus === "loading" || sessionsStatus === "idle" ? (
+                  <p
+                    className="py-3 text-sm text-muted-foreground"
+                    role="status"
+                  >
+                    Loading active sessions…
+                  </p>
+                ) : sessionsStatus === "error" ? (
+                  <div
+                    className="rounded-2xl border border-destructive/30 bg-red-50 p-4"
+                    role="alert"
+                  >
+                    <p className="text-sm font-bold text-red-950">
+                      Session details could not be loaded.
+                    </p>
+                    <p className="mt-1 text-xs text-red-950/70">
+                      {sessionsError}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-3 bg-white"
+                      onClick={() => void loadSessions()}
+                    >
+                      Retry session details
+                    </Button>
+                  </div>
+                ) : sessions.length ? (
                   sessions.map((session) => (
                     <div
                       key={session.id}
@@ -235,7 +276,7 @@ export default function SettingsPage() {
                   ))
                 ) : (
                   <p className="py-3 text-sm text-muted-foreground">
-                    No session details are available.
+                    No active sessions were returned.
                   </p>
                 )}
               </div>

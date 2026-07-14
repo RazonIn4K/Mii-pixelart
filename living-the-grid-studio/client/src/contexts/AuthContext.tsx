@@ -18,6 +18,7 @@ interface AuthContextValue {
   serviceMessage: string | null;
   serviceAvailable: boolean;
   isAuthenticated: boolean;
+  applyAccountUpdate: (user: CommunityUser) => void;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
   revokeAll: () => Promise<void>;
@@ -47,6 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<CommunityUser | null>(null);
   const [serviceMessage, setServiceMessage] = useState<string | null>(null);
+
+  const applyAccountUpdate = useCallback((nextUser: CommunityUser) => {
+    setUser((currentUser) =>
+      currentUser?.id === nextUser.id
+        ? { ...currentUser, ...nextUser }
+        : currentUser,
+    );
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -107,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
+      applyAccountUpdate,
       serviceMessage,
       serviceAvailable: status !== "loading" && serviceMessage === null,
       isAuthenticated: status === "authenticated" && Boolean(user),
@@ -115,7 +125,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       revokeAll,
       getSessions,
     }),
-    [getSessions, logout, refresh, revokeAll, serviceMessage, status, user],
+    [
+      applyAccountUpdate,
+      getSessions,
+      logout,
+      refresh,
+      revokeAll,
+      serviceMessage,
+      status,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

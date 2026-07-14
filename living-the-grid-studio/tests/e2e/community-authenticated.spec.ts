@@ -128,6 +128,172 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
   });
 });
 
+test("onboarding can regenerate its avatar without losing unsaved identity fields", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["desktop", "minimum-phone"].includes(testInfo.project.name),
+    "Desktop and minimum-phone avatar-regeneration runs cover the layout edges.",
+  );
+
+  let avatarSeed = "00000000-0000-4000-8000-000000000001";
+  let submitted: Record<string, unknown> | null = null;
+  let releaseResponse: (() => void) | null = null;
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  const currentUser = () =>
+    user({
+      avatarSeed,
+      bio: "",
+      displayName: "New Islander",
+      username: null,
+    });
+
+  await page.route("**/api/auth/session", (route) =>
+    fulfillJson(route, {
+      data: {
+        session: {
+          createdAt: Date.now(),
+          current: true,
+          expiresAt: Date.now() + 86_400_000,
+          id: "session-1",
+          lastSeenAt: Date.now(),
+        },
+        user: currentUser(),
+      },
+      requestId,
+    }),
+  );
+  await page.route("**/api/me", async (route) => {
+    submitted = route.request().postDataJSON() as Record<string, unknown>;
+    await responseGate;
+    avatarSeed = "00000000-0000-4000-8000-000000000099";
+    await fulfillJson(route, { data: currentUser(), requestId });
+  });
+
+  await page.goto("/me/setup");
+  await page.getByLabel("Username").fill("unsaved-islander");
+  await page.getByLabel("Display name").fill("Unsaved Islander");
+  await page.getByLabel("Bio (optional)").fill("This draft must stay here.");
+  const avatar = page.getByRole("img", {
+    name: "Your generated Island Workshop avatar",
+  });
+  const originalAvatar = await avatar.innerHTML();
+  await page.getByRole("button", { name: "Try another avatar" }).click();
+  await expect.poll(() => submitted).toEqual({ regenerateAvatar: true });
+  await expect(
+    page.getByRole("button", { name: "Generating…" }),
+  ).toBeDisabled();
+  expect(releaseResponse).not.toBeNull();
+  releaseResponse?.();
+
+  await expect(page.getByText("New avatar generated").first()).toBeVisible();
+  await expect(page.getByLabel("Username")).toHaveValue("unsaved-islander");
+  await expect(page.getByLabel("Display name")).toHaveValue("Unsaved Islander");
+  await expect(page.getByLabel("Bio (optional)")).toHaveValue(
+    "This draft must stay here.",
+  );
+  await expect.poll(() => avatar.innerHTML()).not.toBe(originalAvatar);
+});
+
+test("settings regenerates an avatar and exposes recoverable session loading", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["desktop", "minimum-phone"].includes(testInfo.project.name),
+    "Desktop and minimum-phone settings-state runs cover the layout edges.",
+  );
+
+  let avatarSeed = "00000000-0000-4000-8000-000000000001";
+  let avatarRequest: Record<string, unknown> | null = null;
+  let sessionLoads = 0;
+  let releaseSessionFailure: (() => void) | null = null;
+  const sessionFailureGate = new Promise<void>((resolve) => {
+    releaseSessionFailure = resolve;
+  });
+  const currentUser = () => user({ avatarSeed });
+
+  await page.route("**/api/auth/session", (route) =>
+    fulfillJson(route, {
+      data: {
+        session: {
+          createdAt: Date.now(),
+          current: true,
+          expiresAt: Date.now() + 86_400_000,
+          id: "session-1",
+          lastSeenAt: Date.now(),
+        },
+        user: currentUser(),
+      },
+      requestId,
+    }),
+  );
+  await page.route("**/api/me/sessions", async (route) => {
+    sessionLoads += 1;
+    if (sessionLoads === 1) {
+      await sessionFailureGate;
+      await fulfillJson(
+        route,
+        {
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Session service unavailable.",
+          },
+          requestId,
+        },
+        503,
+      );
+      return;
+    }
+    await fulfillJson(route, {
+      data: [
+        {
+          createdAt: 1_700_000_000_000,
+          current: true,
+          expiresAt: 1_800_000_000_000,
+          id: "session-1",
+          lastSeenAt: 1_700_000_000_000,
+          userAgentLabel: "Test browser",
+        },
+      ],
+      requestId,
+    });
+  });
+  await page.route("**/api/me", async (route) => {
+    avatarRequest = route.request().postDataJSON() as Record<string, unknown>;
+    avatarSeed = "00000000-0000-4000-8000-000000000099";
+    await fulfillJson(route, { data: currentUser(), requestId });
+  });
+
+  await page.goto("/me/settings");
+  await expect(page.getByText("Loading active sessions…")).toBeVisible();
+  await expect(page.getByText("No active sessions were returned.")).toHaveCount(
+    0,
+  );
+  expect(releaseSessionFailure).not.toBeNull();
+  releaseSessionFailure?.();
+  await expect(
+    page.getByText("Session details could not be loaded."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Retry session details" }).click();
+  await expect(page.getByText(/Test browser.*This device/)).toBeVisible();
+
+  await page.getByLabel("Display name").fill("Unsaved Settings Name");
+  await page.getByLabel("Bio").fill("Unsaved settings bio.");
+  const avatar = page.getByRole("img", {
+    name: "Your generated Island Workshop avatar",
+  });
+  const originalAvatar = await avatar.innerHTML();
+  await page.getByRole("button", { name: "Try another avatar" }).click();
+  await expect.poll(() => avatarRequest).toEqual({ regenerateAvatar: true });
+  await expect(page.getByLabel("Display name")).toHaveValue(
+    "Unsaved Settings Name",
+  );
+  await expect(page.getByLabel("Bio")).toHaveValue("Unsaved settings bio.");
+  await expect.poll(() => avatar.innerHTML()).not.toBe(originalAvatar);
+});
+
 test("an existing username reviews newer terms without changing identity", async ({
   page,
 }) => {
@@ -300,6 +466,75 @@ test("stale Terms consent redirects public social and report actions before muta
   await page.goto("/creation/terms-preflight-creation");
   await page.getByRole("button", { name: "Report", exact: true }).click();
   await expectSetupRedirect("/creation/terms-preflight-creation");
+});
+
+test("anonymous reporting stops before opening the dialog or calling the API", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One focused anonymous-report preflight run is sufficient.",
+  );
+
+  const creator = user({
+    displayName: "Gallery Creator",
+    id: "00000000-0000-4000-8000-000000000041",
+    username: "gallery-creator",
+  });
+  const creation = {
+    commentsEnabled: true,
+    commentsLocked: false,
+    createdAt: 1_700_000_000_000,
+    description: "A public creation readable without an account.",
+    id: "00000000-0000-4000-8000-000000000042",
+    likedByViewer: false,
+    owner: creator,
+    projectDownloadEnabled: false,
+    publishedAt: 1_700_000_000_000,
+    revision: 1,
+    slug: "anonymous-report-creation",
+    state: "published",
+    stats: { comments: 0, likes: 0 },
+    tags: [],
+    title: "Anonymous report creation",
+    updatedAt: 1_700_000_000_000,
+    visibility: "public",
+  };
+  let reportRequests = 0;
+
+  await mockSession(page, null);
+  await page.route(
+    "**/api/public/creations/anonymous-report-creation",
+    (route) => fulfillJson(route, { data: creation, requestId }),
+  );
+  await page.route(`**/api/creations/${creation.id}/comments**`, (route) =>
+    fulfillJson(route, {
+      data: [],
+      meta: { nextCursor: null },
+      requestId,
+    }),
+  );
+  await page.route("**/api/reports", async (route) => {
+    reportRequests += 1;
+    await fulfillJson(
+      route,
+      {
+        error: { code: "UNAUTHENTICATED", message: "Sign in is required." },
+        requestId,
+      },
+      401,
+    );
+  });
+
+  await page.goto("/creation/anonymous-report-creation");
+  await page.getByRole("button", { name: "Report", exact: true }).click();
+  await expect(
+    page.getByText("Sign in when you need to report community content."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Report this creation" }),
+  ).toHaveCount(0);
+  expect(reportRequests).toBe(0);
 });
 
 test("an anonymous cloud link keeps its validated destination through sign-in and onboarding", async ({

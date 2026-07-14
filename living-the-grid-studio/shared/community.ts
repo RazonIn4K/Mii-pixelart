@@ -500,6 +500,7 @@ export const ProfileUpdateSchema = z
   .object({
     displayName: DisplayNameSchema.optional(),
     bio: BioSchema.optional(),
+    regenerateAvatar: z.literal(true).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

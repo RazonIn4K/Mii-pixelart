@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IslandAvatar } from "@/components/community/IslandAvatar";
+import { AvatarRegenerationButton } from "@/components/community/AvatarRegenerationButton";
 import { RequireAuth } from "@/components/community/RequireAuth";
 import { CommunityShell } from "@/components/layout/CommunityShell";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,7 +21,7 @@ import type { CommunityUser } from "@/lib/community/types";
 
 export default function Setup() {
   useDocumentTitle("Set up your profile");
-  const { user, refresh } = useAuth();
+  const { applyAccountUpdate, user } = useAuth();
   const [, navigate] = useLocation();
   const [username, setUsername] = useState(user?.username ?? "");
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
@@ -36,7 +37,7 @@ export default function Setup() {
     setUsername(user.username ?? normalizeUsername(user.displayName));
     setDisplayName(user.displayName);
     setBio(user.bio ?? "");
-  }, [user]);
+  }, [user?.bio, user?.displayName, user?.username]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -59,7 +60,7 @@ export default function Setup() {
     }
     setSubmitting(true);
     try {
-      await communityApi<CommunityUser>("/api/me/setup", {
+      const result = await communityApi<CommunityUser>("/api/me/setup", {
         method: "POST",
         body: jsonBody({
           username: normalized,
@@ -70,7 +71,7 @@ export default function Setup() {
           confirmsAge13OrOlder: true,
         }),
       });
-      await refresh();
+      applyAccountUpdate(result.data);
       toast.success("Your island profile is ready");
       const hasResumeDraft = await hasAuthResumeDraft();
       navigate(setupCompletionReturnTo() ?? (hasResumeDraft ? "/studio" : "/me/projects"));
@@ -96,7 +97,8 @@ export default function Setup() {
             <aside className="community-detail-panel text-center">
               <IslandAvatar seed={user?.avatarSeed ?? "new-islander"} label="Your generated Island Workshop avatar" className="mx-auto h-32 w-32" />
               <h2 className="mt-5 text-xl font-black">Your generated avatar</h2>
-              <p className="mt-2 text-xs leading-5 text-[var(--island-ink)]/55">Every profile gets an original, deterministic Island Workshop avatar. No photo upload is needed.</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--island-ink)]/55">Every profile gets an original, deterministic Island Workshop avatar. No photo upload is needed, and you can try another without losing this form.</p>
+              <AvatarRegenerationButton className="mt-4" />
             </aside>
             <form onSubmit={submit} className="community-detail-panel">
               <p className="island-kicker">{reviewingUpdatedTerms ? "Terms update" : "One-time setup"}</p>

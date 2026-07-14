@@ -2,9 +2,9 @@
 
 ## Product boundary
 
-Tomodachi uses three deliberately separate image paths:
+Tomodachi uses four deliberately separate image paths:
 
-1. **Profile avatars** are deterministic inline SVG assembled from a server-generated `avatar_seed`. They require no upload, model call, storage object, or moderation queue. The seed is a stable visual identifier, not an authentication secret.
+1. **Profile avatars** are deterministic inline SVG assembled from a server-generated `avatar_seed`. They require no upload, model call, storage object, or moderation queue. The seed is stable until its owner requests regeneration and is a visual identifier, not an authentication secret.
 2. **Creation previews** are rendered only from validated `GridDocumentV1` data. The Worker builds safe SVG, transcodes it through Cloudflare Images, and stores immutable WebP/JPEG objects in private R2.
 3. **Creation showcase images** are optional owner-selected photos/screenshots attached to an existing grid creation. The Worker retains only bounded, metadata-free WebP/JPEG variants; the local import source is never uploaded automatically.
 4. **Marketing and empty-state artwork** is generated during development, reviewed for originality and franchise safety, optimized locally, and committed as a static asset.
@@ -22,7 +22,7 @@ End users cannot submit arbitrary markup, avatar files, image-only posts, or pro
 - four eye treatments and four mouth treatments;
 - six neutral accessory treatments.
 
-The recipe yields millions of possible combinations while returning the same SVG for the same seed. Treat `ISLAND_AVATAR_VERSION` as a compatibility contract after public profiles launch.
+The recipe yields millions of possible combinations while returning the same SVG for the same seed. Owners may request a new server-generated seed, which updates their avatar everywhere without uploading an image. Treat `ISLAND_AVATAR_VERSION` as a compatibility contract after public profiles launch.
 
 ## Static generated artwork
 

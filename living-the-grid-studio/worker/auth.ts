@@ -104,6 +104,7 @@ interface SessionRow {
   terms_version: string | null;
   user_id: string;
   user_created_at: number;
+  user_updated_at: number;
   username: string | null;
 }
 
@@ -128,6 +129,7 @@ export interface AuthenticatedSession {
     termsAccepted: boolean;
     termsAcceptedAt: number | null;
     termsVersion: string | null;
+    updatedAt: number;
     username: string | null;
   };
 }
@@ -368,7 +370,8 @@ export async function optionalSession(
        s.id AS session_id, s.last_authenticated_at, s.created_at, s.last_seen_at,
        s.expires_at, u.id AS user_id, u.username, u.display_name, u.bio,
        u.role, u.status, u.avatar_seed, u.terms_accepted_at, u.terms_version,
-       u.deletion_due_at, u.created_at AS user_created_at, ei.email,
+       u.deletion_due_at, u.created_at AS user_created_at,
+       u.updated_at AS user_updated_at, ei.email,
        ei.provider_subject
      FROM sessions s
      JOIN users u ON u.id = s.user_id
@@ -408,6 +411,7 @@ export async function optionalSession(
         row.terms_accepted_at !== null && row.terms_version === context.env.TERMS_VERSION,
       termsAcceptedAt: row.terms_accepted_at,
       termsVersion: row.terms_version,
+      updatedAt: row.user_updated_at,
       username: row.username,
     },
   };

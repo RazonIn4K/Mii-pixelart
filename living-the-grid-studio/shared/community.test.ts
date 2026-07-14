@@ -4,6 +4,7 @@ import {
   CanonicalGridDocumentSchema,
   CreateCreationImageUploadSchema,
   GridDocumentV1Schema,
+  ProfileUpdateSchema,
   UpdateCreationImagesSchema,
   UsernameSchema,
   decodeCursor,
@@ -73,6 +74,15 @@ describe("GridDocumentV1Schema", () => {
 });
 
 describe("community helpers", () => {
+  it("allows only a server-controlled avatar regeneration request", () => {
+    expect(ProfileUpdateSchema.parse({ regenerateAvatar: true })).toEqual({
+      regenerateAvatar: true,
+    });
+    expect(ProfileUpdateSchema.safeParse({ regenerateAvatar: false }).success).toBe(false);
+    expect(ProfileUpdateSchema.safeParse({ avatarSeed: "chosen-by-client" }).success).toBe(false);
+    expect(ProfileUpdateSchema.safeParse({}).success).toBe(false);
+  });
+
   it("accepts only bounded raster showcase upload tickets", () => {
     const valid = {
       altText: "A painted island flag displayed in the town square.",

@@ -32,9 +32,9 @@ const SHIRT_COLORS = [
   "#35a8a2",
 ] as const;
 
-// The avatar seed is permanent account data, so this recipe version is also a
-// visual compatibility contract. Add an explicit migration instead of
-// changing the version after public profiles launch.
+// An avatar seed is stable until its owner deliberately regenerates it. The
+// recipe version remains a visual compatibility contract: add an explicit
+// migration instead of silently changing existing public avatars.
 export const ISLAND_AVATAR_VERSION = 2;
 
 export type IslandAvatarRecipe = {
