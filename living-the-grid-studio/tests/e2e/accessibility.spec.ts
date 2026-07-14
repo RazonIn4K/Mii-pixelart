@@ -17,6 +17,12 @@ const TINY_PNG = Buffer.from(
 test("representative public routes have no WCAG 2.2 A/AA violations", async ({
   page,
 }) => {
+  // This one test performs five complete navigations and five Axe scans. It
+  // finishes in about 15s alone, but can exceed the global 30s limit while the
+  // six-worker browser matrix is contending for CPU. Keep the extra headroom
+  // scoped to this audit so the rest of the suite retains the strict default.
+  test.setTimeout(60_000);
+
   for (const route of representativeRoutes) {
     await page.goto(route);
     await page.waitForLoadState("networkidle");

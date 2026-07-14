@@ -71,6 +71,42 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("authenticated header lazy-loads the complete account menu", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared authenticated account menu boundary.",
+  );
+
+  let logoutRequested = false;
+  await mockSession(page, user({ role: "admin" }));
+  await page.route("**/api/auth/logout", async (route) => {
+    logoutRequested = true;
+    await fulfillJson(route, { data: null, requestId });
+  });
+
+  await page.goto("/");
+  const accountTrigger = page.getByRole("button", {
+    name: /Test Islander/i,
+  });
+  await expect(accountTrigger).toBeVisible();
+  await accountTrigger.click();
+
+  await expect(page.getByRole("menuitem", { name: /Profile/i })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Projects" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Settings/i })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Moderation" }),
+  ).toBeVisible();
+
+  await page.getByRole("menuitem", { name: /Sign out/i }).click();
+  await expect.poll(() => logoutRequested).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" }),
+  ).toBeVisible();
+});
+
 test("onboarding stores profile, bio, age attestation, and terms in one request", async ({
   page,
 }) => {

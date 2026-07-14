@@ -14,6 +14,11 @@ describe("deterministic revision preview PNG", () => {
     await Promise.all(TEST_PREFIXES.splice(0).map(clearPrefix));
   });
 
+  // This determinism proof synchronously renders and compresses the same
+  // 640px RGBA image three times. It completes within the global 15s timeout
+  // alone, but can take about 20s while the Workers pool runs CPU-heavy files
+  // in parallel. Keep the extra headroom local so other tests still catch
+  // stalls against the stricter suite-wide timeout.
   it("emits a deterministic 640px RGBA PNG with no user metadata chunks", () => {
     const cells = ["R1C1", "R10C7", ...Array.from({ length: 62 }, () => null)];
     const project = gridProject("<script>alert(1)</script>", cells);
@@ -32,7 +37,7 @@ describe("deterministic revision preview PNG", () => {
     expect(renderGridPng(project)).toEqual(png);
     expect(renderGridPng(sameGrid)).toEqual(png);
     expect(new TextDecoder().decode(png)).not.toContain("script");
-  });
+  }, 30_000);
 
   it("renders only canonical palette colors into the raster", async () => {
     const project = gridProject("Palette proof", [

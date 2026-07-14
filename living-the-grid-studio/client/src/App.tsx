@@ -1,5 +1,4 @@
 import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense, type ReactNode } from "react";
 import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -128,23 +127,21 @@ function App() {
           Skip to main content
         </a>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Suspense
-              fallback={
-                <div
-                  className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60"
-                  role="status"
-                >
-                  Opening the workshop…
-                </div>
-              }
-            >
-              <Router />
-            </Suspense>
-            <AnalyticsLoader />
-            <CookieConsent />
-          </TooltipProvider>
+          <Toaster />
+          <Suspense
+            fallback={
+              <div
+                className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60"
+                role="status"
+              >
+                Opening the workshop…
+              </div>
+            }
+          >
+            <Router />
+          </Suspense>
+          <AnalyticsLoader />
+          <CookieConsent />
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

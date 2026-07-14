@@ -14,6 +14,10 @@ Object.assign(process.env, {
   OPENROUTER_API_KEY: ephemeralCredential(),
   STRIPE_SECRET_KEY: ephemeralCredential(),
   STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
+  // Give consent tests a same-origin analytics target that Playwright
+  // intercepts locally. No external analytics service is contacted.
+  VITE_ANALYTICS_ENDPOINT: "/__test/analytics",
+  VITE_ANALYTICS_WEBSITE_ID: "playwright-consent-site",
 });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";

@@ -418,6 +418,84 @@ test("the hero image is preloaded only on the homepage", async ({ page }) => {
   );
 });
 
+test("anonymous homepage does not request the authenticated account menu", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared anonymous bundle boundary.",
+  );
+
+  const accountMenuRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("AuthenticatedAccountMenu")) {
+      accountMenuRequests.push(request.url());
+    }
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: { session: null, user: null },
+        requestId: "anonymous-header-test",
+      }),
+      status: 200,
+    }),
+  );
+
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" }),
+  ).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(accountMenuRequests).toEqual([]);
+});
+
+test("recovery tools defer model discovery until they approach the viewport", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared viewport-gated recovery boundary.",
+  );
+
+  let modelRequests = 0;
+  await page.route("**/api/ai/models", (route) => {
+    modelRequests += 1;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ presets: [] }),
+      status: 200,
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(modelRequests).toBe(0);
+
+  await page.locator("#recovery").scrollIntoViewIfNeeded();
+  await expect(
+    page.getByRole("heading", {
+      name: "Calm help when something goes wrong.",
+    }),
+  ).toBeVisible();
+  await expect.poll(() => modelRequests).toBe(1);
+  const recoveryAccessibility = await new AxeBuilder({ page })
+    .include("#recovery")
+    .analyze();
+  expect(recoveryAccessibility.violations).toEqual([]);
+
+  await page.goto("/#recovery");
+  await page.reload();
+  await expect(
+    page.getByRole("heading", {
+      name: "Calm help when something goes wrong.",
+    }),
+  ).toBeVisible();
+  await expect.poll(() => modelRequests).toBe(2);
+});
+
 test("original community artwork and generated avatars are wired into public routes", async ({
   page,
 }) => {
