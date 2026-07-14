@@ -560,6 +560,12 @@ test("stale Terms consent redirects public social and report actions before muta
         name: "Review the current community terms.",
       }),
     ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Review and accept the current Terms before using community features.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     expect(attemptedMutations).toEqual([]);
   };
 
@@ -568,6 +574,13 @@ test("stale Terms consent redirects public social and report actions before muta
     .getByRole("button", { name: "Like Terms preflight creation" })
     .click();
   await expectSetupRedirect("/discover");
+  await page.reload();
+  await expect(
+    page.getByText(
+      "Review and accept the current Terms before using community features.",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
 
   await page.goto("/u/gallery-creator");
   await page.getByRole("button", { name: "Follow", exact: true }).click();
@@ -751,6 +764,38 @@ test("an anonymous cloud link keeps its validated destination through sign-in an
   await expect(
     page.getByText("Cloud link project", { exact: true }),
   ).toBeVisible();
+});
+
+test("an authenticated first cloud save explains setup after its hard redirect", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared hard-navigation notification path.",
+  );
+
+  await mockSession(
+    page,
+    user({
+      displayName: "New Cloud Islander",
+      termsAccepted: false,
+      username: null,
+    }),
+  );
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await page.getByRole("button", { name: "Save to account" }).click();
+
+  await expect(page).toHaveURL(/\/me\/setup\?returnTo=%2Fstudio$/);
+  const notice = page.getByText(
+    "Finish your public profile once before using cloud projects.",
+    { exact: true },
+  );
+  await expect(notice).toBeVisible();
+
+  await page.reload();
+  await expect(notice).toHaveCount(0);
 });
 
 test("the deliberate first cloud save still resumes its local draft after onboarding", async ({

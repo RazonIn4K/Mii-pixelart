@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";

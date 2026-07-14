@@ -27,6 +27,14 @@ test("representative public routes have no WCAG 2.2 A/AA violations", async ({
     await page.goto(route);
     await page.waitForLoadState("networkidle");
 
+    if (route === "/") {
+      await expect(
+        page.getByRole("heading", { name: /Create freely/ }),
+      ).toBeAttached();
+      await page.locator("#recovery").scrollIntoViewIfNeeded();
+      await expect(page.locator("#password-leak-check")).toBeVisible();
+    }
+
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();

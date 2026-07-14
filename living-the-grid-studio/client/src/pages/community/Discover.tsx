@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dices, Plus } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CreationCard } from "@/components/community/CreationCard";
 import {

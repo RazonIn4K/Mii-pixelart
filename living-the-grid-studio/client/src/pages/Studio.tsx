@@ -40,7 +40,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useGridDocument } from "@/hooks/useGridDocument";
 import CanvasViewer from "@/components/studio/CanvasViewer";
 import type { PaintTool } from "@/components/studio/CreationPanel";

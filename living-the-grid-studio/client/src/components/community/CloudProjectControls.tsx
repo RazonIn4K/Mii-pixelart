@@ -7,7 +7,7 @@ import {
   Save,
   TriangleAlert,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { PublishDialog } from "./PublishDialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -140,7 +140,7 @@ export function CloudProjectControls({
       if (!user.username || user.termsAccepted !== true) {
         try {
           await markDraftForAuthResume(document);
-          toast.info(
+          toast.infoAfterNavigation(
             "Finish your public profile once before using cloud projects.",
           );
           window.location.assign(setupPathForReturnTo(currentStudioReturnTo()));

@@ -78,6 +78,63 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
   ).toBe(true);
 });
 
+test("queued Studio notifications survive the deferred toast runtime", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared deferred notification runtime.",
+  );
+
+  const runtimeRequests: string[] = [];
+  page.on("request", (request) => {
+    if (
+      /RuntimeToaster|components\/ui\/sonner|deps\/sonner/.test(request.url())
+    ) {
+      runtimeRequests.push(request.url());
+    }
+  });
+
+  await page.goto("/studio");
+  await expect(
+    page.getByRole("heading", { name: "What would you like to make?" }),
+  ).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(runtimeRequests).toEqual([]);
+
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: true }),
+  ).toBeVisible();
+  expect(runtimeRequests.some((url) => url.includes("RuntimeToaster"))).toBe(
+    true,
+  );
+});
+
+test("Studio notifications remain usable when the optional toast chunk fails", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared notification fallback.",
+  );
+
+  await page.route("**/src/components/RuntimeToaster.tsx*", (route) =>
+    route.abort("failed"),
+  );
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+
+  const notifications = page.getByRole("region", { name: "Notifications" });
+  await expect(notifications).toBeVisible();
+  await expect(
+    notifications.getByText("Created Untitled Canvas", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    notifications.getByRole("button", { name: "Dismiss notification" }),
+  ).toBeVisible();
+});
+
 test("Studio file pickers are keyboard-focusable buttons while inputs stay out of the tab order", async ({
   page,
 }, testInfo) => {

@@ -1,9 +1,6 @@
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { CommunityUser } from "./types";
-import {
-  currentRelativeReturnTo,
-  setupPathForReturnTo,
-} from "./return-to";
+import { currentRelativeReturnTo, setupPathForReturnTo } from "./return-to";
 
 /**
  * Public community pages remain readable before setup or Terms re-consent,
@@ -16,13 +13,11 @@ export function ensureCommunityMutationReady(
 ): boolean {
   if (user.username && user.termsAccepted === true) return true;
 
-  toast.info(
+  toast.infoAfterNavigation(
     user.username
       ? "Review and accept the current Terms before using community features."
       : "Finish your profile before using community features.",
   );
-  window.location.assign(
-    setupPathForReturnTo(currentRelativeReturnTo()),
-  );
+  window.location.assign(setupPathForReturnTo(currentRelativeReturnTo()));
   return false;
 }

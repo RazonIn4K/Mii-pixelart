@@ -1,7 +1,8 @@
-import { Toaster } from "@/components/ui/sonner";
 import { lazy, Suspense, type ReactNode } from "react";
 import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { DeferredToaster } from "./components/DeferredToaster";
+import { ScrollRestoration } from "./components/ScrollRestoration";
 import CookieConsent from "./components/CookieConsent";
 import { AnalyticsLoader } from "./components/AnalyticsLoader";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -126,8 +127,9 @@ function App() {
         >
           Skip to main content
         </a>
+        <ScrollRestoration />
         <AuthProvider>
-          <Toaster />
+          <DeferredToaster />
           <Suspense
             fallback={
               <div

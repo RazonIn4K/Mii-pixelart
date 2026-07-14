@@ -1,7 +1,7 @@
 import { Check, Copy, Download, ExternalLink, Share2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

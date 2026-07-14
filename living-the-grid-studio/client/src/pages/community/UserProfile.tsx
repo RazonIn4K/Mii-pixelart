@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, UserPlus, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CreationCard } from "@/components/community/CreationCard";
 import {

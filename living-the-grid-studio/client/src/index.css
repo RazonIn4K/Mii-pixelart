@@ -421,6 +421,76 @@
       var(--island-paper);
   }
 
+  /* Keep homepage semantics and scroll geometry present while letting the
+     browser skip offscreen style, layout, and paint work. These measured
+     fallbacks follow the responsive layout breakpoints used by the sections. */
+  .home-render-section {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto var(--home-section-intrinsic-size);
+  }
+
+  .home-render-paths { --home-section-intrinsic-size: 79rem; }
+  .home-render-workflow { --home-section-intrinsic-size: 89rem; }
+  .home-render-workshop { --home-section-intrinsic-size: 122rem; }
+  .home-render-showcase { --home-section-intrinsic-size: 65rem; }
+  .home-render-cta { --home-section-intrinsic-size: 43rem; }
+
+  @media (min-width: 360px) {
+    .home-render-paths { --home-section-intrinsic-size: 75.25rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 85.5rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 117.75rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 68rem; }
+    .home-render-cta { --home-section-intrinsic-size: 41.5rem; }
+  }
+
+  @media (min-width: 390px) {
+    .home-render-paths { --home-section-intrinsic-size: 75rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 85.5rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 115.5rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 69.75rem; }
+    .home-render-cta { --home-section-intrinsic-size: 40.5rem; }
+  }
+
+  @media (min-width: 430px) {
+    .home-render-paths { --home-section-intrinsic-size: 73.25rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 84rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 115.5rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 71rem; }
+    .home-render-cta { --home-section-intrinsic-size: 36.5rem; }
+  }
+
+  @media (min-width: 640px) {
+    .home-render-paths { --home-section-intrinsic-size: 82.5rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 113rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 120.5rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 94.25rem; }
+    .home-render-cta { --home-section-intrinsic-size: 47.25rem; }
+  }
+
+  @media (min-width: 768px) {
+    .home-render-paths { --home-section-intrinsic-size: 82.5rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 66.25rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 97rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 103.5rem; }
+    .home-render-cta { --home-section-intrinsic-size: 43.5rem; }
+  }
+
+  @media (min-width: 1024px) {
+    .home-render-paths { --home-section-intrinsic-size: 49.5rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 66.25rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 76rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 54rem; }
+    .home-render-cta { --home-section-intrinsic-size: 43.5rem; }
+  }
+
+  @media (min-width: 1280px) {
+    .home-render-paths { --home-section-intrinsic-size: 49.5rem; }
+    .home-render-workflow { --home-section-intrinsic-size: 45.25rem; }
+    .home-render-workshop { --home-section-intrinsic-size: 76rem; }
+    .home-render-showcase { --home-section-intrinsic-size: 60.5rem; }
+    .home-render-cta { --home-section-intrinsic-size: 43.5rem; }
+  }
+
   .island-tool-card {
     border: 2px solid var(--island-ink);
     border-radius: 1.5rem;

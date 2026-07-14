@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EyeOff, MoreHorizontal, Plus, Settings2, Trash2 } from "lucide-react";
 import { Link } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

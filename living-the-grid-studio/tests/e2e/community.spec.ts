@@ -447,8 +447,359 @@ test("anonymous homepage does not request the authenticated account menu", async
   await expect(
     page.getByRole("button", { name: "Sign in with Google" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Enter the studio" }),
+  ).toBeAttached();
   await page.waitForTimeout(500);
   expect(accountMenuRequests).toEqual([]);
+});
+
+test("homepage keeps deep scroll restoration stable across browser history", async ({
+  page,
+}, testInfo) => {
+  let clientRouteDocumentRequests = 0;
+  page.on("request", (request) => {
+    if (
+      request.resourceType() === "document" &&
+      ["/about", "/guides"].includes(new URL(request.url()).pathname)
+    ) {
+      clientRouteDocumentRequests += 1;
+    }
+  });
+
+  await page.goto("/#recovery");
+  const recoveryHeading = page.getByRole("heading", {
+    name: "Calm help when something goes wrong.",
+  });
+  await expect(recoveryHeading).toBeVisible();
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerdown"));
+    window.scrollBy(0, Math.min(320, Math.round(window.innerHeight / 3)));
+  });
+  const initialScrollY = await page.evaluate(() => window.scrollY);
+
+  await page
+    .locator('a[href="/guides"]')
+    .first()
+    .evaluate((link: HTMLAnchorElement) => link.click());
+  await expect(page).toHaveURL(/\/guides$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Guides", exact: true }),
+  ).toBeVisible();
+  expect(clientRouteDocumentRequests).toBe(0);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/#recovery$/);
+  await expect(page.locator("#recovery")).toBeInViewport();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        initialScrollY,
+      ),
+    )
+    // Sub-pixel section sizing can shift the exact offset, but a client-side
+    // Back traversal must retain the user's within-section reading position.
+    .toBeLessThan(100);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/guides$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Guides", exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(50);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/#recovery$/);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        initialScrollY,
+      ),
+    )
+    .toBeLessThan(100);
+
+  if (testInfo.project.name === "desktop") {
+    await page.evaluate(() =>
+      window.history.replaceState(
+        { source: "scroll-restoration-test" },
+        "",
+        "/about",
+      ),
+    );
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "A Mii pixel-art studio paired with practical breach recovery.",
+      }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeLessThan(50);
+    expect(await page.evaluate(() => window.history.state.source)).toBe(
+      "scroll-restoration-test",
+    );
+    expect(clientRouteDocumentRequests).toBe(0);
+  }
+});
+
+test("scroll restoration preserves custom state and immediate traversals", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers History state and rapid traversal semantics.",
+  );
+
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, 1_200));
+  const firstPosition = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() =>
+    window.history.pushState(["preserve", { nested: true }], "", "/about"),
+  );
+  await expect(page).toHaveURL(/\/about$/);
+  expect(
+    await page.evaluate(() => ({
+      isArray: Array.isArray(window.history.state),
+      value: window.history.state,
+    })),
+  ).toEqual({
+    isArray: true,
+    value: ["preserve", { nested: true }],
+  });
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        firstPosition,
+      ),
+    )
+    .toBeLessThan(10);
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerdown"));
+    window.scrollTo(0, 900);
+    window.history.pushState(null, "", "/faq");
+    window.history.back();
+  });
+  await expect(page).toHaveURL(/\/$/);
+  await expect
+    .poll(() => page.evaluate(() => Math.abs(window.scrollY - 900)))
+    .toBeLessThan(10);
+
+  await page.evaluate(() => {
+    document.documentElement.style.minHeight = "5000px";
+    window.dispatchEvent(new PointerEvent("pointerdown"));
+    window.scrollTo(0, 600);
+  });
+  const firstEntryPosition = await page.evaluate(() => window.scrollY);
+
+  await page.evaluate(() => window.history.pushState(null, "", "/about"));
+  await expect(page).toHaveURL(/\/about$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(10);
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerdown"));
+    window.scrollTo(0, 1_100);
+  });
+  const middleEntryPosition = await page.evaluate(() => window.scrollY);
+
+  await page.evaluate(() => window.history.pushState(null, "", "/faq"));
+  await expect(page).toHaveURL(/\/faq$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(10);
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerdown"));
+    window.scrollTo(0, 1_600);
+  });
+
+  // Trigger the second Back from the first popstate handler, before the
+  // component's two-frame restore can apply the middle entry's position.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        let traversals = 0;
+        const onPopState = () => {
+          traversals += 1;
+          if (traversals === 1) window.history.back();
+          else {
+            window.removeEventListener("popstate", onPopState);
+            resolve();
+          }
+        };
+        window.addEventListener("popstate", onPopState);
+        window.history.back();
+      }),
+  );
+  await expect(page).toHaveURL(/\/$/);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        firstEntryPosition,
+      ),
+    )
+    .toBeLessThan(10);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        middleEntryPosition,
+      ),
+    )
+    .toBeLessThan(10);
+});
+
+test("native fragment history restores both sides of the trip", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers native same-document fragment history.",
+  );
+
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, 1_200));
+  const rootPosition = await page.evaluate(() => window.scrollY);
+  await page
+    .locator('a[href="#recovery"]')
+    .evaluate((link: HTMLAnchorElement) => link.click());
+  await expect(page).toHaveURL(/\/#recovery$/);
+  await expect(page.locator("#recovery")).toBeInViewport();
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        (expected) => Math.abs(window.scrollY - expected),
+        rootPosition,
+      ),
+    )
+    .toBeLessThan(10);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/#recovery$/);
+  await expect(page.locator("#recovery")).toBeInViewport();
+});
+
+test("saved scroll remains eligible while delayed content restores page height", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers delayed API-driven destination height.",
+  );
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.style.minHeight = "20000px";
+    window.scrollTo(0, 15_000);
+  });
+  const savedPosition = await page.evaluate(() => window.scrollY);
+
+  await page.evaluate(() => window.history.pushState(null, "", "/about"));
+  await expect(page).toHaveURL(/\/about$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(10);
+
+  await page.evaluate(() => {
+    document.documentElement.style.minHeight = "";
+    window.setTimeout(() => {
+      document.documentElement.style.minHeight = "20000px";
+    }, 1_500);
+    window.history.back();
+  });
+  await expect(page).toHaveURL(/\/$/);
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          (expected) => Math.abs(window.scrollY - expected),
+          savedPosition,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBeLessThan(10);
+});
+
+test("delayed restoration yields to input and blocked storage", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the defensive restoration fallbacks.",
+  );
+
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === "tomodachi.scroll-positions.v1") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return originalGetItem.call(this, key);
+    };
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "tomodachi.scroll-positions.v1") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return originalSetItem.call(this, key, value);
+    };
+  });
+
+  await page.goto("/");
+  await page.evaluate(() =>
+    window.history.pushState(null, "", "/#missing-restoration-target"),
+  );
+  // Let the normal two-frame traversal phase finish before simulating a
+  // scrollbar/assistive scroll with no preceding input event.
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    // A scrollbar or assistive scroll may not emit any wheel, pointer, touch,
+    // or key event. The scroll event itself must cancel the delayed restore.
+    window.scrollTo(0, 600);
+  });
+  await expect(page).toHaveURL(/#missing-restoration-target$/);
+  await page.waitForTimeout(1_200);
+  await expect
+    .poll(() => page.evaluate(() => Math.abs(window.scrollY - 600)))
+    .toBeLessThan(10);
+});
+
+test("one malformed stored scroll entry does not discard valid entries", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers defensive stored-position parsing.",
+  );
+
+  await page.addInitScript(() => {
+    window.history.replaceState(
+      { __tomodachiScrollKey: "valid-scroll-entry" },
+      "",
+      window.location.href,
+    );
+    window.sessionStorage.setItem(
+      "tomodachi.scroll-positions.v1",
+      JSON.stringify({
+        "broken-scroll-entry": null,
+        "valid-scroll-entry": { x: 0, y: 600 },
+      }),
+    );
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => Math.abs(window.scrollY - 600)))
+    .toBeLessThan(10);
 });
 
 test("recovery tools defer model discovery until they approach the viewport", async ({
@@ -474,6 +825,9 @@ test("recovery tools defer model discovery until they approach the viewport", as
   await page.waitForTimeout(500);
   expect(modelRequests).toBe(0);
 
+  await expect(
+    page.getByRole("heading", { name: /Create freely/ }),
+  ).toBeAttached();
   await page.locator("#recovery").scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("heading", {
@@ -486,14 +840,25 @@ test("recovery tools defer model discovery until they approach the viewport", as
     .analyze();
   expect(recoveryAccessibility.violations).toEqual([]);
 
+  await page.goto("about:blank");
+  modelRequests = 0;
+  await page.goto("/#how-it-works");
+  const workflowHeading = page.getByRole("heading", {
+    name: "From idea to paintable recipe.",
+  });
+  await expect(workflowHeading).toBeVisible();
+  await expect(workflowHeading).toBeInViewport();
+  expect(modelRequests).toBe(0);
+
+  await page.goto("about:blank");
+  modelRequests = 0;
   await page.goto("/#recovery");
-  await page.reload();
-  await expect(
-    page.getByRole("heading", {
-      name: "Calm help when something goes wrong.",
-    }),
-  ).toBeVisible();
-  await expect.poll(() => modelRequests).toBe(2);
+  const directRecoveryHeading = page.getByRole("heading", {
+    name: "Calm help when something goes wrong.",
+  });
+  await expect(directRecoveryHeading).toBeVisible();
+  await expect(directRecoveryHeading).toBeInViewport();
+  await expect.poll(() => modelRequests).toBe(1);
 });
 
 test("original community artwork and generated avatars are wired into public routes", async ({

@@ -1,5 +1,5 @@
 import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Link } from "wouter";
 import { IslandAvatar } from "@/components/community/IslandAvatar";
 import { Button } from "@/components/ui/button";

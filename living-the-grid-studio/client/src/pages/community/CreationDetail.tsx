@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, Heart, MessageCircle, Pencil, Save, Trash2, X } from "lucide-react";
 import { Link, useParams } from "wouter";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CommunityError, CommunityLoading } from "@/components/community/CommunityState";
