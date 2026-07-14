@@ -651,6 +651,7 @@ export default function ImportPanel({
         </div>
         <input
           id="ltg-image-input"
+          name="studio-image-file"
           ref={fileInputRef}
           type="file"
           accept={IMAGE_INPUT_ACCEPT}
@@ -661,6 +662,7 @@ export default function ImportPanel({
         />
         <input
           id="ltg-json-input"
+          name="studio-json-file"
           ref={jsonInputRef}
           type="file"
           accept=".json"
@@ -722,7 +724,7 @@ export default function ImportPanel({
           {sourcePreviewUrl && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Source Frame</Label>
+                <p className="text-xs font-semibold">Source Frame</p>
                 <span className="text-[0.7rem] text-muted-foreground">
                   {Math.round(cropWidth)}×{Math.round(cropHeight)}%
                 </span>
@@ -927,7 +929,7 @@ export default function ImportPanel({
 
       {/* Grid Size Controls */}
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Use Case Presets</Label>
+        <p className="text-xs font-semibold">Use Case Presets</p>
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
@@ -1055,7 +1057,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Framing</Label>
+        <p className="text-xs font-semibold">Framing</p>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
@@ -1107,7 +1109,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Source Type</Label>
+        <p className="text-xs font-semibold">Source Type</p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -1130,7 +1132,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Background</Label>
+        <p className="text-xs font-semibold">Background</p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -1172,7 +1174,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Image Adjustments</Label>
+        <p className="text-xs font-semibold">Image Adjustments</p>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Colors</span>
@@ -1270,6 +1272,8 @@ function CropNumberControl({
       <div className="relative">
         <Input
           id={id}
+          name={id}
+          autoComplete="off"
           type="number"
           inputMode="numeric"
           min={min}

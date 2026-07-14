@@ -576,8 +576,14 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       </div>
 
       <div className="space-y-2 rounded-xl border border-border bg-card p-3">
-        <Label className="text-xs font-semibold">What should AI do?</Label>
-        <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3">
+        <p id="ai-workflow-label" className="text-xs font-semibold">
+          What should AI do?
+        </p>
+        <div
+          className="grid gap-2 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3"
+          role="group"
+          aria-labelledby="ai-workflow-label"
+        >
           <button
             type="button"
             className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -651,7 +657,12 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
         <div className="mt-3 space-y-3">
           <div className="space-y-3 rounded-sm border border-border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs font-semibold">Chat Session</Label>
+              <Label
+                htmlFor="ai-chat-session-select"
+                className="text-xs font-semibold"
+              >
+                Chat Session
+              </Label>
               <div className="flex gap-1">
                 <Button
                   type="button"
@@ -682,7 +693,10 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               onValueChange={selectSession}
               disabled={isLoading}
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger
+                id="ai-chat-session-select"
+                className="h-8 text-xs"
+              >
                 <SelectValue placeholder="Choose saved chat" />
               </SelectTrigger>
               <SelectContent>
@@ -701,13 +715,22 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
 
           <div className="space-y-3 rounded-sm border border-border bg-card p-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Model</Label>
+              <Label
+                htmlFor="ai-model-select"
+                className="text-xs font-semibold"
+              >
+                Model
+              </Label>
               <Select
                 value={modelChoice}
                 onValueChange={setModelChoice}
                 disabled={isLoading}
               >
-                <SelectTrigger className="h-8 text-xs" aria-label="AI model">
+                <SelectTrigger
+                  id="ai-model-select"
+                  className="h-8 text-xs"
+                  aria-label="AI model"
+                >
                   <SelectValue placeholder="Choose model" />
                 </SelectTrigger>
                 <SelectContent>
@@ -742,33 +765,40 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
             </div>
 
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs">
                 <Checkbox
+                  id="ai-request-sketch"
                   checked={requestSketch}
                   disabled={isLoading}
                   onCheckedChange={(checked) =>
                     setRequestSketch(Boolean(checked))
                   }
                 />
-                Generate applyable sketch JSON
-              </label>
+                <Label htmlFor="ai-request-sketch" className="text-xs">
+                  Generate applyable sketch JSON
+                </Label>
+              </div>
               <p className="pl-6 text-[0.68rem] leading-relaxed text-muted-foreground">
                 Leave on for paintable grid output. Turn off if you want a
                 free-form critique or written planning instead of an applyable
                 sketch.
               </p>
-              <label className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs">
                 <Checkbox
+                  id="ai-include-grid-summary"
                   checked={includeGridSummary}
                   disabled={isLoading}
                   onCheckedChange={(checked) =>
                     setIncludeGridSummary(Boolean(checked))
                   }
                 />
-                Include current grid summary
-              </label>
-              <label className="flex items-center gap-2 text-xs">
+                <Label htmlFor="ai-include-grid-summary" className="text-xs">
+                  Include current grid summary
+                </Label>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
                 <Checkbox
+                  id="ai-include-grid-image"
                   checked={includeGridImage}
                   disabled={isLoading || !canRefine}
                   onCheckedChange={(checked) => {
@@ -777,8 +807,10 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                     if (next) setIncludeGridSummary(true);
                   }}
                 />
-                Include current canvas for editing
-              </label>
+                <Label htmlFor="ai-include-grid-image" className="text-xs">
+                  Include current canvas for editing
+                </Label>
+              </div>
               {includeGridImage && (
                 <p className="pl-6 text-[0.68rem] leading-relaxed text-muted-foreground">
                   Sends a clean PNG of the current grid to OpenRouter, a
@@ -976,7 +1008,13 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
         )}
 
         <div className="space-y-2">
+          <Label htmlFor="studio-ai-prompt" className="text-xs font-semibold">
+            Your AI request
+          </Label>
           <Textarea
+            id="studio-ai-prompt"
+            name="studio-ai-prompt"
+            autoComplete="off"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             maxLength={AI_SESSION_LIMITS.messageCharacters}

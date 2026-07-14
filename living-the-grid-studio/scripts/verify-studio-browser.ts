@@ -9,7 +9,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import http from "node:http";
 import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
@@ -921,24 +920,13 @@ async function assertStudioReachable(): Promise<void> {
   }
 }
 
-function fetchText(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    http
-      .get(url, (response) => {
-        const status = response.statusCode ?? 0;
-        if (status < 200 || status >= 300) {
-          response.resume();
-          reject(new Error(`HTTP ${status}`));
-          return;
-        }
-        let data = "";
-        response.on("data", (chunk: Buffer) => {
-          data += chunk.toString("utf8");
-        });
-        response.on("end", () => resolve(data));
-      })
-      .on("error", reject);
-  });
+async function fetchText(url: string): Promise<string> {
+  const response = await fetch(url, { redirect: "manual" });
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.text();
 }
 
 function fetchJson<T>(url: string): Promise<T> {

@@ -1,5 +1,98 @@
 import { expect, test } from "@playwright/test";
 
+declare global {
+  interface Window {
+    __studioCspEvalViolations?: string[];
+  }
+}
+
+async function expectStudioFormMetadata(page: import("@playwright/test").Page) {
+  const metadata = await page.evaluate(() => ({
+    fieldsMissingIdAndName: Array.from(
+      document.querySelectorAll<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >("input, select, textarea"),
+    )
+      .filter((field) => !field.id && !field.name)
+      .map((field) => field.outerHTML),
+    orphanedLabels: Array.from(document.querySelectorAll("label"))
+      .filter((label) => label.control === null)
+      .map((label) => label.textContent?.trim() ?? label.outerHTML),
+  }));
+
+  expect(metadata.fieldsMissingIdAndName).toEqual([]);
+  expect(metadata.orphanedLabels).toEqual([]);
+}
+
+test("Studio stays strict-CSP safe and gives every native form control metadata", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One Chromium run covers the shared lazy chunks and form metadata.",
+  );
+
+  await page.addInitScript(() => {
+    window.__studioCspEvalViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+      if (event.blockedURI === "eval") {
+        window.__studioCspEvalViolations?.push(event.violatedDirective);
+      }
+    });
+  });
+
+  const navigationResponse = await page.goto("/studio");
+  expect(navigationResponse).not.toBeNull();
+  const enforcedCsp = navigationResponse?.headers()["content-security-policy"];
+  expect(enforcedCsp).toBeTruthy();
+  expect(enforcedCsp).toContain("script-src");
+  expect(enforcedCsp).not.toContain("'unsafe-eval'");
+
+  await expect(page.getByRole("tabpanel", { name: "Import" })).toBeVisible();
+  await expectStudioFormMetadata(page);
+
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Create" })).toBeVisible();
+
+  const brushSize = page.getByRole("combobox", { name: "Brush size" });
+  await expect(brushSize).toHaveAttribute("id", "studio-brush-size");
+  await expect(brushSize).toHaveAttribute("name", "studio-brush-size");
+  await expect(brushSize).toHaveAttribute("autocomplete", "off");
+  await expectStudioFormMetadata(page);
+
+  for (const tabName of ["Palette", "Optimize", "AI", "Export"] as const) {
+    await page.getByRole("tab", { name: tabName, exact: true }).click();
+    await expect(page.getByRole("tabpanel", { name: tabName })).toBeVisible();
+    await expectStudioFormMetadata(page);
+  }
+
+  await page.getByRole("tab", { name: "Optimize", exact: true }).click();
+  const cleanupSwitch = page.getByRole("switch", {
+    name: "Single-Cell Cleanup",
+  });
+  await expect(cleanupSwitch).toBeChecked();
+  await page.getByText("Single-Cell Cleanup", { exact: true }).click();
+  await expect(cleanupSwitch).not.toBeChecked();
+
+  await page.getByRole("tab", { name: "AI", exact: true }).click();
+  await page.getByText("Advanced AI settings", { exact: true }).click();
+  const requestSketch = page.getByRole("checkbox", {
+    name: "Generate applyable sketch JSON",
+  });
+  await expect(requestSketch).toBeChecked();
+  await page
+    .getByText("Generate applyable sketch JSON", { exact: true })
+    .click();
+  await expect(requestSketch).not.toBeChecked();
+  await expect(
+    page.getByRole("textbox", { name: "Your AI request" }),
+  ).toHaveAttribute("autocomplete", "off");
+
+  expect(
+    await page.evaluate(() => window.__studioCspEvalViolations ?? []),
+  ).toEqual([]);
+});
+
 test("mobile Studio keeps the canvas bounded and paint controls within reach", async ({
   page,
 }, testInfo) => {

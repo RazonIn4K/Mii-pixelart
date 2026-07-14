@@ -97,6 +97,7 @@ docs/*
 !docs/community-data-flow.md
 !docs/community-deployment-runbook.md
 !docs/community-threat-model.md
+!docs/hosted-read-only-acceptance.md
 !docs/studio-game-reference-roadmap.md
 !docs/visual-assets.md
 

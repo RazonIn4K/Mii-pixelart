@@ -31,6 +31,7 @@
     "verify:ai-sketch": "tsx scripts/verify-ai-sketch.ts",
     "verify:residents": "tsx scripts/verify-residents.ts",
     "verify:bundle": "tsx scripts/verify-bundle-budgets.ts",
+    "verify:hosted-read-only": "tsx scripts/verify-hosted-read-only.ts",
     "verify:release-output": "tsx scripts/verify-release-output.ts",
     "verify:studio": "tsx scripts/verify-studio-browser.ts",
     "cloudflare:security-insights": "tsx scripts/cloudflare-security-insights.ts",

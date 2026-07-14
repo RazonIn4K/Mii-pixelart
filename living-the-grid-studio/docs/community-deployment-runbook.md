@@ -359,7 +359,22 @@ After explicit approval for resources and staging deployment:
 6. Before treating the deployment as backend acceptance, request
    `/api/discover/recent?limit=1` with `Accept: application/json` and require a
    JSON content type plus the standard `{ data, requestId }` envelope. A `200`
-   HTML SPA shell is a routing failure, not a successful API smoke test.
+   HTML SPA shell is a routing failure, not a successful API smoke test. Run
+   the tracked, fail-closed anonymous hosted gate rather than reconstructing an
+   ad hoc request list:
+
+   ```bash
+   pnpm verify:hosted-read-only -- --base-url https://staging.tomodachi.pw
+   ```
+
+   The command refuses production and arbitrary remote hosts, omits
+   credentials, never follows redirects, and never calls OAuth, account, AI,
+   Stripe, webhook, moderation, scheduled, or destructive routes. See
+   [`hosted-read-only-acceptance.md`](hosted-read-only-acceptance.md) for its
+   exact allowlist and local fixture tests. Continue to verify
+   `CONSULT_SALES_ENABLED=false` in the generated/deployed configuration; the
+   hosted network gate deliberately never calls a Stripe route.
+
 7. Run contract/integration/browser/security/accessibility/performance tests,
    including two-user authorization, OAuth, R2 failure injection, cleanup, and
    crawler metadata.

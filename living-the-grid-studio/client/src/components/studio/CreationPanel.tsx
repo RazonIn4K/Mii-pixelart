@@ -5,7 +5,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { getPaletteColor } from "@/lib/engine/palette";
 import {
   CREATIVE_TEMPLATES,
@@ -78,7 +77,7 @@ export default function CreationPanel({
       {currentDoc && (
         <div className="space-y-3 rounded-sm border border-border bg-card p-3">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs font-semibold">Canvas Detail</Label>
+            <p className="text-xs font-semibold">Canvas Detail</p>
             <span className="font-mono text-[0.68rem] text-muted-foreground">
               {currentDoc.width}x{currentDoc.height}
             </span>
@@ -124,7 +123,7 @@ export default function CreationPanel({
       )}
 
       <div className="space-y-3 rounded-sm border border-border bg-card p-3">
-        <Label className="text-xs font-semibold">Starter Designs</Label>
+        <p className="text-xs font-semibold">Starter Designs</p>
         <div className="space-y-4">
           {templateGroups.map((group) => (
             <div key={group.category} className="space-y-2">
@@ -163,7 +162,7 @@ export default function CreationPanel({
 
       <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs font-semibold">Starter Canvas</Label>
+          <p className="text-xs font-semibold">Starter Canvas</p>
           <div className="grid grid-cols-2 gap-1">
             <Button
               type="button"

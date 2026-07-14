@@ -136,9 +136,15 @@ export function CanvasPaintToolbar({
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:overflow-x-auto">
-          <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground">
+          <label
+            htmlFor="studio-brush-size"
+            className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground"
+          >
             Size
             <select
+              id="studio-brush-size"
+              name="studio-brush-size"
+              autoComplete="off"
               value={brushSize}
               disabled={!brushEnabled}
               onChange={(event) =>
