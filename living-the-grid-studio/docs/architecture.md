@@ -7,7 +7,7 @@
 > **Deployment status (2026-07-14):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
 > Images, and scheduled handlers. Exact source
-> `4d905038d755cf4ffd0860bee02037f647ddfc0a` is accepted on the isolated
+> `e5d49d13c5ee07cfd0640e989c48aeb796d5d412` is accepted on the isolated
 > staging Worker in standard read-only mode. Production `tomodachi.pw` still
 > runs the rollback-safe Cloudflare Pages deployment from protected `main`.
 > Authenticated writable staging, PR merge, production resources, and Worker
