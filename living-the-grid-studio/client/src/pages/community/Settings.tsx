@@ -18,8 +18,14 @@ import type { CommunityUser, SessionInfo } from "@/lib/community/types";
 
 export default function SettingsPage() {
   useDocumentTitle("Account settings", undefined, { noindex: true });
-  const { applyAccountUpdate, user, refresh, revokeAll, getSessions } =
-    useAuth();
+  const {
+    applyAccountUpdate,
+    communityMutationsEnabled,
+    user,
+    refresh,
+    revokeAll,
+    getSessions,
+  } = useAuth();
   const [, navigate] = useLocation();
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
@@ -122,6 +128,18 @@ export default function SettingsPage() {
                 deletion from one place.
               </p>
             </div>
+            {!communityMutationsEnabled ? (
+              <section
+                className="rounded-3xl border-2 border-amber-500 bg-amber-50 p-6 text-amber-950"
+                role="status"
+              >
+                <h2 className="text-xl font-black">Profile changes are paused</h2>
+                <p className="mt-2 text-sm leading-6">
+                  Session, export, and account-safety controls remain available,
+                  but profile and community writes are read-only right now.
+                </p>
+              </section>
+            ) : null}
             {accountSetupRequired ? (
               <section
                 className="rounded-3xl border-2 border-[var(--island-blue)]/45 bg-[var(--island-blue-soft)] p-6"
@@ -192,6 +210,7 @@ export default function SettingsPage() {
                       }
                       required
                       maxLength={50}
+                      disabled={!communityMutationsEnabled}
                     />
                   </div>
                   <div className="space-y-2">
@@ -204,13 +223,14 @@ export default function SettingsPage() {
                       }
                       rows={4}
                       maxLength={500}
+                      disabled={!communityMutationsEnabled}
                     />
                     <p className="text-right text-xs text-muted-foreground">
                       {bio.length}/500
                     </p>
                   </div>
                 </div>
-                <Button type="submit" className="mt-5" disabled={saving}>
+                <Button type="submit" className="mt-5" disabled={saving || !communityMutationsEnabled}>
                   <Save /> {saving ? "Saving…" : "Save profile"}
                 </Button>
               </form>

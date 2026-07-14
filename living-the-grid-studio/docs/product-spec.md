@@ -14,9 +14,10 @@ The strongest product angle: **not just "turn image into pixels," but "make this
 The local Studio workflow below is implemented and remains available without an
 account. The Island Workshop account, cloud-project, publishing, discovery,
 social, and moderation surfaces are also implemented and locally/CI tested.
-Exact source `520d0f287d390ba14b0fef179a6394893a5ab92d` is accepted on the
-isolated staging Worker in standard read-only mode; authenticated writable
-staging and production launch are still approval-gated. Production
+Exact source `520d0f287d390ba14b0fef179a6394893a5ab92d` remains the last accepted
+isolated staging Worker deployment in standard read-only mode. The current
+branch prepares the controlled writable-staging acceptance gate; production
+launch remains separately approval-gated. Production
 `tomodachi.pw` remains on Cloudflare Pages.
 
 ## Target User

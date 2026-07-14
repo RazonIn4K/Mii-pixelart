@@ -166,7 +166,11 @@ describe("Worker HTTP integration", () => {
     const response = await SELF.fetch("http://localhost:3000/api/auth/session");
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      data: { session: null, user: null },
+      data: {
+        capabilities: { communityMutationsEnabled: true },
+        session: null,
+        user: null,
+      },
     });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });

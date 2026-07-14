@@ -99,6 +99,25 @@ test("Unlock keeps consult sales visibly paused and has no consult checkout acti
   expect(consultCheckoutRequests).toEqual([]);
 });
 
+test("phone header exposes Google sign-in before opening navigation", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["small-phone", "minimum-phone"].includes(testInfo.project.name),
+    "The two narrowest Chromium viewports cover compact sign-in.",
+  );
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(
+    page.locator("header").getByRole("button", { name: "Sign in with Google" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    ),
+  ).toBe(true);
+});
+
 test("mobile navigation exposes community and Studio destinations", async ({
   page,
 }, testInfo) => {

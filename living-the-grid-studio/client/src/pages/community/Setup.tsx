@@ -21,7 +21,7 @@ import type { CommunityUser } from "@/lib/community/types";
 
 export default function Setup() {
   useDocumentTitle("Set up your profile", undefined, { noindex: true });
-  const { applyAccountUpdate, user } = useAuth();
+  const { applyAccountUpdate, communityMutationsEnabled, user } = useAuth();
   const [, navigate] = useLocation();
   const [username, setUsername] = useState(user?.username ?? "");
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
@@ -115,6 +115,19 @@ export default function Setup() {
               <p className="island-kicker">{reviewingUpdatedTerms ? "Terms update" : "One-time setup"}</p>
               <h1 className="mt-3 text-4xl font-black tracking-[-0.045em]">{reviewingUpdatedTerms ? "Review the current community terms." : "Choose your island identity."}</h1>
               <p className="mt-3 text-sm leading-6 text-[var(--island-ink)]/60">{reviewingUpdatedTerms ? "Your username stays the same. Review and accept the current Terms before returning to cloud projects and community actions." : "Your email remains private. The username, display name, bio, and generated avatar are public when you publish."}</p>
+              {!communityMutationsEnabled ? (
+                <div
+                  className="mt-5 rounded-2xl border-2 border-amber-500 bg-amber-50 p-4 text-amber-950"
+                  role="status"
+                >
+                  <p className="font-black">Profile changes are paused</p>
+                  <p className="mt-1 text-sm leading-6">
+                    Your Google session is active, but this environment is in
+                    read-only mode. Your form stays here; finish setup after
+                    writes are restored.
+                  </p>
+                </div>
+              ) : null}
               <div className="mt-8 space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="profile-username">Username</Label>
@@ -139,7 +152,7 @@ export default function Setup() {
                 <div className="space-y-2"><Label htmlFor="profile-bio">Bio (optional)</Label><Textarea id="profile-bio" value={bio} onChange={(event) => setBio(event.target.value.slice(0, 500))} maxLength={500} rows={4} /><p className="text-right text-xs text-muted-foreground">{bio.length}/500</p></div>
                 <label className="flex items-start gap-3 rounded-xl bg-muted/60 p-4 text-sm leading-6"><Checkbox checked={accepted} onCheckedChange={(checked) => setAccepted(checked === true)} className="mt-1" /><span>I am at least 13 years old and agree to the <a href="/terms" className="font-bold underline">Terms</a> and <a href="/community-guidelines" className="font-bold underline">Community Guidelines</a>.</span></label>
               </div>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center"><Button type="submit" disabled={submitting}><Check /> {submitting ? "Saving…" : reviewingUpdatedTerms ? "Accept current terms" : "Finish setup"}</Button><span className="inline-flex items-center gap-1.5 text-xs text-[var(--island-ink)]/50"><ShieldCheck className="h-4 w-4" /> Google email is never displayed</span></div>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center"><Button type="submit" disabled={submitting || !communityMutationsEnabled}><Check /> {submitting ? "Saving…" : reviewingUpdatedTerms ? "Accept current terms" : "Finish setup"}</Button><span className="inline-flex items-center gap-1.5 text-xs text-[var(--island-ink)]/50"><ShieldCheck className="h-4 w-4" /> Google email is never displayed</span></div>
             </form>
           </div>
         </div>

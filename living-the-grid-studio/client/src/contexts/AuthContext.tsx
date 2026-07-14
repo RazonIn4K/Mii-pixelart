@@ -8,7 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { communityApi, jsonBody, messageFromError } from "@/lib/community/api";
-import type { CommunityUser, SessionInfo } from "@/lib/community/types";
+import type {
+  CommunityCapabilities,
+  CommunityUser,
+  SessionInfo,
+} from "@/lib/community/types";
 
 type AuthStatus = "loading" | "anonymous" | "authenticated";
 
@@ -17,6 +21,7 @@ interface AuthContextValue {
   user: CommunityUser | null;
   serviceMessage: string | null;
   serviceAvailable: boolean;
+  communityMutationsEnabled: boolean;
   isAuthenticated: boolean;
   applyAccountUpdate: (
     update: Pick<CommunityUser, "id"> & Partial<Omit<CommunityUser, "id">>,
@@ -50,6 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<CommunityUser | null>(null);
   const [serviceMessage, setServiceMessage] = useState<string | null>(null);
+  const [communityMutationsEnabled, setCommunityMutationsEnabled] =
+    useState(false);
 
   const applyAccountUpdate = useCallback(
     (
@@ -69,17 +76,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await communityApi<
         | CommunityUser
         | {
+            capabilities?: Partial<CommunityCapabilities>;
             user?: CommunityUser | null;
             session?: { user?: CommunityUser | null } | null;
           }
         | null
       >("/api/auth/session");
       const nextUser = sessionUser(result.data);
+      const nextCapabilities =
+        result.data && "capabilities" in result.data
+          ? result.data.capabilities
+          : undefined;
       setUser(nextUser);
+      // Missing or malformed capabilities fail closed so a mixed-version
+      // response cannot expose write controls against a read-only Worker.
+      setCommunityMutationsEnabled(
+        nextCapabilities?.communityMutationsEnabled === true,
+      );
       setStatus(nextUser ? "authenticated" : "anonymous");
       setServiceMessage(null);
     } catch (error) {
       setUser(null);
+      setCommunityMutationsEnabled(false);
       setStatus("anonymous");
       setServiceMessage(messageFromError(error));
     }
@@ -95,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: jsonBody({}),
     });
     setUser(null);
+    setCommunityMutationsEnabled(false);
     setStatus("anonymous");
   }, []);
 
@@ -104,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: jsonBody({}),
     });
     setUser(null);
+    setCommunityMutationsEnabled(false);
     setStatus("anonymous");
   }, []);
 
@@ -126,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyAccountUpdate,
       serviceMessage,
       serviceAvailable: status !== "loading" && serviceMessage === null,
+      communityMutationsEnabled,
       isAuthenticated: status === "authenticated" && Boolean(user),
       refresh,
       logout,
@@ -134,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       applyAccountUpdate,
+      communityMutationsEnabled,
       getSessions,
       logout,
       refresh,

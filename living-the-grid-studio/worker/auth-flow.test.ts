@@ -98,6 +98,7 @@ describe("Google OIDC routes", () => {
     );
     await expect(sessionResponse.json()).resolves.toMatchObject({
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: { current: true },
         user: {
           email: "islander@example.com",

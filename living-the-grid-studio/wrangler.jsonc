@@ -124,7 +124,7 @@
         "PUBLIC_SITE_URL": "https://staging.tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://staging.tomodachi.pw/api/auth/google/callback",
         "TERMS_VERSION": "2026-07-13",
-        "COMMUNITY_MUTATIONS_ENABLED": "false",
+        "COMMUNITY_MUTATIONS_ENABLED": "true",
         "CONSULT_SALES_ENABLED": "false"
       },
       "secrets": {

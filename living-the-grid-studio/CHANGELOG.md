@@ -6,6 +6,15 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-14
 
+- **Writable-staging account acceptance candidate:** exposed the fail-closed
+  community-write capability through the session contract, added truthful
+  read-only profile/setup affordances, made phone sign-in visible without
+  opening navigation, and clarified incomplete-profile account actions. The
+  staging candidate enables community mutations for controlled authenticated
+  acceptance; production mutations and consult sales remain disabled. Local
+  Worker, contract, release-preflight, accessibility, responsive, full browser,
+  build, bundle, audit, and secret-diff checks pass. Hosted authenticated
+  acceptance remains required before this candidate is considered accepted.
 - **Final-head Worker staging acceptance:** deployed and accepted exact source
   `520d0f287d390ba14b0fef179a6394893a5ab92d` on the isolated staging Worker with
   community mutations and consult sales disabled. Exact-source type, preflight,

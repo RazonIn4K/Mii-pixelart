@@ -7,11 +7,12 @@
 > **Deployment status (2026-07-14):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
 > Images, and scheduled handlers. Exact source
-> `520d0f287d390ba14b0fef179a6394893a5ab92d` is accepted on the isolated
-> staging Worker in standard read-only mode. Production `tomodachi.pw` still
-> runs the rollback-safe Cloudflare Pages deployment from protected `main`.
-> Authenticated writable staging, PR merge, production resources, and Worker
-> domain cutover remain independent approval gates. References below to Pages
+> `520d0f287d390ba14b0fef179a6394893a5ab92d` is the last accepted isolated
+> staging Worker source in standard read-only mode. The current branch prepares
+> the separately approved writable-staging acceptance gate. Production
+> `tomodachi.pw` still runs the rollback-safe Cloudflare Pages deployment from
+> protected `main`; PR merge, production resources, and Worker domain cutover
+> remain independent approval gates. References below to Pages
 > Functions describe the active production/rollback compatibility surface, not
 > the staging branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
 > and the [community deployment runbook](community-deployment-runbook.md).

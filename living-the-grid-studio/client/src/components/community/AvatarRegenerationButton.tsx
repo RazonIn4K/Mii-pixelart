@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ export function AvatarRegenerationButton({
 }: {
   className?: string;
 }) {
-  const { applyAccountUpdate } = useAuth();
+  const { applyAccountUpdate, communityMutationsEnabled } = useAuth();
+  const unavailableDescriptionId = useId();
   const [regenerating, setRegenerating] = useState(false);
   const [announcement, setAnnouncement] = useState("");
 
@@ -51,8 +52,11 @@ export function AvatarRegenerationButton({
         type="button"
         size="sm"
         variant="outline"
-        disabled={regenerating}
+        disabled={regenerating || !communityMutationsEnabled}
         aria-busy={regenerating}
+        aria-describedby={
+          communityMutationsEnabled ? undefined : unavailableDescriptionId
+        }
         onClick={() => void regenerate()}
       >
         <RefreshCw
@@ -60,6 +64,11 @@ export function AvatarRegenerationButton({
         />
         {regenerating ? "Generating…" : "Try another avatar"}
       </Button>
+      {!communityMutationsEnabled ? (
+        <span id={unavailableDescriptionId} className="sr-only">
+          Profile changes are temporarily paused in this environment.
+        </span>
+      ) : null}
       <span
         className="sr-only"
         role="status"

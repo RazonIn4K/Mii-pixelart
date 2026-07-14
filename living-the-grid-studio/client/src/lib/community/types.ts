@@ -37,6 +37,10 @@ export interface SessionInfo {
   current: boolean;
 }
 
+export interface CommunityCapabilities {
+  communityMutationsEnabled: boolean;
+}
+
 export interface CreationSummary {
   id: string;
   slug: string;

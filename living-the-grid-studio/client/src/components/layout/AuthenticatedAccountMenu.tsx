@@ -18,10 +18,12 @@ export default function AuthenticatedAccountMenu() {
   const { user, logout } = useAuth();
   if (!user) return null;
 
-  const profilePath =
-    user.username && user.termsAccepted === true
-      ? `/u/${encodeURIComponent(user.username)}`
-      : "/me/setup";
+  const profileComplete = Boolean(
+    user.username && user.termsAccepted === true,
+  );
+  const profilePath = profileComplete
+    ? `/u/${encodeURIComponent(user.username!)}`
+    : "/me/setup";
 
   return (
     <DropdownMenu>
@@ -30,12 +32,25 @@ export default function AuthenticatedAccountMenu() {
           type="button"
           variant="ghost"
           className="h-11 rounded-full px-2 sm:px-3"
+          aria-label={
+            profileComplete
+              ? `Open account menu for ${user.displayName}`
+              : `Finish profile for ${user.displayName}`
+          }
         >
-          <IslandAvatar
-            seed={user.avatarSeed}
-            label={`${user.displayName}'s generated avatar`}
-            className="h-8 w-8"
-          />
+          <span className="relative">
+            <IslandAvatar
+              seed={user.avatarSeed}
+              label={`${user.displayName}'s generated avatar`}
+              className="h-8 w-8"
+            />
+            {!profileComplete ? (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-amber-500"
+                aria-hidden="true"
+              />
+            ) : null}
+          </span>
           <span className="hidden max-w-28 truncate text-xs font-black sm:inline">
             {user.displayName}
           </span>
@@ -54,7 +69,7 @@ export default function AuthenticatedAccountMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href={profilePath}>
-            <UserRound /> Profile
+            <UserRound /> {profileComplete ? "Profile" : "Finish profile"}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

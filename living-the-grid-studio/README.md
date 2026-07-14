@@ -11,11 +11,11 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-07-14):** Exact staging source
-> `520d0f287d390ba14b0fef179a6394893a5ab92d` is accepted on
-> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) in standard read-only
-> mode. The account/community implementation and its local/CI tests are present
-> on this branch, but authenticated community writes are not yet enabled.
+> **Deployment status (2026-07-14):** The current branch is configured for the
+> isolated writable-staging acceptance gate. Exact source
+> `520d0f287d390ba14b0fef179a6394893a5ab92d` remains the last accepted deployment
+> on [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) in read-only mode
+> until this candidate is deployed and authenticated acceptance completes.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
 > Cloudflare Pages deployment until writable staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
@@ -50,7 +50,7 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 - Long-form articles on Mii creation, clearly labeled legacy 3DS daily-play basics, Tomodachishare recovery, QR codes + save backup
 
 **Island Workshop community** — opt-in only; implemented on the branch and
-read-only staging, not yet enabled on production
+entering controlled writable-staging acceptance, not enabled on production
 
 - Google OIDC accounts with generated avatars and private cloud projects
 - Explicit review before public or unlisted publishing; authentication never publishes work

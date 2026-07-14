@@ -317,8 +317,13 @@ async function finishGoogleLogin(
 
 async function getAuthSession(context: WorkerRequestContext): Promise<Response> {
   const session = await optionalSession(context);
+  const capabilities = {
+    communityMutationsEnabled:
+      context.env.COMMUNITY_MUTATIONS_ENABLED === "true",
+  };
   return success(context.requestId, session
     ? {
+        capabilities,
         user: {
           ...session.user,
           requiredTermsVersion: context.env.TERMS_VERSION,
@@ -332,7 +337,7 @@ async function getAuthSession(context: WorkerRequestContext): Promise<Response> 
           lastSeenAt: session.lastSeenAt,
         },
       }
-    : { user: null, session: null });
+    : { capabilities, user: null, session: null });
 }
 
 async function logout(context: WorkerRequestContext): Promise<Response> {

@@ -216,7 +216,8 @@ human-authorized moderation.
 
 **Remaining approval gates:**
 
-- [ ] Authenticated single-user writable staging acceptance for cloud projects,
+- [ ] Deploy the current writable-staging candidate and complete authenticated
+      single-user acceptance for profile setup, avatars, cloud projects,
       generated/uploaded media, publishing, conflicts, quotas, and cleanup
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
@@ -226,8 +227,10 @@ human-authorized moderation.
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
 Production `tomodachi.pw` remains on the existing Cloudflare Pages deployment.
-Community mutations and consult sales remain disabled on staging; no roadmap
-status grants approval for a later release gate.
+The current candidate enables community mutations only in isolated staging for
+the approved acceptance gate; the last accepted deployment remains read-only
+until replacement. Consult sales stays disabled everywhere, and no roadmap
+status grants approval for production.
 
 ---
 

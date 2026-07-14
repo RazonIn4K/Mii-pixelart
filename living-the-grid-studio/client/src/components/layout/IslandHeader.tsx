@@ -46,9 +46,11 @@ function currentSearchQuery(): string {
 
 function SignInForm({
   className,
+  compact = false,
   unavailableMessage,
 }: {
   className?: string;
+  compact?: boolean;
   unavailableMessage?: string | null;
 }) {
   const unavailableDescriptionId = useId();
@@ -61,15 +63,32 @@ function SignInForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       <Button
         type="submit"
-        className="island-button w-full rounded-full font-bold"
+        className={cn(
+          "island-button rounded-full font-bold",
+          compact
+            ? "h-9 w-auto px-3 text-xs sm:h-10 sm:px-4 sm:text-sm"
+            : "w-full",
+        )}
         disabled={Boolean(unavailableMessage)}
+        aria-label={
+          unavailableMessage ? "Accounts unavailable" : "Sign in with Google"
+        }
         aria-describedby={
           unavailableMessage ? unavailableDescriptionId : undefined
         }
         title={unavailableMessage ?? undefined}
       >
         {unavailableMessage ? <CloudOff /> : null}
-        {unavailableMessage ? "Accounts unavailable" : "Sign in with Google"}
+        {unavailableMessage ? (
+          "Accounts unavailable"
+        ) : compact ? (
+          <>
+            <span className="sm:hidden">Sign in</span>
+            <span className="hidden sm:inline">Sign in with Google</span>
+          </>
+        ) : (
+          "Sign in with Google"
+        )}
       </Button>
       {unavailableMessage ? (
         <p id={unavailableDescriptionId} className="sr-only">
@@ -85,7 +104,8 @@ function AccountMenu() {
   if (!user) {
     return (
       <SignInForm
-        className="hidden sm:block"
+        className="shrink-0"
+        compact
         unavailableMessage={serviceMessage}
       />
     );

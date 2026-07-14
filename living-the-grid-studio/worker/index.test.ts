@@ -863,6 +863,20 @@ describe("community Worker integration", () => {
         return Reflect.get(target, property, receiver);
       },
     });
+    const sessionExecution = createExecutionContext();
+    const session = await worker.fetch(
+      new Request(`${ORIGIN}/api/auth/session`),
+      readOnlyEnv,
+      sessionExecution,
+    );
+    await waitOnExecutionContext(sessionExecution);
+    expect(session.status).toBe(200);
+    await expect(session.json()).resolves.toMatchObject({
+      data: {
+        capabilities: { communityMutationsEnabled: false },
+      },
+    });
+
     const execution = createExecutionContext();
     const blocked = await worker.fetch(new Request(`${ORIGIN}/api/creations`, {
       body: JSON.stringify({ project: project("Blocked by read-only mode") }),

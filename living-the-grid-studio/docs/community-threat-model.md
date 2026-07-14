@@ -140,9 +140,10 @@ authorization and is outside this API.
   deployments require it and `consultFulfillmentTestPassed` to be false. A
   later release may set it to true only when the readiness approval records a
   passed end-to-end consult fulfillment test.
-- The tracked staging and production configurations remain read-only. Enabling
-  mutations, replacing placeholder resource IDs, writing secrets, deploying,
-  and attaching a domain are separate approval gates.
+- The tracked staging configuration may enable mutations only for controlled
+  authenticated acceptance. Production remains read-only. Replacing resource
+  IDs, writing secrets, deploying, and attaching a domain remain separate
+  approval gates.
 - Target-explicit release commands validate the selected source and generated
   Worker configurations. Non-dry-run commands reject placeholder bindings,
   legal launch markers, a dirty/wrong commit, stale or unignored approvals,

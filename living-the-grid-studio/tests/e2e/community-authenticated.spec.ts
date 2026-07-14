@@ -36,11 +36,13 @@ async function fulfillJson(
 async function mockSession(
   page: Page,
   currentUser: ReturnType<typeof user> | null,
+  communityMutationsEnabled = true,
 ) {
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: currentUser
         ? {
+            capabilities: { communityMutationsEnabled },
             session: {
               createdAt: Date.now(),
               current: true,
@@ -50,11 +52,46 @@ async function mockSession(
             },
             user: currentUser,
           }
-        : { session: null, user: null },
+        : {
+            capabilities: { communityMutationsEnabled },
+            session: null,
+            user: null,
+          },
       requestId,
     }),
   );
 }
+
+test("read-only mode explains and disables unavailable profile writes", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared deployment-capability contract.",
+  );
+
+  await mockSession(
+    page,
+    user({ displayName: "New Islander", username: null }),
+    false,
+  );
+  await page.goto("/me/setup");
+
+  await expect(page.getByText("Profile changes are paused")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Finish setup" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Try another avatar" }),
+  ).toBeDisabled();
+
+  await page
+    .getByRole("button", { name: "Finish profile for New Islander" })
+    .click();
+  await expect(
+    page.getByRole("menuitem", { name: "Finish profile" }),
+  ).toBeVisible();
+});
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -115,6 +152,7 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: {
           createdAt: Date.now(),
           current: true,
@@ -189,6 +227,7 @@ test("onboarding can regenerate its avatar without losing unsaved identity field
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: {
           createdAt: Date.now(),
           current: true,
@@ -332,6 +371,7 @@ test("settings regenerates an avatar and exposes recoverable session loading", a
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: {
           createdAt: Date.now(),
           current: true,
@@ -423,6 +463,7 @@ test("an existing username reviews newer terms without changing identity", async
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: {
           createdAt: Date.now(),
           current: true,
@@ -683,6 +724,7 @@ test("an anonymous cloud link keeps its validated destination through sign-in an
     fulfillJson(route, {
       data: authenticated
         ? {
+            capabilities: { communityMutationsEnabled: true },
             session: {
               createdAt: Date.now(),
               current: true,
@@ -814,6 +856,7 @@ test("the deliberate first cloud save still resumes its local draft after onboar
     fulfillJson(route, {
       data: authenticated
         ? {
+            capabilities: { communityMutationsEnabled: true },
             session: {
               createdAt: Date.now(),
               current: true,
@@ -1834,6 +1877,7 @@ test("deletion-pending accounts can cancel during the grace period", async ({
   await page.route("**/api/auth/session", (route) =>
     fulfillJson(route, {
       data: {
+        capabilities: { communityMutationsEnabled: true },
         session: {
           createdAt: Date.now(),
           current: true,

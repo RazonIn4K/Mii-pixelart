@@ -170,9 +170,10 @@ Missing, malformed, and `false` values return the standard `503
 SERVICE_UNAVAILABLE` envelope before a route handler can mutate D1 or R2. Reads,
 anonymous Studio operation, OAuth/session controls, account deletion and
 cancellation, the existing AI/Stripe routes, and Stripe webhooks remain
-available. Local development is enabled; the tracked staging and production
-configurations are deliberately read-only until a reviewed deployment artifact
-sets the flag to `true`.
+available. Local development is enabled. The tracked staging configuration is
+writable only for the approved authenticated acceptance gate; production stays
+read-only until its own reviewed deployment artifact and approval set the flag
+to `true`.
 
 Because a Wrangler environment variable changes only through deployment, keep
 a validated read-only Worker version ready for rollback. Do not describe this
