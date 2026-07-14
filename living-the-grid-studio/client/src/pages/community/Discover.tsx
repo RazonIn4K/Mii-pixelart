@@ -315,7 +315,7 @@ export default function Discover() {
                   : `${viewLabel} · ${items.length} loaded`}
               </p>
               <p
-                className="mt-2 text-sm font-semibold text-[var(--island-ink)]/60"
+                className="mt-2 text-sm font-semibold text-[var(--island-muted-ink)]"
                 role="status"
               >
                 Tag filters could not be loaded. This is a temporary service

@@ -38,6 +38,19 @@ app.all("*", (context) => handleRequest(
   context.executionCtx,
 ));
 
+const CRAWLER_CONTROL_PATHS = new Set([
+  "/robots.txt",
+  "/sitemap.xml",
+  "/sitemap-images.xml",
+]);
+const STAGING_ROBOTS = `# Non-production environment: do not crawl or index.
+User-agent: *
+Disallow: /
+`;
+const EMPTY_SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>
+`;
+
 async function handleRequest(
   request: Request,
   env: Env,
@@ -69,7 +82,9 @@ async function handleRequest(
         // API route matching decodes parameters. Document routing must stay on
         // the raw URL so malformed public slugs become safe 404/noindex pages
         // and never reach a decoding path that can throw URIError.
-        response = (await dynamicDocument(context)) ?? await assetOrSpa(request, env);
+        response = (await crawlerControlAsset(request, env))
+          ?? (await dynamicDocument(context))
+          ?? await assetOrSpa(request, env);
       }
     }
   } catch (error) {
@@ -78,6 +93,7 @@ async function handleRequest(
 
   const headers = new Headers(response.headers);
   headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
+  applyEnvironmentCrawlerPolicy(headers, env);
   response = new Response(request.method === "HEAD" ? null : response.body, {
     headers,
     status: response.status,
@@ -91,6 +107,33 @@ async function handleRequest(
     status: response.status,
   }));
   return response;
+}
+
+async function crawlerControlAsset(
+  request: Request,
+  env: Env,
+): Promise<Response | null> {
+  const pathname = new URL(request.url).pathname;
+  if (!CRAWLER_CONTROL_PATHS.has(pathname)) return null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return env.ASSETS.fetch(request);
+  }
+
+  // Production and local development retain the version-controlled static
+  // crawler policy byte-for-byte. Staging must never advertise production URLs
+  // or invite indexing, even though it shares the same built asset bundle.
+  if (env.ENVIRONMENT !== "staging") return env.ASSETS.fetch(request);
+
+  const isRobots = pathname === "/robots.txt";
+  return new Response(isRobots ? STAGING_ROBOTS : EMPTY_SITEMAP, {
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": isRobots
+        ? "text/plain; charset=utf-8"
+        : "application/xml; charset=utf-8",
+      "X-Robots-Tag": "noindex,nofollow",
+    },
+  });
 }
 
 async function assetOrSpa(request: Request, env: Env): Promise<Response> {
@@ -142,6 +185,7 @@ function malformedApiPath(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const response = failure(requestId, 400, "invalid_path", "Request path encoding is invalid.");
   response.headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
+  applyEnvironmentCrawlerPolicy(response.headers, env);
   console.log(formatRequestLog(request, {
     duration: 0,
     environment: env.ENVIRONMENT,
@@ -149,4 +193,10 @@ function malformedApiPath(request: Request, env: Env): Promise<Response> {
     status: 400,
   }));
   return Promise.resolve(applySecurityHeaders(response, requestId));
+}
+
+function applyEnvironmentCrawlerPolicy(headers: Headers, env: Env): void {
+  if (env.ENVIRONMENT === "staging") {
+    headers.set("X-Robots-Tag", "noindex,nofollow");
+  }
 }

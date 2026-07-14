@@ -309,7 +309,7 @@ export default function Home() {
           <div className="island-orbit island-orbit-two" aria-hidden="true" />
           <div className="container relative grid min-h-[760px] items-center gap-12 py-16 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
             <div className="relative z-10 max-w-2xl">
-              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[var(--island-ink)]/12 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--island-ink)]/65 shadow-sm">
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[var(--island-ink)]/12 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--island-muted-ink)] shadow-sm">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
                 Fan-made creator toolkit
               </div>
@@ -328,7 +328,7 @@ export default function Home() {
                 <span className="mt-5 block">Pixel by pixel.</span>
               </h1>
 
-              <p className="mt-9 max-w-xl text-base font-medium leading-7 text-[var(--island-ink)]/66 sm:text-lg">
+              <p className="mt-9 max-w-xl text-base font-medium leading-7 text-[var(--island-muted-ink)] sm:text-lg">
                 Turn faces, characters, logos, memes, and sketches into clear,
                 paintable guides—then refine every square in a private,
                 browser-first studio.
@@ -348,7 +348,7 @@ export default function Home() {
                 </Button>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[var(--island-ink)]/58">
+              <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[var(--island-muted-ink)]">
                 <span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 text-[var(--island-mint-dark)]" /> No account required</span>
                 <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-[var(--island-yellow-dark)]" /> Runs in your browser</span>
                 <span className="flex items-center gap-1.5"><Heart className="h-3.5 w-3.5 text-primary" /> Made for fans</span>
@@ -363,7 +363,7 @@ export default function Home() {
                     <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-yellow)]" />
                     <span className="h-2.5 w-2.5 rounded-full bg-[var(--island-mint)]" />
                   </div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--island-ink)]/45">New project / Face paint</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--island-muted-ink)]">New project / Face paint</span>
                   <Grid3X3 className="h-4 w-4 text-[var(--island-ink)]/40" />
                 </div>
                 <div className="relative overflow-hidden bg-[var(--island-paper)] p-3 sm:p-5">
@@ -386,7 +386,7 @@ export default function Home() {
 
               <div className="island-float-card -left-5 top-16 hidden -rotate-6 sm:block">
                 <span className="text-2xl font-black text-[var(--island-ink)]">84</span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--island-ink)]/50">palette colors</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--island-muted-ink)]">palette colors</span>
               </div>
 
               <div className="island-float-card -bottom-7 right-1 rotate-3">
@@ -395,7 +395,7 @@ export default function Home() {
                     <span key={color} className="h-5 w-5 rounded-md border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
                   ))}
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--island-ink)]/50">your working palette</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--island-muted-ink)]">your working palette</span>
               </div>
             </div>
           </div>
@@ -425,7 +425,7 @@ export default function Home() {
                 <p className="island-kicker">Two paths, one friendly home</p>
                 <h2 className="mt-3 text-4xl font-black tracking-[-0.045em] text-[var(--island-ink)] sm:text-5xl">Create freely.<br />Recover safely.</h2>
               </div>
-              <p className="max-w-2xl text-base font-medium leading-7 text-[var(--island-ink)]/62 lg:justify-self-end">
+              <p className="max-w-2xl text-base font-medium leading-7 text-[var(--island-muted-ink)] lg:justify-self-end">
                 Tomodachi combines the energy of a community discovery page with
                 a focused creation workspace. The creative studio stays fun;
                 security help stays clearly separated, calm, and practical.
@@ -437,7 +437,7 @@ export default function Home() {
                 <div className="relative z-10 max-w-md">
                   <span className="island-card-number">01 / CREATE</span>
                   <h3 className="mt-8 text-3xl font-black tracking-[-0.04em] text-[var(--island-ink)]">Build something unmistakably yours.</h3>
-                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-ink)]/64">Import, draw, simplify, and export without sending your working image to an account system.</p>
+                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">Import, draw, simplify, and export without sending your working image to an account system.</p>
                   <Link href="/studio" className="mt-7 inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)] underline decoration-primary decoration-2 underline-offset-4">
                     Enter the studio <ArrowRight className="h-4 w-4" />
                   </Link>
@@ -449,7 +449,7 @@ export default function Home() {
                 <div className="relative z-10 max-w-md">
                   <span className="island-card-number">02 / RECOVER</span>
                   <h3 className="mt-8 text-3xl font-black tracking-[-0.04em] text-[var(--island-ink)]">Get clear next steps after a breach.</h3>
-                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-ink)]/64">Use a privacy-aware password check, a recovery plan, and plain-language guides without mixing crisis help with ads.</p>
+                  <p className="mt-4 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">Use a privacy-aware password check, a recovery plan, and plain-language guides without mixing crisis help with ads.</p>
                   <a href="#recovery" className="mt-7 inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)] underline decoration-[var(--island-mint-dark)] decoration-2 underline-offset-4">
                     Open recovery tools <ArrowRight className="h-4 w-4" />
                   </a>
@@ -465,7 +465,7 @@ export default function Home() {
             <div className="mx-auto mb-14 max-w-2xl text-center">
               <p className="island-kicker">A simple creative loop</p>
               <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">From idea to paintable recipe.</h2>
-              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-ink)]/60">The studio handles conversion and organization. You stay in control of the actual design.</p>
+              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-muted-ink)]">The studio handles conversion and organization. You stay in control of the actual design.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -478,7 +478,7 @@ export default function Home() {
                     </span>
                   </div>
                   <h3 className="mt-10 text-xl font-black tracking-[-0.025em] text-[var(--island-ink)]">{step.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">{step.text}</p>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">{step.text}</p>
                 </article>
               ))}
             </div>
@@ -490,7 +490,7 @@ export default function Home() {
             <div className="lg:sticky lg:top-28">
               <p className="island-kicker">The workshop</p>
               <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">Powerful tools.<br />Playful surface.</h2>
-              <p className="mt-5 max-w-md text-base font-medium leading-7 text-[var(--island-ink)]/60">A friendly interface on top, deterministic grid and palette logic underneath. Every project remains editable and exportable.</p>
+              <p className="mt-5 max-w-md text-base font-medium leading-7 text-[var(--island-muted-ink)]">A friendly interface on top, deterministic grid and palette logic underneath. Every project remains editable and exportable.</p>
               <div className="mt-8 flex flex-wrap gap-2">
                 {["Preview before commit", "Undoable cleanup", "JSON round-trip", "AI sketches validated"].map((item) => (
                   <span key={item} className="rounded-full bg-[var(--island-ink)] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white">{item}</span>
@@ -504,9 +504,9 @@ export default function Home() {
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/75 text-[var(--island-ink)] shadow-sm">
                     <feature.icon className="h-5 w-5" />
                   </div>
-                  <p className="mt-8 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--island-ink)]/45">{feature.eyebrow}</p>
+                  <p className="mt-8 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--island-muted-ink)]">{feature.eyebrow}</p>
                   <h3 className="mt-2 text-2xl font-black tracking-[-0.035em] text-[var(--island-ink)]">{feature.title}</h3>
-                  <p className="mt-3 max-w-md text-sm font-medium leading-6 text-[var(--island-ink)]/60">{feature.description}</p>
+                  <p className="mt-3 max-w-md text-sm font-medium leading-6 text-[var(--island-muted-ink)]">{feature.description}</p>
                 </article>
               ))}
             </div>
@@ -529,14 +529,14 @@ export default function Home() {
               <figure className="island-showcase-card">
                 <img src={CANVAS_IMG} alt="An original lantern workshop robot arranged as a repaintable pixel guide on graph paper" className="aspect-[4/3] w-full object-cover" width={1254} height={1254} loading="lazy" decoding="async" />
                 <figcaption className="flex items-center justify-between gap-4 p-5">
-                  <div><p className="text-sm font-black text-[var(--island-ink)]">Original workshop bot</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Clean shapes, visible cells, repeatable result.</p></div>
+                  <div><p className="text-sm font-black text-[var(--island-ink)]">Original workshop bot</p><p className="mt-1 text-xs font-medium text-[var(--island-muted-ink)]">Clean shapes, visible cells, repeatable result.</p></div>
                   <Grid3X3 className="h-5 w-5 text-primary" />
                 </figcaption>
               </figure>
               <figure className="island-showcase-card lg:translate-y-12">
                 <img src={PALETTE_IMG} alt="A labeled reference sheet showing the available color swatches" className="aspect-[4/3] w-full object-cover" width={1920} height={1434} loading="lazy" decoding="async" />
                 <figcaption className="flex items-center justify-between gap-4 p-5">
-                  <div><p className="text-sm font-black text-[var(--island-ink)]">Palette recipe</p><p className="mt-1 text-xs font-medium text-[var(--island-ink)]/52">Stable swatch IDs for every color choice.</p></div>
+                  <div><p className="text-sm font-black text-[var(--island-ink)]">Palette recipe</p><p className="mt-1 text-xs font-medium text-[var(--island-muted-ink)]">Stable swatch IDs for every color choice.</p></div>
                   <Palette className="h-5 w-5 text-[var(--island-blue)]" />
                 </figcaption>
               </figure>
@@ -552,7 +552,7 @@ export default function Home() {
               </div>
               <p className="island-kicker">TomodachiShare recovery hub</p>
               <h2 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[var(--island-ink)] sm:text-5xl">Calm help when something goes wrong.</h2>
-              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-ink)]/60">If you arrived from the <a href={BREACH_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="font-bold underline decoration-2 underline-offset-4">public breach notice</a>, start here. These tools are intentionally separated from creator content and advertising.</p>
+              <p className="mt-5 text-base font-medium leading-7 text-[var(--island-muted-ink)]">If you arrived from the <a href={BREACH_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="font-bold underline decoration-2 underline-offset-4">public breach notice</a>, start here. These tools are intentionally separated from creator content and advertising.</p>
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
@@ -564,7 +564,7 @@ export default function Home() {
                   </div>
                   <Search className="h-6 w-6 shrink-0 text-primary" />
                 </div>
-                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Your full password never leaves the browser. Only the first five characters of its SHA-1 hash are sent to the HIBP range API.</p>
+                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">Your full password never leaves the browser. Only the first five characters of its SHA-1 hash are sent to the HIBP range API.</p>
                 <form
                   className="mt-7 space-y-3"
                   onSubmit={(event) => {
@@ -578,7 +578,7 @@ export default function Home() {
                     <Search className="mr-2 h-4 w-4" />
                     {passwordCheck.status === "checking" ? "Checking…" : "Check exposure"}
                   </Button>
-                  <p aria-live="polite" className={`min-h-10 rounded-xl p-3 text-xs font-semibold leading-5 ${passwordCheck.status === "found" || passwordCheck.status === "error" ? "bg-red-50 text-red-800" : passwordCheck.status === "safe" ? "bg-emerald-50 text-emerald-800" : "bg-[var(--island-paper)] text-[var(--island-ink)]/48"}`}>
+                  <p aria-live="polite" className={`min-h-10 rounded-xl p-3 text-xs font-semibold leading-5 ${passwordCheck.status === "found" || passwordCheck.status === "error" ? "bg-red-50 text-red-800" : passwordCheck.status === "safe" ? "bg-emerald-50 text-emerald-800" : "bg-[var(--island-paper)] text-[var(--island-muted-ink)]"}`}>
                     {passwordCheck.message || "Use this as a signal—not proof that a password is safe."}
                   </p>
                 </form>
@@ -592,7 +592,7 @@ export default function Home() {
                   </div>
                   <BotMessageSquare className="h-6 w-6 shrink-0 text-[var(--island-blue)]" />
                 </div>
-                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-ink)]/58">Describe the situation without including passwords, payment details, recovery codes, or other secrets.</p>
+                <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">Describe the situation without including passwords, payment details, recovery codes, or other secrets.</p>
                 <div className="mt-7 space-y-3">
                   <Label htmlFor="breach-situation" className="text-xs font-bold">What happened?</Label>
                   <Textarea id="breach-situation" rows={4} maxLength={2000} placeholder="Example: My email appeared in a leak and I reused that password on two accounts…" value={incidentPrompt} onChange={(event) => setIncidentPrompt(event.target.value)} className="rounded-xl border-[var(--island-ink)]/15 bg-white" />

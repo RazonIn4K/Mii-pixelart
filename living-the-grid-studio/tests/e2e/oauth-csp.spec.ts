@@ -9,10 +9,31 @@ const headersSource = readFileSync(
 const contentSecurityPolicy = headersSource.match(
   /^\s*Content-Security-Policy:\s*(.+)$/mu,
 )?.[1];
+const contentSecurityPolicyReportOnly = headersSource.match(
+  /^\s*Content-Security-Policy-Report-Only:\s*(.+)$/mu,
+)?.[1];
 
 if (!contentSecurityPolicy) {
   throw new Error("The authored Content-Security-Policy header is missing.");
 }
+
+test("allows only the intended Google Fonts preconnect origins", () => {
+  const connectSources = contentSecurityPolicy
+    .split(";")
+    .find((directive) => directive.trimStart().startsWith("connect-src "))
+    ?.trim()
+    .split(/\s+/u)
+    .slice(1);
+
+  expect(connectSources).toContain("https://fonts.googleapis.com");
+  expect(connectSources).toContain("https://fonts.gstatic.com");
+  expect(connectSources).not.toContain("https://*.googleapis.com");
+  expect(connectSources).not.toContain("https://*.gstatic.com");
+});
+
+test("does not ship a report-only policy without a reporting endpoint", () => {
+  expect(contentSecurityPolicyReportOnly).toBeUndefined();
+});
 
 test("allows the Google OIDC form redirect required by form-action", async ({
   baseURL,

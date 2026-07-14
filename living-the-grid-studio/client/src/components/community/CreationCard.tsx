@@ -85,7 +85,7 @@ export function CreationCard({
             {creation.owner.username ? (
               <Link
                 href={`/u/${encodeURIComponent(creation.owner.username)}`}
-                className="mt-2 flex min-w-0 items-center gap-2 rounded-lg text-xs font-bold text-[var(--island-ink)]/55 hover:text-[var(--island-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="mt-2 flex min-w-0 items-center gap-2 rounded-lg text-xs font-bold text-[var(--island-muted-ink)] hover:text-[var(--island-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <IslandAvatar
                   seed={creation.owner.avatarSeed}
@@ -131,7 +131,7 @@ export function CreationCard({
             )}
             {creation.tags.length > 3 ? (
               <span
-                className="rounded-full bg-[var(--island-ink)]/6 px-2.5 py-1 text-[10px] font-black text-[var(--island-ink)]/50"
+                className="rounded-full bg-[var(--island-ink)]/6 px-2.5 py-1 text-[10px] font-black text-[var(--island-muted-ink)]"
                 aria-label={`${creation.tags.length - 3} more tags`}
               >
                 +{creation.tags.length - 3}
@@ -140,7 +140,7 @@ export function CreationCard({
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--island-ink)]/8 pt-3 text-xs font-bold text-[var(--island-ink)]/50">
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--island-ink)]/8 pt-3 text-xs font-bold text-[var(--island-muted-ink)]">
           <span>
             {formatCommunityDate(creation.publishedAt ?? creation.updatedAt)}
           </span>

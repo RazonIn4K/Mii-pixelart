@@ -87,7 +87,7 @@
   --popover: oklch(0.99 0.003 90);
   --popover-foreground: oklch(0.35 0.01 60);
   /* Red accent as primary */
-  --primary: oklch(0.58 0.2 25);
+  --primary: oklch(0.56 0.2 25);
   --primary-foreground: oklch(0.98 0.005 90);
   /* Light warm gray secondary */
   --secondary: oklch(0.95 0.005 90);
@@ -104,7 +104,7 @@
   /* Borders: subtle graphite */
   --border: oklch(0.9 0.005 90);
   --input: oklch(0.92 0.005 90);
-  --ring: oklch(0.58 0.2 25);
+  --ring: oklch(0.56 0.2 25);
   /* Charts */
   --chart-1: oklch(0.58 0.2 25);
   --chart-2: oklch(0.84 0.03 230);
@@ -114,17 +114,20 @@
   /* Sidebar */
   --sidebar: oklch(0.97 0.005 90);
   --sidebar-foreground: oklch(0.35 0.01 60);
-  --sidebar-primary: oklch(0.58 0.2 25);
+  --sidebar-primary: oklch(0.56 0.2 25);
   --sidebar-primary-foreground: oklch(0.98 0.005 90);
   --sidebar-accent: oklch(0.95 0.02 25);
   --sidebar-accent-foreground: oklch(0.35 0.01 60);
   --sidebar-border: oklch(0.9 0.005 90);
-  --sidebar-ring: oklch(0.58 0.2 25);
+  --sidebar-ring: oklch(0.56 0.2 25);
 
   /* Island Workshop semantic tokens */
   --island-ink: #20202a;
   --island-paper: #f8f5ed;
   --island-coral: #f36b5f;
+  /* Opaque text accents keep small workshop labels readable on every light panel. */
+  --island-coral-ink: #b33a31;
+  --island-muted-ink: #5d5d64;
   --island-coral-soft: #ffe1dc;
   --island-blue: #69b7ef;
   --island-blue-soft: #dff1ff;
@@ -348,7 +351,7 @@
     letter-spacing: 0.18em;
     line-height: 1;
     text-transform: uppercase;
-    color: var(--island-coral);
+    color: var(--island-coral-ink);
   }
 
   .island-path-card {
@@ -369,7 +372,7 @@
     font-size: 0.64rem;
     font-weight: 800;
     letter-spacing: 0.16em;
-    color: rgba(32,32,42,0.48);
+    color: var(--island-muted-ink);
   }
 
   .island-section-blue {

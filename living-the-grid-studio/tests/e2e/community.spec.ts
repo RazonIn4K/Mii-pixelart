@@ -384,6 +384,24 @@ test("the document permits zoom and advertises the original social card", async 
   );
 });
 
+test("the public AI-agent index is concise and action-safe", async ({
+  request,
+}) => {
+  const response = await request.get("/llms.txt");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("text/plain");
+
+  const body = await response.text();
+  expect(body).toMatch(/^# Tomodachi\.pw$/m);
+  expect(body).toContain("## Public resources");
+  expect(body).toContain("## Agent safety boundaries");
+  expect(body).toContain("https://tomodachi.pw/studio");
+  expect(body).toContain("https://tomodachi.pw/community-guidelines");
+  expect(body).toContain("Respect `robots.txt`");
+  expect(body).toContain("Do not automate sign-in");
+  expect(body.length).toBeLessThan(2_000);
+});
+
 test("the hero image is preloaded only on the homepage", async ({ page }) => {
   await page.goto("/discover", { waitUntil: "networkidle" });
   await expect(

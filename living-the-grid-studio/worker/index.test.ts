@@ -891,6 +891,212 @@ describe("community Worker integration", () => {
     expect(logout.status).toBe(200);
   });
 
+  it("isolates staging crawler files while preserving production assets", async () => {
+    const staticAssets = new Map([
+      [
+        "/",
+        {
+          body: "<!doctype html><html><head><title>Static shell</title></head><body><div id=\"root\"></div></body></html>",
+          contentType: "text/html; charset=utf-8",
+        },
+      ],
+      [
+        "/assets/island.css",
+        {
+          body: ":root { color-scheme: light; }",
+          contentType: "text/css; charset=utf-8",
+        },
+      ],
+      [
+        "/robots.txt",
+        {
+          body: "User-agent: *\nAllow: /\nSitemap: https://tomodachi.pw/sitemap.xml\n",
+          contentType: "text/plain; charset=utf-8",
+        },
+      ],
+      [
+        "/sitemap.xml",
+        {
+          body: "<urlset><url><loc>https://tomodachi.pw/</loc></url></urlset>",
+          contentType: "application/xml; charset=utf-8",
+        },
+      ],
+      [
+        "/sitemap-images.xml",
+        {
+          body: "<urlset><url><loc>https://tomodachi.pw/community-og.jpg</loc></url></urlset>",
+          contentType: "application/xml; charset=utf-8",
+        },
+      ],
+    ]);
+    const assetRequests: string[] = [];
+    const assets = {
+      fetch(request: Request): Promise<Response> {
+        const pathname = new URL(request.url).pathname;
+        assetRequests.push(pathname);
+        const asset = staticAssets.get(pathname);
+        return Promise.resolve(asset
+          ? new Response(asset.body, {
+              headers: { "Content-Type": asset.contentType },
+            })
+          : new Response(null, { status: 404 }));
+      },
+    };
+    const environment = (
+      name: Env["ENVIRONMENT"],
+      site: Env["PUBLIC_SITE_URL"],
+    ) => new Proxy(env as Env, {
+      get(target, property, receiver) {
+        if (property === "ASSETS") return assets;
+        if (property === "ENVIRONMENT") return name;
+        if (property === "PUBLIC_SITE_URL") return site;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const fetchFrom = async (site: string, path: string, target: Env) => {
+      const execution = createExecutionContext();
+      const response = await worker.fetch(
+        new Request(`${site}${path}`),
+        target,
+        execution,
+      );
+      await waitOnExecutionContext(execution);
+      return response;
+    };
+
+    const stagingEnv = environment(
+      "staging",
+      "https://staging.tomodachi.pw",
+    );
+    const stagingRobots = await fetchFrom(
+      "https://staging.tomodachi.pw",
+      "/robots.txt",
+      stagingEnv,
+    );
+    expect(stagingRobots.status).toBe(200);
+    expect(stagingRobots.headers.get("cache-control")).toBe("no-store");
+    expect(stagingRobots.headers.get("content-type")).toContain("text/plain");
+    expect(stagingRobots.headers.get("x-robots-tag")).toBe("noindex,nofollow");
+    const stagingRobotsBody = await stagingRobots.text();
+    expect(stagingRobotsBody).toContain("User-agent: *\nDisallow: /");
+    expect(stagingRobotsBody).not.toMatch(/^Sitemap:/imu);
+
+    for (const path of ["/sitemap.xml", "/sitemap-images.xml"] as const) {
+      const response = await fetchFrom(
+        "https://staging.tomodachi.pw",
+        path,
+        stagingEnv,
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("content-type")).toContain("application/xml");
+      expect(response.headers.get("x-robots-tag")).toBe("noindex,nofollow");
+      const body = await response.text();
+      expect(body).toContain("<urlset");
+      expect(body).not.toContain("<loc>");
+      expect(body).not.toContain("tomodachi.pw");
+    }
+    expect(assetRequests).toEqual([]);
+
+    for (const path of ["/", "/discover"] as const) {
+      const response = await fetchFrom(
+        "https://staging.tomodachi.pw",
+        path,
+        stagingEnv,
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(response.headers.get("x-robots-tag")).toBe("noindex,nofollow");
+    }
+    const stagingAsset = await fetchFrom(
+      "https://staging.tomodachi.pw",
+      "/assets/island.css",
+      stagingEnv,
+    );
+    expect(stagingAsset.status).toBe(200);
+    expect(stagingAsset.headers.get("x-robots-tag")).toBe("noindex,nofollow");
+    await expect(stagingAsset.text()).resolves.toBe(
+      staticAssets.get("/assets/island.css")?.body,
+    );
+    const stagingApi = await fetchFrom(
+      "https://staging.tomodachi.pw",
+      "/api/auth/session",
+      stagingEnv,
+    );
+    expect(stagingApi.status).toBe(200);
+    expect(stagingApi.headers.get("x-robots-tag")).toBe("noindex,nofollow");
+    const stagingMalformedApi = await fetchFrom(
+      "https://staging.tomodachi.pw",
+      "/api/creations/%E0%A4%A",
+      stagingEnv,
+    );
+    expect(stagingMalformedApi.status).toBe(400);
+    expect(stagingMalformedApi.headers.get("x-robots-tag")).toBe(
+      "noindex,nofollow",
+    );
+
+    assetRequests.length = 0;
+
+    const productionEnv = environment("production", "https://tomodachi.pw");
+    for (const path of [
+      "/robots.txt",
+      "/sitemap.xml",
+      "/sitemap-images.xml",
+    ] as const) {
+      const asset = staticAssets.get(path)!;
+      const response = await fetchFrom(
+        "https://tomodachi.pw",
+        path,
+        productionEnv,
+      );
+      expect(response.status).toBe(200);
+      await expect(response.text()).resolves.toBe(asset.body);
+    }
+    expect(assetRequests).toEqual([
+      "/robots.txt",
+      "/sitemap.xml",
+      "/sitemap-images.xml",
+    ]);
+
+    const productionDocument = await fetchFrom(
+      "https://tomodachi.pw",
+      "/discover",
+      productionEnv,
+    );
+    expect(productionDocument.status).toBe(200);
+    expect(productionDocument.headers.get("x-robots-tag")).toBe("index,follow");
+    const productionAsset = await fetchFrom(
+      "https://tomodachi.pw",
+      "/assets/island.css",
+      productionEnv,
+    );
+    expect(productionAsset.status).toBe(200);
+    expect(productionAsset.headers.get("x-robots-tag")).toBeNull();
+    const productionMalformedApi = await fetchFrom(
+      "https://tomodachi.pw",
+      "/api/creations/%E0%A4%A",
+      productionEnv,
+    );
+    expect(productionMalformedApi.status).toBe(400);
+    expect(productionMalformedApi.headers.get("x-robots-tag")).toBeNull();
+
+    const localEnv = environment("local", "http://localhost:3000");
+    const localDocument = await fetchFrom(
+      "http://localhost:3000",
+      "/discover",
+      localEnv,
+    );
+    expect(localDocument.status).toBe(200);
+    expect(localDocument.headers.get("x-robots-tag")).toBe("index,follow");
+    const localAsset = await fetchFrom(
+      "http://localhost:3000",
+      "/assets/island.css",
+      localEnv,
+    );
+    expect(localAsset.status).toBe(200);
+    expect(localAsset.headers.get("x-robots-tag")).toBeNull();
+  });
+
   it("rejects placeholder identity credentials outside local development", async () => {
     const productionEnv = new Proxy(env as Env, {
       get(target, property, receiver) {

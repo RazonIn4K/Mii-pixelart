@@ -9,11 +9,11 @@ export function IslandFooter() {
             <span className="brand-mark brand-mark-small" aria-hidden="true"><span /><span /><span /><span /></span>
             <span className="text-sm font-extrabold text-[var(--island-ink)]">tomodachi<span className="text-primary">.pw</span></span>
           </Link>
-          <p className="mt-4 max-w-md text-xs font-medium leading-5 text-[var(--island-ink)]/50">
+          <p className="mt-4 max-w-md text-xs font-medium leading-5 text-[var(--island-muted-ink)]">
             An unofficial, fan-made creative tool. No official game or character assets are bundled, and no affiliation with Nintendo is implied.
           </p>
         </div>
-        <nav aria-label="Footer" className="flex max-w-xl flex-wrap gap-x-5 gap-y-3 text-xs font-bold text-[var(--island-ink)]/60 md:justify-end">
+        <nav aria-label="Footer" className="flex max-w-xl flex-wrap gap-x-5 gap-y-3 text-xs font-bold text-[var(--island-muted-ink)] md:justify-end">
           <Link href="/discover">Discover</Link>
           <Link href="/studio">Studio</Link>
           <Link href="/community-guidelines">Community guidelines</Link>

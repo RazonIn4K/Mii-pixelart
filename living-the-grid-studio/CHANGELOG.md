@@ -6,6 +6,18 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ### 2026-07-13
 
+- **Read-only staging evidence and acceptance fixes:** deployed the approved
+  immutable staging candidate with both community mutations and consult sales
+  disabled, then recorded the guarded release, 594-check API/security matrix,
+  seven-width Chromium plus mobile WebKit functional audit, unchanged D1
+  aggregates, rollback version, and exact mobile performance trace in
+  [`docs/release-evidence/2026-07-13-staging-gate-3a-replacement.md`](./docs/release-evidence/2026-07-13-staging-gate-3a-replacement.md).
+  The hosted audit exposed low-contrast secondary text, a blocked Google Fonts
+  preconnect, an orphaned Trusted Types report-only policy, and staging crawler
+  files that advertised production URLs. The undeployed follow-up fixes those
+  findings with AA-safe semantic inks, exact-origin CSP rules, an agent-safe
+  `llms.txt`, and staging-only noindex crawler responses; production and the
+  approved hosted revision remain unchanged pending a new gate.
 - **Fast, accessible mobile navigation:** replaced the header's scroll-locking
   drawer with a native modal dialog that keeps the background inert, traps
   keyboard focus, closes by Escape, backdrop, navigation, or desktop resize,

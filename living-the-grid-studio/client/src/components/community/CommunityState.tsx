@@ -40,7 +40,7 @@ export function CommunityError({
             ? "Community features are not connected here yet"
             : "Community unavailable"}
         </h2>
-        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">
+        <p className="mt-1 max-w-md text-sm text-[var(--island-muted-ink)]">
           {message}
         </p>
       </div>
@@ -99,7 +99,7 @@ export function CommunityEmpty({
       </span>
       <div>
         <p className="font-black text-[var(--island-ink)]">{title}</p>
-        <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">
+        <p className="mt-1 max-w-md text-sm text-[var(--island-muted-ink)]">
           {message}
         </p>
       </div>

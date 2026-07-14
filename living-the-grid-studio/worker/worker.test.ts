@@ -81,6 +81,12 @@ describe("Worker security primitives", () => {
     expect(response.headers.get("content-security-policy")).toContain(
       "form-action 'self' https://accounts.google.com https://checkout.stripe.com",
     );
+    expect(response.headers.get("content-security-policy")).toContain(
+      "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+    );
+    expect(
+      response.headers.get("content-security-policy-report-only"),
+    ).toBeNull();
   });
 
   it("returns a Retry-After hint when a binding rejects a request", async () => {

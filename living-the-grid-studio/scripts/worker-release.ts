@@ -127,6 +127,9 @@ const EXPECTED_RATE_LIMITS = [
 
 const REQUIRED_ASSET_ROUTES = [
   "/api/*",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/sitemap-images.xml",
   "/",
   "/studio",
   "/guides",
@@ -469,7 +472,10 @@ function validateRateLimits(config: JsonRecord): void {
   }
 }
 
-function validateAssets(config: JsonRecord): void {
+function validateAssets(
+  config: JsonRecord,
+  expectedWorkerFirst: unknown = REQUIRED_ASSET_ROUTES,
+): void {
   const assets = objectAt(config, "assets", "Static Assets binding");
   expectExact(assets.binding, "ASSETS", "Static Assets binding");
   expectExact(
@@ -479,7 +485,7 @@ function validateAssets(config: JsonRecord): void {
   );
   expectJsonExact(
     assets.run_worker_first,
-    REQUIRED_ASSET_ROUTES,
+    expectedWorkerFirst,
     "Worker-first routes",
   );
 }
@@ -607,6 +613,18 @@ function validateSourceConfig(
   );
   validateSourceIsolation(source);
   validateAssets(source);
+  const stagingSource = objectAt(envs, "staging", "Staging environment");
+  validateAssets(stagingSource, true);
+  const productionSource = objectAt(
+    envs,
+    "production",
+    "Production environment",
+  );
+  if ("assets" in productionSource) {
+    throw new ReleaseError(
+      "Production must inherit the version-controlled Static Assets routing policy.",
+    );
+  }
   const triggers = objectAt(
     source,
     "triggers",
@@ -750,7 +768,10 @@ function validateGeneratedConfig(
     validateConsultSalesVariable(selected),
     "Generated consult sales mode",
   );
-  validateAssets(generated);
+  validateAssets(
+    generated,
+    target === "staging" ? true : REQUIRED_ASSET_ROUTES,
+  );
   const generatedTriggers = objectAt(
     generated,
     "triggers",

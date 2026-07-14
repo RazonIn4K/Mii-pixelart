@@ -1056,7 +1056,8 @@ includes:
 - `Strict-Transport-Security`
 - `X-DNS-Prefetch-Control`
 - `Content-Security-Policy`
-- `Content-Security-Policy-Report-Only` for Trusted Types observation
+- no Trusted Types report-only header until a real reporting endpoint and
+  `report-to` policy are available; the enforced CSP remains active
 - long immutable cache for `/assets/*`
 - no-cache for `/index.html`
 - no-store for `/api/*`

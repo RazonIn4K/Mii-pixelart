@@ -30,7 +30,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
         </span>
         <div>
           <p className="font-black text-[var(--island-ink)]">Sign in to continue</p>
-          <p className="mt-1 max-w-md text-sm text-[var(--island-ink)]/60">The Studio stays free without an account. Sign in only when you want cloud projects or community features.</p>
+          <p className="mt-1 max-w-md text-sm text-[var(--island-muted-ink)]">The Studio stays free without an account. Sign in only when you want cloud projects or community features.</p>
         </div>
         <GoogleSignIn />
       </div>

@@ -100,7 +100,7 @@ export function CookieConsent() {
             <p className="font-medium">
               We use cookies to keep this site useful.
             </p>
-            <p className="mt-1 text-xs sm:text-sm text-foreground/70">
+            <p className="mt-1 text-xs text-foreground/85 sm:text-sm">
               Essential cookies keep the studio working. We only load ads,
               affiliate tracking, and analytics if you opt in. See our{" "}
               <Link href="/privacy" className="underline underline-offset-2">

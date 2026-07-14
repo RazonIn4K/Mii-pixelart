@@ -65,6 +65,9 @@ function privilegedRoleResult(
 
 const assetRoutes = [
   "/api/*",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/sitemap-images.xml",
   "/",
   "/studio",
   "/guides",
@@ -192,6 +195,15 @@ function environmentConfig(
     workers_dev: false,
     preview_urls: false,
     ...(target === "staging" ? { limits: { cpu_ms: 2_000 } } : {}),
+    ...(target === "staging"
+      ? {
+          assets: {
+            binding: "ASSETS",
+            not_found_handling: "single-page-application",
+            run_worker_first: true,
+          },
+        }
+      : {}),
     ...(values.customDomain === null
       ? {}
       : {
@@ -283,7 +295,10 @@ function generatedConfig(target: ReleaseTarget, source = sourceConfig()) {
     compatibility_date: source.compatibility_date,
     compatibility_flags: source.compatibility_flags,
     triggers: source.triggers,
-    assets: { ...source.assets, directory: "../client" },
+    assets: {
+      ...(selected.assets ?? source.assets),
+      directory: "../client",
+    },
     vars: selected.vars,
     d1_databases: selected.d1_databases,
     r2_buckets: selected.r2_buckets,

@@ -121,7 +121,7 @@ export function CommunityFilterRail({
     <div className="grid min-w-0 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
       {feed && onFeedChange ? (
         <fieldset className="min-w-0">
-          <legend className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--island-ink)]/50">
+          <legend className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--island-muted-ink)]">
             Feed
           </legend>
           <div className="flex flex-wrap gap-2">
@@ -133,7 +133,7 @@ export function CommunityFilterRail({
                 "inline-flex min-h-10 items-center gap-2 rounded-full border-2 px-3 py-2 text-sm font-black transition-colors",
                 feed === "recent" && !query && !activeTag
                   ? "border-[var(--island-ink)] bg-[var(--island-yellow-soft)] text-[var(--island-ink)]"
-                  : "border-[var(--island-ink)]/15 bg-white text-[var(--island-ink)]/65 hover:border-[var(--island-ink)]/45",
+                  : "border-[var(--island-ink)]/15 bg-white text-[var(--island-muted-ink)] hover:border-[var(--island-ink)]/45",
               )}
             >
               <Sparkles className="h-4 w-4" /> New
@@ -146,7 +146,7 @@ export function CommunityFilterRail({
                 "inline-flex min-h-10 items-center gap-2 rounded-full border-2 px-3 py-2 text-sm font-black transition-colors",
                 feed === "popular" && !query && !activeTag
                   ? "border-[var(--island-ink)] bg-[var(--island-coral)]/20 text-[var(--island-ink)]"
-                  : "border-[var(--island-ink)]/15 bg-white text-[var(--island-ink)]/65 hover:border-[var(--island-ink)]/45",
+                  : "border-[var(--island-ink)]/15 bg-white text-[var(--island-muted-ink)] hover:border-[var(--island-ink)]/45",
               )}
             >
               <Flame className="h-4 w-4" /> Popular
@@ -156,7 +156,7 @@ export function CommunityFilterRail({
       ) : null}
 
       <fieldset className="min-w-0">
-        <legend className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--island-ink)]/50">
+        <legend className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--island-muted-ink)]">
           Tags
         </legend>
         {tags.length ? (
@@ -177,7 +177,7 @@ export function CommunityFilterRail({
                   "min-h-9 max-w-full rounded-full border px-3 py-1.5 text-xs font-black transition-colors",
                   activeTag === tag.slug
                     ? "border-[var(--island-ink)] bg-[var(--island-blue-soft)] text-[var(--island-ink)]"
-                    : "border-[var(--island-ink)]/15 bg-white text-[var(--island-ink)]/60 hover:border-[var(--island-ink)]/45",
+                    : "border-[var(--island-ink)]/15 bg-white text-[var(--island-muted-ink)] hover:border-[var(--island-ink)]/45",
                 )}
               >
                 <span className="block truncate">#{tag.label}</span>
@@ -185,7 +185,7 @@ export function CommunityFilterRail({
             ))}
           </div>
         ) : (
-          <p className="text-sm font-semibold text-[var(--island-ink)]/50">
+          <p className="text-sm font-semibold text-[var(--island-muted-ink)]">
             Tags will appear as creations are shared.
           </p>
         )}
@@ -258,7 +258,7 @@ export function CommunityFilterRail({
           className="mt-4 flex min-w-0 flex-wrap items-center gap-2 border-t border-[var(--island-ink)]/10 pt-4"
           aria-label="Active filters"
         >
-          <span className="text-xs font-black uppercase tracking-[0.12em] text-[var(--island-ink)]/45">
+          <span className="text-xs font-black uppercase tracking-[0.12em] text-[var(--island-muted-ink)]">
             Active
           </span>
           {query ? (

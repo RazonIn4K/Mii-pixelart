@@ -133,7 +133,7 @@ export default function Search() {
           />
         ) : (
           <>
-            <p className="mb-6 text-sm font-bold text-[var(--island-ink)]/60">Results for “{submittedQuery}”</p>
+            <p className="mb-6 text-sm font-bold text-[var(--island-muted-ink)]">Results for “{submittedQuery}”</p>
             <div className="community-grid">{items.map((creation) => <CreationCard key={creation.id} creation={creation} />)}</div>
             {cursor ? (
               <div className="mt-10 text-center">

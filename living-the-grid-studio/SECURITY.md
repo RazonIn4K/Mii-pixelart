@@ -49,7 +49,9 @@ Tomodachi is solo-funded by Stripe tips and consult bookings, so we cannot offer
 
 For context on prior security work, see [`CHANGELOG.md`](./CHANGELOG.md) and the relevant headers below:
 
-- Content Security Policy is locked down per Google CSP Evaluator with Trusted Types in report-only mode (see [`client/public/_headers`](./client/public/_headers))
+- Content Security Policy is locked down per Google CSP Evaluator. A Trusted
+  Types report-only policy is intentionally withheld until a real reporting
+  endpoint exists (see [`client/public/_headers`](./client/public/_headers)).
 - Stripe checkout uses an origin allowlist (`assertStripeRedirect` in [`client/src/lib/stripeUrl.ts`](./client/src/lib/stripeUrl.ts)) to block open-redirect attacks
 - Password breach checks use HIBP k-anonymity (only the first 5 chars of SHA-1 ever leave the browser)
 - Stripe webhook signatures are verified with HMAC-SHA256 at the edge before any state changes

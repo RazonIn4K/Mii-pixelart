@@ -28,7 +28,7 @@ export function CommunityPageIntro({
       <div className="max-w-3xl">
         <p className="island-kicker">{eyebrow}</p>
         <h1 className="mt-3 text-4xl font-black tracking-[-0.055em] text-[var(--island-ink)] sm:text-6xl">{title}</h1>
-        <p className="mt-4 max-w-2xl text-sm font-medium leading-6 text-[var(--island-ink)]/60 sm:text-base">{description}</p>
+        <p className="mt-4 max-w-2xl text-sm font-medium leading-6 text-[var(--island-muted-ink)] sm:text-base">{description}</p>
       </div>
       {action}
     </div>

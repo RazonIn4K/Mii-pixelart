@@ -298,15 +298,12 @@ export function applySecurityHeaders(response: Response, requestId: string): Res
   if (!headers.has("Content-Security-Policy")) {
     headers.set(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://js.stripe.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com https://api.stripe.com https://r.stripe.com https://cloudflareinsights.com https://*.cloudflareinsights.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://js.stripe.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com https://api.stripe.com https://r.stripe.com https://cloudflareinsights.com https://*.cloudflareinsights.com; frame-src https://checkout.stripe.com https://*.stripe.com https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests",
     );
   }
-  if (!headers.has("Content-Security-Policy-Report-Only")) {
-    headers.set(
-      "Content-Security-Policy-Report-Only",
-      "require-trusted-types-for 'script'; trusted-types default 'allow-duplicates'",
-    );
-  }
+  // A report-only policy without report-to plus a real Reporting-Endpoints
+  // destination has no monitoring effect and causes WebKit console errors.
+  // Restore Trusted Types observation only when that reporting path exists.
   return new Response(response.body, { status: response.status, headers });
 }
 
