@@ -113,6 +113,166 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("recovery AI requires consent and sends an isolated recovery request", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the lazy Recovery Hub AI boundary.",
+  );
+
+  await mockSession(page, user());
+  await page.route("**/api/ai/models", (route) =>
+    fulfillJson(route, { presets: [] }),
+  );
+  let recoveryRequest: Record<string, unknown> | null = null;
+  await page.route("**/api/ai/chat", (route) => {
+    recoveryRequest = route.request().postDataJSON() as Record<string, unknown>;
+    return fulfillJson(route, {
+      configured: true,
+      reply: "1. Revoke active sessions.\n2. Reset the email password.",
+    });
+  });
+
+  await page.goto("/#recovery");
+  const recovery = page.locator("#recovery");
+  await expect(
+    recovery.getByRole("heading", {
+      name: "Calm help when something goes wrong.",
+    }),
+  ).toBeVisible();
+  await recovery
+    .getByRole("textbox", { name: "What happened?" })
+    .fill("My email appeared in a breach and I reused its password.");
+  await recovery
+    .getByRole("button", { name: "Generate recovery plan" })
+    .click();
+
+  await expect(
+    recovery.getByRole("alertdialog", {
+      name: "Recovery AI processing consent",
+    }),
+  ).toBeVisible();
+  expect(recoveryRequest).toBeNull();
+  await recovery.getByRole("button", { name: "Agree and generate" }).click();
+
+  await expect(
+    recovery.getByText("1. Revoke active sessions.", { exact: false }),
+  ).toBeVisible();
+  expect(recoveryRequest).toMatchObject({
+    currentDocument: null,
+    currentGridImage: null,
+    purpose: "recovery",
+    requestSketch: false,
+  });
+  expect(recoveryRequest).not.toHaveProperty("sessionId");
+});
+
+test("recovery AI remains safely disabled when every free model is unavailable", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the Recovery Hub availability fail-safe.",
+  );
+
+  await mockSession(page, user());
+  await page.route("**/api/ai/models", (route) =>
+    fulfillJson(route, {
+      presets: [
+        {
+          available: false,
+          context: "0 tokens",
+          id: "offline/model:free",
+          label: "Temporarily offline",
+          note: "The provider reports this model as unavailable.",
+          pricingCompletion: "$0.00/1M",
+          pricingPrompt: "$0.00/1M",
+          rank: 1,
+          releaseDate: "2026-07-15",
+          supportsImages: false,
+        },
+      ],
+    }),
+  );
+  let chatRequests = 0;
+  await page.route("**/api/ai/chat", (route) => {
+    chatRequests += 1;
+    return fulfillJson(route, { configured: true, reply: "Unexpected" });
+  });
+
+  await page.goto("/#recovery");
+  const recovery = page.locator("#recovery");
+  await expect(
+    recovery.getByText(
+      "No free AI recovery model is currently available. The private breach check and recovery guides still work.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await recovery
+    .getByRole("textbox", { name: "What happened?" })
+    .fill("My email appeared in a breach.");
+  await expect(
+    recovery.getByRole("button", { name: "Generate recovery plan" }),
+  ).toBeDisabled();
+  expect(chatRequests).toBe(0);
+});
+
+test("signing out clears and cancels an in-flight private password check", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers password-check identity isolation.",
+  );
+
+  await mockSession(page, user());
+  await page.route("**/api/auth/logout", (route) =>
+    fulfillJson(route, { data: null, requestId }),
+  );
+  let markPasswordRequestStarted: (() => void) | null = null;
+  const passwordRequestStarted = new Promise<void>((resolve) => {
+    markPasswordRequestStarted = resolve;
+  });
+  let releasePasswordResponse: (() => void) | null = null;
+  await page.route("https://api.pwnedpasswords.com/range/**", async (route) => {
+    markPasswordRequestStarted?.();
+    await new Promise<void>((resolve) => {
+      releasePasswordResponse = resolve;
+    });
+    await route
+      .fulfill({ body: "UNRELATEDHASH:1\n", contentType: "text/plain" })
+      .catch(() => undefined);
+  });
+
+  await page.goto("/");
+  const passwordField = page.getByLabel("Password to test");
+  await passwordField.fill("private-value-that-must-not-cross-accounts");
+  await page.getByRole("button", { name: "Check exposure" }).click();
+  await passwordRequestStarted;
+  await expect(page.getByRole("button", { name: "Checking…" })).toBeDisabled();
+
+  await page
+    .getByRole("button", { name: "Open account menu for Test Islander" })
+    .click();
+  await page.getByRole("menuitem", { name: /Sign out/i }).click();
+
+  await expect(passwordField).toHaveValue("");
+  await expect(
+    page.getByText("Use this as a signal—not proof that a password is safe.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(releasePasswordResponse).not.toBeNull();
+  releasePasswordResponse?.();
+  await page.waitForTimeout(150);
+  await expect(
+    page.getByText("No match was found in the available breach list.", {
+      exact: false,
+    }),
+  ).toHaveCount(0);
+});
+
 test("authenticated header lazy-loads the complete account menu", async ({
   page,
 }, testInfo) => {

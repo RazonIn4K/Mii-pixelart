@@ -39,6 +39,15 @@ describe("OpenRouter model policy", () => {
     expect(validateAiGridSketch(example.sketch)).toMatchObject({ ok: true });
   });
 
+  it("uses a purpose-limited recovery prompt without pixel-art instructions", () => {
+    const prompt = buildAiSystemPrompt(false, "recovery");
+
+    expect(prompt).toContain("account-security recovery assistant");
+    expect(prompt).toContain("Never ask for or repeat passwords");
+    expect(prompt).not.toContain("pixel-art");
+    expect(prompt).not.toContain("palette IDs");
+  });
+
   it("allows every curated free preset", () => {
     for (const preset of OPENROUTER_MODEL_PRESETS) {
       expect(isSupportedOpenRouterModel(preset.id)).toBe(true);
@@ -195,6 +204,46 @@ describe("OpenRouter untrusted response hardening", () => {
     });
   });
 
+  it("lets live metadata shrink but never expand reviewed model capabilities", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  architecture: { input_modalities: ["text", "image"] },
+                  id: OPENROUTER_MODEL_PRESETS[0].id,
+                  top_provider: { max_completion_tokens: 12_000 },
+                },
+                {
+                  architecture: { input_modalities: ["text", "image"] },
+                  id: OPENROUTER_MODEL_PRESETS[1].id,
+                  top_provider: { max_completion_tokens: 32_768 },
+                },
+                {
+                  architecture: { input_modalities: ["text", "image"] },
+                  id: OPENROUTER_MODEL_PRESETS[2].id,
+                  top_provider: { max_completion_tokens: 32_768 },
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    const result = await getOpenRouterModels();
+    const presets = (
+      result.body as { presets: typeof OPENROUTER_MODEL_PRESETS }
+    ).presets;
+
+    expect(presets[0].maxOutputTokens).toBe(12_000);
+    expect(presets[1].maxOutputTokens).toBe(8_192);
+    expect(presets[2].supportsImages).toBe(false);
+  });
+
   it("forwards a model sketch only after validation", async () => {
     const fetchMock = upstreamReplying({
       reply: "Done.",
@@ -209,6 +258,73 @@ describe("OpenRouter untrusted response hardening", () => {
     expect(body.sketch).toMatchObject({ width: 8, height: 8 });
     expect(body.warning).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes recovery advice through its dedicated prompt without a session ID", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              { message: { content: "Start with your email account." } },
+            ],
+            model: "test/free",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      {
+        messages: [{ content: "My account was reused.", role: "user" }],
+        model: OPENROUTER_MODEL_PRESETS[0].id,
+        purpose: "recovery",
+        requestSketch: false,
+        sessionId: "shared-recovery-session",
+      },
+      { OPENROUTER_API_KEY: "test-shared-key" },
+    );
+
+    expect(result).toMatchObject({
+      body: { reply: "Start with your email account." },
+      status: 200,
+    });
+    const sent = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    ) as { messages: OpenRouterTestMessage[]; session_id?: string };
+    expect(String(sent.messages[0]?.content)).toContain(
+      "account-security recovery assistant",
+    );
+    expect(sent).not.toHaveProperty("session_id");
+  });
+
+  it("rejects recovery requests that try to attach a Studio canvas", async () => {
+    const fetchMock = upstreamReplying({ reply: "ok", sketch: null });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      {
+        currentDocument: {
+          height: 8,
+          name: "Current canvas",
+          usedColors: [],
+          width: 8,
+        },
+        messages: [{ content: "Help me recover.", role: "user" }],
+        model: OPENROUTER_MODEL_PRESETS[0].id,
+        purpose: "recovery",
+      },
+      { OPENROUTER_API_KEY: "test-shared-key" },
+    );
+
+    expect(result).toMatchObject({
+      body: {
+        reply: "Recovery requests cannot attach or generate a Studio canvas.",
+      },
+      status: 400,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("repairs one malformed text-only sketch without replaying raw model output", async () => {
@@ -391,6 +507,43 @@ describe("OpenRouter untrusted response hardening", () => {
       body: { reply: expect.stringContaining("timed out") },
       status: 504,
     });
+  });
+
+  it("propagates an external request abort to the upstream fetch", async () => {
+    const requestController = new AbortController();
+    let resolveFetchStarted: (() => void) | undefined;
+    const fetchStarted = new Promise<void>((resolve) => {
+      resolveFetchStarted = resolve;
+    });
+    let upstreamSignal: AbortSignal | null | undefined;
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        upstreamSignal = init?.signal;
+        resolveFetchStarted?.();
+        return await new Promise<Response>((_resolve, reject) => {
+          upstreamSignal?.addEventListener(
+            "abort",
+            () => reject(upstreamSignal?.reason),
+            { once: true },
+          );
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resultPromise = sendOpenRouterChat(
+      request(OPENROUTER_MODEL_PRESETS[0].id),
+      { OPENROUTER_API_KEY: "test-shared-key" },
+      requestController.signal,
+    );
+    await fetchStarted;
+
+    expect(upstreamSignal?.aborted).toBe(false);
+    requestController.abort();
+    expect(upstreamSignal?.aborted).toBe(true);
+
+    await expect(resultPromise).resolves.toMatchObject({ status: 504 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("strips a sketch containing non-palette cells and warns instead", async () => {

@@ -257,7 +257,7 @@ function sourceConfig(
     name: "tomodachi-studio",
     main: "./worker/index.ts",
     compatibility_date: "2025-05-01",
-    compatibility_flags: ["nodejs_compat"],
+    compatibility_flags: ["nodejs_compat", "enable_request_signal"],
     assets: {
       binding: "ASSETS",
       not_found_handling: "single-page-application",

@@ -71,7 +71,9 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
     if (!isAiChatRequest(body)) {
       throw new HttpError(400, "invalid_ai_request", "AI request is invalid.");
     }
-    return legacyJson(await sendOpenRouterChat(body, context.env));
+    return legacyJson(
+      await sendOpenRouterChat(body, context.env, context.request.signal),
+    );
   }
   throw new HttpError(404, "ai_route_not_found", "AI route was not found.");
 }

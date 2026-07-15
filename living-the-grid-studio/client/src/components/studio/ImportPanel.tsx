@@ -43,6 +43,7 @@ type CropDragMode = "move" | "nw" | "ne" | "sw" | "se";
 
 interface CropDragState {
   mode: CropDragMode;
+  pointerId: number;
   startPoint: { x: number; y: number };
   startCrop: {
     x: number;
@@ -69,6 +70,7 @@ const LOCAL_IMAGE_LIMITS = {
   dimension: 8_192,
   pixels: 40_000_000,
 } as const;
+const LOCAL_JSON_LIMIT_BYTES = 2 * 1024 * 1024;
 
 const IMAGE_INPUT_ACCEPT = [
   "image/png",
@@ -222,8 +224,14 @@ export default function ImportPanel({
 
   const handlePreviewPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
       event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture can be unavailable for synthetic events and embedded
+        // browsers. Focus dragging still works while the pointer stays inside.
+      }
       setFocusFromPointer(event.clientX, event.clientY);
     },
     [setFocusFromPointer],
@@ -233,6 +241,13 @@ export default function ImportPanel({
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = cropDragRef.current;
       if (drag) {
+        if (drag.pointerId !== event.pointerId) return;
+        // A lost capture can be followed by hover-only pointer moves. Ending
+        // the drag here prevents the crop from remaining stuck to the cursor.
+        if (event.buttons !== 1) {
+          cropDragRef.current = null;
+          return;
+        }
         const point = getImagePointFromPointer(event.clientX, event.clientY);
         if (!point) return;
         const dx = point.x - drag.startPoint.x;
@@ -253,9 +268,15 @@ export default function ImportPanel({
 
   const handlePreviewPointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      cropDragRef.current = null;
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      if (cropDragRef.current?.pointerId === event.pointerId) {
+        cropDragRef.current = null;
+      }
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // The browser may already have released capture during cancellation.
       }
     },
     [],
@@ -263,13 +284,19 @@ export default function ImportPanel({
 
   const handleCropPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, mode: CropDragMode) => {
+      if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       const point = getImagePointFromPointer(event.clientX, event.clientY);
       if (!point) return;
-      sourcePreviewRef.current?.setPointerCapture(event.pointerId);
+      try {
+        sourcePreviewRef.current?.setPointerCapture(event.pointerId);
+      } catch {
+        // Keep the local drag functional even when capture is unavailable.
+      }
       cropDragRef.current = {
         mode,
+        pointerId: event.pointerId,
         startPoint: point,
         startCrop: {
           x: cropX,
@@ -293,8 +320,15 @@ export default function ImportPanel({
         setIsInspectingFile(false);
         setLastImageFile(null);
         setLastAppliedOptions(null);
+        if (file.size > LOCAL_JSON_LIMIT_BYTES) {
+          setImportError(
+            "That Studio JSON is larger than the 2 MiB project limit.",
+          );
+          return;
+        }
         const reader = new FileReader();
         reader.onload = () => {
+          if (validationRequestRef.current !== requestNumber) return;
           if (typeof reader.result === "string") {
             const imported = onImportJson(reader.result);
             if (!imported) {
@@ -306,7 +340,10 @@ export default function ImportPanel({
             setImportError("Could not read that JSON file.");
           }
         };
-        reader.onerror = () => setImportError("Could not read that JSON file.");
+        reader.onerror = () => {
+          if (validationRequestRef.current !== requestNumber) return;
+          setImportError("Could not read that JSON file.");
+        };
         reader.readAsText(file);
         return;
       }
@@ -736,6 +773,7 @@ export default function ImportPanel({
                 onPointerMove={handlePreviewPointerMove}
                 onPointerUp={handlePreviewPointerUp}
                 onPointerCancel={handlePreviewPointerUp}
+                onLostPointerCapture={handlePreviewPointerUp}
                 aria-label="Set image crop and subject position"
                 role="img"
               >

@@ -83,7 +83,10 @@ interface ClientPoint {
 type PointerGesture = "draw" | "pan" | "pinch" | "tap";
 
 const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 8;
+// A fitted 256×256 document starts at one CSS pixel per cell on small screens.
+// Cell view promises a literal, paintable cell mesh, so allow enough zoom to
+// reach the 12–14px editing scale even for the largest supported canvas.
+const MAX_ZOOM = 16;
 const TAP_MOVE_TOLERANCE = 5;
 const TOUCH_TAP_MOVE_TOLERANCE = 14;
 
@@ -239,14 +242,17 @@ export default function CanvasViewer({
       const gridHeight = doc.height * scaledSize;
 
       return {
+        bottomInset,
         cellSize,
         height,
+        horizontalPadding,
         panX: Math.round((width - gridWidth) / 2 + viewPan.x),
         panY: Math.round(
           topInset + (availableHeight - gridHeight) / 2 + viewPan.y,
         ),
         renderZoom,
         scaledSize,
+        topInset,
         width,
       };
     },
@@ -262,8 +268,13 @@ export default function CanvasViewer({
 
     const metrics = getRenderMetrics();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(metrics.width * dpr));
-    canvas.height = Math.max(1, Math.floor(metrics.height * dpr));
+    const backingWidth = Math.max(1, Math.floor(metrics.width * dpr));
+    const backingHeight = Math.max(1, Math.floor(metrics.height * dpr));
+    // Reassigning a canvas backing dimension clears and reallocates its bitmap.
+    // Avoid that expensive path on every painted cell when the viewport did not
+    // actually resize.
+    if (canvas.width !== backingWidth) canvas.width = backingWidth;
+    if (canvas.height !== backingHeight) canvas.height = backingHeight;
     canvas.style.width = `${metrics.width}px`;
     canvas.style.height = `${metrics.height}px`;
 
@@ -317,7 +328,13 @@ export default function CanvasViewer({
           : "rgba(64, 83, 92, 0.42)",
       gridWidth: 1,
       majorGridColor: background === "dark" ? "#f7c75f" : "#29485a",
-      majorGridStep: 8,
+      // Cell view is the literal one-project-cell mesh used while drawing and
+      // copying. Adding a second, heavy eight-cell cadence over that mesh made
+      // the surface read as two stacked grids. Coarse/medium views retain the
+      // section guides; the exact cell view stays one consistent grid, like the
+      // in-game repaint screen, with optional center guides providing the
+      // stronger orientation axis instead.
+      majorGridStep: renderGridStep === 1 ? 0 : 8,
       majorGridWidth: 1.5,
     });
 
@@ -444,6 +461,7 @@ export default function CanvasViewer({
 
   // Mouse/trackpad wheel zoom. Touch users can use the explicit zoom buttons.
   const handleWheel = useCallback((event: React.WheelEvent) => {
+    if (event.deltaY === 0) return;
     event.preventDefault();
     const delta = event.deltaY > 0 ? 0.9 : 1.1;
     setZoom((current) =>
@@ -529,12 +547,12 @@ export default function CanvasViewer({
         });
       }
 
-      if (activePointerIdRef.current !== null) {
-        const touches = Array.from(touchPointsRef.current.entries());
-        if (event.pointerType !== "touch" || touches.length < 2) return;
-
+      const touches = Array.from(touchPointsRef.current.entries());
+      if (event.pointerType === "touch" && touches.length >= 2) {
         event.preventDefault();
-        capturePointer(event.currentTarget, event.pointerId);
+        for (const [pointerId] of touches.slice(0, 2)) {
+          capturePointer(event.currentTarget, pointerId);
+        }
         if (pointerGestureRef.current === "pinch") {
           pointerMovedRef.current = true;
           return;
@@ -549,12 +567,14 @@ export default function CanvasViewer({
           pan,
         );
         pointerGestureRef.current = "pinch";
+        activePointerIdRef.current = touches[0][0];
         pointerMovedRef.current = true;
         lastDragCellRef.current = null;
         setIsPanning(true);
         setStatusMessage("Two-finger pan and zoom enabled; drawing paused.");
         return;
       }
+      if (activePointerIdRef.current !== null) return;
       if (event.pointerType !== "mouse" && !event.isPrimary) return;
 
       const wantsPan =
@@ -745,6 +765,7 @@ export default function CanvasViewer({
             }
           }
           lastDragCellRef.current = { x: cell.x, y: cell.y };
+          setHoverCell({ x: cell.x, y: cell.y });
           setKeyboardCell({ x: cell.x, y: cell.y });
           return;
         }
@@ -897,6 +918,37 @@ export default function CanvasViewer({
     setHoverCell(null);
   }, []);
 
+  const keepKeyboardCellInView = useCallback(
+    (cell: { x: number; y: number }) => {
+      setPan((current) => {
+        const metrics = getRenderMetrics(zoom, current);
+        const cellLeft = metrics.panX + cell.x * metrics.scaledSize;
+        const cellTop = metrics.panY + cell.y * metrics.scaledSize;
+        const cellRight = cellLeft + metrics.scaledSize;
+        const cellBottom = cellTop + metrics.scaledSize;
+        const viewportLeft = metrics.horizontalPadding / 2;
+        const viewportRight = metrics.width - metrics.horizontalPadding / 2;
+        const viewportTop = metrics.topInset;
+        const viewportBottom = metrics.height - metrics.bottomInset;
+        const deltaX =
+          cellLeft < viewportLeft
+            ? viewportLeft - cellLeft
+            : cellRight > viewportRight
+              ? viewportRight - cellRight
+              : 0;
+        const deltaY =
+          cellTop < viewportTop
+            ? viewportTop - cellTop
+            : cellBottom > viewportBottom
+              ? viewportBottom - cellBottom
+              : 0;
+        if (deltaX === 0 && deltaY === 0) return current;
+        return { x: current.x + deltaX, y: current.y + deltaY };
+      });
+    },
+    [getRenderMetrics, zoom],
+  );
+
   const moveKeyboardCursor = useCallback(
     (deltaX: number, deltaY: number) => {
       const next = {
@@ -905,12 +957,13 @@ export default function CanvasViewer({
       };
       setKeyboardCell(next);
       setHoverCell(next);
+      keepKeyboardCellInView(next);
       onCellHover?.(next.x, next.y, getCell(doc, next.x, next.y));
       setStatusMessage(
         `Keyboard cursor at column ${next.x + 1}, row ${next.y + 1}.`,
       );
     },
-    [doc, keyboardCell, onCellHover],
+    [doc, keepKeyboardCellInView, keyboardCell, onCellHover],
   );
 
   const handleKeyDown = useCallback(

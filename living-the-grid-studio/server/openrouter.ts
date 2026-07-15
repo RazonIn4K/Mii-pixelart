@@ -1,5 +1,6 @@
 import type {
   AiChatMessage,
+  AiChatPurpose,
   AiChatResponse,
   AiDocumentSummary,
   AiGridImage,
@@ -73,6 +74,7 @@ interface NormalizedAiRequest {
   messages: OpenRouterMessage[];
   model: string;
   preserveDimensions: boolean;
+  purpose: AiChatPurpose;
   requestSketch: boolean;
   sessionId?: string;
 }
@@ -227,15 +229,27 @@ export async function getOpenRouterModels(
       body: {
         presets: OPENROUTER_MODEL_PRESETS.map((preset) => {
           const model = modelsById.get(preset.id);
+          const providerMaxOutputTokens = normalizeMaxOutputTokens(
+            model?.top_provider?.max_completion_tokens,
+          );
+          // The checked-in preset is the reviewed product capability ceiling.
+          // Live catalog metadata may reduce that ceiling or mark a model
+          // unavailable, but it must never silently unlock a larger refinement
+          // size (or image input) that normalizeAiRequest would reject.
+          const maxOutputTokens =
+            preset.maxOutputTokens === undefined
+              ? providerMaxOutputTokens
+              : providerMaxOutputTokens === undefined
+                ? preset.maxOutputTokens
+                : Math.min(preset.maxOutputTokens, providerMaxOutputTokens);
           return {
             ...preset,
             available: Boolean(model),
-            maxOutputTokens:
-              normalizeMaxOutputTokens(
-                model?.top_provider?.max_completion_tokens,
-              ) ?? preset.maxOutputTokens,
+            maxOutputTokens,
             supportsImages:
-              model?.architecture?.input_modalities?.includes("image") ?? false,
+              preset.supportsImages === true &&
+              (model?.architecture?.input_modalities?.includes("image") ??
+                false),
           };
         }),
       },
@@ -257,6 +271,7 @@ export async function getOpenRouterModels(
 export async function sendOpenRouterChat(
   request: unknown,
   env?: OpenRouterEnv,
+  requestSignal?: AbortSignal,
 ): Promise<ApiResult> {
   const normalized = normalizeAiRequest(request);
   if (!normalized.ok) {
@@ -284,7 +299,10 @@ export async function sendOpenRouterChat(
   const messages: OpenRouterMessage[] = [
     {
       role: "system",
-      content: buildAiSystemPrompt(normalized.requestSketch),
+      content: buildAiSystemPrompt(
+        normalized.requestSketch,
+        normalized.purpose,
+      ),
     },
     ...buildContextMessages(
       normalized.currentDocument,
@@ -303,6 +321,7 @@ export async function sendOpenRouterChat(
       apiKey,
       env,
       deadlineAt,
+      requestSignal,
     );
   } catch (error) {
     const timedOut =
@@ -368,6 +387,7 @@ export async function sendOpenRouterChat(
         apiKey,
         env,
         deadlineAt,
+        requestSignal,
       );
       if (repairAttempt.response.ok) {
         const repaired = parseOpenRouterCompletion(
@@ -419,15 +439,20 @@ async function requestOpenRouterCompletion(
   apiKey: string,
   env: OpenRouterEnv | undefined,
   deadlineAt: number,
+  requestSignal: AbortSignal | undefined,
 ): Promise<OpenRouterCompletionAttempt> {
   // Both the first request and optional correction consume one shared deadline.
   // A minimum of 1 ms keeps AbortSignal.timeout within its valid range if the
   // clock crosses the deadline immediately before fetch begins.
   const remainingMs = Math.max(1, Math.ceil(deadlineAt - Date.now()));
+  const timeoutSignal = AbortSignal.timeout(remainingMs);
+  const signal = requestSignal
+    ? AbortSignal.any([requestSignal, timeoutSignal])
+    : timeoutSignal;
   const response = await fetch(OPENROUTER_CHAT_URL, {
     method: "POST",
     headers: getOpenRouterHeaders(true, apiKey, env),
-    signal: AbortSignal.timeout(remainingMs),
+    signal,
     body: JSON.stringify({
       // Sketch budget math: 16x16=256 cells, 24x24=576, 32x32=1024. Each cell
       // is ~6-8 tokens ("R10C7", comma+space). 1024 cells × 8 tokens ≈ 8192
@@ -597,6 +622,17 @@ function normalizeAiRequest(
     };
   }
   const preserveDimensions = request.preserveDimensions === true;
+  const purpose: AiChatPurpose =
+    request.purpose === "recovery" ? "recovery" : "studio";
+  if (
+    purpose === "recovery" &&
+    (request.requestSketch === true || currentDocument || currentGridImage)
+  ) {
+    return {
+      ok: false,
+      error: "Recovery requests cannot attach or generate a Studio canvas.",
+    };
+  }
   const expectedDimensions = currentDocument ?? currentGridImage;
   if (
     preserveDimensions &&
@@ -632,8 +668,12 @@ function normalizeAiRequest(
     model,
     ok: true,
     preserveDimensions,
+    purpose,
     requestSketch: request.requestSketch === true,
-    sessionId: normalizeSessionId(request.sessionId),
+    sessionId:
+      purpose === "recovery"
+        ? undefined
+        : normalizeSessionId(request.sessionId),
   };
 }
 
@@ -677,7 +717,20 @@ function buildContextMessages(
   ];
 }
 
-export function buildAiSystemPrompt(requestSketch: boolean): string {
+export function buildAiSystemPrompt(
+  requestSketch: boolean,
+  purpose: AiChatPurpose = "studio",
+): string {
+  if (purpose === "recovery") {
+    return [
+      "You are a plain-language account-security recovery assistant.",
+      "Give calm, concise, practical steps for the next 24 hours, account cleanup, password-reset order, and safe communication.",
+      "Never ask for or repeat passwords, recovery codes, session tokens, payment-card numbers, government identifiers, or other secrets.",
+      "Do not claim to contact providers, reverse transactions, investigate systems, or guarantee account recovery.",
+      "Prioritize preserving evidence, using official provider recovery pages, enabling MFA, revoking sessions, and contacting financial institutions or emergency services when appropriate.",
+      "Clearly distinguish general information from legal, financial, or incident-response advice.",
+    ].join(" ");
+  }
   const paletteGuide = [
     "R1 reds, R2 oranges, R3 yellows, R4 greens, R5 cyans, R6 blues, R7 purples, R8 pinks, R9 browns/skin, R10 grays, R11 warm grays, S1-S7 saturated extras.",
     "Common IDs: R10C1 black, R10C7 white, R1C2 red, R2C3 orange, R3C3 bright yellow, R4C2 green, R6C3 bright blue, R7C2 purple, R9C5 beige, R11C1 charcoal.",

@@ -7,7 +7,7 @@
   // Preserve the current Pages runtime behavior for the first parity cutover.
   // Advance this in a dedicated, tested compatibility update.
   "compatibility_date": "2025-05-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",

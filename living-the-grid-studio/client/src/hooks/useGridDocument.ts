@@ -59,6 +59,8 @@ function appendHistory(
 
 export function useGridDocument() {
   const previewRequestRef = useRef(0);
+  const strokeActiveRef = useRef(false);
+  const strokeStartDocRef = useRef<GridDocument | null>(null);
   const [state, setState] = useState<GridDocumentState>({
     doc: null,
     imagePreview: null,
@@ -67,6 +69,23 @@ export function useGridDocument() {
     isLoading: false,
     error: null,
   });
+
+  const rollbackActiveStroke = useCallback((): boolean => {
+    if (!strokeActiveRef.current) return false;
+    strokeActiveRef.current = false;
+    const startDoc = strokeStartDocRef.current;
+    strokeStartDocRef.current = null;
+    setState((prev) => {
+      if (!startDoc || prev.doc === startDoc) return prev;
+      return {
+        ...prev,
+        doc: startDoc,
+        imagePreview: null,
+        error: null,
+      };
+    });
+    return true;
+  }, []);
 
   const pushHistory = useCallback((doc: GridDocument) => {
     previewRequestRef.current += 1;
@@ -81,6 +100,10 @@ export function useGridDocument() {
   );
 
   const undo = useCallback(() => {
+    // A live pointer gesture still owns the document. Ignore history movement
+    // until pointerup commits one atomic stroke; otherwise later pointermove
+    // samples could resume outside the transaction and create partial entries.
+    if (strokeActiveRef.current) return;
     setState((prev) => {
       if (prev.historyIndex <= 0) return prev;
       const newIndex = prev.historyIndex - 1;
@@ -93,6 +116,7 @@ export function useGridDocument() {
   }, []);
 
   const redo = useCallback(() => {
+    if (strokeActiveRef.current) return;
     setState((prev) => {
       if (prev.historyIndex >= prev.history.length - 1) return prev;
       const newIndex = prev.historyIndex + 1;
@@ -217,7 +241,11 @@ export function useGridDocument() {
       const locked = state.doc.lockedColors.includes(colorId)
         ? state.doc.lockedColors.filter((id) => id !== colorId)
         : [...state.doc.lockedColors, colorId];
-      const newDoc = { ...state.doc, lockedColors: locked };
+      const newDoc = {
+        ...state.doc,
+        lockedColors: locked,
+        meta: { ...state.doc.meta, modifiedAt: new Date().toISOString() },
+      };
       pushHistory(newDoc);
     },
     [state.doc, pushHistory],
@@ -239,10 +267,8 @@ export function useGridDocument() {
    * re-render and so the active flag is read synchronously by the same
    * tick's paintCell call.
    */
-  const strokeActiveRef = useRef(false);
-  const strokeStartDocRef = useRef<GridDocument | null>(null);
-
   const beginStroke = useCallback(() => {
+    if (strokeActiveRef.current) return;
     strokeActiveRef.current = true;
     // Capture the pre-stroke doc so we know what to compare against on end.
     setState((prev) => {
@@ -284,21 +310,7 @@ export function useGridDocument() {
    * a drawing gesture into pinch/pan, so navigation can never leave a stray
    * painted cell behind.
    */
-  const cancelStroke = useCallback(() => {
-    if (!strokeActiveRef.current) return;
-    strokeActiveRef.current = false;
-    setState((prev) => {
-      const startDoc = strokeStartDocRef.current;
-      strokeStartDocRef.current = null;
-      if (!startDoc || prev.doc === startDoc) return prev;
-      return {
-        ...prev,
-        doc: startDoc,
-        imagePreview: null,
-        error: null,
-      };
-    });
-  }, []);
+  const cancelStroke = rollbackActiveStroke;
 
   const paintCell = useCallback(
     (x: number, y: number, colorId: string | null) => {

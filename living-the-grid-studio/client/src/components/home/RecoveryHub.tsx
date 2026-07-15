@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   AlertTriangle,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Search,
   ShieldCheck,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,15 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GoogleSignIn } from "@/components/community/RequireAuth";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  OPENROUTER_MODEL_PRESETS,
-  type AiModelPreset,
-} from "@shared/ai";
+import { OPENROUTER_MODEL_PRESETS, type AiModelPreset } from "@shared/ai";
+import { readAiChatResponse } from "@/lib/ai-http";
 
 const BREACH_NOTICE_URL = "https://tomodachishare.com/breach-notice";
 const HIBP_PASSWORD_API = "https://api.pwnedpasswords.com/range/";
 const DEFAULT_MODEL =
   OPENROUTER_MODEL_PRESETS[0]?.id ?? "google/gemma-4-26b-a4b-it:free";
+const RECOVERY_AI_TIMEOUT_MS = 95_000;
 
 type PasswordBreachStatus = "idle" | "checking" | "safe" | "found" | "error";
 
@@ -50,21 +50,28 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-function pickFirstAvailableModel(presets: AiModelPreset[]): string {
-  return (
-    presets.find((preset) => preset.available !== false)?.id ??
-    presets[0]?.id ??
-    DEFAULT_MODEL
-  );
+function pickFirstAvailableModel(presets: AiModelPreset[]): string | null {
+  return presets.find((preset) => preset.available !== false)?.id ?? null;
 }
 
 export default function RecoveryHub() {
   const { serviceMessage, status: authStatus, user } = useAuth();
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
-  const [incidentModel, setIncidentModel] = useState(DEFAULT_MODEL);
+  const [incidentModel, setIncidentModel] = useState<string | null>(
+    DEFAULT_MODEL,
+  );
   const [incidentLoading, setIncidentLoading] = useState(false);
   const [incidentError, setIncidentError] = useState<string | null>(null);
+  const [showIncidentConsent, setShowIncidentConsent] = useState(false);
+  const incidentRequestRef = useRef<{
+    controller: AbortController;
+    timeoutId: number;
+  } | null>(null);
+  const incidentGenerationRef = useRef(0);
+  const incidentConsentAcceptRef = useRef<HTMLButtonElement>(null);
+  const passwordRequestRef = useRef<AbortController | null>(null);
+  const passwordGenerationRef = useRef(0);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordCheck, setPasswordCheck] = useState<PasswordBreachResult>({
     status: "idle",
@@ -74,7 +81,7 @@ export default function RecoveryHub() {
   useEffect(() => {
     let canceled = false;
 
-    fetch("/api/ai/models")
+    fetch("/api/ai/models", { signal: AbortSignal.timeout(10_000) })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { presets?: AiModelPreset[] } | null) => {
         if (!canceled && data?.presets?.length) {
@@ -88,11 +95,42 @@ export default function RecoveryHub() {
     };
   }, []);
 
+  useEffect(() => {
+    setIncidentLoading(false);
+    setShowIncidentConsent(false);
+    setIncidentPrompt("");
+    setIncidentPlan("");
+    setIncidentError(null);
+    setPasswordInput("");
+    setPasswordCheck({ status: "idle", message: "" });
+    return () => {
+      passwordGenerationRef.current += 1;
+      passwordRequestRef.current?.abort();
+      passwordRequestRef.current = null;
+      const request = incidentRequestRef.current;
+      if (!request) return;
+      window.clearTimeout(request.timeoutId);
+      request.controller.abort();
+      incidentRequestRef.current = null;
+      incidentGenerationRef.current += 1;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (showIncidentConsent) incidentConsentAcceptRef.current?.focus();
+  }, [showIncidentConsent]);
+
   const checkPasswordForBreaches = async () => {
     if (!passwordInput) {
       setPasswordCheck({ status: "error", message: "Type a password first." });
       return;
     }
+
+    passwordGenerationRef.current += 1;
+    passwordRequestRef.current?.abort();
+    const generation = passwordGenerationRef.current;
+    const controller = new AbortController();
+    passwordRequestRef.current = controller;
 
     setPasswordCheck({
       status: "checking",
@@ -105,6 +143,7 @@ export default function RecoveryHub() {
       const suffix = hash.slice(5);
       const response = await fetch(`${HIBP_PASSWORD_API}${prefix}`, {
         headers: { "Add-Padding": "true", Accept: "text/plain" },
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -115,6 +154,8 @@ export default function RecoveryHub() {
         .split("\n")
         .map((row) => row.trim())
         .find((row) => row.startsWith(`${suffix}:`));
+
+      if (passwordGenerationRef.current !== generation) return;
 
       if (!found) {
         setPasswordCheck({
@@ -132,6 +173,7 @@ export default function RecoveryHub() {
         message: `Found in ${formatNumber(count)} public breach record${count === 1 ? "" : "s"}. Change it anywhere it was used and enable MFA.`,
       });
     } catch (error) {
+      if (passwordGenerationRef.current !== generation) return;
       setPasswordCheck({
         status: "error",
         message:
@@ -139,21 +181,39 @@ export default function RecoveryHub() {
             ? error.message
             : "The check could not be completed.",
       });
+    } finally {
+      if (passwordRequestRef.current === controller) {
+        passwordRequestRef.current = null;
+      }
     }
   };
 
   const createBreachRecoveryPlan = async () => {
     const prompt = incidentPrompt.trim().slice(0, 2000);
-    if (!prompt || !user) return;
+    const model = incidentModel;
+    if (!prompt || !user || !model) return;
 
+    setShowIncidentConsent(false);
     setIncidentLoading(true);
     setIncidentError(null);
     setIncidentPlan("");
+
+    const generation = ++incidentGenerationRef.current;
+    const controller = new AbortController();
+    const activeRequest = {
+      controller,
+      timeoutId: window.setTimeout(
+        () => controller.abort(),
+        RECOVERY_AI_TIMEOUT_MS,
+      ),
+    };
+    incidentRequestRef.current = activeRequest;
 
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           currentDocument: null,
           currentGridImage: null,
@@ -163,33 +223,52 @@ export default function RecoveryHub() {
               content: `You are a plain-language security assistant. Situation: ${prompt}. Return: 1) next 24-hour actions, 2) account cleanup checklist, 3) password reset order, 4) a short message the user can send, and 5) what not to do. Be concise and practical.`,
             },
           ],
-          model: incidentModel,
+          model,
+          purpose: "recovery",
           requestSketch: false,
-          sessionId: "breach-recovery-session",
         }),
       });
-
-      const data = (await response.json()) as {
-        reply?: string;
-        warning?: string;
-      };
-
-      if (!response.ok || !data.reply) {
-        throw new Error(
-          data.warning ?? `The assistant returned ${response.status}.`,
-        );
-      }
-
+      const data = await readAiChatResponse(response);
+      if (incidentGenerationRef.current !== generation) return;
       setIncidentPlan(data.reply);
     } catch (error) {
+      if (incidentGenerationRef.current !== generation) return;
       setIncidentError(
-        error instanceof Error
-          ? error.message
-          : "The plan could not be created.",
+        controller.signal.aborted
+          ? "The recovery-plan request timed out. Your description stayed here so you can try again."
+          : error instanceof Error
+            ? error.message
+            : "The plan could not be created.",
       );
     } finally {
-      setIncidentLoading(false);
+      window.clearTimeout(activeRequest.timeoutId);
+      if (incidentRequestRef.current === activeRequest) {
+        incidentRequestRef.current = null;
+      }
+      if (incidentGenerationRef.current === generation) {
+        setIncidentLoading(false);
+      }
     }
+  };
+
+  const requestBreachRecoveryPlan = () => {
+    if (!incidentPrompt.trim() || !user || !incidentModel || incidentLoading)
+      return;
+    setIncidentError(null);
+    setShowIncidentConsent(true);
+  };
+
+  const cancelBreachRecoveryPlan = () => {
+    const request = incidentRequestRef.current;
+    if (!request) return;
+    incidentGenerationRef.current += 1;
+    window.clearTimeout(request.timeoutId);
+    request.controller.abort();
+    incidentRequestRef.current = null;
+    setIncidentLoading(false);
+    setIncidentError(
+      "Recovery-plan request canceled. Your description is ready to edit or send again.",
+    );
   };
 
   return (
@@ -240,7 +319,10 @@ export default function RecoveryHub() {
                 void checkPasswordForBreaches();
               }}
             >
-              <Label htmlFor="password-leak-check" className="text-xs font-bold">
+              <Label
+                htmlFor="password-leak-check"
+                className="text-xs font-bold"
+              >
                 Password to test
               </Label>
               <Input
@@ -300,8 +382,13 @@ export default function RecoveryHub() {
                 className="rounded-xl border-[var(--island-ink)]/15 bg-white"
               />
               <Button
-                onClick={createBreachRecoveryPlan}
-                disabled={incidentLoading || !incidentPrompt.trim() || !user}
+                onClick={requestBreachRecoveryPlan}
+                disabled={
+                  incidentLoading ||
+                  !incidentPrompt.trim() ||
+                  !incidentModel ||
+                  !user
+                }
                 className="h-12 w-full rounded-xl bg-[var(--island-blue)] font-bold text-[var(--island-ink)] hover:bg-[var(--island-blue)]/85"
               >
                 <AlertTriangle className="mr-2 h-4 w-4" />
@@ -311,6 +398,66 @@ export default function RecoveryHub() {
                     ? "Generate recovery plan"
                     : "Sign in to generate"}
               </Button>
+              {incidentLoading ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={cancelBreachRecoveryPlan}
+                  className="h-11 w-full rounded-xl font-bold"
+                >
+                  <Square className="mr-2 h-4 w-4" />
+                  Cancel recovery request
+                </Button>
+              ) : null}
+              {!incidentModel ? (
+                <p
+                  role="status"
+                  className="rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900"
+                >
+                  No free AI recovery model is currently available. The private
+                  breach check and recovery guides still work.
+                </p>
+              ) : null}
+              {showIncidentConsent ? (
+                <div
+                  role="alertdialog"
+                  aria-label="Recovery AI processing consent"
+                  aria-describedby="recovery-ai-consent-description"
+                  className="space-y-3 rounded-xl border border-[var(--island-blue)]/35 bg-sky-50 p-4"
+                >
+                  <p className="text-xs font-black text-[var(--island-ink)]">
+                    Send this description to a third-party AI service?
+                  </p>
+                  <p
+                    id="recovery-ai-consent-description"
+                    className="text-xs font-medium leading-5 text-[var(--island-muted-ink)]"
+                  >
+                    The description is sent through OpenRouter to an external
+                    model provider. Do not include passwords, recovery codes,
+                    payment details, government IDs, or other secrets. The
+                    password breach checker remains separate and never sends the
+                    password to AI.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      ref={incidentConsentAcceptRef}
+                      onClick={() => void createBreachRecoveryPlan()}
+                    >
+                      Agree and generate
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowIncidentConsent(false)}
+                    >
+                      Not now
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {!user && authStatus !== "loading" ? (
                 serviceMessage ? (
                   <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">

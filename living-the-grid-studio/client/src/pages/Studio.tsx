@@ -450,22 +450,19 @@ export default function Studio() {
    * eyedropper, fill) are single-click and don't need transaction grouping.
    */
   const handleStrokeBegin = useCallback(() => {
-    if (paintTool === "pencil" || paintTool === "eraser") {
-      beginStroke();
-    }
-  }, [paintTool, beginStroke]);
+    // CanvasViewer only starts this lifecycle for a real pencil/eraser drag.
+    // Keep ownership with the gesture instead of the currently selected tool:
+    // a keyboard shortcut may change tools before pointerup.
+    beginStroke();
+  }, [beginStroke]);
 
   const handleStrokeEnd = useCallback(() => {
-    if (paintTool === "pencil" || paintTool === "eraser") {
-      endStroke();
-    }
-  }, [paintTool, endStroke]);
+    endStroke();
+  }, [endStroke]);
 
   const handleStrokeCancel = useCallback(() => {
-    if (paintTool === "pencil" || paintTool === "eraser") {
-      cancelStroke();
-    }
-  }, [paintTool, cancelStroke]);
+    cancelStroke();
+  }, [cancelStroke]);
 
   const handleCreateCanvas = useCallback(
     (

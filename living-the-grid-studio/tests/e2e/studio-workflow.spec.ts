@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 const TINY_PNG = Buffer.from(
@@ -8,6 +8,64 @@ const TINY_PNG = Buffer.from(
 const SAMPLE_STUDIO_JSON = readFileSync(
   new URL("../../fixtures/sample-grid-document.json", import.meta.url),
 );
+
+async function mockAiAccount(
+  page: Page,
+  userId: string,
+  dataCollection: "allow" | "deny" = "deny",
+  presets: unknown[] = [],
+) {
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          session: { id: `${userId}-session` },
+          user: {
+            avatarSeed: userId,
+            createdAt: Date.now(),
+            displayName: "AI Browser User",
+            id: userId,
+            role: "user",
+            status: "active",
+            termsAccepted: true,
+            termsVersion: "2026-07-14",
+            username: userId,
+          },
+        },
+        requestId: `${userId}-request`,
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ configured: true, dataCollection }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/ai/models", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ presets }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+}
+
+const UNAVAILABLE_AI_PRESET = {
+  available: false,
+  context: "0 tokens",
+  id: "offline/model:free",
+  label: "Temporarily offline",
+  note: "The provider reports this model as unavailable.",
+  pricingCompletion: "$0.00/1M",
+  pricingPrompt: "$0.00/1M",
+  rank: 1,
+  releaseDate: "2026-07-15",
+  supportsImages: false,
+};
 
 test("Studio opens with a task-oriented workflow and useful start choices", async ({
   page,
@@ -357,7 +415,7 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
     "One desktop request covers the shared AI payload builder.",
   );
   await page.addInitScript(() => {
-    localStorage.setItem("ltg.ai.consent.v1.ai-refine-user", "granted");
+    localStorage.setItem("ltg.ai.consent.v1.ai-refine-user", "v2:deny");
   });
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -496,7 +554,7 @@ test("AI provider failure leaves manual painting available", async ({
     "One desktop failure run covers the shared recovery path.",
   );
   await page.addInitScript(() => {
-    localStorage.setItem("ltg.ai.consent.v1.ai-failure-user", "granted");
+    localStorage.setItem("ltg.ai.consent.v1.ai-failure-user", "v2:deny");
   });
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -575,6 +633,152 @@ test("AI provider failure leaves manual painting available", async ({
   ).toBeVisible();
 });
 
+test("AI disables sending when the live catalog has no available free model", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the live model-availability fail-safe.",
+  );
+  await mockAiAccount(page, "ai-no-model-user", "deny", [
+    UNAVAILABLE_AI_PRESET,
+  ]);
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await page.getByRole("tab", { name: "AI" }).click();
+
+  await expect(
+    page.getByText(
+      "No free AI model is currently available. Manual Studio tools and all exports remain available.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Your AI request" })
+    .fill("Draw a small island badge.");
+  await expect(page.getByRole("button", { name: "Send to AI" })).toBeDisabled();
+});
+
+test("canceling an AI request restores the prompt and ignores a late reply", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared abort and stale-response path.",
+  );
+  const userId = "ai-cancel-user";
+  await page.addInitScript((id) => {
+    localStorage.setItem(`ltg.ai.consent.v1.${id}`, "v2:deny");
+  }, userId);
+  await mockAiAccount(page, userId);
+
+  let releaseProvider: (() => void) | null = null;
+  await page.route("**/api/ai/chat", async (route) => {
+    await new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    await route
+      .fulfill({
+        body: JSON.stringify({
+          configured: true,
+          reply: "This late reply must never enter history.",
+        }),
+        contentType: "application/json",
+        status: 200,
+      })
+      .catch(() => undefined);
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  const prompt = page.getByRole("textbox", { name: "Your AI request" });
+  await prompt.fill("Make a small lighthouse badge");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (id) => localStorage.getItem(`ltg.ai.sessions.v1.${id}`) ?? "",
+        userId,
+      ),
+    )
+    .not.toContain("Make a small lighthouse badge");
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await expect(
+    page.getByText(
+      "AI request canceled. Your prompt is ready to edit or send again.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(prompt).toHaveValue("Make a small lighthouse badge");
+  expect(releaseProvider).not.toBeNull();
+  releaseProvider?.();
+  await page.waitForTimeout(150);
+  await expect(
+    page.getByText("This late reply must never enter history.", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+});
+
+test("AI consent is requested again when provider data policy changes", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers versioned, policy-scoped AI consent.",
+  );
+  const userId = "ai-policy-user";
+  await page.addInitScript((id) => {
+    localStorage.setItem(`ltg.ai.consent.v1.${id}`, "v2:deny");
+  }, userId);
+  await mockAiAccount(page, userId, "allow");
+  let chatRequests = 0;
+  await page.route("**/api/ai/chat", (route) => {
+    chatRequests += 1;
+    return route.fulfill({
+      body: JSON.stringify({ configured: true, reply: "Unexpected request" }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("Created Untitled Canvas", { exact: false }),
+  ).toBeHidden();
+  await page.getByRole("tab", { name: "AI" }).click();
+  await page
+    .getByRole("textbox", { name: "Your AI request" })
+    .fill("Suggest three cleaner colors");
+  await page.getByRole("button", { name: "Send to AI" }).click();
+
+  await expect(
+    page.getByRole("alertdialog", { name: "AI processing consent" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/allows providers that may collect request data/i),
+  ).toBeVisible();
+  expect(chatRequests).toBe(0);
+  await page.getByRole("button", { name: "Not now" }).click();
+  expect(chatRequests).toBe(0);
+});
+
 test("AI history and consent stay isolated between signed-in users", async ({
   page,
 }, testInfo) => {
@@ -584,7 +788,7 @@ test("AI history and consent stay isolated between signed-in users", async ({
   );
   let currentUserId = "ai-account-a";
   await page.addInitScript(() => {
-    localStorage.setItem("ltg.ai.consent.v1.ai-account-a", "granted");
+    localStorage.setItem("ltg.ai.consent.v1.ai-account-a", "v2:deny");
   });
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({

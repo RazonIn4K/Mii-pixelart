@@ -1000,7 +1000,7 @@ These links render when the Markdown viewer supports local relative images:
   "name": "tomodachi-studio",
   "main": "./worker/index.ts",
   "compatibility_date": "2025-05-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
@@ -1013,6 +1013,10 @@ Local, staging, and production environments declare isolated D1, private R2,
 KV, Images, rate-limit, OAuth, and secret bindings. The compatibility date is
 intentionally held for parity and must be advanced in a separate verified
 change.
+
+`enable_request_signal` makes an incoming browser disconnect observable through
+`request.signal`, allowing a canceled AI request to abort the corresponding
+OpenRouter fetch instead of consuming provider time until the Worker deadline.
 
 ### Unified Worker Routes
 

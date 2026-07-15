@@ -98,6 +98,73 @@ describe("canvas export rendering", () => {
       fillRect.mock.invocationCallOrder[0],
     );
   });
+
+  it("paints only cells intersecting the visible viewport at edit zoom", () => {
+    const { context, fillRect } = installCanvasDouble();
+    context.canvas.width = 32;
+    context.canvas.height = 32;
+    const doc = createGridDocument(16, 16, "Large", "R1C1");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 8,
+      devicePixelRatio: 1,
+      showGrid: false,
+    });
+
+    expect(fillRect).toHaveBeenCalledTimes(16);
+  });
+
+  it("uses the full logical viewport and clears it at a fractional DPR", () => {
+    const { context, fillRect } = installCanvasDouble();
+    context.canvas.width = 32;
+    context.canvas.height = 32;
+    const doc = createGridDocument(16, 16, "Large", "R1C1");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 8,
+      devicePixelRatio: 0.8,
+      showGrid: false,
+    });
+
+    expect(context.clearRect).toHaveBeenCalledWith(0, 0, 40, 40);
+    expect(fillRect).toHaveBeenCalledTimes(25);
+  });
+
+  it("limits checkerboard tiles to the visible artboard intersection", () => {
+    const { context, fillRect } = installCanvasDouble();
+    context.canvas.width = 48;
+    context.canvas.height = 48;
+    const doc = createGridDocument(256, 256, "Large");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 16,
+      checkerboard: "light",
+      panX: -12,
+      panY: -12,
+      showGrid: false,
+    });
+
+    expect(fillRect).toHaveBeenCalledTimes(5);
+    expect(fillRect).toHaveBeenCalledWith(12, 12, 48, 48);
+    expect(fillRect).toHaveBeenCalledWith(24, 12, 24, 12);
+    expect(fillRect).toHaveBeenCalledWith(12, 24, 12, 24);
+    expect(fillRect).toHaveBeenCalledWith(48, 24, 12, 24);
+    expect(fillRect).toHaveBeenCalledWith(24, 48, 24, 12);
+  });
+
+  it("uses a bounded tint instead of a negative highlight stroke on dense cells", () => {
+    const { context, fillRect } = installCanvasDouble();
+    const doc = setCell(createGridDocument(8, 8), 0, 0, "R1C1");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 2,
+      highlightColorId: "R1C1",
+      showGrid: false,
+    });
+
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 2, 2);
+    expect(context).not.toHaveProperty("strokeRect");
+  });
 });
 
 describe("interactive grid visibility", () => {
@@ -159,7 +226,29 @@ describe("interactive grid visibility", () => {
     expect(fillRect).toHaveBeenCalledWith(0, 31, 64, 2);
   });
 
-  it("snaps strip edges to DPR 1 and DPR 2 physical pixels", () => {
+  it("draws exact Cell view as one uniform mesh without a second cadence", () => {
+    const { context, fillRect } = installCanvasDouble();
+    const doc = createGridDocument(4, 4);
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 8,
+      devicePixelRatio: 1,
+      gridStep: 1,
+      gridWidth: 1,
+      majorGridStep: 0,
+      showGrid: true,
+    });
+
+    // Three interior strips per axis plus the four outer boundary strips.
+    // Every strip is the same one-pixel cadence; no major-grid layer is drawn.
+    expect(fillRect).toHaveBeenCalledTimes(10);
+    expect(fillRect).toHaveBeenCalledWith(8, 0, 1, 32);
+    expect(fillRect).toHaveBeenCalledWith(0, 8, 32, 1);
+    expect(fillRect).not.toHaveBeenCalledWith(31, 0, 2, 32);
+  });
+
+  it("snaps strip edges at any positive DPR", () => {
+    expect(snapGridStrip(15.5, 0.8)).toBe(15);
     expect(snapGridStrip(15.5, 1)).toBe(16);
     expect(snapGridStrip(15.5, 2)).toBe(15.5);
     expect(snapGridStrip(15.26, 2)).toBe(15.5);

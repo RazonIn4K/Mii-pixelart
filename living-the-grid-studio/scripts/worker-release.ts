@@ -601,7 +601,7 @@ function validateSourceConfig(
   expectExact(source.compatibility_date, "2025-05-01", "Compatibility date");
   expectJsonExact(
     source.compatibility_flags,
-    ["nodejs_compat"],
+    ["nodejs_compat", "enable_request_signal"],
     "Compatibility flags",
   );
 

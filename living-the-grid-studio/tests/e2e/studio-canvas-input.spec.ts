@@ -133,7 +133,7 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await page.getByRole("button", { name: "Start blank" }).click();
 
   const canvas = page.getByRole("application", {
-    name: "Editable 64 by 64 pixel grid",
+    name: /Editable \d+ by \d+ pixel grid/,
   });
   const paintControls = page.getByRole("region", {
     name: "Canvas paint controls",
@@ -341,7 +341,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await page.getByRole("button", { name: "Start blank" }).click();
 
   const canvas = page.getByRole("application", {
-    name: "Editable 64 by 64 pixel grid",
+    name: /Editable \d+ by \d+ pixel grid/,
   });
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toHaveAttribute("data-grid-density", "cell");
@@ -588,10 +588,193 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
       exact: true,
     }),
   ).toHaveCount(1);
+  await expect(canvas).toHaveAttribute("data-cell-size", "14");
+  const originBeforeKeyboardFollow = Number(
+    await canvas.getAttribute("data-grid-origin-y"),
+  );
+  for (let step = 0; step < 64; step += 1) {
+    await canvas.press("ArrowDown");
+  }
+  await expect(
+    page.getByText(/Keyboard cursor at column \d+, row 64\./),
+  ).toHaveCount(1);
+  await expect
+    .poll(() =>
+      canvas.getAttribute("data-grid-origin-y").then((value) => Number(value)),
+    )
+    .toBeLessThan(originBeforeKeyboardFollow);
   await canvas.press("0");
   await expect(
     page.getByText("Canvas view reset to fit.", { exact: true }),
   ).toHaveCount(1);
+
+  await page.getByRole("button", { name: "256 Detail" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-width", "256");
+  await page
+    .getByRole("button", { name: /Zoom to edit pixels · Cell view/ })
+    .click();
+  await expect
+    .poll(() =>
+      canvas.getAttribute("data-cell-size").then((value) => Number(value)),
+    )
+    .toBeGreaterThanOrEqual(12);
+});
+
+test("paint tools change pixels and a mid-stroke shortcut keeps one undo entry", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared canvas tool and stroke transaction path.",
+  );
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  const canvas = page.getByRole("application", {
+    name: "Editable 64 by 64 pixel grid",
+  });
+  const point = async (x: number, y: number) => {
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    const cellSize = Number(await canvas.getAttribute("data-cell-size"));
+    return {
+      clientX:
+        box!.x +
+        Number(await canvas.getAttribute("data-grid-origin-x")) +
+        (x + 0.5) * cellSize,
+      clientY:
+        box!.y +
+        Number(await canvas.getAttribute("data-grid-origin-y")) +
+        (y + 0.5) * cellSize,
+    };
+  };
+  const readCellPixel = async (x: number, y: number) =>
+    canvas.evaluate(
+      (element, target) => {
+        const targetCanvas = element as HTMLCanvasElement;
+        const context = targetCanvas.getContext("2d");
+        if (!context) throw new Error("Canvas context unavailable");
+        const dpr = window.devicePixelRatio || 1;
+        const size = Number(targetCanvas.dataset.cellSize);
+        const panX = Number(targetCanvas.dataset.gridOriginX);
+        const panY = Number(targetCanvas.dataset.gridOriginY);
+        return Array.from(
+          context.getImageData(
+            Math.floor((panX + (target.x + 0.5) * size) * dpr),
+            Math.floor((panY + (target.y + 0.5) * size) * dpr),
+            1,
+            1,
+          ).data,
+        );
+      },
+      { x, y },
+    );
+
+  const selectPaletteColor = async (accessibleName: string) => {
+    await page.getByRole("button", { name: /Choose paint color/ }).click();
+    await page
+      .getByTestId("studio-palette-matrix")
+      .getByRole("button", { name: accessibleName, exact: true })
+      .click();
+  };
+
+  await selectPaletteColor("Select R1C2 Red");
+  await canvas.focus();
+  await canvas.press("f");
+  const fillPoint = await point(1, 1);
+  await page.mouse.click(fillPoint.clientX, fillPoint.clientY);
+  await expect(page.getByText(/^64×64 · 1 color(?: ·|$)/)).toBeVisible();
+
+  await selectPaletteColor("Select R10C1 Black");
+  await canvas.focus();
+  await canvas.press("p");
+  const blackPoint = await point(10, 10);
+  await page.mouse.click(blackPoint.clientX, blackPoint.clientY);
+  const blackPixel = await readCellPixel(10, 10);
+  expect(blackPixel[0] + blackPixel[1] + blackPixel[2]).toBeLessThan(180);
+
+  await canvas.focus();
+  await canvas.press("i");
+  const eyedropperPoint = await point(10, 10);
+  await page.mouse.click(eyedropperPoint.clientX, eyedropperPoint.clientY);
+  await expect(
+    page.getByRole("button", { name: "Select R10C1 Black" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await canvas.focus();
+  await canvas.press("e");
+  await page.getByRole("combobox", { name: "Brush size" }).selectOption("3");
+  const eraserPoint = await point(10, 10);
+  await page.mouse.click(eraserPoint.clientX, eraserPoint.clientY);
+  const erasedPixel = await readCellPixel(10, 10);
+  expect(erasedPixel[0] + erasedPixel[1] + erasedPixel[2]).toBeGreaterThan(300);
+  await page.getByRole("button", { name: "Undo" }).click();
+  expect(await readCellPixel(10, 10)).toEqual(blackPixel);
+
+  await page.getByRole("combobox", { name: "Brush size" }).selectOption("1");
+  await canvas.focus();
+  await canvas.press("p");
+  const strokeStart = await point(20, 20);
+  const strokeEnd = await point(24, 20);
+  await canvas.dispatchEvent("pointerdown", {
+    ...strokeStart,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 71,
+    pointerType: "pen",
+  });
+  await canvas.dispatchEvent("pointermove", {
+    ...strokeEnd,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 71,
+    pointerType: "pen",
+  });
+  await page.keyboard.press("f");
+  await canvas.dispatchEvent("pointerup", {
+    ...strokeEnd,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 71,
+    pointerType: "pen",
+  });
+  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+  const paintedStrokePixel = await readCellPixel(22, 20);
+  await page.getByRole("button", { name: "Undo" }).click();
+  expect(await readCellPixel(22, 20)).not.toEqual(paintedStrokePixel);
+
+  await canvas.focus();
+  await canvas.press("p");
+  await canvas.dispatchEvent("pointerdown", {
+    ...strokeStart,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 72,
+    pointerType: "pen",
+  });
+  await page.keyboard.press("Control+z");
+  await canvas.dispatchEvent("pointermove", {
+    ...strokeEnd,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 72,
+    pointerType: "pen",
+  });
+  await canvas.dispatchEvent("pointerup", {
+    ...strokeEnd,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 72,
+    pointerType: "pen",
+  });
+  await page.getByRole("button", { name: "Undo" }).click();
+  expect(await readCellPixel(22, 20)).not.toEqual(paintedStrokePixel);
 });
 
 test("two-finger gestures pause painting without changing the document", async ({
@@ -617,9 +800,11 @@ test("two-finger gestures pause painting without changing the document", async (
     x: box!.x + Number(await canvas.getAttribute("data-grid-origin-x")),
     y: box!.y + Number(await canvas.getAttribute("data-grid-origin-y")),
   };
+  // Begin in the surrounding workbench gutter, not on a project cell. A
+  // two-finger navigation gesture must still start without painting.
   const first = {
-    clientX: origin.x + 10.5 * cellSize,
-    clientY: origin.y + 10.5 * cellSize,
+    clientX: box!.x + 8,
+    clientY: box!.y + box!.height / 2,
   };
   const second = {
     clientX: origin.x + 20.5 * cellSize,
@@ -650,9 +835,14 @@ test("two-finger gestures pause painting without changing the document", async (
     pointerId: 42,
     pointerType: "touch",
   });
+  await expect(
+    page.getByText("Two-finger pan and zoom enabled; drawing paused.", {
+      exact: true,
+    }),
+  ).toHaveCount(1);
   await canvas.dispatchEvent("pointermove", {
-    clientX: first.clientX - cellSize * 2,
-    clientY: first.clientY - cellSize * 2,
+    clientX: first.clientX - cellSize * 8,
+    clientY: first.clientY - cellSize * 8,
     button: 0,
     buttons: 1,
     isPrimary: true,
@@ -660,8 +850,8 @@ test("two-finger gestures pause painting without changing the document", async (
     pointerType: "touch",
   });
   await canvas.dispatchEvent("pointermove", {
-    clientX: second.clientX + cellSize * 2,
-    clientY: second.clientY + cellSize * 2,
+    clientX: second.clientX + cellSize * 8,
+    clientY: second.clientY + cellSize * 8,
     button: 0,
     buttons: 1,
     isPrimary: false,

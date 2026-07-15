@@ -161,22 +161,57 @@ function drawCheckerboard(
   height: number,
   scaledSize: number,
   mode: Exclude<RenderOptions["checkerboard"], "none">,
+  visibleX: number,
+  visibleY: number,
+  visibleWidth: number,
+  visibleHeight: number,
 ): void {
   const colors =
     mode === "dark"
       ? (["#33424b", "#465963"] as const)
       : (["#fffaf0", "#eee5d6"] as const);
   const tileSize = Math.max(8, Math.min(24, Math.round(scaledSize * 2)));
+  const left = Math.max(0, Math.min(width, visibleX));
+  const top = Math.max(0, Math.min(height, visibleY));
+  const right = Math.max(
+    left,
+    Math.min(width, visibleX + Math.max(0, visibleWidth)),
+  );
+  const bottom = Math.max(
+    top,
+    Math.min(height, visibleY + Math.max(0, visibleHeight)),
+  );
+  if (right <= left || bottom <= top) return;
+
   ctx.fillStyle = colors[0];
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(left, top, right - left, bottom - top);
   ctx.fillStyle = colors[1];
-  for (let y = 0; y < height; y += tileSize) {
-    for (let x = 0; x < width; x += tileSize) {
-      if ((x / tileSize + y / tileSize) % 2 === 1) {
-        ctx.fillRect(x, y, tileSize, tileSize);
+  const firstColumn = Math.floor(left / tileSize);
+  const finalColumn = Math.ceil(right / tileSize);
+  const firstRow = Math.floor(top / tileSize);
+  const finalRow = Math.ceil(bottom / tileSize);
+  for (let row = firstRow; row < finalRow; row++) {
+    for (let column = firstColumn; column < finalColumn; column++) {
+      if ((column + row) % 2 === 1) {
+        const tileLeft = Math.max(left, column * tileSize);
+        const tileTop = Math.max(top, row * tileSize);
+        const tileRight = Math.min(right, (column + 1) * tileSize);
+        const tileBottom = Math.min(bottom, (row + 1) * tileSize);
+        ctx.fillRect(
+          tileLeft,
+          tileTop,
+          tileRight - tileLeft,
+          tileBottom - tileTop,
+        );
       }
     }
   }
+}
+
+function normalizedDevicePixelRatio(devicePixelRatio: number): number {
+  return Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+    ? devicePixelRatio
+    : 1;
 }
 
 function drawReference(
@@ -216,7 +251,7 @@ export function snapGridStrip(
   coordinate: number,
   devicePixelRatio: number,
 ): number {
-  const dpr = Math.max(1, devicePixelRatio);
+  const dpr = normalizedDevicePixelRatio(devicePixelRatio);
   return Math.round(coordinate * dpr) / dpr;
 }
 
@@ -233,7 +268,7 @@ function drawGridStrips(
 ): void {
   if (lineWidth <= 0 || color === "transparent") return;
   const safeStep = Math.max(1, Math.floor(step));
-  const dpr = Math.max(1, devicePixelRatio);
+  const dpr = normalizedDevicePixelRatio(devicePixelRatio);
   const safeWidth = Math.max(1 / dpr, Math.round(lineWidth * dpr) / dpr);
   ctx.fillStyle = color;
 
@@ -264,7 +299,7 @@ function drawGridBoundary(
   devicePixelRatio: number,
 ): void {
   if (lineWidth <= 0 || color === "transparent") return;
-  const dpr = Math.max(1, devicePixelRatio);
+  const dpr = normalizedDevicePixelRatio(devicePixelRatio);
   const safeWidth = Math.max(1 / dpr, Math.round(lineWidth * dpr) / dpr);
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, width, safeWidth);
@@ -285,18 +320,54 @@ export function renderGrid(
   const { cellSize, zoom, panX, panY } = opts;
   const scaledSize = cellSize * zoom;
 
-  // Build label map: assign a number to each used color
+  // Build the frequency label map only when labels will actually be painted.
+  // Counting and sorting a 256×256 document on every freehand sample was a
+  // measurable source of brush lag even with labels disabled.
   const labelMap = new Map<string, number>();
-  const counts = getColorUsageCounts(doc);
-  const sortedColors = Array.from(counts.keys()).sort(
-    (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0),
-  );
-  sortedColors.forEach((id, i) => labelMap.set(id, i + 1));
+  if (opts.showLabels) {
+    const counts = getColorUsageCounts(doc);
+    const sortedColors = Array.from(counts.keys()).sort(
+      (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0),
+    );
+    sortedColors.forEach((id, i) => labelMap.set(id, i + 1));
+  }
 
   // Clear canvas
   const canvasW = doc.width * scaledSize;
   const canvasH = doc.height * scaledSize;
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  const dpr = normalizedDevicePixelRatio(opts.devicePixelRatio);
+  const viewportWidth = ctx.canvas.width > 0 ? ctx.canvas.width / dpr : canvasW;
+  const viewportHeight =
+    ctx.canvas.height > 0 ? ctx.canvas.height / dpr : canvasH;
+  const visibleArtboardX = Math.max(0, Math.min(canvasW, -panX));
+  const visibleArtboardY = Math.max(0, Math.min(canvasH, -panY));
+  const visibleArtboardRight = Math.max(
+    visibleArtboardX,
+    Math.min(canvasW, viewportWidth - panX),
+  );
+  const visibleArtboardBottom = Math.max(
+    visibleArtboardY,
+    Math.min(canvasH, viewportHeight - panY),
+  );
+  const visibleStartX = Math.max(
+    0,
+    Math.min(doc.width, Math.floor(-panX / scaledSize)),
+  );
+  const visibleEndX = Math.max(
+    visibleStartX,
+    Math.min(doc.width, Math.ceil((viewportWidth - panX) / scaledSize)),
+  );
+  const visibleStartY = Math.max(
+    0,
+    Math.min(doc.height, Math.floor(-panY / scaledSize)),
+  );
+  const visibleEndY = Math.max(
+    visibleStartY,
+    Math.min(doc.height, Math.ceil((viewportHeight - panY) / scaledSize)),
+  );
+  // CanvasViewer installs a DPR transform before rendering. clearRect therefore
+  // takes logical CSS pixels, including for fractional DPR values below one.
+  ctx.clearRect(0, 0, viewportWidth, viewportHeight);
 
   ctx.save();
   ctx.translate(panX, panY);
@@ -307,7 +378,17 @@ export function renderGrid(
   }
 
   if (opts.checkerboard !== "none") {
-    drawCheckerboard(ctx, canvasW, canvasH, scaledSize, opts.checkerboard);
+    drawCheckerboard(
+      ctx,
+      canvasW,
+      canvasH,
+      scaledSize,
+      opts.checkerboard,
+      visibleArtboardX,
+      visibleArtboardY,
+      visibleArtboardRight - visibleArtboardX,
+      visibleArtboardBottom - visibleArtboardY,
+    );
   }
 
   // A browser-local tracing sheet belongs below the project paint. Keeping
@@ -326,8 +407,8 @@ export function renderGrid(
   }
 
   // Draw cells
-  for (let y = 0; y < doc.height; y++) {
-    for (let x = 0; x < doc.width; x++) {
+  for (let y = visibleStartY; y < visibleEndY; y++) {
+    for (let x = visibleStartX; x < visibleEndX; x++) {
       const colorId = getCell(doc, x, y);
       const px = x * scaledSize;
       const py = y * scaledSize;
@@ -388,15 +469,30 @@ export function renderGrid(
   if (opts.highlightColorId) {
     ctx.strokeStyle = "#D94F4F";
     ctx.lineWidth = 2;
-    for (let y = 0; y < doc.height; y++) {
-      for (let x = 0; x < doc.width; x++) {
+    for (let y = visibleStartY; y < visibleEndY; y++) {
+      for (let x = visibleStartX; x < visibleEndX; x++) {
         if (getCell(doc, x, y) === opts.highlightColorId) {
-          ctx.strokeRect(
-            x * scaledSize + 1,
-            y * scaledSize + 1,
-            scaledSize - 2,
-            scaledSize - 2,
-          );
+          if (scaledSize >= 4) {
+            ctx.strokeRect(
+              x * scaledSize + 1,
+              y * scaledSize + 1,
+              scaledSize - 2,
+              scaledSize - 2,
+            );
+          } else {
+            // A 1–2px cell cannot contain an inset stroke; a translucent tint
+            // stays valid and avoids zero/negative stroke rectangles.
+            ctx.save();
+            ctx.globalAlpha = 0.45;
+            ctx.fillStyle = "#D94F4F";
+            ctx.fillRect(
+              x * scaledSize,
+              y * scaledSize,
+              scaledSize,
+              scaledSize,
+            );
+            ctx.restore();
+          }
         }
       }
     }
@@ -409,8 +505,8 @@ export function renderGrid(
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    for (let y = 0; y < doc.height; y++) {
-      for (let x = 0; x < doc.width; x++) {
+    for (let y = visibleStartY; y < visibleEndY; y++) {
+      for (let x = visibleStartX; x < visibleEndX; x++) {
         const colorId = getCell(doc, x, y);
         if (!colorId) continue;
         const label = labelMap.get(colorId);

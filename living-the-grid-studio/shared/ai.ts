@@ -1,4 +1,5 @@
 export type AiChatRole = "user" | "assistant";
+export type AiChatPurpose = "studio" | "recovery";
 
 /**
  * The Worker reads the complete JSON body before the OpenRouter adapter sees
@@ -52,8 +53,7 @@ export const AI_SKETCH_LIMITS = {
 export const PALETTE_COLOR_ID_PATTERN = /^(?:R(?:[1-9]|1[01])C[1-7]|S[1-7])$/;
 
 export type AiGridSketchValidation =
-  | { ok: true; sketch: AiGridSketch }
-  | { ok: false; error: string };
+  { ok: true; sketch: AiGridSketch } | { ok: false; error: string };
 
 /**
  * Validate untrusted model output claiming to be an AiGridSketch.
@@ -164,6 +164,7 @@ export interface AiChatRequest {
   messages: AiChatMessage[];
   model: string;
   preserveDimensions?: boolean;
+  purpose?: AiChatPurpose;
   requestSketch?: boolean;
   sessionId?: string;
 }

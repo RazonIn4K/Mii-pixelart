@@ -8,12 +8,12 @@ import {
   Paintbrush,
   Plus,
   Send,
+  Square,
   Trash2,
   WandSparkles,
 } from "lucide-react";
 import type {
   AiChatMessage,
-  AiChatResponse,
   AiModelPreset,
   AiDocumentSummary,
   AiGridImage,
@@ -49,6 +49,7 @@ import {
   parseSavedAiSessions,
   type SavedAiSession,
 } from "@/lib/ai-models";
+import { readAiChatResponse } from "@/lib/ai-http";
 
 interface AiPanelProps {
   currentDoc: GridDocument | null;
@@ -59,6 +60,7 @@ const AI_SESSION_STORAGE_KEY = "ltg.ai.sessions.v1";
 // Consent and chat history are scoped to the authenticated internal user ID so
 // one account never inherits another account's local AI data on a shared device.
 const AI_CONSENT_STORAGE_KEY = "ltg.ai.consent.v1";
+const AI_CONSENT_DISCLOSURE_VERSION = 2;
 // Client ceilings sit slightly above the server's upstream timeouts so the
 // server's cleaner error message wins when the provider is slow.
 const AI_CHAT_TIMEOUT_MS = 95_000;
@@ -68,22 +70,42 @@ function scopedStorageKey(base: string, userId: string): string {
   return `${base}.${userId}`;
 }
 
-function readStoredAiConsent(userId: string): boolean {
+type AiDataCollectionPolicy = "allow" | "deny" | "unknown";
+
+interface ActiveAiRequest {
+  controller: AbortController;
+  previousMessages: AiChatMessage[];
+  prompt: string;
+  timedOut: boolean;
+  timeoutId: number;
+}
+
+function consentStorageValue(policy: AiDataCollectionPolicy): string {
+  return `v${AI_CONSENT_DISCLOSURE_VERSION}:${policy}`;
+}
+
+function readStoredAiConsent(
+  userId: string,
+  policy: AiDataCollectionPolicy,
+): boolean {
   try {
     return (
       localStorage.getItem(scopedStorageKey(AI_CONSENT_STORAGE_KEY, userId)) ===
-      "granted"
+      consentStorageValue(policy)
     );
   } catch {
     return false;
   }
 }
 
-function persistAiConsent(userId: string): void {
+function persistAiConsent(
+  userId: string,
+  policy: AiDataCollectionPolicy,
+): void {
   try {
     localStorage.setItem(
       scopedStorageKey(AI_CONSENT_STORAGE_KEY, userId),
-      "granted",
+      consentStorageValue(policy),
     );
   } catch {
     /* Private browsing: consent simply re-prompts next session. */
@@ -101,20 +123,16 @@ const STARTER_PROMPTS = [
 
 type AiWorkflow = "create" | "refine" | "advice";
 
-function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset {
-  return (
-    presets.find((preset) => preset.available !== false) ??
-    OPENROUTER_MODEL_PRESETS[0]
-  );
+function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset | null {
+  return presets.find((preset) => preset.available !== false) ?? null;
 }
 
 export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const { serviceMessage, status: authStatus, user } = useAuth();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
-  const [dataCollectionPolicy, setDataCollectionPolicy] = useState<
-    "allow" | "deny" | "unknown"
-  >("unknown");
+  const [dataCollectionPolicy, setDataCollectionPolicy] =
+    useState<AiDataCollectionPolicy>("unknown");
   const [sessions, setSessions] = useState<SavedAiSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState("");
   const [modelChoice, setModelChoice] = useState(
@@ -132,6 +150,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   const [showConsentPrompt, setShowConsentPrompt] = useState(false);
   const consentAcceptRef = useRef<HTMLButtonElement>(null);
   const requestGenerationRef = useRef(0);
+  const activeRequestRef = useRef<ActiveAiRequest | null>(null);
   const [presets, setPresets] = useState<AiModelPreset[]>(
     OPENROUTER_MODEL_PRESETS,
   );
@@ -172,12 +191,15 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     const preset = presets.find((entry) => entry.id === modelChoice);
     if (!preset || preset.available === false) {
       const fallback = getFallbackPreset(presets);
-      setModelChoice(fallback.id);
+      setModelChoice(fallback?.id ?? "");
     }
   }, [modelChoice, presets]);
 
   const selectedModel = modelChoice;
   const selectedPreset = presets.find((preset) => preset.id === selectedModel);
+  const hasAvailableModels = presets.some(
+    (preset) => preset.available !== false,
+  );
   const requiredRefineDimension = Math.max(
     currentDoc?.width ?? AI_SKETCH_LIMITS.minDimension,
     currentDoc?.height ?? AI_SKETCH_LIMITS.minDimension,
@@ -257,6 +279,12 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   };
 
   useEffect(() => {
+    const activeRequest = activeRequestRef.current;
+    if (activeRequest) {
+      window.clearTimeout(activeRequest.timeoutId);
+      activeRequest.controller.abort();
+      activeRequestRef.current = null;
+    }
     requestGenerationRef.current += 1;
     setIsLoading(false);
     setHydratedUserId(null);
@@ -272,7 +300,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       return;
     }
     removeLegacySharedAiStorage();
-    setHasAiConsent(readStoredAiConsent(user.id));
+    setHasAiConsent(false);
     const loaded = readAiSessions(user.id);
     const initialSession = loaded[0] ?? createEmptySession();
     const nextSessions = loaded.length > 0 ? loaded : [initialSession];
@@ -281,6 +309,26 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     setActiveSessionId(initialSession.id);
     setHydratedUserId(user.id);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) {
+      setHasAiConsent(false);
+      return;
+    }
+    setHasAiConsent(readStoredAiConsent(user.id, dataCollectionPolicy));
+  }, [dataCollectionPolicy, user?.id]);
+
+  useEffect(
+    () => () => {
+      const activeRequest = activeRequestRef.current;
+      if (!activeRequest) return;
+      window.clearTimeout(activeRequest.timeoutId);
+      activeRequest.controller.abort();
+      activeRequestRef.current = null;
+      requestGenerationRef.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     let canceled = false;
@@ -310,7 +358,11 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
   }, []);
 
   useEffect(() => {
-    if (!activeSessionId || !user || hydratedUserId !== user.id) return;
+    // The visible user message is optimistic while a provider request is in
+    // flight. Persist only settled conversations so a tab close, route change,
+    // or account switch cannot leave a one-sided canceled turn in history.
+    if (isLoading || !activeSessionId || !user || hydratedUserId !== user.id)
+      return;
     setSessions((prev) => {
       const now = new Date().toISOString();
       const session = {
@@ -339,6 +391,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     includeGridImage,
     includeGridSummary,
     hydratedUserId,
+    isLoading,
     messages,
     modelChoice,
     requestSketch,
@@ -396,8 +449,9 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     const trimmed = input.trim().slice(0, AI_SESSION_LIMITS.messageCharacters);
     if (!trimmed || !selectedModel || isLoading || configured !== true) return;
 
+    const previousMessages = messages;
     const nextMessages = boundAiMessages([
-      ...messages,
+      ...previousMessages,
       { role: "user", content: trimmed },
     ]);
     setMessages(nextMessages);
@@ -410,12 +464,25 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     const expectedDimensions = currentDoc
       ? { height: currentDoc.height, width: currentDoc.width }
       : null;
+    const controller = new AbortController();
+    const activeRequest: ActiveAiRequest = {
+      controller,
+      previousMessages,
+      prompt: trimmed,
+      timedOut: false,
+      timeoutId: 0,
+    };
+    activeRequest.timeoutId = window.setTimeout(() => {
+      activeRequest.timedOut = true;
+      controller.abort();
+    }, AI_CHAT_TIMEOUT_MS);
+    activeRequestRef.current = activeRequest;
 
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(AI_CHAT_TIMEOUT_MS),
+        signal: controller.signal,
         body: JSON.stringify({
           currentDocument: currentSummary,
           currentGridImage:
@@ -429,11 +496,8 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
           sessionId: activeSessionId,
         }),
       });
-      const data = (await response.json()) as AiChatResponse;
+      const data = await readAiChatResponse(response);
       if (requestGenerationRef.current !== requestGeneration) return;
-      if (!response.ok) {
-        throw new Error(data.reply || "AI request failed.");
-      }
       setMessages((prev) =>
         boundAiMessages([...prev, { role: "assistant", content: data.reply }]),
       );
@@ -459,17 +523,22 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       if (data.warning) setError(data.warning);
     } catch (err) {
       if (requestGenerationRef.current !== requestGeneration) return;
-      const timedOut =
-        err instanceof Error &&
-        (err.name === "TimeoutError" || err.name === "AbortError");
+      // A failed request is not a completed conversation turn. Restore both
+      // the prior history and editable prompt so retry never duplicates it.
+      setMessages(previousMessages);
+      setInput(trimmed);
       setError(
-        timedOut
+        activeRequest.timedOut
           ? "The AI request timed out. Try again, ask for a smaller sketch, or pick a faster model."
           : err instanceof Error
             ? err.message
             : "AI request failed.",
       );
     } finally {
+      window.clearTimeout(activeRequest.timeoutId);
+      if (activeRequestRef.current === activeRequest) {
+        activeRequestRef.current = null;
+      }
       if (requestGenerationRef.current === requestGeneration) {
         setIsLoading(false);
       }
@@ -493,9 +562,25 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     void performSend();
   };
 
+  const cancelAiRequest = () => {
+    const activeRequest = activeRequestRef.current;
+    if (!activeRequest) return;
+    requestGenerationRef.current += 1;
+    window.clearTimeout(activeRequest.timeoutId);
+    activeRequest.controller.abort();
+    activeRequestRef.current = null;
+    setMessages(activeRequest.previousMessages);
+    setInput(activeRequest.prompt);
+    setPendingSketch(null);
+    setIsLoading(false);
+    setError(
+      "AI request canceled. Your prompt is ready to edit or send again.",
+    );
+  };
+
   const acceptAiConsent = () => {
     if (!user) return;
-    persistAiConsent(user.id);
+    persistAiConsent(user.id, dataCollectionPolicy);
     setHasAiConsent(true);
     setShowConsentPrompt(false);
     void performSend();
@@ -574,6 +659,16 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
           applied to the canvas.
         </p>
       </div>
+
+      {!hasAvailableModels ? (
+        <p
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-950"
+        >
+          No free AI model is currently available. Manual Studio tools and all
+          exports remain available.
+        </p>
+      ) : null}
 
       <div className="space-y-2 rounded-xl border border-border bg-card p-3">
         <p id="ai-workflow-label" className="text-xs font-semibold">
@@ -724,7 +819,7 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               <Select
                 value={modelChoice}
                 onValueChange={setModelChoice}
-                disabled={isLoading}
+                disabled={isLoading || !hasAvailableModels}
               >
                 <SelectTrigger
                   id="ai-model-select"
@@ -1028,21 +1123,35 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
             {input.length.toLocaleString()} /{" "}
             {AI_SESSION_LIMITS.messageCharacters.toLocaleString()}
           </p>
-          <Button
-            type="button"
-            className="w-full text-xs"
-            disabled={
-              !user ||
-              configured !== true ||
-              !input.trim() ||
-              !selectedModel ||
-              isLoading
-            }
-            onClick={sendMessage}
-          >
-            <Send className="mr-2 h-3.5 w-3.5" />
-            {isLoading ? "Asking model..." : "Send to AI"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              className="min-w-0 flex-1 text-xs"
+              disabled={
+                !user ||
+                configured !== true ||
+                !input.trim() ||
+                !selectedModel ||
+                !hasAvailableModels ||
+                isLoading
+              }
+              onClick={sendMessage}
+            >
+              <Send className="mr-2 h-3.5 w-3.5" />
+              {isLoading ? "Asking model..." : "Send to AI"}
+            </Button>
+            {isLoading ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 text-xs"
+                onClick={cancelAiRequest}
+              >
+                <Square className="mr-2 h-3.5 w-3.5" />
+                Cancel
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
