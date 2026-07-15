@@ -214,7 +214,7 @@ export function CanvasPaintToolbar({
                 <button
                   key={density}
                   type="button"
-                  className={`h-9 rounded-lg px-2 text-[0.68rem] font-black transition-colors sm:px-2.5 ${
+                  className={`h-9 min-w-8 rounded-lg px-2 text-[0.68rem] font-black transition-colors sm:px-2.5 ${
                     gridDensity === density
                       ? "bg-[#24786f] text-white shadow-sm"
                       : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"

@@ -1019,8 +1019,8 @@ export default function Studio() {
             <StudioWorkflowNav />
 
             <div className="flex-1 overflow-auto">
-              <Suspense fallback={<PanelLoading />}>
-                <TabsContent value="import" className="mt-0">
+              <TabsContent value="import" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   <ImportPanel
                     previewDoc={imagePreview}
                     onPreviewImage={handlePreviewImage}
@@ -1029,9 +1029,11 @@ export default function Studio() {
                     onImportJson={handleImportJson}
                     isLoading={isLoading}
                   />
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                <TabsContent value="create" className="mt-0">
+              <TabsContent value="create" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   {imagePreview ? (
                     <PreviewBlockedPanel title="Create" />
                   ) : (
@@ -1043,11 +1045,13 @@ export default function Studio() {
                       onResampleCanvas={resampleCanvas}
                     />
                   )}
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                {/* Island tab removed in Pass 19. */}
+              {/* Island tab removed in Pass 19. */}
 
-                <TabsContent value="palette" className="mt-0 h-full">
+              <TabsContent value="palette" className="mt-0 h-full">
+                <Suspense fallback={<PanelLoading />}>
                   {imagePreview ? (
                     <PreviewBlockedPanel title="Palette" />
                   ) : doc ? (
@@ -1069,18 +1073,22 @@ export default function Studio() {
                       </p>
                     </div>
                   )}
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                <TabsContent value="optimize" className="mt-0">
+              <TabsContent value="optimize" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   <OptimizerPanel
                     currentColorCount={doc?.usedColors.length ?? 0}
                     onRunOptimizer={runOptimizer}
                     disabled={!doc || !!imagePreview}
                   />
                   {imagePreview && <PreviewBlockedPanel title="Optimizer" />}
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                <TabsContent value="ai" className="mt-0">
+              <TabsContent value="ai" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   {imagePreview ? (
                     <PreviewBlockedPanel title="AI Draw" />
                   ) : (
@@ -1089,9 +1097,11 @@ export default function Studio() {
                       onApplySketch={handleApplyAiSketch}
                     />
                   )}
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                <TabsContent value="copy" className="mt-0">
+              <TabsContent value="copy" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   {imagePreview ? (
                     <PreviewBlockedPanel title="Copy Guide" />
                   ) : doc ? (
@@ -1108,9 +1118,11 @@ export default function Studio() {
                       </p>
                     </div>
                   )}
-                </TabsContent>
+                </Suspense>
+              </TabsContent>
 
-                <TabsContent value="export" className="mt-0">
+              <TabsContent value="export" className="mt-0">
+                <Suspense fallback={<PanelLoading />}>
                   <ExportPanel
                     doc={imagePreview ? null : doc}
                     disabledReason={
@@ -1119,8 +1131,8 @@ export default function Studio() {
                         : undefined
                     }
                   />
-                </TabsContent>
-              </Suspense>
+                </Suspense>
+              </TabsContent>
             </div>
           </Tabs>
         </div>

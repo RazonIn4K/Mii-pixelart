@@ -750,7 +750,7 @@ export function CloudProjectControls({
 
               <div className="rounded-xl border border-[var(--island-mint-dark)]/25 bg-[var(--island-mint)]/15 p-3 text-sm">
                 <p className="font-semibold">Recommended: keep both versions</p>
-                <p className="mt-1 text-muted-foreground">
+                <p className="mt-1 text-foreground/80">
                   Save your local work as a new private cloud project. The
                   existing cloud project stays unchanged.
                 </p>

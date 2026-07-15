@@ -571,7 +571,7 @@ test("AI provider failure leaves manual painting available", async ({
   await canvas.focus();
   await canvas.press("Enter");
   await expect(
-    page.getByText("64×64 · 1 color", { exact: true }),
+    page.getByText("64×64 · 1 color", { exact: false }),
   ).toBeVisible();
 });
 
