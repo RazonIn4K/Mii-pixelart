@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 const requestId = "browser-test-request";
 const TINY_PNG = Buffer.from(
@@ -1755,7 +1756,49 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
   page,
 }) => {
   const currentUser = user();
+  let copyAttempts = 0;
+  let copiedProjectName: string | null = null;
   await mockSession(page, currentUser);
+  await page.route("**/api/creations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    copyAttempts += 1;
+    copiedProjectName =
+      (
+        route.request().postDataJSON() as {
+          project?: { meta?: { name?: string } };
+        }
+      ).project?.meta?.name ?? null;
+    if (copyAttempts === 1) {
+      await fulfillJson(
+        route,
+        {
+          error: {
+            code: "temporary_save_failure",
+            message: "The copy could not be saved yet.",
+          },
+          requestId,
+        },
+        503,
+      );
+      return;
+    }
+    await fulfillJson(
+      route,
+      {
+        data: {
+          id: "00000000-0000-4000-8000-000000000099",
+          revision: 1,
+          slug: "conflicted-draft-copy-01",
+        },
+        requestId,
+      },
+      201,
+      { ETag: '"rev-1"' },
+    );
+  });
   await page.setViewportSize({ width: 320, height: 760 });
 
   await page.goto("/");
@@ -1813,13 +1856,263 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
 
   await page.goto("/studio");
   await expect(page.getByText("Conflict", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Use cloud" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save copy" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resolve cloud save conflict" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Use cloud version" }),
+  ).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: "Resolve cloud save conflict" })
+    .click();
+  const choiceDialog = page.getByRole("dialog", {
+    name: "Choose how to resolve this save conflict",
+  });
+  await expect(choiceDialog).toBeVisible();
+  await expect(
+    choiceDialog.getByText(
+      "Your local work and the newer cloud version are both preserved until you make an explicit choice.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await expect(choiceDialog.getByText("Local work modified")).toBeVisible();
+  await expect(
+    choiceDialog.locator('time[datetime="2026-07-10T12:01:00.000Z"]'),
+  ).toBeVisible();
+  await expect(
+    choiceDialog.getByText("Last synced cloud revision"),
+  ).toBeVisible();
+  await expect(choiceDialog.getByText("v1", { exact: true })).toBeVisible();
+  await expect(
+    choiceDialog.getByRole("button", {
+      name: "Save local work as a copy",
+    }),
+  ).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .include('[data-slot="dialog-content"]')
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+
+  await choiceDialog.getByRole("button", { name: "Use cloud version" }).click();
+  const cloudConfirmation = page.getByRole("alertdialog", {
+    name: "Replace the local editor with the cloud version?",
+  });
+  await expect(cloudConfirmation).toBeVisible();
+  await expect(
+    cloudConfirmation.getByRole("button", {
+      name: "Confirm use cloud version",
+    }),
+  ).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .include('[data-slot="alert-dialog-content"]')
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await cloudConfirmation.getByRole("button", { name: "Cancel" }).click();
+  await expect(cloudConfirmation).toBeHidden();
+  await expect(page.getByText("Conflict", { exact: true })).toBeVisible();
+
+  await page
+    .getByRole("button", { name: "Resolve cloud save conflict" })
+    .click();
+  await page
+    .getByRole("dialog", {
+      name: "Choose how to resolve this save conflict",
+    })
+    .getByRole("button", { name: "Save local work as a copy" })
+    .click();
+  await expect.poll(() => copyAttempts).toBe(1);
+  await expect(
+    page.getByRole("dialog", {
+      name: "Choose how to resolve this save conflict",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Conflict", { exact: true })).toBeVisible();
+
+  await page
+    .getByRole("dialog", {
+      name: "Choose how to resolve this save conflict",
+    })
+    .getByRole("button", { name: "Save local work as a copy" })
+    .click();
+  await expect.poll(() => copyAttempts).toBe(2);
+  expect(copiedProjectName).toBe(
+    "A very long restored conflict project title for mobile (copy)",
+  );
+  await expect(page.getByText("Saved · v1", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("saving a conflicted cloud project as a copy replaces the cloud URL before reload", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the cloud query-state binding contract.",
+  );
+
+  const currentUser = user();
+  const oldCreationId = "00000000-0000-4000-8000-000000000051";
+  const newCreationId = "00000000-0000-4000-8000-000000000052";
+  const originalProject = {
+    cells: ["R1C1", ...Array.from({ length: 63 }, () => null as string | null)],
+    height: 8,
+    lockedColors: [] as string[],
+    meta: {
+      createdAt: "2026-07-14T12:00:00.000Z",
+      modifiedAt: "2026-07-14T12:00:00.000Z",
+      name: "Query-bound conflict project",
+    },
+    usedColors: ["R1C1"],
+    version: 1 as const,
+    width: 8,
+  };
+  let copiedProject: typeof originalProject | null = null;
+  let oldProjectReads = 0;
+  let newProjectReads = 0;
+
+  const creationDetail = (
+    id: string,
+    slug: string,
+    project: typeof originalProject,
+  ) => ({
+    commentsEnabled: false,
+    commentCount: 0,
+    description: "",
+    downloadEnabled: false,
+    id,
+    likeCount: 0,
+    owner: currentUser,
+    project,
+    revision: 1,
+    slug,
+    status: "draft",
+    tags: [],
+    title: project.meta.name,
+    updatedAt: 1_720_000_000_000,
+    visibility: "private",
+  });
+
+  await mockSession(page, currentUser);
+  await page.route(`**/api/creations/${oldCreationId}`, async (route) => {
+    oldProjectReads += 1;
+    await fulfillJson(
+      route,
+      {
+        data: creationDetail(
+          oldCreationId,
+          "query-bound-conflict-project",
+          originalProject,
+        ),
+        requestId,
+      },
+      200,
+      { ETag: '"rev-1"' },
+    );
+  });
+  await page.route(`**/api/creations/${newCreationId}`, async (route) => {
+    newProjectReads += 1;
+    await fulfillJson(
+      route,
+      {
+        data: creationDetail(
+          newCreationId,
+          "query-bound-conflict-project-copy",
+          copiedProject ?? originalProject,
+        ),
+        requestId,
+      },
+      200,
+      { ETag: '"rev-1"' },
+    );
+  });
+  await page.route(`**/api/creations/${oldCreationId}/project`, (route) =>
+    fulfillJson(
+      route,
+      {
+        error: {
+          code: "revision_conflict",
+          message: "A newer cloud revision exists.",
+        },
+        requestId,
+      },
+      409,
+    ),
+  );
+  await page.route("**/api/creations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    copiedProject = (
+      route.request().postDataJSON() as { project: typeof originalProject }
+    ).project;
+    await fulfillJson(
+      route,
+      {
+        data: {
+          id: newCreationId,
+          revision: 1,
+          slug: "query-bound-conflict-project-copy",
+        },
+        requestId,
+      },
+      201,
+      { ETag: '"rev-1"' },
+    );
+  });
+
+  await page.goto(
+    `/studio?cloud=${oldCreationId}&workspace=guided%20copy#canvas`,
+  );
+  await expect(
+    page.getByText("Query-bound conflict project", { exact: true }),
+  ).toBeVisible();
+  const canvas = page.getByRole("application", {
+    name: "Editable 8 by 8 pixel grid",
+  });
+  await canvas.focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByText("Conflict", { exact: true })).toBeVisible({
+    timeout: 7_000,
+  });
+
+  await page
+    .getByRole("button", { name: "Resolve cloud save conflict" })
+    .click();
+  await page
+    .getByRole("dialog", {
+      name: "Choose how to resolve this save conflict",
+    })
+    .getByRole("button", { name: "Save local work as a copy" })
+    .click();
+  await expect(page.getByText("Saved · v1", { exact: true })).toBeVisible();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("cloud"))
+    .toBe(newCreationId);
+  expect(new URL(page.url()).searchParams.get("workspace")).toBe("guided copy");
+  expect(new URL(page.url()).hash).toBe("#canvas");
+  expect(copiedProject?.meta.name).toBe("Query-bound conflict project (copy)");
+
+  await page.reload();
+  await expect(
+    page.getByText("Query-bound conflict project (copy)", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => newProjectReads).toBe(1);
+  expect(oldProjectReads).toBe(1);
+  expect(new URL(page.url()).searchParams.get("cloud")).toBe(newCreationId);
+  expect(new URL(page.url()).searchParams.get("workspace")).toBe("guided copy");
+  expect(new URL(page.url()).hash).toBe("#canvas");
 });
 
 test("a dirty restored cloud draft autosaves before publishing becomes available", async ({

@@ -82,7 +82,13 @@ test("Studio stays strict-CSP safe and gives every native form control metadata"
   await expect(brushSize).toHaveAttribute("autocomplete", "off");
   await expectStudioFormMetadata(page);
 
-  for (const tabName of ["Palette", "Optimize", "AI", "Export"] as const) {
+  for (const tabName of [
+    "Palette",
+    "Optimize",
+    "AI",
+    "Copy Guide",
+    "Export",
+  ] as const) {
     await page.getByRole("tab", { name: tabName, exact: true }).click();
     await expect(page.getByRole("tabpanel", { name: tabName })).toBeVisible();
     await expectStudioFormMetadata(page);

@@ -11,15 +11,17 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-07-14):** The current branch is configured for the
-> isolated writable-staging acceptance gate. Exact source
-> `520d0f287d390ba14b0fef179a6394893a5ab92d` remains the last accepted deployment
-> on [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) in read-only mode
-> until this candidate is deployed and authenticated acceptance completes.
+> **Deployment status (2026-07-14):** Exact source
+> `1bded7eda46f9be9f9a184656e535256467919d4` is the accepted deployment on
+> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) for the approved
+> authenticated single-account profile, showcase, generated-avatar fallback,
+> Guided Copy, Studio, accessibility, crawler, and performance scope. Community
+> mutations are enabled only on staging; consult sales remains disabled. The
+> current branch contains post-gate Studio refinements that are not deployed.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
-> Cloudflare Pages deployment until writable staging, merge, production
+> Cloudflare Pages deployment until cross-user staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
-> [sanitized staging record](docs/release-evidence/2026-07-14-staging-gate-final-head-520d0f28.md).
+> [sanitized staging record](docs/release-evidence/2026-07-14-staging-profile-guided-copy-1bded7e.md).
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
@@ -37,6 +39,7 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 - Every color labeled by row + column (R9C5, R10C1, etc.) for consistent manual matching in the Copy Guide
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
+- Interactive read-only Copy Guide with exact one-based row runs, highlighted cells, browser-local progress, and a direct reference-image entry point
 - Account-gated AI sketch assistant with local per-user chat sessions, explicit grid-snapshot consent, validation, visual review, and one-step undoable apply
 - Export individual repaint assets or a ZIP reference pack with JSON, labeled PNG guide, clean PNG, palette sheet PNG, paint-order CSV, notes, manifest, and HTML reference
 

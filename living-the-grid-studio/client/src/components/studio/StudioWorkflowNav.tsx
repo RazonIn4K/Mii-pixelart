@@ -1,6 +1,7 @@
 import {
   Download,
   ImageUp,
+  ListChecks,
   Palette,
   PencilRuler,
   Sparkles,
@@ -9,12 +10,7 @@ import {
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type StudioPanel =
-  | "import"
-  | "create"
-  | "palette"
-  | "optimize"
-  | "ai"
-  | "export";
+  "import" | "create" | "palette" | "optimize" | "ai" | "copy" | "export";
 
 const WORKFLOW_GROUPS = [
   {
@@ -37,7 +33,10 @@ const WORKFLOW_GROUPS = [
   },
   {
     label: "Finish",
-    tools: [{ icon: Download, label: "Export", value: "export" }],
+    tools: [
+      { icon: ListChecks, label: "Copy Guide", value: "copy" },
+      { icon: Download, label: "Export", value: "export" },
+    ],
   },
 ] as const satisfies ReadonlyArray<{
   label: string;

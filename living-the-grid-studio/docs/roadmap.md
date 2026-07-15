@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
-| 7     | Island Workshop Community  | Read-only staging       | Source and CI complete; exact `520d0f28` Worker staging accepted; authenticated writes and launch gated       |
+| 7     | Island Workshop Community  | Writable single-account staging | Exact `1bded7e` accepted for the approved authenticated scope; cross-user and launch gates remain separate     |
 
 ---
 
@@ -205,8 +205,14 @@ human-authorized moderation.
 
 **Accepted on isolated staging:**
 
-- [x] Exact source `520d0f287d390ba14b0fef179a6394893a5ab92d`
-      deployed in standard read-only mode
+- [x] Exact source `1bded7eda46f9be9f9a184656e535256467919d4`
+      deployed with community mutations enabled only on isolated staging and
+      consult sales disabled
+- [x] Authenticated single-account profile setup and Terms reacceptance,
+      generated/custom avatar lifecycle, private cloud restore, showcase-image
+      lifecycle, generated-avatar fallback, and empty moderation workspace
+- [x] Studio single-canvas painting plus browser-local Guided Copy reference
+      lifecycle without an unintended cloud revision
 - [x] Anonymous API/security/crawler, CSP/font, responsive browser,
       accessibility, local-only Studio stroke/undo, zero-write D1, and rollback
       checks
@@ -216,22 +222,17 @@ human-authorized moderation.
 
 **Remaining approval gates:**
 
-- [ ] Deploy the current writable-staging candidate and complete authenticated
-      single-user acceptance for profile setup, generated/custom avatars,
-      current-Terms reacceptance, cloud projects,
-      generated/uploaded media, publishing, conflicts, quotas, and cleanup
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
-- [x] Immutable preview and Worker asset-byte parity for the accepted
-      `520d0f28` source
+- [x] Immutable preview and Worker asset-byte parity for the preceding accepted
+      read-only `520d0f28` source
 - [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
 Production `tomodachi.pw` remains on the existing Cloudflare Pages deployment.
-The current candidate enables community mutations only in isolated staging for
-the approved acceptance gate; the last accepted deployment remains read-only
-until replacement. Consult sales stays disabled everywhere, and no roadmap
-status grants approval for production.
+The accepted staging deployment enables community mutations only in isolated
+staging for its approved single-account scope. Consult sales stays disabled
+everywhere, and no roadmap status grants approval for production.
 
 ---
 

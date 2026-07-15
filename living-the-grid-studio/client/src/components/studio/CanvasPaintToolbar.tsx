@@ -3,6 +3,8 @@ import {
   Crosshair,
   Eraser,
   FlipHorizontal2,
+  ImagePlus,
+  ListChecks,
   MousePointer2,
   PaintBucket,
   Palette,
@@ -87,6 +89,8 @@ export function CanvasPaintToolbar({
   onSelectedColorChange,
   onShowCenterGuideChange,
   onToolChange,
+  onAddReference,
+  onOpenCopyGuide,
 }: {
   activeTool: PaintTool;
   brushSize: BrushSize;
@@ -101,6 +105,8 @@ export function CanvasPaintToolbar({
   onSelectedColorChange: (colorId: string) => void;
   onShowCenterGuideChange: (enabled: boolean) => void;
   onToolChange: (tool: PaintTool) => void;
+  onAddReference: () => void;
+  onOpenCopyGuide: () => void;
 }) {
   const selectedColor = getPaletteColor(selectedColorId);
   const quickColors = useMemo(
@@ -130,12 +136,33 @@ export function CanvasPaintToolbar({
       <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 px-1 pb-2">
         <div className="min-w-0">
           <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-primary">
-            Guided Copy
+            Canvas tools
           </p>
           <p className="text-[0.68rem] font-medium text-muted-foreground">
-            View-only guides · coordinates start at 1
+            Paint here · copy from the read-only guide
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-11 px-2 text-[0.68rem] font-bold sm:h-9"
+            onClick={onAddReference}
+          >
+            <ImagePlus className="size-3.5" /> Reference
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="h-11 px-2 text-[0.68rem] font-bold sm:h-9"
+            onClick={onOpenCopyGuide}
+          >
+            <ListChecks className="size-3.5" /> Copy Guide
+          </Button>
+        </div>
+      </div>
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-end gap-2 border-b border-border/70 px-1 pb-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <div
             className="flex min-w-0 items-center rounded-lg border border-border bg-white p-0.5"

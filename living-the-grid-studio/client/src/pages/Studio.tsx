@@ -65,12 +65,14 @@ import type { GridDocument } from "@/lib/engine/grid";
 import type { GridDensity } from "@/lib/engine/canvas-renderer";
 import type { ImageImportOptions } from "@/lib/engine/image-import";
 import { buildPaintCells } from "@/lib/engine/paint-assists";
+import type { CopyGuideRun } from "@/lib/engine/copy-guide";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
 
 const EMPTY_STATE_IMG = "/empty-state.webp";
 const AiPanel = lazy(() => import("@/components/studio/AiPanel"));
 const CreationPanel = lazy(() => import("@/components/studio/CreationPanel"));
+const CopyGuidePanel = lazy(() => import("@/components/studio/CopyGuidePanel"));
 const ExportPanel = lazy(() => import("@/components/studio/ExportPanel"));
 const ImportPanel = lazy(() => import("@/components/studio/ImportPanel"));
 const OptimizerPanel = lazy(() => import("@/components/studio/OptimizerPanel"));
@@ -123,6 +125,7 @@ export default function Studio() {
   const [brushSize, setBrushSize] = useState<BrushSize>(1);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const [activeCopyRun, setActiveCopyRun] = useState<CopyGuideRun | null>(null);
   const [referenceSourceUrl, setReferenceSourceUrl] = useState<string | null>(
     null,
   );
@@ -130,6 +133,7 @@ export default function Studio() {
   const referenceFileRef = useRef<File | null>(null);
   const referenceSourceUrlRef = useRef<string | null>(null);
   const visibleDoc = imagePreview ?? doc;
+  const isCopyMode = activePanel === "copy" && !!doc && !imagePreview;
 
   useEffect(() => {
     if (!referenceSourceUrl) return;
@@ -181,6 +185,12 @@ export default function Studio() {
       }
 
       const key = e.key.toLowerCase();
+      if (activePanel === "copy") {
+        if ((e.metaKey || e.ctrlKey) && (key === "z" || key === "y")) {
+          e.preventDefault();
+        }
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
@@ -224,7 +234,7 @@ export default function Studio() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [doc, horizontalMirror, imagePreview, undo, redo]);
+  }, [activePanel, doc, horizontalMirror, imagePreview, undo, redo]);
 
   // Show errors
   useEffect(() => {
@@ -598,20 +608,29 @@ export default function Studio() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setShowLabels((v) => !v)}
+                disabled={isCopyMode}
                 className={`p-1.5 rounded-sm transition-colors ${
-                  showLabels
+                  isCopyMode || showLabels
                     ? "bg-accent text-foreground"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-70`}
                 aria-label="Toggle paint-by-numbers labels"
-                aria-pressed={showLabels}
-                title="Toggle paint-by-numbers labels"
+                aria-pressed={isCopyMode || showLabels}
+                title={
+                  isCopyMode
+                    ? "Paint-by-numbers labels stay on in Copy Guide"
+                    : "Toggle paint-by-numbers labels"
+                }
               >
                 <Hash className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">Toggle paint-by-numbers labels</p>
+              <p className="text-xs">
+                {isCopyMode
+                  ? "Paint-by-numbers labels stay on in Copy Guide"
+                  : "Toggle paint-by-numbers labels"}
+              </p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -621,8 +640,10 @@ export default function Studio() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={undo}
-                disabled={!canUndo}
+                onClick={() => {
+                  if (!isCopyMode) undo();
+                }}
+                disabled={!canUndo || isCopyMode}
                 className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                 aria-label="Undo"
                 title="Undo"
@@ -638,8 +659,10 @@ export default function Studio() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={redo}
-                disabled={!canRedo}
+                onClick={() => {
+                  if (!isCopyMode) redo();
+                }}
+                disabled={!canRedo || isCopyMode}
                 className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                 aria-label="Redo"
                 title="Redo"
@@ -667,13 +690,13 @@ export default function Studio() {
             visibleDoc
               ? referenceSourceUrl
                 ? "h-[82svh] min-h-[40rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
-                : "h-[68svh] min-h-[31rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
+                : "h-[76svh] min-h-[35rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
               : "min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
           }
         >
           {visibleDoc ? (
             <div className="relative flex h-full min-h-0 w-full flex-col gap-2">
-              {!imagePreview && doc ? (
+              {!imagePreview && doc && !isCopyMode ? (
                 <CanvasPaintToolbar
                   activeTool={paintTool}
                   brushSize={brushSize}
@@ -694,7 +717,30 @@ export default function Studio() {
                   }}
                   onShowCenterGuideChange={setShowCenterGuide}
                   onToolChange={setPaintTool}
+                  onAddReference={handleChooseImage}
+                  onOpenCopyGuide={() => setActivePanel("copy")}
                 />
+              ) : null}
+              {isCopyMode ? (
+                <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-orange-950 shadow-sm">
+                  <div>
+                    <p className="text-xs font-black">
+                      Copy Guide is read-only
+                    </p>
+                    <p className="text-[0.68rem] leading-4 text-orange-900/75">
+                      The highlighted run is the next section to recreate.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 border-orange-300 bg-white sm:min-h-9"
+                    onClick={handleChooseImage}
+                  >
+                    <ImageUp /> Add reference
+                  </Button>
+                </div>
               ) : null}
               {imagePreview && (
                 <div className="absolute top-3 left-3 z-20 rounded-sm border border-primary/30 bg-background/95 px-2 py-1 text-xs shadow-sm">
@@ -717,23 +763,27 @@ export default function Studio() {
                 <div className="h-full min-h-0 min-w-0">
                   <CanvasViewer
                     doc={visibleDoc}
-                    highlightColorId={highlightColorId}
-                    gridDensity={gridDensity}
-                    showLabels={showLabels}
+                    highlightColorId={isCopyMode ? null : highlightColorId}
+                    gridDensity={isCopyMode ? "cell" : gridDensity}
+                    showLabels={isCopyMode || showLabels}
                     showCenterGuide={showCenterGuide}
-                    onCellClick={handleCellClick}
+                    readOnly={isCopyMode}
+                    guideHighlight={isCopyMode ? activeCopyRun : null}
+                    onCellClick={isCopyMode ? undefined : handleCellClick}
                     onCellDrag={
-                      paintTool === "pencil" || paintTool === "eraser"
+                      !isCopyMode &&
+                      (paintTool === "pencil" || paintTool === "eraser")
                         ? handleCellDrag
                         : undefined
                     }
                     onCellDragSegment={
-                      paintTool === "pencil" || paintTool === "eraser"
+                      !isCopyMode &&
+                      (paintTool === "pencil" || paintTool === "eraser")
                         ? handleCellDragSegment
                         : undefined
                     }
                     onCellHover={handleCellHover}
-                    onStrokeBegin={handleStrokeBegin}
+                    onStrokeBegin={isCopyMode ? undefined : handleStrokeBegin}
                     onStrokeEnd={handleStrokeEnd}
                   />
                 </div>
@@ -839,7 +889,11 @@ export default function Studio() {
 
           <Tabs
             value={activePanel}
-            onValueChange={(value) => setActivePanel(value as StudioPanel)}
+            onValueChange={(value) => {
+              const nextPanel = value as StudioPanel;
+              setActivePanel(nextPanel);
+              if (nextPanel !== "copy") setActiveCopyRun(null);
+            }}
             className="min-w-0 flex-1 flex-col overflow-hidden"
           >
             <StudioWorkflowNav />
@@ -914,6 +968,25 @@ export default function Studio() {
                       currentDoc={doc}
                       onApplySketch={handleApplyAiSketch}
                     />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="copy" className="mt-0">
+                  {imagePreview ? (
+                    <PreviewBlockedPanel title="Copy Guide" />
+                  ) : doc ? (
+                    <CopyGuidePanel
+                      doc={doc}
+                      hasReference={Boolean(referenceSourceUrl)}
+                      onActiveRunChange={setActiveCopyRun}
+                      onAddReference={handleChooseImage}
+                    />
+                  ) : (
+                    <div className="p-4 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        Create or import a project to start Copy Guide.
+                      </p>
+                    </div>
                   )}
                 </TabsContent>
 

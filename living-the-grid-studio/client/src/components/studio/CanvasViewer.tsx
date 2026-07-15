@@ -23,6 +23,15 @@ interface CanvasViewerProps {
   highlightColorId: string | null;
   gridDensity: GridDensity;
   showLabels: boolean;
+  /** Prevent every artwork mutation while retaining zoom, pan, and inspection. */
+  readOnly?: boolean;
+  /** One-based Copy Guide range drawn over the existing authoritative canvas. */
+  guideHighlight?: {
+    row: number;
+    startColumn: number;
+    endColumn: number;
+    instruction: string;
+  } | null;
   /** Draw local-only horizontal and vertical guides through the center. */
   showCenterGuide?: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
@@ -62,6 +71,8 @@ export default function CanvasViewer({
   highlightColorId,
   gridDensity,
   showLabels,
+  readOnly = false,
+  guideHighlight = null,
   showCenterGuide = false,
   onCellClick,
   onCellDrag,
@@ -133,6 +144,17 @@ export default function CanvasViewer({
     );
   }, [doc.width, doc.height]);
 
+  useEffect(() => {
+    if (!guideHighlight) return;
+    const nextCell = {
+      x: Math.max(0, Math.min(doc.width - 1, guideHighlight.startColumn - 1)),
+      y: Math.max(0, Math.min(doc.height - 1, guideHighlight.row - 1)),
+    };
+    setKeyboardCell(nextCell);
+    setHoverCell(nextCell);
+    setStatusMessage(guideHighlight.instruction);
+  }, [doc.height, doc.width, guideHighlight]);
+
   const getRenderMetrics = useCallback(() => {
     const width =
       viewportSize.width || containerRef.current?.clientWidth || 800;
@@ -198,6 +220,37 @@ export default function CanvasViewer({
       gridWidth: 1,
     });
 
+    if (guideHighlight) {
+      const scaledSize = metrics.cellSize * zoom;
+      const startColumn = Math.max(
+        1,
+        Math.min(doc.width, guideHighlight.startColumn),
+      );
+      const endColumn = Math.max(
+        startColumn,
+        Math.min(doc.width, guideHighlight.endColumn),
+      );
+      const row = Math.max(1, Math.min(doc.height, guideHighlight.row));
+      const x = metrics.panX + (startColumn - 1) * scaledSize;
+      const y = metrics.panY + (row - 1) * scaledSize;
+      const width = (endColumn - startColumn + 1) * scaledSize;
+
+      ctx.save();
+      ctx.fillStyle = "rgba(255, 178, 0, 0.24)";
+      ctx.fillRect(x, y, width, scaledSize);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.96)";
+      ctx.lineWidth = Math.max(4, Math.min(8, scaledSize / 2));
+      ctx.strokeRect(x, y, width, scaledSize);
+      ctx.strokeStyle = "#c2410c";
+      ctx.lineWidth = Math.max(2, Math.min(4, scaledSize / 3));
+      ctx.setLineDash([
+        Math.max(3, scaledSize / 2),
+        Math.max(2, scaledSize / 3),
+      ]);
+      ctx.strokeRect(x, y, width, scaledSize);
+      ctx.restore();
+    }
+
     if (showCenterGuide) {
       const scaledSize = metrics.cellSize * zoom;
       const centerX = metrics.panX + (doc.width * scaledSize) / 2;
@@ -255,6 +308,7 @@ export default function CanvasViewer({
     showLabels,
     showCenterGuide,
     highlightColorId,
+    guideHighlight,
     getRenderMetrics,
     isKeyboardFocused,
     keyboardCell,
@@ -284,8 +338,12 @@ export default function CanvasViewer({
       ),
     );
     setPan({ x: 0, y: 0 });
-    setStatusMessage("Canvas zoomed to an easier painting scale.");
-  }, [getRenderMetrics]);
+    setStatusMessage(
+      readOnly
+        ? "Canvas zoomed to an easier copying scale."
+        : "Canvas zoomed to an easier painting scale.",
+    );
+  }, [getRenderMetrics, readOnly]);
 
   // Mouse/trackpad wheel zoom. Touch users can use the explicit zoom buttons.
   const handleWheel = useCallback((event: React.WheelEvent) => {
@@ -374,7 +432,7 @@ export default function CanvasViewer({
       pointerMovedRef.current = false;
       setKeyboardCell({ x: cell.x, y: cell.y });
 
-      if (onCellDrag || onCellDragSegment) {
+      if (!readOnly && (onCellDrag || onCellDragSegment)) {
         pointerGestureRef.current = "draw";
         setIsPanning(false);
         // Begin the stroke transaction so all paints below collapse into one
@@ -392,6 +450,11 @@ export default function CanvasViewer({
       } else {
         pointerGestureRef.current = "tap";
         setIsPanning(false);
+        if (readOnly) {
+          setStatusMessage(
+            `Inspecting column ${cell.x + 1}, row ${cell.y + 1}. Copy Guide is read-only.`,
+          );
+        }
       }
     },
     [
@@ -402,6 +465,7 @@ export default function CanvasViewer({
       onStrokeBegin,
       pan,
       panMode,
+      readOnly,
     ],
   );
 
@@ -507,8 +571,16 @@ export default function CanvasViewer({
 
       if (shouldActivateCell) {
         setKeyboardCell({ x: cell.x, y: cell.y });
-        onCellClick?.(cell.x, cell.y, cell.colorId);
-        setStatusMessage(`Activated column ${cell.x + 1}, row ${cell.y + 1}.`);
+        if (readOnly) {
+          setStatusMessage(
+            `Inspected column ${cell.x + 1}, row ${cell.y + 1}. Copy Guide is read-only.`,
+          );
+        } else {
+          onCellClick?.(cell.x, cell.y, cell.colorId);
+          setStatusMessage(
+            `Activated column ${cell.x + 1}, row ${cell.y + 1}.`,
+          );
+        }
       } else if (gesture === "draw") {
         setStatusMessage(
           canceled ? "Stroke ended safely." : "Stroke complete.",
@@ -517,7 +589,7 @@ export default function CanvasViewer({
         setStatusMessage(canceled ? "Pan ended." : "Canvas panned.");
       }
     },
-    [getEventCell, onCellClick, onStrokeEnd],
+    [getEventCell, onCellClick, onStrokeEnd, readOnly],
   );
 
   const handlePointerUp = useCallback(
@@ -577,6 +649,12 @@ export default function CanvasViewer({
         case "Enter":
         case " ": {
           event.preventDefault();
+          if (readOnly) {
+            setStatusMessage(
+              `Inspected column ${keyboardCell.x + 1}, row ${keyboardCell.y + 1}. Copy Guide is read-only.`,
+            );
+            return;
+          }
           const colorId = getCell(doc, keyboardCell.x, keyboardCell.y);
           onCellClick?.(keyboardCell.x, keyboardCell.y, colorId);
           setStatusMessage(
@@ -609,7 +687,11 @@ export default function CanvasViewer({
           event.preventDefault();
           setPanMode((current) => !current);
           setStatusMessage(
-            panMode ? "Drawing interaction enabled." : "Hand tool enabled.",
+            panMode
+              ? readOnly
+                ? "Cell inspection enabled."
+                : "Drawing interaction enabled."
+              : "Hand tool enabled.",
           );
           return;
         default:
@@ -623,6 +705,7 @@ export default function CanvasViewer({
       moveKeyboardCursor,
       onCellClick,
       panMode,
+      readOnly,
       resetView,
       zoomIn,
       zoomOut,
@@ -633,7 +716,7 @@ export default function CanvasViewer({
     ? isPanning
       ? "cursor-grabbing"
       : "cursor-grab"
-    : onCellDrag || onCellDragSegment
+    : !readOnly && (onCellDrag || onCellDragSegment)
       ? "cursor-crosshair"
       : "cursor-cell";
   const currentRenderMetrics = getRenderMetrics();
@@ -655,16 +738,19 @@ export default function CanvasViewer({
       data-testid="canvas-workspace"
     >
       <p id={instructionsId} className="sr-only">
-        Use one pointer to draw. Choose the Hand button or press H, then drag to
-        pan. With the canvas focused, use the arrow keys to move the keyboard
-        cursor, Enter or Space to activate a cell, plus and minus to zoom, and
-        zero to fit the whole canvas. Press 2 to zoom to an easier painting
-        scale. Press M to mirror pencil and eraser strokes left to right, and G
-        to toggle the horizontal and vertical center guides.
+        {readOnly
+          ? "Copy Guide is read-only. Use the arrow keys to inspect cells. Choose the Hand button or press H, then drag to pan. Use plus and minus to zoom, zero to fit the canvas, and 2 for a closer copy view."
+          : "Use one pointer to draw. Choose the Hand button or press H, then drag to pan. With the canvas focused, use the arrow keys to move the keyboard cursor, Enter or Space to activate a cell, plus and minus to zoom, and zero to fit the whole canvas. Press 2 to zoom to an easier painting scale. Press M to mirror pencil and eraser strokes left to right, and G to toggle the horizontal and vertical center guides."}
       </p>
       <p id={statusId} className="sr-only" role="status" aria-live="polite">
         {statusMessage}
       </p>
+
+      {readOnly ? (
+        <div className="pointer-events-none absolute left-3 top-[4.25rem] z-10 rounded-full border border-orange-700/30 bg-orange-50/95 px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-orange-900 shadow-sm backdrop-blur-sm sm:top-3">
+          Copy mode · read only
+        </div>
+      ) : null}
 
       {/* Interaction and zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-sm border border-border bg-card/90 p-1 shadow-sm backdrop-blur-sm">
@@ -673,7 +759,11 @@ export default function CanvasViewer({
           onClick={() => {
             setPanMode((current) => !current);
             setStatusMessage(
-              panMode ? "Drawing interaction enabled." : "Hand tool enabled.",
+              panMode
+                ? readOnly
+                  ? "Cell inspection enabled."
+                  : "Drawing interaction enabled."
+                : "Hand tool enabled.",
             );
           }}
           className={`flex size-11 items-center justify-center rounded-sm transition-colors sm:size-9 ${
@@ -712,10 +802,10 @@ export default function CanvasViewer({
           type="button"
           onClick={editView}
           className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground sm:h-9"
-          aria-label="Zoom to edit pixels"
-          title="Edit zoom (2)"
+          aria-label={readOnly ? "Zoom to copy pixels" : "Zoom to edit pixels"}
+          title={readOnly ? "Copy zoom (2)" : "Edit zoom (2)"}
         >
-          Edit
+          {readOnly ? "Copy" : "Edit"}
         </button>
         <button
           type="button"
@@ -747,7 +837,8 @@ export default function CanvasViewer({
             role="status"
             aria-live="polite"
           >
-            Dense preview · choose Edit to see cell lines
+            Dense preview · choose {readOnly ? "Copy" : "Edit"} to see cell
+            lines
           </span>
         ) : null}
       </div>
@@ -756,18 +847,28 @@ export default function CanvasViewer({
         ref={canvasRef}
         className={`h-full w-full touch-none select-none pixel-canvas outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${canvasCursor}`}
         role="application"
-        aria-label={`Editable ${doc.width} by ${doc.height} pixel grid`}
-        aria-roledescription="pixel art canvas"
+        aria-label={`${readOnly ? "Read-only Copy Guide" : "Editable"} ${doc.width} by ${doc.height} pixel grid`}
+        aria-roledescription={
+          readOnly ? "copy guide pixel art canvas" : "pixel art canvas"
+        }
         aria-describedby={`${instructionsId} ${statusId}${
           gridLineState === "suppressed" ? ` ${zoomHintId}` : ""
         }`}
-        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G"
+        aria-keyshortcuts={
+          readOnly
+            ? "ArrowLeft ArrowRight ArrowUp ArrowDown + - 0 2 H"
+            : "ArrowLeft ArrowRight ArrowUp ArrowDown Enter Space + - 0 2 H M G"
+        }
         data-grid-width={doc.width}
         data-grid-height={doc.height}
         data-grid-density={gridDensity}
         data-grid-lines={gridLineState}
         data-document-modified-at={doc.meta.modifiedAt}
         data-center-guide={showCenterGuide ? "visible" : "hidden"}
+        data-canvas-mode={readOnly ? "copy" : "edit"}
+        data-guide-row={guideHighlight?.row}
+        data-guide-start-column={guideHighlight?.startColumn}
+        data-guide-end-column={guideHighlight?.endColumn}
         tabIndex={0}
         onBlur={() => {
           setIsKeyboardFocused(false);

@@ -2,13 +2,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Cloud,
   CloudOff,
+  CopyPlus,
   LoaderCircle,
   LogIn,
   Save,
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { PublishDialog } from "./PublishDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import type { GridDocument } from "@/lib/engine/grid";
@@ -59,6 +79,90 @@ function quotedRevision(revision: number): string {
   return `"rev-${revision}"`;
 }
 
+function replaceCloudProjectInCurrentUrl(creationId: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("cloud", creationId);
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
+
+function projectTimestamp(value: string | number | undefined): {
+  dateTime: string;
+  label: string;
+} | null {
+  if (value === undefined) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    dateTime: date.toISOString(),
+    label: new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date),
+  };
+}
+
+function ConflictVersionDetails({
+  cloud,
+  document,
+}: {
+  cloud: CloudProjectState;
+  document: GridDocument;
+}) {
+  const localModified = projectTimestamp(document.meta.modifiedAt);
+  const lastSyncedDocument = projectTimestamp(cloud.lastSyncedModifiedAt);
+  const lastSuccessfulSave = projectTimestamp(cloud.lastSavedAt);
+  const timestamp = (
+    value: ReturnType<typeof projectTimestamp>,
+    unavailable: string,
+  ) =>
+    value ? (
+      <time dateTime={value.dateTime} title={value.dateTime}>
+        {value.label}
+      </time>
+    ) : (
+      unavailable
+    );
+
+  return (
+    <dl className="grid gap-2 rounded-xl border bg-muted/35 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-muted-foreground">
+          Local work modified
+        </dt>
+        <dd className="break-words font-medium">
+          {timestamp(localModified, "Timestamp not recorded")}
+        </dd>
+      </div>
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-muted-foreground">
+          Last synced cloud revision
+        </dt>
+        <dd className="font-medium">v{cloud.revision}</dd>
+      </div>
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-muted-foreground">
+          Synced document timestamp
+        </dt>
+        <dd className="break-words font-medium">
+          {timestamp(lastSyncedDocument, "Not recorded")}
+        </dd>
+      </div>
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-muted-foreground">
+          Last successful cloud save
+        </dt>
+        <dd className="break-words font-medium">
+          {timestamp(lastSuccessfulSave, "Not recorded in this browser")}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
 export function CloudProjectControls({
   doc,
   onLoadDocument,
@@ -70,6 +174,8 @@ export function CloudProjectControls({
   const [cloud, setCloud] = useState<CloudProjectState | null>(null);
   const [cloudSignInRequired, setCloudSignInRequired] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [confirmCloudReplaceOpen, setConfirmCloudReplaceOpen] = useState(false);
   const docRef = useRef(doc);
   const savingRef = useRef(false);
   const lastSavedModifiedRef = useRef<string | null>(null);
@@ -135,8 +241,11 @@ export function CloudProjectControls({
   }, [cloud, doc, persistLocal]);
 
   const firstSave = useCallback(
-    async (document: GridDocument) => {
-      if (!user) return;
+    async (
+      document: GridDocument,
+      options?: { preserveCloudOnError?: boolean },
+    ): Promise<string | null> => {
+      if (!user) return null;
       if (!user.username || user.termsAccepted !== true) {
         try {
           await markDraftForAuthResume(document);
@@ -149,7 +258,7 @@ export function CloudProjectControls({
             "This browser could not preserve the draft for profile setup. Export JSON before leaving the page.",
           );
         }
-        return;
+        return null;
       }
       setBusy(true);
       savingRef.current = true;
@@ -186,13 +295,21 @@ export function CloudProjectControls({
         toast.success(
           "Private cloud save created. Publishing is still separate.",
         );
+        return creationId;
       } catch (error) {
         toast.error(messageFromError(error));
-        setCloud((current) =>
-          current
-            ? { ...current, saveState: "error", error: messageFromError(error) }
-            : null,
-        );
+        if (!options?.preserveCloudOnError) {
+          setCloud((current) =>
+            current
+              ? {
+                  ...current,
+                  saveState: "error",
+                  error: messageFromError(error),
+                }
+              : null,
+          );
+        }
+        return null;
       } finally {
         savingRef.current = false;
         setBusy(false);
@@ -465,13 +582,24 @@ export function CloudProjectControls({
   };
 
   const saveCopy = async () => {
-    if (!doc) return;
-    setCloud(null);
-    await firstSave({
-      ...doc,
-      meta: { ...doc.meta, name: `${doc.meta.name} (copy)` },
-    });
+    if (!doc) return false;
+    const creationId = await firstSave(
+      {
+        ...doc,
+        meta: { ...doc.meta, name: `${doc.meta.name} (copy)` },
+      },
+      { preserveCloudOnError: true },
+    );
+    if (!creationId) return false;
+    replaceCloudProjectInCurrentUrl(creationId);
+    return true;
   };
+
+  useEffect(() => {
+    if (cloud?.saveState === "conflict") return;
+    setConflictDialogOpen(false);
+    setConfirmCloudReplaceOpen(false);
+  }, [cloud?.saveState]);
 
   if (!serviceAvailable) {
     const checking = status === "loading";
@@ -590,25 +718,115 @@ export function CloudProjectControls({
       </span>
       {cloud.saveState === "conflict" ? (
         <>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="px-2 sm:px-3"
-            onClick={() => void reloadCloud()}
-            disabled={busy}
+          <Dialog
+            open={conflictDialogOpen}
+            onOpenChange={setConflictDialogOpen}
           >
-            Use cloud
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="px-2 sm:px-3"
-            onClick={() => void saveCopy()}
-            disabled={busy}
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 rounded-full px-2 text-xs sm:px-3"
+                disabled={busy}
+                aria-label="Resolve cloud save conflict"
+              >
+                <span className="hidden sm:inline">Resolve conflict</span>
+                <span className="sm:hidden">Resolve</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>
+                  Choose how to resolve this save conflict
+                </DialogTitle>
+                <DialogDescription>
+                  Your local work and the newer cloud version are both preserved
+                  until you make an explicit choice. Nothing will be overwritten
+                  by opening or canceling this window.
+                </DialogDescription>
+              </DialogHeader>
+
+              <ConflictVersionDetails cloud={cloud} document={doc} />
+
+              <div className="rounded-xl border border-[var(--island-mint-dark)]/25 bg-[var(--island-mint)]/15 p-3 text-sm">
+                <p className="font-semibold">Recommended: keep both versions</p>
+                <p className="mt-1 text-muted-foreground">
+                  Save your local work as a new private cloud project. The
+                  existing cloud project stays unchanged.
+                </p>
+              </div>
+
+              <DialogFooter className="sm:flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConflictDialogOpen(false)}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    setConflictDialogOpen(false);
+                    setConfirmCloudReplaceOpen(true);
+                  }}
+                  disabled={busy}
+                >
+                  Use cloud version
+                </Button>
+                <Button
+                  type="button"
+                  autoFocus
+                  onClick={() => {
+                    void saveCopy().then((saved) => {
+                      if (saved) setConflictDialogOpen(false);
+                    });
+                  }}
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <LoaderCircle className="animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <CopyPlus />
+                  )}
+                  {busy ? "Saving copy…" : "Save local work as a copy"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <AlertDialog
+            open={confirmCloudReplaceOpen}
+            onOpenChange={setConfirmCloudReplaceOpen}
           >
-            Save copy
-          </Button>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Replace the local editor with the cloud version?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This explicit choice loads the newer cloud project into the
+                  Studio and removes the current local edits from the editor. If
+                  you may need those edits, cancel and save them as a copy
+                  instead.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <ConflictVersionDetails cloud={cloud} document={doc} />
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className={buttonVariants({ variant: "destructive" })}
+                  onClick={() => void reloadCloud()}
+                  disabled={busy}
+                >
+                  Confirm use cloud version
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       ) : (
         <>

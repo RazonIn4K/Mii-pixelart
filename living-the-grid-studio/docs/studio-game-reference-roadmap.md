@@ -235,7 +235,9 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 1. **Implemented:** consolidate the current Pixel workspace around one authoritative canvas and remove duplicate-grid/input paths.
 2. Add the shared command layer and expand pointer, keyboard, touch, pen, and undo tests.
 3. **In progress:** ship the new-project chooser, browser-local reference dock, prior-work/remix start, and review step. The first slice now includes the persistent read-only reference, four grid-density presets, two-axis center guides, one-based coordinates, and an 11-by-7 shade matrix with a separate vivid rail.
-4. Add Copy Guide v1 for Pixel projects.
+4. **Implemented:** Copy Guide v1 turns a validated Pixel project into exact
+   one-based contiguous row runs, highlights only the current run on the same
+   authoritative read-only canvas, and keeps completion progress browser-local.
 5. Add local Sketch mode and explicit conversion to `GridDocumentV1`.
 6. Add Sketch copy guides and multi-panel project navigation.
 7. Route AI suggestions through validated, previewable commands.

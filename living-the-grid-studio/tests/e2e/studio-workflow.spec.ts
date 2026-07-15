@@ -35,6 +35,7 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
     "Palette",
     "Optimize",
     "AI",
+    "Copy Guide",
     "Export",
   ]) {
     await expect(
