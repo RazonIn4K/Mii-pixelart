@@ -185,7 +185,7 @@ test("minimum-phone Studio exposes reference and Copy Guide actions without over
   const zoomHint = page.getByTestId("grid-zoom-hint");
   if ((await zoomHint.count()) > 0) {
     await expect(zoomHint).toHaveText(
-      "Dense preview · choose Copy to see cell lines",
+      "Dense preview · choose Cell view to see cell lines",
     );
   }
   await expect(page.getByTestId("copy-guide-panel")).toBeVisible();
@@ -212,13 +212,16 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
   });
   const box = await editableCanvas.boundingBox();
   expect(box).not.toBeNull();
-  const cellSize = Math.max(
-    1,
-    Math.floor(Math.min((box!.width - 40) / 64, (box!.height - 40) / 64, 32)),
-  );
+  const cellSize = Number(await editableCanvas.getAttribute("data-cell-size"));
   const point = {
-    clientX: box!.x + (box!.width - cellSize * 64) / 2 + (4 + 0.5) * cellSize,
-    clientY: box!.y + (box!.height - cellSize * 64) / 2 + (4 + 0.5) * cellSize,
+    clientX:
+      box!.x +
+      Number(await editableCanvas.getAttribute("data-grid-origin-x")) +
+      (4 + 0.5) * cellSize,
+    clientY:
+      box!.y +
+      Number(await editableCanvas.getAttribute("data-grid-origin-y")) +
+      (4 + 0.5) * cellSize,
   };
 
   await editableCanvas.dispatchEvent("pointerdown", {
@@ -229,9 +232,7 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
     pointerId: 31,
     pointerType: "pen",
   });
-  await expect(
-    page.getByText("64×64 · 1 color", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(/^64×64 · 1 color(?: ·|$)/)).toBeVisible();
 
   await page
     .getByRole("button", { name: "Copy Guide", exact: true })

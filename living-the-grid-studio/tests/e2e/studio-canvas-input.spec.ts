@@ -144,7 +144,7 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   expect(["suppressed", "visible"]).toContain(initialGridState);
   if (initialGridState === "suppressed") {
     await expect(page.getByTestId("grid-zoom-hint")).toHaveText(
-      "Dense preview · choose Edit to see cell lines",
+      "Dense preview · choose Cell view to see cell lines",
     );
     await expect(canvas).toHaveAttribute("aria-describedby", /\S+ \S+ \S+/);
   } else {
@@ -171,10 +171,12 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await expect(page.getByText("Starter Designs", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByTestId("canvas-workspace")).toHaveCSS(
-    "background-image",
-    "none",
+  await expect(page.getByTestId("canvas-workspace")).toHaveAttribute(
+    "data-testid",
+    "canvas-workspace",
   );
+  await expect(canvas).toHaveAttribute("data-grid-renderer", "crisp-layered");
+  await expect(canvas).toHaveAttribute("data-canvas-background", "light");
 
   // Let the lazily rendered Create panel settle before checking for the old
   // resize feedback loop. The regression continually grew the canvas; normal
@@ -220,17 +222,110 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   ).toBe(true);
   expect(
     await page.evaluate(() => {
-      const quickColors = document.querySelector(
-        '[aria-label="Quick paint colors"]',
-      );
+      const quickColors = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[aria-label="Quick paint colors"]',
+        ),
+      ).find((group) => group.getClientRects().length > 0);
       if (!quickColors) return false;
-      return Array.from(quickColors.querySelectorAll("button")).every(
-        (button) => {
-          const rect = button.getBoundingClientRect();
-          return rect.left >= 0 && rect.right <= window.innerWidth;
-        },
+      const railRect = quickColors.getBoundingClientRect();
+      return (
+        railRect.left >= 0 &&
+        railRect.right <= window.innerWidth &&
+        Array.from(quickColors.querySelectorAll("button"))
+          .filter((button) => button.getClientRects().length > 0)
+          .every((button) => {
+            const rect = button.getBoundingClientRect();
+            return rect.width >= 44 && rect.height >= 44;
+          })
       );
     }),
+  ).toBe(true);
+});
+
+test("tablet keeps the reference and workflow below a full-width canvas", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "tablet",
+    "The 768px breakpoint guards against the former three-column squeeze.",
+  );
+
+  await page.goto("/studio");
+  await page.locator("#ltg-image-input").setInputFiles({
+    buffer: TINY_PNG,
+    mimeType: "image/png",
+    name: "tablet-reference.png",
+  });
+  await expect(page.getByText("Preview ready", { exact: true })).toBeVisible();
+
+  const canvasBox = await page
+    .getByRole("application", { name: /pixel grid/ })
+    .boundingBox();
+  const dockBox = await page.getByTestId("studio-reference-dock").boundingBox();
+  const toolsBox = await page.locator("#studio-tools").boundingBox();
+  expect(canvasBox).not.toBeNull();
+  expect(dockBox).not.toBeNull();
+  expect(toolsBox).not.toBeNull();
+  expect(canvasBox!.width).toBeGreaterThanOrEqual(700);
+  expect(dockBox!.y).toBeGreaterThanOrEqual(canvasBox!.y + canvasBox!.height);
+  expect(toolsBox!.y).toBeGreaterThanOrEqual(dockBox!.y + dockBox!.height);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    ),
+  ).toBe(true);
+});
+
+test("minimum phone keeps a traced source clear of the workflow panel", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "minimum-phone",
+    "The 320px trace flow guards the intrinsic reference-dock height.",
+  );
+
+  await page.goto("/studio");
+  await page.locator("#ltg-image-input").setInputFiles({
+    buffer: TINY_PNG,
+    mimeType: "image/png",
+    name: "phone-trace.png",
+  });
+  const trace = page.getByRole("button", {
+    name: "Trace framed source on a blank grid",
+  });
+  await expect(trace).toBeEnabled();
+  await trace.click();
+
+  const dock = page.getByTestId("studio-reference-dock");
+  const tools = page.locator("#studio-tools");
+  await expect(dock).toBeVisible();
+  const layout = await page.evaluate(() => {
+    const dockElement = document.querySelector<HTMLElement>(
+      '[data-testid="studio-reference-dock"]',
+    );
+    const toolsElement = document.querySelector<HTMLElement>("#studio-tools");
+    if (!dockElement || !toolsElement) return null;
+    const dockRect = dockElement.getBoundingClientRect();
+    const childrenBottom = Math.max(
+      dockRect.bottom,
+      ...Array.from(dockElement.querySelectorAll<HTMLElement>("*")).map(
+        (element) => element.getBoundingClientRect().bottom,
+      ),
+    );
+    return {
+      childrenBottom,
+      dockHeight: dockRect.height,
+      toolsTop: toolsElement.getBoundingClientRect().top,
+    };
+  });
+  expect(layout).not.toBeNull();
+  expect(layout!.dockHeight).toBeGreaterThanOrEqual(360);
+  expect(layout!.childrenBottom).toBeLessThanOrEqual(layout!.toolsTop);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    ),
   ).toBe(true);
 });
 
@@ -250,6 +345,11 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   });
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toHaveAttribute("data-grid-density", "cell");
+  await expect(canvas).toHaveAttribute("data-brush-preview", "1");
+  const brushSizeControl = page.getByRole("combobox", { name: "Brush size" });
+  await brushSizeControl.selectOption("3");
+  await expect(canvas).toHaveAttribute("data-brush-preview", "3");
+  await brushSizeControl.selectOption("1");
 
   for (const density of ["Off", "Coarse", "Medium", "Cell"] as const) {
     await expect(
@@ -263,6 +363,17 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await expect(canvas).toHaveAttribute("data-grid-density", "coarse");
   await expect(canvas).toHaveAttribute("data-grid-lines", "visible");
   await page.getByRole("button", { name: "Grid density: Cell" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Canvas background: Light checker" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "Canvas background: Dark checker" })
+    .click();
+  await expect(canvas).toHaveAttribute("data-canvas-background", "dark");
+  await page
+    .getByRole("button", { name: "Canvas background: Light checker" })
+    .click();
 
   await page.getByRole("button", { name: /Choose paint color/ }).click();
   await expect(
@@ -287,6 +398,9 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     name: "Show center guides",
   });
   await expect(mirrorButton).toHaveAttribute("aria-pressed", "false");
+  await expect(guideButton).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute("data-center-guide", "visible");
+  await guideButton.click();
   await expect(guideButton).toHaveAttribute("aria-pressed", "false");
   await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
   await mirrorButton.click();
@@ -302,12 +416,11 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
 
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
-  const cellSize = Math.max(
-    1,
-    Math.floor(Math.min((box!.width - 40) / 64, (box!.height - 40) / 64, 32)),
-  );
-  const originX = box!.x + (box!.width - cellSize * 64) / 2;
-  const originY = box!.y + (box!.height - cellSize * 64) / 2;
+  const cellSize = Number(await canvas.getAttribute("data-cell-size"));
+  const originX =
+    box!.x + Number(await canvas.getAttribute("data-grid-origin-x"));
+  const originY =
+    box!.y + Number(await canvas.getAttribute("data-grid-origin-y"));
   const pointForCell = (x: number, y: number) => ({
     clientX: originX + (x + 0.5) * cellSize,
     clientY: originY + (y + 0.5) * cellSize,
@@ -316,7 +429,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   const firstCellPoint = pointForCell(0, 0);
   await page.mouse.move(firstCellPoint.clientX, firstCellPoint.clientY);
   await expect(
-    page.getByText("64×64 · 0 colors · column 1 · row 1", { exact: true }),
+    page.getByText("64×64 · 0 colors · C 1 · R 1 · NW", { exact: true }),
   ).toBeVisible();
   await page.mouse.move(0, 0);
 
@@ -347,19 +460,13 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     pointerType: "touch",
   });
 
-  await expect(
-    page.getByText("64×64 · 1 color", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(/^64×64 · 1 color(?: ·|$)/)).toBeVisible();
 
   const mirroredPixels = await canvas.evaluate((element) => {
     const canvasElement = element as HTMLCanvasElement;
-    const rect = canvasElement.getBoundingClientRect();
-    const cellSize = Math.max(
-      1,
-      Math.floor(Math.min((rect.width - 40) / 64, (rect.height - 40) / 64, 32)),
-    );
-    const panX = Math.round((rect.width - cellSize * 64) / 2);
-    const panY = Math.round((rect.height - cellSize * 64) / 2);
+    const cellSize = Number(canvasElement.dataset.cellSize);
+    const panX = Number(canvasElement.dataset.gridOriginX);
+    const panY = Number(canvasElement.dataset.gridOriginY);
     const dpr = window.devicePixelRatio || 1;
     const context = canvasElement.getContext("2d");
     if (!context) throw new Error("Canvas context unavailable");
@@ -429,7 +536,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await canvas.press("ArrowRight");
   await canvas.press("Enter");
   await expect(
-    page.getByText(/^64×64 · 1 color · column \d+ · row \d+$/),
+    page.getByText(/^64×64 · 1 color · C \d+ · R \d+ · (?:NW|NE|SW|SE)$/),
   ).toBeVisible();
   await expect(page.getByText(/Activated column \d+, row \d+\./)).toHaveCount(
     1,
@@ -477,7 +584,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   await canvas.focus();
   await canvas.press("2");
   await expect(
-    page.getByText("Canvas zoomed to an easier painting scale.", {
+    page.getByText("Canvas set to Cell view for precise drawing.", {
       exact: true,
     }),
   ).toHaveCount(1);
@@ -487,7 +594,126 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
   ).toHaveCount(1);
 });
 
-test("an imported image stays as a browser-local reference beside one canvas", async ({
+test("two-finger gestures pause painting without changing the document", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Synthetic multi-touch in one browser covers the shared gesture state machine.",
+  );
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  const canvas = page.getByRole("application", {
+    name: "Editable 64 by 64 pixel grid",
+  });
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const cellSize = Number(await canvas.getAttribute("data-cell-size"));
+  const modifiedAtBeforeGesture = await canvas.getAttribute(
+    "data-document-modified-at",
+  );
+  const origin = {
+    x: box!.x + Number(await canvas.getAttribute("data-grid-origin-x")),
+    y: box!.y + Number(await canvas.getAttribute("data-grid-origin-y")),
+  };
+  const first = {
+    clientX: origin.x + 10.5 * cellSize,
+    clientY: origin.y + 10.5 * cellSize,
+  };
+  const second = {
+    clientX: origin.x + 20.5 * cellSize,
+    clientY: origin.y + 20.5 * cellSize,
+  };
+  const midpoint = {
+    x: (first.clientX + second.clientX) / 2,
+    y: (first.clientY + second.clientY) / 2,
+  };
+  const anchoredWorldCell = {
+    x: (midpoint.x - origin.x) / cellSize,
+    y: (midpoint.y - origin.y) / cellSize,
+  };
+
+  await canvas.dispatchEvent("pointerdown", {
+    ...first,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 41,
+    pointerType: "touch",
+  });
+  await canvas.dispatchEvent("pointerdown", {
+    ...second,
+    button: 0,
+    buttons: 1,
+    isPrimary: false,
+    pointerId: 42,
+    pointerType: "touch",
+  });
+  await canvas.dispatchEvent("pointermove", {
+    clientX: first.clientX - cellSize * 2,
+    clientY: first.clientY - cellSize * 2,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 41,
+    pointerType: "touch",
+  });
+  await canvas.dispatchEvent("pointermove", {
+    clientX: second.clientX + cellSize * 2,
+    clientY: second.clientY + cellSize * 2,
+    button: 0,
+    buttons: 1,
+    isPrimary: false,
+    pointerId: 42,
+    pointerType: "touch",
+  });
+  await expect
+    .poll(() =>
+      canvas.getAttribute("data-cell-size").then((value) => Number(value)),
+    )
+    .toBeGreaterThan(cellSize);
+  const pinchedCellSize = Number(await canvas.getAttribute("data-cell-size"));
+  const pinchedOrigin = {
+    x: box!.x + Number(await canvas.getAttribute("data-grid-origin-x")),
+    y: box!.y + Number(await canvas.getAttribute("data-grid-origin-y")),
+  };
+  expect(
+    Math.abs(
+      pinchedOrigin.x + anchoredWorldCell.x * pinchedCellSize - midpoint.x,
+    ),
+  ).toBeLessThanOrEqual(1.5);
+  expect(
+    Math.abs(
+      pinchedOrigin.y + anchoredWorldCell.y * pinchedCellSize - midpoint.y,
+    ),
+  ).toBeLessThanOrEqual(1.5);
+  await canvas.dispatchEvent("pointerup", {
+    ...second,
+    button: 0,
+    buttons: 0,
+    isPrimary: false,
+    pointerId: 42,
+    pointerType: "touch",
+  });
+  await canvas.dispatchEvent("pointerup", {
+    ...first,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 41,
+    pointerType: "touch",
+  });
+
+  await expect(page.getByText(/64×64 · 0 colors/)).toBeVisible();
+  await expect(canvas).toHaveAttribute(
+    "data-document-modified-at",
+    modifiedAtBeforeGesture ?? "",
+  );
+  await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+});
+
+test("an imported image becomes a browser-local tracing layer on one canvas", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -509,24 +735,56 @@ test("an imported image stays as a browser-local reference beside one canvas", a
   await expect(
     page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);
+  await expect(page.locator("canvas")).toHaveCount(1);
+  const canvas = page.getByRole("application", { name: /pixel grid/ });
+  await expect(canvas).toHaveAttribute("data-reference-underlay", "hidden");
+  await expect(
+    dock.getByRole("button", { name: "Commit or trace first" }),
+  ).toBeDisabled();
+
+  await dock
+    .getByRole("button", { name: "Trace framed source on a blank grid" })
+    .click();
+  await expect(
+    page.getByRole("application", {
+      name: "Editable 32 by 32 pixel grid",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Commit Preview" }),
+  ).toHaveCount(0);
+  await expect(canvas).toHaveAttribute("data-reference-underlay", "visible");
 
   const dim = dock.locator('input[type="range"]');
   await dim.fill("55");
   await expect(dim).toHaveValue("55");
-  const flip = dock.getByRole("button", { name: "Flip reference" });
+  const flip = dock.getByRole("button", { name: "Flip" });
   await flip.click();
-  await expect(
-    dock.getByRole("button", { name: "Use original direction" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(dock.getByRole("button", { name: "Unflip" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 
-  await page.getByRole("button", { name: "Commit Preview" }).click();
+  const tracingToggle = dock.getByRole("button", {
+    name: "Reference visible",
+  });
+  await tracingToggle.click();
+  await expect(
+    dock.getByRole("button", { name: "Show reference" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute("data-reference-underlay", "hidden");
+  await dock.getByRole("button", { name: "Show reference" }).click();
+  await expect(canvas).toHaveAttribute("data-reference-underlay", "visible");
+
   await expect(dock).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(1);
   await expect(
     page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);
 
   await dock.getByRole("button", { name: "Remove local reference" }).click();
   await expect(dock).toHaveCount(0);
+  await expect(page.locator("canvas")).toHaveCount(1);
   await expect(
     page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);

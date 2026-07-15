@@ -278,6 +278,28 @@ export function useGridDocument() {
     });
   }, []);
 
+  /**
+   * Roll an in-flight stroke back to its exact starting document without
+   * adding an undo entry. Canvas gestures use this when a second touch turns
+   * a drawing gesture into pinch/pan, so navigation can never leave a stray
+   * painted cell behind.
+   */
+  const cancelStroke = useCallback(() => {
+    if (!strokeActiveRef.current) return;
+    strokeActiveRef.current = false;
+    setState((prev) => {
+      const startDoc = strokeStartDocRef.current;
+      strokeStartDocRef.current = null;
+      if (!startDoc || prev.doc === startDoc) return prev;
+      return {
+        ...prev,
+        doc: startDoc,
+        imagePreview: null,
+        error: null,
+      };
+    });
+  }, []);
+
   const paintCell = useCallback(
     (x: number, y: number, colorId: string | null) => {
       setState((prev) => {
@@ -448,6 +470,7 @@ export function useGridDocument() {
     fillRegion,
     applyCommands,
     beginStroke,
+    cancelStroke,
     endStroke,
     resampleCanvas,
     mergeColors,

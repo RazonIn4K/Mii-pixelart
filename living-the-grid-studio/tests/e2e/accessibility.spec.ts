@@ -97,12 +97,23 @@ test("named visual groups and Studio sliders use supported ARIA semantics", asyn
   page,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop",
-    "One Chromium desktop run covers the shared semantic components.",
+    !["desktop", "minimum-phone"].includes(testInfo.project.name),
+    "Desktop and the 320px support edge cover the shared semantic components.",
   );
 
-  const expectNoUnsupportedAria = async () => {
-    const results = await new AxeBuilder({ page }).analyze();
+  const expectNoStudioAccessibilityViolations = async () => {
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(
+      results.violations,
+      results.violations
+        .map(
+          (finding) =>
+            `${finding.id}: ${finding.help} (${finding.nodes.length})`,
+        )
+        .join("\n"),
+    ).toEqual([]);
     const unsupportedAria = [
       ...results.violations,
       ...results.incomplete,
@@ -126,7 +137,7 @@ test("named visual groups and Studio sliders use supported ARIA semantics", asyn
       name: "Examples of generated Island Workshop avatars",
     }),
   ).toBeVisible();
-  await expectNoUnsupportedAria();
+  await expectNoStudioAccessibilityViolations();
 
   await page.goto("/studio");
   await page.locator("#ltg-image-input").setInputFiles({
@@ -138,14 +149,14 @@ test("named visual groups and Studio sliders use supported ARIA semantics", asyn
   await expect(page.locator('[data-slot="slider"][aria-label]')).toHaveCount(0);
   expect(await page.getByRole("slider").count()).toBeGreaterThanOrEqual(8);
   await expect(page.getByRole("slider", { name: "Grid width" })).toHaveCount(1);
-  await expectNoUnsupportedAria();
+  await expectNoStudioAccessibilityViolations();
 
   await page.reload();
   await page.getByRole("button", { name: "Start blank" }).click();
   await expect(
     page.getByRole("group", { name: "Quick paint colors" }),
   ).toBeVisible();
-  await expectNoUnsupportedAria();
+  await expectNoStudioAccessibilityViolations();
 });
 
 test("Chromium remains keyboard-usable at a direct 200 percent page scale", async ({

@@ -13,9 +13,11 @@ import {
   gridStepForDensity,
   renderGrid,
   shouldRenderGridLines,
+  type CanvasBackground,
   type GridDensity,
 } from "@/lib/engine/canvas-renderer";
 import { bresenhamLine, getCell } from "@/lib/engine/grid";
+import { buildPaintCells, type BrushSize } from "@/lib/engine/paint-assists";
 import { formatCountLabel } from "@/lib/format-count";
 
 interface CanvasViewerProps {
@@ -34,6 +36,22 @@ interface CanvasViewerProps {
   } | null;
   /** Draw local-only horizontal and vertical guides through the center. */
   showCenterGuide?: boolean;
+  /** Local display surface behind transparent cells. */
+  background?: CanvasBackground;
+  /** Browser-local source aligned beneath the one authoritative cell grid. */
+  referenceUnderlay?: {
+    fit: "contain" | "cover";
+    flipped: boolean;
+    opacity: number;
+    sourceUrl: string;
+    visible: boolean;
+  } | null;
+  /** Exact local brush footprint preview; it never mutates the document. */
+  paintPreview?: {
+    brushSize: BrushSize;
+    horizontalMirror: boolean;
+    tool: "eraser" | "pencil";
+  } | null;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
   onCellDrag?: (x: number, y: number, colorId: string | null) => void;
   /**
@@ -52,6 +70,8 @@ interface CanvasViewerProps {
    * rather than one entry per painted cell.
    */
   onStrokeBegin?: () => void;
+  /** Roll back an in-flight stroke when navigation takes over. */
+  onStrokeCancel?: () => void;
   onStrokeEnd?: () => void;
 }
 
@@ -60,11 +80,12 @@ interface ClientPoint {
   clientY: number;
 }
 
-type PointerGesture = "draw" | "pan" | "tap";
+type PointerGesture = "draw" | "pan" | "pinch" | "tap";
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
 const TAP_MOVE_TOLERANCE = 5;
+const TOUCH_TAP_MOVE_TOLERANCE = 14;
 
 export default function CanvasViewer({
   doc,
@@ -74,11 +95,15 @@ export default function CanvasViewer({
   readOnly = false,
   guideHighlight = null,
   showCenterGuide = false,
+  background = "light",
+  referenceUnderlay = null,
+  paintPreview = null,
   onCellClick,
   onCellDrag,
   onCellDragSegment,
   onCellHover,
   onStrokeBegin,
+  onStrokeCancel,
   onStrokeEnd,
 }: CanvasViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,6 +113,13 @@ export default function CanvasViewer({
   const pointerStartRef = useRef<ClientPoint | null>(null);
   const pointerMovedRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
+  const touchPointsRef = useRef(new Map<number, ClientPoint>());
+  const pinchStartRef = useRef<{
+    distance: number;
+    pointerIds: [number, number];
+    world: { x: number; y: number };
+    zoom: number;
+  } | null>(null);
   // Last sample position during a drag, used to Bresenham-interpolate the
   // gap to the current position so fast strokes don't skip cells.
   const lastDragCellRef = useRef<{ x: number; y: number } | null>(null);
@@ -112,6 +144,29 @@ export default function CanvasViewer({
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [referenceImage, setReferenceImage] = useState<HTMLImageElement | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!referenceUnderlay?.sourceUrl || !referenceUnderlay.visible) {
+      setReferenceImage(null);
+      return;
+    }
+    let active = true;
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      if (active) setReferenceImage(image);
+    };
+    image.onerror = () => {
+      if (active) setReferenceImage(null);
+    };
+    image.src = referenceUnderlay.sourceUrl;
+    return () => {
+      active = false;
+    };
+  }, [referenceUnderlay?.sourceUrl, referenceUnderlay?.visible]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -155,32 +210,48 @@ export default function CanvasViewer({
     setStatusMessage(guideHighlight.instruction);
   }, [doc.height, doc.width, guideHighlight]);
 
-  const getRenderMetrics = useCallback(() => {
-    const width =
-      viewportSize.width || containerRef.current?.clientWidth || 800;
-    const height =
-      viewportSize.height || containerRef.current?.clientHeight || 600;
-    const padding = 40;
-    const availableWidth = Math.max(1, width - padding);
-    const availableHeight = Math.max(1, height - padding);
-    const fitCellSize = Math.min(
-      availableWidth / doc.width,
-      availableHeight / doc.height,
-      32,
-    );
-    const cellSize = Math.max(1, Math.floor(fitCellSize));
-    const scaledSize = cellSize * zoom;
-    const gridWidth = doc.width * scaledSize;
-    const gridHeight = doc.height * scaledSize;
+  const getRenderMetrics = useCallback(
+    (viewZoom = zoom, viewPan = pan) => {
+      const width =
+        viewportSize.width || containerRef.current?.clientWidth || 800;
+      const height =
+        viewportSize.height || containerRef.current?.clientHeight || 600;
+      // Reserve real chrome space above and below the artboard. Controls and the
+      // coordinate HUD stay visible without intercepting the first/last rows.
+      // Tiny screens retain a compact ruler gutter and at least four-pixel cells.
+      const horizontalPadding = width <= 360 ? 24 : 40;
+      const topInset = width <= 360 ? 68 : 60;
+      const bottomInset = width <= 360 ? 56 : 52;
+      const availableWidth = Math.max(1, width - horizontalPadding);
+      const availableHeight = Math.max(1, height - topInset - bottomInset);
+      const fitCellSize = Math.min(
+        availableWidth / doc.width,
+        availableHeight / doc.height,
+        32,
+      );
+      const cellSize = Math.max(1, Math.floor(fitCellSize));
+      // Keep every visible cell an integer number of CSS pixels. Fractional cell
+      // widths make alternating squares look wider/narrower and can recreate a
+      // soft double-grid effect even when line strips are physically snapped.
+      const scaledSize = Math.max(1, Math.round(cellSize * viewZoom));
+      const renderZoom = scaledSize / cellSize;
+      const gridWidth = doc.width * scaledSize;
+      const gridHeight = doc.height * scaledSize;
 
-    return {
-      cellSize,
-      height,
-      panX: Math.round((width - gridWidth) / 2 + pan.x),
-      panY: Math.round((height - gridHeight) / 2 + pan.y),
-      width,
-    };
-  }, [doc.width, doc.height, pan, viewportSize, zoom]);
+      return {
+        cellSize,
+        height,
+        panX: Math.round((width - gridWidth) / 2 + viewPan.x),
+        panY: Math.round(
+          topInset + (availableHeight - gridHeight) / 2 + viewPan.y,
+        ),
+        renderZoom,
+        scaledSize,
+        width,
+      };
+    },
+    [doc.width, doc.height, pan, viewportSize, zoom],
+  );
 
   // Render
   useEffect(() => {
@@ -199,29 +270,89 @@ export default function CanvasViewer({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
 
-    const renderGridStep = gridStepForDensity(gridDensity);
+    const requestedGridStep = gridStepForDensity(gridDensity);
+    const requestedGridVisible =
+      requestedGridStep !== null &&
+      shouldRenderGridLines(
+        true,
+        metrics.cellSize,
+        metrics.renderZoom,
+        requestedGridStep,
+      );
+    // A fitted 64×64 canvas can make one-pixel cell lines consume a quarter
+    // of every cell on a phone. Keep clean eight-cell sections at that scale;
+    // Cell view reveals the complete per-cell mesh for exact copying.
+    const renderGridStep =
+      requestedGridStep === 1 && !requestedGridVisible ? 8 : requestedGridStep;
     const renderGridLines =
       renderGridStep !== null &&
-      shouldRenderGridLines(true, metrics.cellSize, zoom, renderGridStep);
+      shouldRenderGridLines(
+        true,
+        metrics.cellSize,
+        metrics.renderZoom,
+        renderGridStep,
+      );
 
     renderGrid(ctx, doc, {
       cellSize: metrics.cellSize,
-      zoom,
+      zoom: metrics.renderZoom,
       panX: metrics.panX,
       panY: metrics.panY,
       showGrid: renderGridLines,
       gridStep: renderGridStep ?? 1,
       showLabels,
       highlightColorId,
-      gridBackground: "#fffef9",
+      checkerboard: background === "paper" ? "none" : background,
+      devicePixelRatio: dpr,
+      gridBackground: background === "paper" ? "#fffaf0" : null,
+      referenceImage,
+      referenceOpacity: (referenceUnderlay?.opacity ?? 45) / 100,
+      referenceFlipped: referenceUnderlay?.flipped ?? false,
+      referenceFit: referenceUnderlay?.fit ?? "contain",
       // Keep the only visible cell grid above the 3:1 non-text contrast target
       // and at least one CSS pixel wide, including fitted mobile canvases.
-      gridColor: "#7f909c",
+      gridColor:
+        background === "dark"
+          ? "rgba(231, 240, 236, 0.48)"
+          : "rgba(64, 83, 92, 0.42)",
       gridWidth: 1,
+      majorGridColor: background === "dark" ? "#f7c75f" : "#29485a",
+      majorGridStep: 8,
+      majorGridWidth: 1.5,
     });
 
+    // Coordinate rulers share the same metrics as the authoritative canvas.
+    // They are deliberately drawn outside the grid so they cannot look like a
+    // second set of cells or intercept paint input.
+    const scaledSize = metrics.scaledSize;
+    if (scaledSize >= 4) {
+      ctx.save();
+      ctx.fillStyle = "#17384a";
+      ctx.font = `700 10px ui-monospace, "SFMono-Regular", Menlo, monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (let x = 0; x < doc.width; x += 8) {
+        ctx.fillText(
+          String(x + 1),
+          metrics.panX + (x + 0.5) * scaledSize,
+          metrics.panY - 5,
+        );
+      }
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let y = 0; y < doc.height; y += 8) {
+        ctx.fillText(
+          String(y + 1),
+          metrics.panX - 5,
+          metrics.panY + (y + 0.5) * scaledSize,
+        );
+      }
+
+      ctx.restore();
+    }
+
     if (guideHighlight) {
-      const scaledSize = metrics.cellSize * zoom;
+      const scaledSize = metrics.scaledSize;
       const startColumn = Math.max(
         1,
         Math.min(doc.width, guideHighlight.startColumn),
@@ -238,9 +369,6 @@ export default function CanvasViewer({
       ctx.save();
       ctx.fillStyle = "rgba(255, 178, 0, 0.24)";
       ctx.fillRect(x, y, width, scaledSize);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.96)";
-      ctx.lineWidth = Math.max(4, Math.min(8, scaledSize / 2));
-      ctx.strokeRect(x, y, width, scaledSize);
       ctx.strokeStyle = "#c2410c";
       ctx.lineWidth = Math.max(2, Math.min(4, scaledSize / 3));
       ctx.setLineDash([
@@ -252,7 +380,7 @@ export default function CanvasViewer({
     }
 
     if (showCenterGuide) {
-      const scaledSize = metrics.cellSize * zoom;
+      const scaledSize = metrics.scaledSize;
       const centerX = metrics.panX + (doc.width * scaledSize) / 2;
       const centerY = metrics.panY + (doc.height * scaledSize) / 2;
       const left = metrics.panX;
@@ -261,44 +389,9 @@ export default function CanvasViewer({
       const bottom = metrics.panY + doc.height * scaledSize;
 
       ctx.save();
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-      ctx.lineWidth = 4;
-      ctx.moveTo(centerX, top);
-      ctx.lineTo(centerX, bottom);
-      ctx.moveTo(left, centerY);
-      ctx.lineTo(right, centerY);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.setLineDash([Math.max(4, scaledSize), Math.max(3, scaledSize / 2)]);
-      ctx.strokeStyle = "#0f766e";
-      ctx.lineWidth = 2;
-      ctx.moveTo(centerX, top);
-      ctx.lineTo(centerX, bottom);
-      ctx.moveTo(left, centerY);
-      ctx.lineTo(right, centerY);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (isKeyboardFocused) {
-      const scaledSize = metrics.cellSize * zoom;
-      const x = metrics.panX + keyboardCell.x * scaledSize;
-      const y = metrics.panY + keyboardCell.y * scaledSize;
-      ctx.save();
-      ctx.strokeStyle = "#E33139";
-      ctx.lineWidth = Math.max(2, Math.min(4, scaledSize / 3));
-      ctx.setLineDash([
-        Math.max(2, scaledSize / 3),
-        Math.max(2, scaledSize / 4),
-      ]);
-      ctx.strokeRect(
-        x + 1,
-        y + 1,
-        Math.max(1, scaledSize - 2),
-        Math.max(1, scaledSize - 2),
-      );
+      ctx.fillStyle = "#b84426";
+      ctx.fillRect(Math.round(centerX) - 1, top, 2, bottom - top);
+      ctx.fillRect(left, Math.round(centerY) - 1, right - left, 2);
       ctx.restore();
     }
   }, [
@@ -307,11 +400,15 @@ export default function CanvasViewer({
     gridDensity,
     showLabels,
     showCenterGuide,
+    background,
     highlightColorId,
     guideHighlight,
     getRenderMetrics,
-    isKeyboardFocused,
-    keyboardCell,
+    readOnly,
+    referenceImage,
+    referenceUnderlay?.fit,
+    referenceUnderlay?.flipped,
+    referenceUnderlay?.opacity,
   ]);
 
   const zoomOut = useCallback(() => {
@@ -340,8 +437,8 @@ export default function CanvasViewer({
     setPan({ x: 0, y: 0 });
     setStatusMessage(
       readOnly
-        ? "Canvas zoomed to an easier copying scale."
-        : "Canvas zoomed to an easier painting scale.",
+        ? "Canvas set to Cell view for precise copying."
+        : "Canvas set to Cell view for precise drawing.",
     );
   }, [getRenderMetrics, readOnly]);
 
@@ -364,7 +461,7 @@ export default function CanvasViewer({
         point.clientY - rect.top,
         {
           cellSize: metrics.cellSize,
-          zoom,
+          zoom: metrics.renderZoom,
           panX: metrics.panX,
           panY: metrics.panY,
         },
@@ -390,9 +487,74 @@ export default function CanvasViewer({
     [],
   );
 
+  const createPinchStart = useCallback(
+    (
+      canvas: HTMLCanvasElement,
+      entries: [[number, ClientPoint], [number, ClientPoint]],
+      viewZoom: number,
+      viewPan: { x: number; y: number },
+    ) => {
+      const [[firstId, first], [secondId, second]] = entries;
+      const midpoint = {
+        clientX: (first.clientX + second.clientX) / 2,
+        clientY: (first.clientY + second.clientY) / 2,
+      };
+      const rect = canvas.getBoundingClientRect();
+      const metrics = getRenderMetrics(viewZoom, viewPan);
+      return {
+        distance: Math.max(
+          1,
+          Math.hypot(
+            second.clientX - first.clientX,
+            second.clientY - first.clientY,
+          ),
+        ),
+        pointerIds: [firstId, secondId] as [number, number],
+        world: {
+          x: (midpoint.clientX - rect.left - metrics.panX) / metrics.scaledSize,
+          y: (midpoint.clientY - rect.top - metrics.panY) / metrics.scaledSize,
+        },
+        zoom: viewZoom,
+      };
+    },
+    [getRenderMetrics],
+  );
+
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
-      if (activePointerIdRef.current !== null) return;
+      if (event.pointerType === "touch") {
+        touchPointsRef.current.set(event.pointerId, {
+          clientX: event.clientX,
+          clientY: event.clientY,
+        });
+      }
+
+      if (activePointerIdRef.current !== null) {
+        const touches = Array.from(touchPointsRef.current.entries());
+        if (event.pointerType !== "touch" || touches.length < 2) return;
+
+        event.preventDefault();
+        capturePointer(event.currentTarget, event.pointerId);
+        if (pointerGestureRef.current === "pinch") {
+          pointerMovedRef.current = true;
+          return;
+        }
+        if (pointerGestureRef.current === "draw") {
+          onStrokeCancel?.();
+        }
+        pinchStartRef.current = createPinchStart(
+          event.currentTarget,
+          touches.slice(0, 2) as [[number, ClientPoint], [number, ClientPoint]],
+          zoom,
+          pan,
+        );
+        pointerGestureRef.current = "pinch";
+        pointerMovedRef.current = true;
+        lastDragCellRef.current = null;
+        setIsPanning(true);
+        setStatusMessage("Two-finger pan and zoom enabled; drawing paused.");
+        return;
+      }
       if (event.pointerType !== "mouse" && !event.isPrimary) return;
 
       const wantsPan =
@@ -459,18 +621,76 @@ export default function CanvasViewer({
     },
     [
       capturePointer,
+      createPinchStart,
       getEventCell,
       onCellDrag,
       onCellDragSegment,
       onStrokeBegin,
+      onStrokeCancel,
+      onStrokeEnd,
       pan,
       panMode,
       readOnly,
+      zoom,
     ],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (
+        event.pointerType === "touch" &&
+        touchPointsRef.current.has(event.pointerId)
+      ) {
+        touchPointsRef.current.set(event.pointerId, {
+          clientX: event.clientX,
+          clientY: event.clientY,
+        });
+      }
+
+      if (pointerGestureRef.current === "pinch") {
+        event.preventDefault();
+        const start = pinchStartRef.current;
+        const first = start
+          ? touchPointsRef.current.get(start.pointerIds[0])
+          : undefined;
+        const second = start
+          ? touchPointsRef.current.get(start.pointerIds[1])
+          : undefined;
+        if (first && second && start) {
+          const distance = Math.max(
+            1,
+            Math.hypot(
+              second.clientX - first.clientX,
+              second.clientY - first.clientY,
+            ),
+          );
+          const midpoint = {
+            clientX: (first.clientX + second.clientX) / 2,
+            clientY: (first.clientY + second.clientY) / 2,
+          };
+          const nextZoom = Math.max(
+            MIN_ZOOM,
+            Math.min(MAX_ZOOM, start.zoom * (distance / start.distance)),
+          );
+          const canvasRect = event.currentTarget.getBoundingClientRect();
+          const targetMetrics = getRenderMetrics(nextZoom, { x: 0, y: 0 });
+          setZoom(nextZoom);
+          setPan({
+            x:
+              midpoint.clientX -
+              canvasRect.left -
+              start.world.x * targetMetrics.scaledSize -
+              targetMetrics.panX,
+            y:
+              midpoint.clientY -
+              canvasRect.top -
+              start.world.y * targetMetrics.scaledSize -
+              targetMetrics.panY,
+          });
+        }
+        return;
+      }
+
       if (activePointerIdRef.current === event.pointerId) {
         event.preventDefault();
         const start = pointerStartRef.current;
@@ -479,7 +699,10 @@ export default function CanvasViewer({
           Math.hypot(
             event.clientX - start.clientX,
             event.clientY - start.clientY,
-          ) >= TAP_MOVE_TOLERANCE
+          ) >=
+            (event.pointerType === "touch"
+              ? TOUCH_TAP_MOVE_TOLERANCE
+              : TAP_MOVE_TOLERANCE)
         ) {
           pointerMovedRef.current = true;
         }
@@ -497,7 +720,12 @@ export default function CanvasViewer({
           (onCellDrag || onCellDragSegment)
         ) {
           const cell = getEventCell(event);
-          if (!cell) return;
+          if (!cell) {
+            // Do not bridge a stroke across the non-grid workspace when the
+            // pointer leaves the artboard and later re-enters it.
+            lastDragCellRef.current = null;
+            return;
+          }
           const previous = lastDragCellRef.current;
           // Bresenham-interpolate between the previous and current sample so
           // fast mouse, pen, and touch drags never leave gaps.
@@ -534,11 +762,61 @@ export default function CanvasViewer({
         setHoverCell(null);
       }
     },
-    [getEventCell, hoverCell, onCellDrag, onCellDragSegment, onCellHover],
+    [
+      getEventCell,
+      getRenderMetrics,
+      hoverCell,
+      onCellDrag,
+      onCellDragSegment,
+      onCellHover,
+    ],
   );
 
   const finishPointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>, canceled: boolean) => {
+      if (event.pointerType === "touch") {
+        touchPointsRef.current.delete(event.pointerId);
+      }
+
+      if (pointerGestureRef.current === "pinch") {
+        const start = pinchStartRef.current;
+        if (
+          touchPointsRef.current.size >= 2 &&
+          start?.pointerIds.includes(event.pointerId)
+        ) {
+          const remaining = Array.from(touchPointsRef.current.entries()).slice(
+            0,
+            2,
+          ) as [[number, ClientPoint], [number, ClientPoint]];
+          pinchStartRef.current = createPinchStart(
+            event.currentTarget,
+            remaining,
+            zoom,
+            pan,
+          );
+          activePointerIdRef.current = remaining[0][0];
+        }
+        if (touchPointsRef.current.size < 2) {
+          const remaining = touchPointsRef.current.keys().next();
+          activePointerIdRef.current = remaining.done ? null : remaining.value;
+          pointerGestureRef.current = remaining.done ? null : "tap";
+          pointerMovedRef.current = true;
+          pinchStartRef.current = null;
+          setIsPanning(false);
+          setStatusMessage(
+            "Two-finger gesture complete; drawing remains safe.",
+          );
+        }
+        try {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        } catch {
+          // Capture can already be gone when the browser ends a gesture.
+        }
+        return;
+      }
+
       if (activePointerIdRef.current !== event.pointerId) return;
 
       const gesture = pointerGestureRef.current;
@@ -589,7 +867,15 @@ export default function CanvasViewer({
         setStatusMessage(canceled ? "Pan ended." : "Canvas panned.");
       }
     },
-    [getEventCell, onCellClick, onStrokeEnd, readOnly],
+    [
+      createPinchStart,
+      getEventCell,
+      onCellClick,
+      onStrokeEnd,
+      pan,
+      readOnly,
+      zoom,
+    ],
   );
 
   const handlePointerUp = useCallback(
@@ -723,24 +1009,44 @@ export default function CanvasViewer({
   const gridStep = gridStepForDensity(gridDensity);
   const gridLinesVisible =
     gridStep !== null &&
-    shouldRenderGridLines(true, currentRenderMetrics.cellSize, zoom, gridStep);
+    shouldRenderGridLines(
+      true,
+      currentRenderMetrics.cellSize,
+      currentRenderMetrics.renderZoom,
+      gridStep,
+    );
   const gridLineState =
     gridDensity === "off"
       ? "hidden"
       : gridLinesVisible
         ? "visible"
         : "suppressed";
+  const activeCell = hoverCell ?? (isKeyboardFocused ? keyboardCell : null);
+  const quadrant = activeCell
+    ? `${activeCell.y < doc.height / 2 ? "N" : "S"}${
+        activeCell.x < doc.width / 2 ? "W" : "E"
+      }`
+    : null;
+  const hoverFootprint =
+    hoverCell && paintPreview && !readOnly
+      ? buildPaintCells(
+          [hoverCell],
+          paintPreview.brushSize,
+          doc,
+          paintPreview.horizontalMirror,
+        )
+      : [];
 
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-[#e9e7e1] shadow-inner"
+      className="relative h-full w-full overflow-hidden rounded-[1.4rem] border-2 border-[#26485a] bg-[#f6d67a] bg-[radial-gradient(circle_at_1px_1px,rgba(38,72,90,0.14)_1px,transparent_0)] bg-[size:18px_18px] shadow-[inset_0_0_0_5px_rgba(255,250,232,0.72),0_8px_24px_rgba(38,72,90,0.13)]"
       data-testid="canvas-workspace"
     >
       <p id={instructionsId} className="sr-only">
         {readOnly
-          ? "Copy Guide is read-only. Use the arrow keys to inspect cells. Choose the Hand button or press H, then drag to pan. Use plus and minus to zoom, zero to fit the canvas, and 2 for a closer copy view."
-          : "Use one pointer to draw. Choose the Hand button or press H, then drag to pan. With the canvas focused, use the arrow keys to move the keyboard cursor, Enter or Space to activate a cell, plus and minus to zoom, and zero to fit the whole canvas. Press 2 to zoom to an easier painting scale. Press M to mirror pencil and eraser strokes left to right, and G to toggle the horizontal and vertical center guides."}
+          ? "Copy Guide is read-only. Use the arrow keys to inspect exact cells. Choose the Hand button or press H, then drag to pan. Pinch with two fingers to pan and zoom safely. Use plus and minus to zoom, zero to fit the canvas, and 2 for Cell view."
+          : "Use one pointer to draw and two fingers to pan or zoom without painting. Choose the Hand button or press H, then drag to pan. With the canvas focused, use the arrow keys to move the keyboard cursor, Enter or Space to activate a cell, plus and minus to zoom, and zero to fit the whole canvas. Press 2 for Cell view. Press M to mirror pencil and eraser strokes left to right, and G to toggle the horizontal and vertical center guides."}
       </p>
       <p id={statusId} className="sr-only" role="status" aria-live="polite">
         {statusMessage}
@@ -753,7 +1059,7 @@ export default function CanvasViewer({
       ) : null}
 
       {/* Interaction and zoom controls */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-sm border border-border bg-card/90 p-1 shadow-sm backdrop-blur-sm">
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-xl border-2 border-[#26485a]/20 bg-[#fffaf0]/95 p-1 shadow-[0_3px_0_rgba(38,72,90,0.18)] backdrop-blur-sm">
         <button
           type="button"
           onClick={() => {
@@ -766,10 +1072,10 @@ export default function CanvasViewer({
                 : "Hand tool enabled.",
             );
           }}
-          className={`flex size-11 items-center justify-center rounded-sm transition-colors sm:size-9 ${
+          className={`flex size-11 items-center justify-center rounded-lg transition-colors sm:size-9 ${
             panMode
-              ? "bg-accent text-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              ? "bg-[#24786f] text-white"
+              : "text-[#26485a] hover:bg-[#e8f5ef]"
           }`}
           aria-label={
             panMode ? "Exit hand tool" : "Use hand tool to pan canvas"
@@ -783,7 +1089,7 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={zoomOut}
-          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9"
+          className="flex size-11 items-center justify-center rounded-lg font-mono text-sm font-black text-[#26485a] hover:bg-[#fff0c2] sm:size-9"
           aria-label="Zoom out"
           title="Zoom out (-)"
         >
@@ -792,8 +1098,8 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={resetView}
-          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground sm:h-9"
-          aria-label="Reset zoom"
+          className="flex h-11 min-w-12 items-center justify-center rounded-lg px-1 font-mono text-xs font-bold text-[#26485a] hover:bg-[#fff0c2] sm:h-9"
+          aria-label="Reset zoom · Fit"
           title="Reset view (0)"
         >
           Fit
@@ -801,16 +1107,16 @@ export default function CanvasViewer({
         <button
           type="button"
           onClick={editView}
-          className="flex h-11 min-w-12 items-center justify-center rounded-sm px-1 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground sm:h-9"
-          aria-label={readOnly ? "Zoom to copy pixels" : "Zoom to edit pixels"}
+          className="flex h-11 min-w-16 items-center justify-center rounded-lg bg-[#b84426] px-2 text-xs font-black text-white shadow-sm hover:bg-[#96381e] sm:h-9"
+          aria-label={`${readOnly ? "Zoom to copy pixels" : "Zoom to edit pixels"} · Cell view`}
           title={readOnly ? "Copy zoom (2)" : "Edit zoom (2)"}
         >
-          {readOnly ? "Copy" : "Edit"}
+          Cell view
         </button>
         <button
           type="button"
           onClick={zoomIn}
-          className="flex size-11 items-center justify-center rounded-sm font-mono text-sm text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9"
+          className="flex size-11 items-center justify-center rounded-lg font-mono text-sm font-black text-[#26485a] hover:bg-[#fff0c2] sm:size-9"
           aria-label="Zoom in"
           title="Zoom in (+)"
         >
@@ -819,13 +1125,14 @@ export default function CanvasViewer({
       </div>
 
       {/* Grid info + live coordinate readout */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-sm border border-border bg-card/90 px-2 py-1 backdrop-blur-sm">
-        <span className="text-xs font-mono text-muted-foreground">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border-2 border-[#26485a]/20 bg-[#fffaf0]/95 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+        <span className="text-xs font-mono font-bold text-[#526975]">
           {doc.width}×{doc.height} ·{" "}
           {formatCountLabel(doc.usedColors.length, "color")}
-          {hoverCell && (
-            <span className="text-foreground">
-              {" · "}column {hoverCell.x + 1} · row {hoverCell.y + 1}
+          {activeCell && (
+            <span className="text-[#17384a]">
+              {" · "}C {activeCell.x + 1} · R {activeCell.y + 1}
+              {quadrant ? ` · ${quadrant}` : ""}
             </span>
           )}
         </span>
@@ -837,8 +1144,7 @@ export default function CanvasViewer({
             role="status"
             aria-live="polite"
           >
-            Dense preview · choose {readOnly ? "Copy" : "Edit"} to see cell
-            lines
+            Dense preview · choose Cell view to see cell lines
           </span>
         ) : null}
       </div>
@@ -861,8 +1167,15 @@ export default function CanvasViewer({
         }
         data-grid-width={doc.width}
         data-grid-height={doc.height}
+        data-grid-origin-x={currentRenderMetrics.panX}
+        data-grid-origin-y={currentRenderMetrics.panY}
+        data-cell-size={currentRenderMetrics.scaledSize}
         data-grid-density={gridDensity}
         data-grid-lines={gridLineState}
+        data-grid-renderer="crisp-layered"
+        data-canvas-background={background}
+        data-reference-underlay={referenceImage ? "visible" : "hidden"}
+        data-brush-preview={paintPreview ? paintPreview.brushSize : "none"}
         data-document-modified-at={doc.meta.modifiedAt}
         data-center-guide={showCenterGuide ? "visible" : "hidden"}
         data-canvas-mode={readOnly ? "copy" : "edit"}
@@ -885,6 +1198,86 @@ export default function CanvasViewer({
         onPointerLeave={handlePointerLeave}
         onContextMenu={(event) => event.preventDefault()}
       />
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox={`0 0 ${currentRenderMetrics.width} ${currentRenderMetrics.height}`}
+        preserveAspectRatio="none"
+        data-testid="canvas-pointer-overlay"
+      >
+        {hoverCell && currentRenderMetrics.scaledSize >= 4 ? (
+          <>
+            <rect
+              x={
+                currentRenderMetrics.panX +
+                hoverCell.x * currentRenderMetrics.scaledSize
+              }
+              y={currentRenderMetrics.panY - 4}
+              width={currentRenderMetrics.scaledSize}
+              height={4}
+              fill="#b84426"
+            />
+            <rect
+              x={currentRenderMetrics.panX - 4}
+              y={
+                currentRenderMetrics.panY +
+                hoverCell.y * currentRenderMetrics.scaledSize
+              }
+              width={4}
+              height={currentRenderMetrics.scaledSize}
+              fill="#b84426"
+            />
+          </>
+        ) : null}
+        {hoverFootprint.map((cell) => (
+          <rect
+            key={`${cell.x}:${cell.y}`}
+            x={
+              currentRenderMetrics.panX +
+              cell.x * currentRenderMetrics.scaledSize
+            }
+            y={
+              currentRenderMetrics.panY +
+              cell.y * currentRenderMetrics.scaledSize
+            }
+            width={currentRenderMetrics.scaledSize}
+            height={currentRenderMetrics.scaledSize}
+            fill={
+              paintPreview?.tool === "eraser"
+                ? "rgba(255, 250, 240, 0.6)"
+                : "rgba(239, 107, 59, 0.26)"
+            }
+            stroke={paintPreview?.tool === "eraser" ? "#526975" : "#b84426"}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {isKeyboardFocused ? (
+          <rect
+            x={
+              currentRenderMetrics.panX +
+              keyboardCell.x * currentRenderMetrics.scaledSize +
+              1
+            }
+            y={
+              currentRenderMetrics.panY +
+              keyboardCell.y * currentRenderMetrics.scaledSize +
+              1
+            }
+            width={Math.max(1, currentRenderMetrics.scaledSize - 2)}
+            height={Math.max(1, currentRenderMetrics.scaledSize - 2)}
+            fill="none"
+            stroke="#b91c1c"
+            strokeWidth={Math.max(
+              2,
+              Math.min(4, currentRenderMetrics.scaledSize / 3),
+            )}
+            strokeDasharray={`${Math.max(2, currentRenderMetrics.scaledSize / 3)} ${Math.max(2, currentRenderMetrics.scaledSize / 4)}`}
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+      </svg>
     </div>
   );
 }

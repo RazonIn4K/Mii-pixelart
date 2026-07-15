@@ -41,8 +41,23 @@ export interface RenderOptions {
   gridColor: string;
   /** Grid line width */
   gridWidth: number;
+  /** Stronger section boundary interval. Set to zero to disable. */
+  majorGridStep: number;
+  /** Stronger section boundary color. */
+  majorGridColor: string;
+  /** Stronger section boundary width. */
+  majorGridWidth: number;
+  /** Device pixel ratio used to snap grid strips to physical pixels. */
+  devicePixelRatio: number;
   /** Optional paper color behind the editable grid only. */
   gridBackground: string | null;
+  /** Optional checkerboard behind transparent project cells. */
+  checkerboard: "none" | "light" | "dark";
+  /** Optional browser-local image drawn beneath the authoritative grid. */
+  referenceImage: CanvasImageSource | null;
+  referenceOpacity: number;
+  referenceFlipped: boolean;
+  referenceFit: "contain" | "cover";
   /** Label font size (auto-scaled if 0) */
   labelFontSize: number;
 }
@@ -58,11 +73,22 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   panY: 0,
   gridColor: "rgba(197, 213, 228, 0.5)", // pale blue grid lines
   gridWidth: 0.5,
+  majorGridStep: 8,
+  majorGridColor: "rgba(32, 56, 73, 0.76)",
+  majorGridWidth: 1.5,
+  devicePixelRatio: 1,
   gridBackground: null,
+  checkerboard: "none",
+  referenceImage: null,
+  referenceOpacity: 0.45,
+  referenceFlipped: false,
+  referenceFit: "contain",
   labelFontSize: 0,
 };
 
-export const MIN_VISIBLE_GRID_CELL_SIZE = 4;
+export const MIN_VISIBLE_GRID_CELL_SIZE = 6;
+
+export type CanvasBackground = "paper" | "light" | "dark";
 
 /** Local-only guide density. Changing this never mutates the grid document. */
 export type GridDensity = "off" | "coarse" | "medium" | "cell";
@@ -109,6 +135,144 @@ function isLightColor(hex: string): boolean {
   return 0.299 * r + 0.587 * g + 0.114 * b > 128;
 }
 
+function imageDimensions(image: CanvasImageSource): {
+  height: number;
+  width: number;
+} {
+  const candidate = image as {
+    height?: number;
+    naturalHeight?: number;
+    naturalWidth?: number;
+    videoHeight?: number;
+    videoWidth?: number;
+    width?: number;
+  };
+  return {
+    height:
+      candidate.naturalHeight ?? candidate.videoHeight ?? candidate.height ?? 1,
+    width:
+      candidate.naturalWidth ?? candidate.videoWidth ?? candidate.width ?? 1,
+  };
+}
+
+function drawCheckerboard(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  scaledSize: number,
+  mode: Exclude<RenderOptions["checkerboard"], "none">,
+): void {
+  const colors =
+    mode === "dark"
+      ? (["#33424b", "#465963"] as const)
+      : (["#fffaf0", "#eee5d6"] as const);
+  const tileSize = Math.max(8, Math.min(24, Math.round(scaledSize * 2)));
+  ctx.fillStyle = colors[0];
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = colors[1];
+  for (let y = 0; y < height; y += tileSize) {
+    for (let x = 0; x < width; x += tileSize) {
+      if ((x / tileSize + y / tileSize) % 2 === 1) {
+        ctx.fillRect(x, y, tileSize, tileSize);
+      }
+    }
+  }
+}
+
+function drawReference(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  canvasWidth: number,
+  canvasHeight: number,
+  opacity: number,
+  flipped: boolean,
+  fit: RenderOptions["referenceFit"],
+): void {
+  const source = imageDimensions(image);
+  const scale =
+    fit === "cover"
+      ? Math.max(canvasWidth / source.width, canvasHeight / source.height)
+      : Math.min(canvasWidth / source.width, canvasHeight / source.height);
+  const width = source.width * scale;
+  const height = source.height * scale;
+  const x = (canvasWidth - width) / 2;
+  const y = (canvasHeight - height) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, canvasWidth, canvasHeight);
+  ctx.clip();
+  ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+  if (flipped) {
+    ctx.translate(canvasWidth, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(image, x, y, width, height);
+  ctx.restore();
+}
+
+/** Snap a grid strip edge to a physical pixel boundary. */
+export function snapGridStrip(
+  coordinate: number,
+  devicePixelRatio: number,
+): number {
+  const dpr = Math.max(1, devicePixelRatio);
+  return Math.round(coordinate * dpr) / dpr;
+}
+
+function drawGridStrips(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  scaledSize: number,
+  step: number,
+  color: string,
+  lineWidth: number,
+  devicePixelRatio: number,
+  skipEvery = 0,
+): void {
+  if (lineWidth <= 0 || color === "transparent") return;
+  const safeStep = Math.max(1, Math.floor(step));
+  const dpr = Math.max(1, devicePixelRatio);
+  const safeWidth = Math.max(1 / dpr, Math.round(lineWidth * dpr) / dpr);
+  ctx.fillStyle = color;
+
+  for (let cell = safeStep; cell * scaledSize < width; cell += safeStep) {
+    if (skipEvery > 0 && cell % skipEvery === 0) continue;
+    const x = snapGridStrip(
+      cell * scaledSize - safeWidth / 2,
+      devicePixelRatio,
+    );
+    ctx.fillRect(x, 0, safeWidth, height);
+  }
+  for (let cell = safeStep; cell * scaledSize < height; cell += safeStep) {
+    if (skipEvery > 0 && cell % skipEvery === 0) continue;
+    const y = snapGridStrip(
+      cell * scaledSize - safeWidth / 2,
+      devicePixelRatio,
+    );
+    ctx.fillRect(0, y, width, safeWidth);
+  }
+}
+
+function drawGridBoundary(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  color: string,
+  lineWidth: number,
+  devicePixelRatio: number,
+): void {
+  if (lineWidth <= 0 || color === "transparent") return;
+  const dpr = Math.max(1, devicePixelRatio);
+  const safeWidth = Math.max(1 / dpr, Math.round(lineWidth * dpr) / dpr);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, width, safeWidth);
+  ctx.fillRect(0, height - safeWidth, width, safeWidth);
+  ctx.fillRect(0, 0, safeWidth, height);
+  ctx.fillRect(width - safeWidth, 0, safeWidth, height);
+}
+
 /**
  * Render a GridDocument onto a canvas context.
  */
@@ -142,6 +306,25 @@ export function renderGrid(
     ctx.fillRect(0, 0, canvasW, canvasH);
   }
 
+  if (opts.checkerboard !== "none") {
+    drawCheckerboard(ctx, canvasW, canvasH, scaledSize, opts.checkerboard);
+  }
+
+  // A browser-local tracing sheet belongs below the project paint. Keeping
+  // this ordering explicit makes fresh strokes remain fully opaque and avoids
+  // tinting completed artwork while the source is visible.
+  if (opts.referenceImage) {
+    drawReference(
+      ctx,
+      opts.referenceImage,
+      canvasW,
+      canvasH,
+      opts.referenceOpacity,
+      opts.referenceFlipped,
+      opts.referenceFit,
+    );
+  }
+
   // Draw cells
   for (let y = 0; y < doc.height; y++) {
     for (let x = 0; x < doc.width; x++) {
@@ -159,28 +342,46 @@ export function renderGrid(
   // Draw grid lines
   if (opts.showGrid) {
     const gridStep = Math.max(1, Math.floor(opts.gridStep));
-    ctx.strokeStyle = opts.gridColor;
-    ctx.lineWidth = opts.gridWidth;
-    ctx.beginPath();
-    for (let x = 0; x <= doc.width; x += gridStep) {
-      const px = x * scaledSize;
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, canvasH);
+    const majorStep = Math.max(0, Math.floor(opts.majorGridStep));
+
+    // When both cadences are the same (Sections / 8 cells), draw exactly one
+    // layer. Double-painting that boundary recreates the fuzzy duplicate-grid
+    // defect this renderer is designed to prevent.
+    if (majorStep !== gridStep) {
+      drawGridStrips(
+        ctx,
+        canvasW,
+        canvasH,
+        scaledSize,
+        gridStep,
+        opts.gridColor,
+        opts.gridWidth,
+        opts.devicePixelRatio,
+        majorStep > gridStep ? majorStep : 0,
+      );
     }
-    if (doc.width % gridStep !== 0) {
-      ctx.moveTo(canvasW, 0);
-      ctx.lineTo(canvasW, canvasH);
+
+    if (majorStep > 0) {
+      drawGridStrips(
+        ctx,
+        canvasW,
+        canvasH,
+        scaledSize,
+        majorStep,
+        opts.majorGridColor,
+        opts.majorGridWidth,
+        opts.devicePixelRatio,
+      );
     }
-    for (let y = 0; y <= doc.height; y += gridStep) {
-      const py = y * scaledSize;
-      ctx.moveTo(0, py);
-      ctx.lineTo(canvasW, py);
-    }
-    if (doc.height % gridStep !== 0) {
-      ctx.moveTo(0, canvasH);
-      ctx.lineTo(canvasW, canvasH);
-    }
-    ctx.stroke();
+
+    drawGridBoundary(
+      ctx,
+      canvasW,
+      canvasH,
+      majorStep > 0 ? opts.majorGridColor : opts.gridColor,
+      majorStep > 0 ? opts.majorGridWidth : opts.gridWidth,
+      opts.devicePixelRatio,
+    );
   }
 
   // Draw highlight

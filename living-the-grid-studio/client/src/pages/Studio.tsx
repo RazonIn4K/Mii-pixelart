@@ -62,8 +62,15 @@ import {
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
 import type { GridDocument } from "@/lib/engine/grid";
-import type { GridDensity } from "@/lib/engine/canvas-renderer";
-import type { ImageImportOptions } from "@/lib/engine/image-import";
+import type {
+  CanvasBackground,
+  GridDensity,
+} from "@/lib/engine/canvas-renderer";
+import {
+  DEFAULT_IMPORT_OPTIONS,
+  getImagePreview,
+  type ImageImportOptions,
+} from "@/lib/engine/image-import";
 import { buildPaintCells } from "@/lib/engine/paint-assists";
 import type { CopyGuideRun } from "@/lib/engine/copy-guide";
 // Resident spec type retired alongside the Island tab.
@@ -106,6 +113,7 @@ export default function Studio() {
     paintCells,
     fillRegion,
     beginStroke,
+    cancelStroke,
     endStroke,
     resampleCanvas,
     mergeColors,
@@ -117,6 +125,8 @@ export default function Studio() {
 
   const [highlightColorId, setHighlightColorId] = useState<string | null>(null);
   const [gridDensity, setGridDensity] = useState<GridDensity>("cell");
+  const [canvasBackground, setCanvasBackground] =
+    useState<CanvasBackground>("light");
   const [showLabels, setShowLabels] = useState(false);
   const [horizontalMirror, setHorizontalMirror] = useState(false);
   const [showCenterGuide, setShowCenterGuide] = useState(false);
@@ -129,7 +139,18 @@ export default function Studio() {
   const [referenceSourceUrl, setReferenceSourceUrl] = useState<string | null>(
     null,
   );
+  const [referenceUnderlayUrl, setReferenceUnderlayUrl] = useState<
+    string | null
+  >(null);
+  const [referenceUnderlayStatus, setReferenceUnderlayStatus] = useState<
+    "error" | "idle" | "preparing" | "ready"
+  >("idle");
+  const [referenceOpacity, setReferenceOpacity] = useState(40);
+  const [referenceFlipped, setReferenceFlipped] = useState(false);
+  const [referenceUnderlayVisible, setReferenceUnderlayVisible] =
+    useState(true);
   const imagePickerRequestRef = useRef(0);
+  const referencePreviewRequestRef = useRef(0);
   const referenceFileRef = useRef<File | null>(null);
   const referenceSourceUrlRef = useRef<string | null>(null);
   const visibleDoc = imagePreview ?? doc;
@@ -148,18 +169,46 @@ export default function Studio() {
     referenceFileRef.current = file;
     referenceSourceUrlRef.current = nextUrl;
     setReferenceSourceUrl(nextUrl);
+    setReferenceOpacity(40);
+    setReferenceFlipped(false);
+    setReferenceUnderlayVisible(true);
   }, []);
 
   const clearLocalReference = useCallback(() => {
+    referencePreviewRequestRef.current += 1;
     referenceFileRef.current = null;
     referenceSourceUrlRef.current = null;
     setReferenceSourceUrl(null);
+    setReferenceUnderlayUrl(null);
+    setReferenceUnderlayStatus("idle");
   }, []);
 
   const handlePreviewImage = useCallback(
     (file: File, options?: Partial<ImageImportOptions>) => {
       rememberLocalReference(file);
       previewFromImage(file, options);
+      const requestNumber = referencePreviewRequestRef.current + 1;
+      referencePreviewRequestRef.current = requestNumber;
+      setReferenceUnderlayUrl(null);
+      setReferenceUnderlayStatus("preparing");
+      const resolvedOptions = { ...DEFAULT_IMPORT_OPTIONS, ...options };
+      void getImagePreview(
+        file,
+        resolvedOptions.gridWidth,
+        resolvedOptions.gridHeight,
+        8,
+        resolvedOptions,
+      )
+        .then((previewUrl) => {
+          if (referencePreviewRequestRef.current !== requestNumber) return;
+          setReferenceUnderlayUrl(previewUrl);
+          setReferenceUnderlayStatus("ready");
+        })
+        .catch(() => {
+          if (referencePreviewRequestRef.current !== requestNumber) return;
+          setReferenceUnderlayUrl(null);
+          setReferenceUnderlayStatus("error");
+        });
     },
     [previewFromImage, rememberLocalReference],
   );
@@ -253,7 +302,7 @@ export default function Studio() {
         setMergeSource(null);
       } else {
         setSelectedPaintColorId(colorId);
-        setHighlightColorId(colorId);
+        setHighlightColorId(null);
         setPaintTool("pencil");
       }
     },
@@ -290,7 +339,7 @@ export default function Studio() {
           buildPaintCells([{ x, y }], brushSize, doc, horizontalMirror),
           selectedPaintColorId,
         );
-        setHighlightColorId(selectedPaintColorId);
+        setHighlightColorId(null);
         return;
       }
 
@@ -305,7 +354,7 @@ export default function Studio() {
       if (paintTool === "eyedropper") {
         if (colorId) {
           setSelectedPaintColorId(colorId);
-          setHighlightColorId(colorId);
+          setHighlightColorId(null);
           toast.success(`Selected ${colorId}`);
         }
         setPaintTool("pencil");
@@ -314,7 +363,7 @@ export default function Studio() {
 
       if (paintTool === "fill") {
         fillRegion(x, y, selectedPaintColorId);
-        setHighlightColorId(selectedPaintColorId);
+        setHighlightColorId(null);
         return;
       }
 
@@ -412,6 +461,12 @@ export default function Studio() {
     }
   }, [paintTool, endStroke]);
 
+  const handleStrokeCancel = useCallback(() => {
+    if (paintTool === "pencil" || paintTool === "eraser") {
+      cancelStroke();
+    }
+  }, [paintTool, cancelStroke]);
+
   const handleCreateCanvas = useCallback(
     (
       width: number,
@@ -426,10 +481,26 @@ export default function Studio() {
     [createNew],
   );
 
+  const handleTraceReferenceOnBlank = useCallback(() => {
+    if (!imagePreview) return;
+    createNew(
+      imagePreview.width,
+      imagePreview.height,
+      `${imagePreview.meta.name} Trace`,
+      null,
+    );
+    clearImagePreview();
+    setHighlightColorId(null);
+    setPaintTool("pencil");
+    setShowCenterGuide(true);
+    setActivePanel("create");
+    toast.success("Blank tracing grid ready");
+  }, [clearImagePreview, createNew, imagePreview]);
+
   const revealPanel = useCallback((panel: StudioPanel) => {
     setActivePanel(panel);
     window.requestAnimationFrame(() => {
-      if (window.matchMedia("(max-width: 767px)").matches) {
+      if (window.matchMedia("(max-width: 1023px)").matches) {
         document.getElementById("studio-tools")?.scrollIntoView({
           behavior: "smooth",
           block: "start",
@@ -440,7 +511,7 @@ export default function Studio() {
 
   const revealCanvasForEditing = useCallback(() => {
     window.requestAnimationFrame(() => {
-      if (!window.matchMedia("(max-width: 767px)").matches) return;
+      if (!window.matchMedia("(max-width: 1023px)").matches) return;
       document
         .querySelector<HTMLCanvasElement>("canvas[data-grid-width]")
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -472,6 +543,7 @@ export default function Studio() {
   const handleStartBlank = useCallback(() => {
     handleCreateCanvas(64, 64, "Untitled Canvas", null);
     setPaintTool("pencil");
+    setShowCenterGuide(true);
     setActivePanel("create");
   }, [handleCreateCanvas]);
 
@@ -481,6 +553,7 @@ export default function Studio() {
       setDoc(templateDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
+      setShowCenterGuide(true);
       setActivePanel("create");
       revealCanvasForEditing();
       toast.success(`Created ${templateDoc.meta.name}`);
@@ -547,7 +620,7 @@ export default function Studio() {
   );
 
   return (
-    <div className="flex min-h-svh min-w-0 flex-col md:h-screen md:min-h-0">
+    <div className="flex min-h-svh min-w-0 flex-col lg:h-screen lg:min-h-0">
       {/* Top Bar */}
       <header className="grid min-h-11 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-1 border-b border-border bg-background px-2 sm:flex sm:h-11 sm:flex-nowrap sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
@@ -677,11 +750,11 @@ export default function Studio() {
         </div>
       </header>
 
-      {/* Main Content — stacks vertically on mobile (<768px) so the
-          right panel doesn't push the canvas off-screen. Side-by-side on md+. */}
+      {/* Main Content — stacks through tablet widths so the workflow panel
+          never squeezes the canvas/reference into three narrow columns. */}
       <main
         id="main-content"
-        className="flex min-w-0 flex-1 flex-col md:min-h-0 md:flex-row md:overflow-hidden"
+        className="flex min-w-0 flex-1 flex-col lg:min-h-0 lg:flex-row lg:overflow-hidden"
       >
         <h1 className="sr-only">Tomodachi Studio pixel editor</h1>
         {/* Canvas Area (full width on mobile, ~65% on desktop) */}
@@ -689,9 +762,9 @@ export default function Studio() {
           className={
             visibleDoc
               ? referenceSourceUrl
-                ? "h-[82svh] min-h-[40rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
-                : "h-[76svh] min-h-[35rem] min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
-              : "min-w-0 flex-none p-3 md:h-auto md:min-h-0 md:flex-1"
+                ? "min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
+                : "h-[88svh] min-h-[41rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
+              : "min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
           }
         >
           {visibleDoc ? (
@@ -701,11 +774,13 @@ export default function Studio() {
                   activeTool={paintTool}
                   brushSize={brushSize}
                   doc={doc}
+                  background={canvasBackground}
                   gridDensity={gridDensity}
                   horizontalMirror={horizontalMirror}
                   selectedColorId={selectedPaintColorId}
                   showCenterGuide={showCenterGuide}
                   onBrushSizeChange={setBrushSize}
+                  onBackgroundChange={setCanvasBackground}
                   onGridDensityChange={setGridDensity}
                   onHorizontalMirrorChange={(enabled) => {
                     setHorizontalMirror(enabled);
@@ -713,7 +788,7 @@ export default function Studio() {
                   }}
                   onSelectedColorChange={(colorId) => {
                     setSelectedPaintColorId(colorId);
-                    setHighlightColorId(colorId);
+                    setHighlightColorId(null);
                   }}
                   onShowCenterGuideChange={setShowCenterGuide}
                   onToolChange={setPaintTool}
@@ -743,32 +818,76 @@ export default function Studio() {
                 </div>
               ) : null}
               {imagePreview && (
-                <div className="absolute top-3 left-3 z-20 rounded-sm border border-primary/30 bg-background/95 px-2 py-1 text-xs shadow-sm">
+                <div className="z-20 shrink-0 self-start rounded-lg border border-primary/30 bg-background/95 px-2 py-1 text-xs shadow-sm">
                   Preview mode · commit or cancel from Import
                 </div>
               )}
               <div
                 className={
                   referenceSourceUrl
-                    ? "grid min-h-0 flex-1 grid-rows-[minmax(10rem,0.38fr)_minmax(16rem,1fr)] gap-2 md:grid-cols-[minmax(11rem,0.32fr)_minmax(0,1fr)] md:grid-rows-1"
+                    ? "grid min-h-0 flex-none grid-rows-[20rem_auto] gap-2 sm:grid-rows-[24rem_auto] lg:flex-1 lg:grid-cols-[14rem_minmax(0,1fr)] lg:grid-rows-1"
                     : "min-h-0 flex-1"
                 }
               >
                 {referenceSourceUrl ? (
                   <ReferenceDock
+                    className="order-2 lg:order-1"
+                    flipped={referenceFlipped}
+                    opacity={referenceOpacity}
                     sourceUrl={referenceSourceUrl}
                     onClear={clearLocalReference}
+                    onFlippedChange={setReferenceFlipped}
+                    onOpacityChange={setReferenceOpacity}
+                    onTraceBlank={
+                      imagePreview && referenceUnderlayUrl
+                        ? handleTraceReferenceOnBlank
+                        : undefined
+                    }
+                    onUnderlayVisibleChange={setReferenceUnderlayVisible}
+                    traceStatus={
+                      imagePreview
+                        ? referenceUnderlayStatus === "idle"
+                          ? "preparing"
+                          : referenceUnderlayStatus
+                        : null
+                    }
+                    underlayEnabled={
+                      !imagePreview && referenceUnderlayStatus === "ready"
+                    }
+                    underlayVisible={referenceUnderlayVisible}
                   />
                 ) : null}
-                <div className="h-full min-h-0 min-w-0">
+                <div className="order-1 h-full min-h-0 min-w-0 lg:order-2">
                   <CanvasViewer
                     doc={visibleDoc}
+                    background={canvasBackground}
                     highlightColorId={isCopyMode ? null : highlightColorId}
                     gridDensity={isCopyMode ? "cell" : gridDensity}
                     showLabels={isCopyMode || showLabels}
                     showCenterGuide={showCenterGuide}
                     readOnly={isCopyMode}
                     guideHighlight={isCopyMode ? activeCopyRun : null}
+                    paintPreview={
+                      !isCopyMode &&
+                      (paintTool === "pencil" || paintTool === "eraser")
+                        ? {
+                            brushSize,
+                            horizontalMirror,
+                            tool: paintTool,
+                          }
+                        : null
+                    }
+                    referenceUnderlay={
+                      referenceUnderlayUrl && !imagePreview
+                        ? {
+                            fit: "contain",
+                            flipped: referenceFlipped,
+                            opacity: referenceOpacity,
+                            sourceUrl: referenceUnderlayUrl,
+                            visible: referenceUnderlayVisible,
+                          }
+                        : null
+                    }
                     onCellClick={isCopyMode ? undefined : handleCellClick}
                     onCellDrag={
                       !isCopyMode &&
@@ -784,6 +903,7 @@ export default function Studio() {
                     }
                     onCellHover={handleCellHover}
                     onStrokeBegin={isCopyMode ? undefined : handleStrokeBegin}
+                    onStrokeCancel={isCopyMode ? undefined : handleStrokeCancel}
                     onStrokeEnd={handleStrokeEnd}
                   />
                 </div>
@@ -855,7 +975,7 @@ export default function Studio() {
         {/* Right Panel (full width on mobile below canvas, ~320px / 384px on md/lg) */}
         <div
           id="studio-tools"
-          className="flex min-h-[34rem] w-full min-w-0 shrink-0 scroll-mt-2 flex-col overflow-hidden border-t border-border bg-background md:min-h-0 md:w-80 md:border-l md:border-t-0 lg:w-96"
+          className="flex min-h-[34rem] w-full min-w-0 shrink-0 scroll-mt-2 flex-col overflow-hidden border-t border-border bg-background lg:min-h-0 lg:w-80 lg:border-l lg:border-t-0"
         >
           {mergeSource && (
             <div className="px-4 py-2 bg-accent border-b border-border">
