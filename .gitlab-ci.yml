@@ -31,7 +31,11 @@ variables:
   # Ultimate-only during the trial. Set to "false" before the trial expires;
   # standard SAST and pipeline secret detection remain useful on the Free tier.
   GITLAB_ADVANCED_SAST_ENABLED: "true"
+  # SEARCH_MAX_DEPTH configures SAST. Dependency-Scanning.v2 uses its separate
+  # DS_MAX_DEPTH variable; set both so nested lockfiles stay in scope instead of
+  # silently falling back to the dependency analyzer's depth-2 default.
   SEARCH_MAX_DEPTH: "20"
+  DS_MAX_DEPTH: "20"
   SECRET_DETECTION_HISTORIC_SCAN: "$[[ inputs.historic_secret_scan ]]"
 
 # GitLab's analyzer templates intentionally limit their built-in jobs to branch

@@ -49,7 +49,6 @@ interface ClaimedUploadRow {
 interface ReadyImageRow {
   id: string;
   is_cover: number;
-  object_bytes: number;
   sort_order: number;
 }
 
@@ -80,12 +79,10 @@ async function createUploadTicket(
   );
   const creation = await ownerDraftCreation(context, session.user.id);
   const readyImages = imagesFromCreation(creation);
-  let replacementBytes = 0;
   if (input.replaceImageId) {
     if (!readyImages.some((image) => image.id === input.replaceImageId)) {
       throw new HttpError(404, "creation_image_not_found", "Showcase image was not found.");
     }
-    replacementBytes = await imageObjectBytes(context.env, input.replaceImageId);
   } else if (readyImages.length >= COMMUNITY_LIMITS.creationImagesPerCreation) {
     throw new HttpError(
       409,
@@ -99,10 +96,10 @@ async function createUploadTicket(
   const tokenHash = await uploadTokenHash(context.env, uploadToken);
   const now = Date.now();
   const expiresAt = now + UPLOAD_TICKET_TTL_MS;
-  const reservedBytes = Math.max(
-    0,
-    COMMUNITY_LIMITS.creationImageOutputBytes - replacementBytes,
-  );
+  // Replacement objects remain physically present and quota-charged until R2
+  // confirms their asynchronous deletion. Reserve the complete maximum output
+  // for the incoming image instead of subtracting the replacement bytes.
+  const reservedBytes = COMMUNITY_LIMITS.creationImageOutputBytes;
 
   try {
     await context.env.DB.batch([
@@ -539,7 +536,10 @@ async function commitShowcaseImage(
   }
   const isCover = replacement ? Boolean(replacement.is_cover) : ready.length === 0;
   const objectBytes = objects.reduce((total, object) => total + object.byteSize, 0);
-  const reservedBytes = Math.max(0, objectBytes - (replacement?.object_bytes ?? 0));
+  // The old derivatives are moved to `deleting` in the commit batch but still
+  // occupy R2. Keep the full new derivative size reserved until that batch
+  // atomically swaps the reservation for the new object rows.
+  const reservedBytes = objectBytes;
   const now = Date.now();
   try {
     const reservation = await env.DB.prepare(
@@ -562,10 +562,11 @@ async function commitShowcaseImage(
     throw imageQuotaError(error) ?? error;
   }
 
-  // The reservation has already been resized to the exact positive storage
-  // delta. Remove it inside the same atomic batch before inserting objects so
-  // quota triggers count each byte exactly once. If a later statement fails,
-  // D1 rolls the reservation deletion back with the rest of the batch.
+  // The reservation has already been resized to the complete new object size.
+  // Remove it inside the same atomic batch before inserting objects so quota
+  // triggers count the retained deleting objects plus every new byte exactly
+  // once. If a later statement fails, D1 rolls the reservation deletion back
+  // with the rest of the batch.
   const statements: D1PreparedStatement[] = [
     guardExactReadyImageSet(env, {
       creationId: upload.creation_id,
@@ -809,24 +810,12 @@ function imagesFromCreation(creation: CreationRow): ShowcaseImageApi[] {
 
 async function readyImageRows(env: Env, creationId: string): Promise<ReadyImageRow[]> {
   const rows = await env.DB.prepare(
-    `SELECT csi.id, csi.sort_order, csi.is_cover,
-      COALESCE(SUM(CASE WHEN cso.status = 'ready' THEN cso.byte_size ELSE 0 END), 0)
-        AS object_bytes
+    `SELECT csi.id, csi.sort_order, csi.is_cover
      FROM creation_showcase_images csi
-     LEFT JOIN creation_showcase_objects cso ON cso.image_id = csi.id
      WHERE csi.creation_id = ? AND csi.status = 'ready'
-     GROUP BY csi.id, csi.sort_order, csi.is_cover
      ORDER BY csi.sort_order ASC, csi.id ASC`,
   ).bind(creationId).all<ReadyImageRow>();
   return rows.results;
-}
-
-async function imageObjectBytes(env: Env, imageId: string): Promise<number> {
-  const row = await env.DB.prepare(
-    `SELECT COALESCE(SUM(byte_size), 0) AS bytes
-     FROM creation_showcase_objects WHERE image_id = ? AND status = 'ready'`,
-  ).bind(imageId).first<{ bytes: number }>();
-  return Number(row?.bytes ?? 0);
 }
 
 async function failUpload(env: Env, uploadId: string, code: string): Promise<void> {

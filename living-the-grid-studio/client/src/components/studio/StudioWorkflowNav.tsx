@@ -49,7 +49,7 @@ const WORKFLOW_GROUPS = [
 
 /**
  * A task-oriented tab list for the Studio inspector. The groups wrap into two
- * columns on small screens instead of turning the six tools into a horizontal
+ * columns on small screens instead of turning the seven tools into a horizontal
  * scroller, while each tool remains a real keyboard-operable tab.
  */
 export function StudioWorkflowNav() {

@@ -1,8 +1,14 @@
-import { env, SELF } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import {
+  createExecutionContext,
+  env,
+  SELF,
+  waitOnExecutionContext,
+} from "cloudflare:test";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COMMUNITY_LIMITS } from "../shared/community";
 import { sha256 } from "./crypto";
+import worker from "./index";
 
 const ORIGIN = "http://localhost:3000";
 const SESSION_PEPPER = "test-only-session-pepper";
@@ -195,6 +201,212 @@ describe("database-authoritative quota admission", () => {
       storage_bytes: 0,
     });
   });
+
+  it("keeps deleting showcase-image objects charged until cleanup removes the bytes", async () => {
+    const owner = await seedUser("showcase-cleanup-owner");
+    const token = await seedSession(
+      owner.id,
+      "deleting-showcase-storage-owner-token",
+    );
+    await seedCommittedStorage(
+      owner.id,
+      COMMUNITY_LIMITS.cloudBytesPerUser - 1,
+    );
+    const deleting = await seedShowcaseObject(owner.id, 1, "deleting");
+
+    const response = await createCloudProject(
+      token,
+      "Deleting showcase bytes remain charged",
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "QUOTA_EXCEEDED" },
+    });
+    await expect(activeReservationTotal(owner.id)).resolves.toMatchObject({
+      count: 0,
+      storage_bytes: 0,
+    });
+    expect(await env.PROJECTS.get(deleting.objectKey)).not.toBeNull();
+  });
+
+  it("reserves the complete incoming showcase output during replacement", async () => {
+    const owner = await seedUser("showcase-replacer");
+    const token = await seedSession(
+      owner.id,
+      "showcase-replacement-owner-token",
+    );
+    const existing = await seedShowcaseObject(owner.id, 1, "ready");
+
+    const response = await SELF.fetch(
+      `${ORIGIN}/api/creations/${existing.creationId}/images/uploads`,
+      {
+        body: JSON.stringify({
+          altText: "Replacement showcase quota fixture",
+          byteSize: 1,
+          contentType: "image/png",
+          replaceImageId: existing.imageId,
+        }),
+        headers: authenticatedHeaders(token),
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const upload = (await response.json()) as { data: { uploadId: string } };
+    await expect(
+      env.DB.prepare(
+        "SELECT storage_bytes FROM quota_reservations WHERE id = ?",
+      )
+        .bind(upload.data.uploadId)
+        .first(),
+    ).resolves.toEqual({
+      storage_bytes: COMMUNITY_LIMITS.creationImageOutputBytes,
+    });
+  });
+
+  it("keeps old and new replacement objects charged when asynchronous cleanup fails", async () => {
+    const owner = await seedUser("showcase-overlap-owner");
+    const token = await seedSession(owner.id, "showcase-overlap-owner-token");
+    const oldBytes = 1024 * 1024;
+    const committedBytes =
+      COMMUNITY_LIMITS.cloudBytesPerUser -
+      oldBytes -
+      COMMUNITY_LIMITS.creationImageOutputBytes;
+    await seedCommittedStorage(owner.id, committedBytes);
+    const existing = await seedShowcaseObject(owner.id, oldBytes, "ready");
+    const pngBytes = onePixelPng();
+    const ticketResponse = await SELF.fetch(
+      `${ORIGIN}/api/creations/${existing.creationId}/images/uploads`,
+      {
+        body: JSON.stringify({
+          altText: "Replacement whose old derivatives remain in R2",
+          byteSize: pngBytes.byteLength,
+          contentType: "image/png",
+          replaceImageId: existing.imageId,
+        }),
+        headers: authenticatedHeaders(token),
+        method: "POST",
+      },
+    );
+    expect(ticketResponse.status).toBe(201);
+    const ticket = (await ticketResponse.json()) as {
+      data: { uploadToken: string; uploadUrl: string };
+    };
+    const cleanupLog = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    let uploaded: Response;
+    try {
+      const body = new Uint8Array(pngBytes.byteLength);
+      body.set(pngBytes);
+      const execution = createExecutionContext();
+      uploaded = await worker.fetch(
+        new Request(`${ORIGIN}${ticket.data.uploadUrl}`, {
+          body: body.buffer,
+          headers: {
+            Authorization: `Bearer ${ticket.data.uploadToken}`,
+            "Content-Type": "image/png",
+            Origin: ORIGIN,
+          },
+          method: "PUT",
+        }),
+        envWithFailingR2Delete(existing.objectKey),
+        execution,
+      );
+      await waitOnExecutionContext(execution);
+      expect(cleanupLog.mock.calls.flat().join("\n")).toContain(
+        "showcase_replacement_cleanup_failed",
+      );
+    } finally {
+      cleanupLog.mockRestore();
+    }
+    expect(uploaded!.status).toBe(201);
+    await expect(
+      env.DB.prepare(
+        `SELECT csi.status AS image_status, cso.status AS object_status
+         FROM creation_showcase_images csi
+         JOIN creation_showcase_objects cso ON cso.image_id = csi.id
+         WHERE csi.id = ? AND cso.object_key = ?`,
+      )
+        .bind(existing.imageId, existing.objectKey)
+        .first(),
+    ).resolves.toEqual({ image_status: "deleting", object_status: "deleting" });
+    expect(await env.PROJECTS.get(existing.objectKey)).not.toBeNull();
+
+    const replacement = await env.DB.prepare(
+      `SELECT csi.id, COALESCE(SUM(cso.byte_size), 0) AS object_bytes
+       FROM creation_showcase_images csi
+       JOIN creation_showcase_objects cso ON cso.image_id = csi.id
+       WHERE csi.creation_id = ? AND csi.status = 'ready'
+       GROUP BY csi.id`,
+    )
+      .bind(existing.creationId)
+      .first<{ id: string; object_bytes: number }>();
+    expect(replacement?.id).not.toBe(existing.imageId);
+    expect(replacement?.object_bytes).toBeGreaterThan(0);
+    const chargedBytes = committedBytes + oldBytes + replacement!.object_bytes;
+    const now = Date.now();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO quota_reservations
+         (id, user_id, creation_slots, storage_bytes, created_at, updated_at, expires_at)
+         VALUES (?, ?, 0, ?, ?, ?, ?)`,
+      )
+        .bind(
+          crypto.randomUUID(),
+          owner.id,
+          COMMUNITY_LIMITS.cloudBytesPerUser - chargedBytes + 1,
+          now,
+          now,
+          now + HOUR_MS,
+        )
+        .run(),
+    ).rejects.toThrow(/storage_quota_exceeded/iu);
+  });
+
+  it("counts deleting showcase bytes when an existing reservation grows", async () => {
+    const owner = await seedUser("showcase-update-guard");
+    await seedCommittedStorage(
+      owner.id,
+      COMMUNITY_LIMITS.cloudBytesPerUser - 1,
+    );
+    await seedShowcaseObject(owner.id, 1, "deleting");
+    const reservationId = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO quota_reservations
+       (id, user_id, creation_slots, storage_bytes, created_at, updated_at, expires_at)
+       VALUES (?, ?, 0, 0, ?, ?, ?)`,
+    )
+      .bind(reservationId, owner.id, now, now, now + HOUR_MS)
+      .run();
+    await expect(reserveBytes(reservationId, 1)).rejects.toThrow(
+      /storage_quota_exceeded/iu,
+    );
+    await expect(
+      env.DB.prepare(
+        "SELECT storage_bytes FROM quota_reservations WHERE id = ?",
+      )
+        .bind(reservationId)
+        .first(),
+    ).resolves.toEqual({ storage_bytes: 0 });
+  });
+
+  it.each(["creation", "showcase", "profile"] as const)(
+    "counts deleting showcase bytes in the %s-object insert guard",
+    async (kind) => {
+      const owner = await seedUser(`${kind}-insert-guard`);
+      await seedCommittedStorage(
+        owner.id,
+        COMMUNITY_LIMITS.cloudBytesPerUser - 1,
+      );
+      await seedShowcaseObject(owner.id, 1, "deleting");
+      await expect(insertOneObject(owner.id, kind)).rejects.toThrow(
+        /storage_quota_exceeded/iu,
+      );
+    },
+  );
 });
 
 describe("database-authoritative rolling report limit", () => {
@@ -444,6 +656,188 @@ async function seedDeletingProfileObject(
       now,
     ),
   ]);
+}
+
+async function seedShowcaseObject(
+  userId: string,
+  bytes: number,
+  status: "deleting" | "ready",
+): Promise<{ creationId: string; imageId: string; objectKey: string }> {
+  const { creationId } = await seedUploadingRevision(
+    userId,
+    `Showcase ${status} storage`,
+  );
+  const imageId = crypto.randomUUID();
+  const objectKey = `private/creations/${creationId}/showcase/${imageId}/display.webp`;
+  const now = Date.now();
+  const ready = status === "ready";
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO creation_showcase_images
+       (id, creation_id, owner_user_id, upload_token_hash,
+        expected_content_type, expected_byte_size, detected_content_type,
+        source_byte_size, source_width, source_height, alt_text, sort_order,
+        is_cover, status, expires_at, created_at, updated_at, ready_at, deleted_at)
+       VALUES (?, ?, ?, NULL, 'image/png', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      imageId,
+      creationId,
+      userId,
+      ready ? "image/png" : null,
+      ready ? 1 : null,
+      ready ? 1 : null,
+      ready ? 1 : null,
+      `Showcase ${status} quota fixture`,
+      ready ? 0 : null,
+      ready ? 1 : 0,
+      status,
+      now + HOUR_MS,
+      now,
+      now,
+      ready ? now : null,
+      ready ? null : now,
+    ),
+    env.DB.prepare(
+      `INSERT INTO creation_showcase_objects
+       (id, image_id, creation_id, kind, object_key, content_type, byte_size,
+        sha256, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'display', ?, 'image/webp', ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      imageId,
+      creationId,
+      objectKey,
+      bytes,
+      "3".repeat(64),
+      status,
+      now,
+      now,
+    ),
+  ]);
+  await env.PROJECTS.put(objectKey, new Uint8Array(bytes));
+  return { creationId, imageId, objectKey };
+}
+
+async function insertOneObject(
+  userId: string,
+  kind: "creation" | "profile" | "showcase",
+): Promise<D1Result> {
+  const now = Date.now();
+  if (kind === "creation") {
+    const target = await seedUploadingRevision(
+      userId,
+      "Creation object guard target",
+    );
+    return env.DB.prepare(
+      `INSERT INTO creation_objects
+       (id, creation_id, revision_id, kind, object_key, content_type,
+        byte_size, sha256, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'project_json', ?, 'application/json', 1, ?, 'ready', ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        target.creationId,
+        target.revisionId,
+        `private/creations/${target.creationId}/${target.revisionId}/project.json`,
+        "4".repeat(64),
+        now,
+        now,
+      )
+      .run();
+  }
+  if (kind === "showcase") {
+    const target = await seedUploadingRevision(
+      userId,
+      "Showcase object guard target",
+    );
+    const imageId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO creation_showcase_images
+       (id, creation_id, owner_user_id, upload_token_hash,
+        expected_content_type, expected_byte_size, detected_content_type,
+        source_byte_size, source_width, source_height, alt_text, sort_order,
+        is_cover, status, expires_at, created_at, updated_at, ready_at)
+       VALUES (?, ?, ?, NULL, 'image/png', 1, 'image/png', 1, 1, 1,
+        'Showcase insert guard target', 0, 1, 'ready', ?, ?, ?, ?)`,
+    )
+      .bind(imageId, target.creationId, userId, now + HOUR_MS, now, now, now)
+      .run();
+    return env.DB.prepare(
+      `INSERT INTO creation_showcase_objects
+       (id, image_id, creation_id, kind, object_key, content_type, byte_size,
+        sha256, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'display', ?, 'image/webp', 1, ?, 'ready', ?, ?)`,
+    )
+      .bind(
+        crypto.randomUUID(),
+        imageId,
+        target.creationId,
+        `private/creations/${target.creationId}/showcase/${imageId}/display.webp`,
+        "5".repeat(64),
+        now,
+        now,
+      )
+      .run();
+  }
+
+  const imageId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO profile_images
+     (id, user_id, upload_token_hash, expected_content_type,
+      expected_byte_size, focus_x, focus_y, detected_content_type,
+      source_byte_size, source_width, source_height, status, expires_at,
+      created_at, updated_at, ready_at)
+     VALUES (?, ?, NULL, 'image/png', 1, 50, 50, 'image/png',
+      1, 1, 1, 'ready', ?, ?, ?, ?)`,
+  )
+    .bind(imageId, userId, now + HOUR_MS, now, now, now)
+    .run();
+  return env.DB.prepare(
+    `INSERT INTO profile_image_objects
+     (id, image_id, user_id, object_key, content_type, byte_size, sha256,
+      status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'image/webp', 1, ?, 'ready', ?, ?)`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      imageId,
+      userId,
+      `private/users/${userId}/avatar/${imageId}/avatar.webp`,
+      "6".repeat(64),
+      now,
+      now,
+    )
+    .run();
+}
+
+function envWithFailingR2Delete(failingKey: string): Env {
+  const projects = new Proxy(env.PROJECTS, {
+    get(target, property, receiver) {
+      if (property === "delete") {
+        return async (keys: string | string[]) => {
+          const requested = Array.isArray(keys) ? keys : [keys];
+          if (requested.includes(failingKey)) {
+            throw new Error("Injected R2 cleanup failure");
+          }
+          return target.delete(keys);
+        };
+      }
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return new Proxy(env, {
+    get(target, property, receiver) {
+      if (property === "PROJECTS") return projects;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
+
+function onePixelPng(): Uint8Array {
+  const encoded =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  return Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
 }
 
 function reservationStatement(

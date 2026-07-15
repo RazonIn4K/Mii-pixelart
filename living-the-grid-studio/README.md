@@ -17,7 +17,8 @@
 > authenticated single-account profile, showcase, generated-avatar fallback,
 > Guided Copy, Studio, accessibility, crawler, and performance scope. Community
 > mutations are enabled only on staging; consult sales remains disabled. The
-> current branch contains post-gate Studio refinements that are not deployed.
+> current branch contains post-gate Studio refinements that are available only
+> in the Pages branch preview, not on the staging Worker or production.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
 > Cloudflare Pages deployment until cross-user staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
@@ -52,8 +53,9 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 - Long-form articles on Mii creation, clearly labeled legacy 3DS daily-play basics, Tomodachishare recovery, QR codes + save backup
 
-**Island Workshop community** — opt-in only; implemented on the branch and
-entering controlled writable-staging acceptance, not enabled on production
+**Island Workshop community** — opt-in only; single-account writable-staging
+acceptance is complete, while cross-user acceptance remains gated and the
+community is not enabled on production
 
 - Google OIDC accounts with generated avatars and private cloud projects
 - Explicit review before public or unlisted publishing; authentication never publishes work

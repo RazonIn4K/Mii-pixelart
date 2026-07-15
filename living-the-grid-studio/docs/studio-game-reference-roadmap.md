@@ -148,7 +148,7 @@ Guides export as ordinary PNG and printable HTML inside the existing reference p
 
 Studio reference import remains browser-local:
 
-1. Accept bounded PNG, JPEG, WebP, and GIF inputs; animated formats use a documented still frame. Reject SVG and unsupported container formats.
+1. Accept bounded PNG, JPEG, GIF, WebP, AVIF, and BMP inputs; animated formats use a documented still frame. Reject SVG and unsupported container formats.
 2. Verify file signatures before decode, enforce byte, dimension, and total-pixel limits, and correct decoded orientation.
 3. Let the user crop, fit, scale, and preview conversion without mutating the current project.
 4. Rasterize into a fresh buffer, discard filenames and metadata, and convert into palette-valid canonical project data.

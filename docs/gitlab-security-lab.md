@@ -27,6 +27,43 @@ high-confidence Tomodachi patterns for OpenRouter keys, Stripe webhook signing
 secrets, and assignment-scoped Runpod and N8N credentials. Keep the expressions
 synthetic in tests and never paste a real credential into repository history.
 
+## Dependency-license evidence
+
+GitLab's dependency scanner produces a CycloneDX SBOM and its pipeline Licenses
+tab is retained as evidence. The project uses the SBOM as its preferred license
+information source and has CycloneDX license scanning enabled. There is no linked
+GitLab security-policy project and no external license approval policy. That is
+intentional: GitHub is canonical, this pipeline does not run for GitLab merge
+requests, and an approval policy without matching source and target scan data
+would not enforce the GitHub pull request.
+
+GitLab's CycloneDX license scanner does not currently support composite SPDX
+expressions. Some packages can therefore appear as `unknown` even when pnpm
+reports an expression such as `(MIT AND Zlib)` or
+`(MIT OR GPL-3.0-or-later)`. Do not treat the Licenses tab as a legal approval
+list or automatically block its entire `unknown` category.
+
+The durable control is the production-only baseline at
+`living-the-grid-studio/config/license-baseline.json`. Every exact
+`package@version` entry is marked `observed-not-legally-approved`. The baseline
+records metadata for drift review; it does not select a branch of a dual license,
+grant legal approval, or prove that notice and distribution obligations have
+been satisfied.
+
+Run the gate after a frozen install:
+
+```bash
+cd living-the-grid-studio
+pnpm verify:licenses
+```
+
+The verifier fails on added, removed, or changed production package metadata and
+on `unknown`, `UNLICENSED`, or `NOASSERTION` expressions. When a dependency
+changes, inspect its upstream license and required notices before deliberately
+updating the exact baseline entry. Escalate license-choice or compatibility
+questions to the operator's legal-review path; changing the baseline alone is
+never an approval.
+
 ## Exact pull-request scan
 
 GitLab must scan the reviewed GitHub pull-request commit, not merely the last
