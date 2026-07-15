@@ -135,6 +135,7 @@ export default function Studio() {
   const [brushSize, setBrushSize] = useState<BrushSize>(1);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const [isPreparingBlankCanvas, setIsPreparingBlankCanvas] = useState(false);
   const [activeCopyRun, setActiveCopyRun] = useState<CopyGuideRun | null>(null);
   const [referenceSourceUrl, setReferenceSourceUrl] = useState<string | null>(
     null,
@@ -151,6 +152,7 @@ export default function Studio() {
     useState(true);
   const imagePickerRequestRef = useRef(0);
   const referencePreviewRequestRef = useRef(0);
+  const blankCanvasFrameRef = useRef<number | null>(null);
   const referenceFileRef = useRef<File | null>(null);
   const referenceSourceUrlRef = useRef<string | null>(null);
   const visibleDoc = imagePreview ?? doc;
@@ -160,6 +162,15 @@ export default function Studio() {
     if (!referenceSourceUrl) return;
     return () => URL.revokeObjectURL(referenceSourceUrl);
   }, [referenceSourceUrl]);
+
+  useEffect(
+    () => () => {
+      if (blankCanvasFrameRef.current !== null) {
+        window.cancelAnimationFrame(blankCanvasFrameRef.current);
+      }
+    },
+    [],
+  );
 
   const rememberLocalReference = useCallback((file: File) => {
     if (referenceFileRef.current === file && referenceSourceUrlRef.current) {
@@ -538,11 +549,28 @@ export default function Studio() {
   }, []);
 
   const handleStartBlank = useCallback(() => {
-    handleCreateCanvas(64, 64, "Untitled Canvas", null);
-    setPaintTool("pencil");
-    setShowCenterGuide(true);
-    setActivePanel("create");
-  }, [handleCreateCanvas]);
+    if (blankCanvasFrameRef.current !== null) return;
+    setIsPreparingBlankCanvas(true);
+
+    // Acknowledge the tap before constructing and rasterizing the complete
+    // editor. On throttled phones this gives the user an immediate visual
+    // response, then opens the fully interactive grid on the next frame.
+    blankCanvasFrameRef.current = window.requestAnimationFrame(() => {
+      blankCanvasFrameRef.current = window.requestAnimationFrame(() => {
+        blankCanvasFrameRef.current = null;
+        createNew(64, 64, "Untitled Canvas", null);
+        setHighlightColorId(null);
+        setPaintTool("pencil");
+        setShowCenterGuide(true);
+        setIsPreparingBlankCanvas(false);
+        // Mount the lightweight canvas previews in the same committed layout
+        // as the editor. Keeping the sidebar stable prevents a fast first
+        // paint gesture from racing a second geometry-changing render.
+        setActivePanel("create");
+        toast.success("Created Untitled Canvas");
+      });
+    });
+  }, [createNew]);
 
   const handleCreateTemplate = useCallback(
     (templateId: CreativeTemplateId) => {
@@ -761,7 +789,7 @@ export default function Studio() {
               ? referenceSourceUrl
                 ? "min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
                 : "h-[88svh] min-h-[41rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
-              : "min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
+              : "h-[88svh] min-h-[41rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
           }
         >
           {visibleDoc ? (
@@ -911,6 +939,7 @@ export default function Studio() {
               <section
                 className="w-full max-w-2xl rounded-[1.5rem] border border-border bg-background/95 p-5 text-center shadow-lg backdrop-blur sm:p-8"
                 aria-labelledby="studio-start-title"
+                aria-busy={isPreparingBlankCanvas}
               >
                 <img
                   src={EMPTY_STATE_IMG}
@@ -939,6 +968,7 @@ export default function Studio() {
                     type="button"
                     className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
                     onClick={handleChooseImage}
+                    disabled={isPreparingBlankCanvas}
                   >
                     <ImageUp /> Upload an image
                   </Button>
@@ -947,14 +977,19 @@ export default function Studio() {
                     variant="outline"
                     className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
                     onClick={handleStartBlank}
+                    disabled={isPreparingBlankCanvas}
                   >
-                    <Grid2x2Plus /> Start blank
+                    <Grid2x2Plus />
+                    {isPreparingBlankCanvas
+                      ? "Preparing canvas…"
+                      : "Start blank"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     className="h-auto min-h-12 justify-center rounded-xl px-4 py-3"
                     onClick={() => revealPanel("create")}
+                    disabled={isPreparingBlankCanvas}
                   >
                     <Sparkles /> Browse starters
                   </Button>

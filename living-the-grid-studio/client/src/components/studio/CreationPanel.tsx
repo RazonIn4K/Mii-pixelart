@@ -2,7 +2,7 @@
  * CreationPanel.tsx — Manual creation and touch-up controls
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPaletteColor } from "@/lib/engine/palette";
@@ -227,22 +227,46 @@ export default function CreationPanel({
 
 function TemplatePreview({ doc }: { doc: GridDocument }) {
   const preview = useMemo(() => buildTemplatePreview(doc), [doc]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+
+    const image = context.createImageData(preview.size, preview.size);
+    const resolvedColors = new Map<string, [number, number, number]>();
+
+    preview.colors.forEach((color, index) => {
+      let rgb = resolvedColors.get(color);
+      if (!rgb) {
+        const value = Number.parseInt(color.slice(1), 16);
+        rgb = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+        resolvedColors.set(color, rgb);
+      }
+
+      const offset = index * 4;
+      image.data[offset] = rgb[0];
+      image.data[offset + 1] = rgb[1];
+      image.data[offset + 2] = rgb[2];
+      image.data[offset + 3] = 0xff;
+    });
+
+    context.putImageData(image, 0, 0);
+  }, [preview]);
 
   return (
     <div
       className="aspect-square overflow-hidden rounded-sm border border-border bg-white"
       aria-hidden="true"
     >
-      <div
-        className="grid h-full w-full"
-        style={{
-          gridTemplateColumns: `repeat(${preview.size}, minmax(0, 1fr))`,
-        }}
-      >
-        {preview.colors.map((color, index) => (
-          <span key={index} style={{ backgroundColor: color }} />
-        ))}
-      </div>
+      <canvas
+        ref={canvasRef}
+        className="h-full w-full [image-rendering:pixelated]"
+        data-template-preview
+        width={preview.size}
+        height={preview.size}
+      />
     </div>
   );
 }

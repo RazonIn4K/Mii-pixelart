@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Crosshair,
   Eraser,
@@ -138,6 +138,7 @@ export function CanvasPaintToolbar({
   onAddReference: () => void;
   onOpenCopyGuide: () => void;
 }) {
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const selectedColor = getPaletteColor(selectedColorId);
   const quickColors = useMemo(
     () =>
@@ -153,6 +154,10 @@ export function CanvasPaintToolbar({
 
   const selectColor = (colorId: string) => {
     onSelectedColorChange(colorId);
+    // A color choice is an immediate painting action. Closing the floating
+    // matrix here keeps it from covering the canvas or intercepting the first
+    // stroke after a mouse, pen, keyboard, or agent selects a swatch.
+    setIsPaletteOpen(false);
     if (activeTool === "inspect" || activeTool === "eyedropper") {
       onToolChange("pencil");
     }
@@ -380,7 +385,7 @@ export function CanvasPaintToolbar({
           </Tooltip>
         </div>
 
-        <Popover>
+        <Popover open={isPaletteOpen} onOpenChange={setIsPaletteOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
@@ -401,7 +406,7 @@ export function CanvasPaintToolbar({
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto p-3"
+            className="max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto p-3 data-[state=closed]:pointer-events-none"
             aria-label="Complete paint palette"
           >
             <div className="mb-3">

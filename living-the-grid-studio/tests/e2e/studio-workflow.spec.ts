@@ -130,6 +130,38 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
   await expect(
     page.getByText("64×64 · 0 colors", { exact: true }),
   ).toBeVisible();
+  const templatePreviews = page.locator("canvas[data-template-preview]");
+  await expect(templatePreviews).toHaveCount(28);
+  expect(
+    await page
+      .locator("#studio-tools")
+      .evaluate((element) => element.querySelectorAll("*").length),
+  ).toBeLessThan(500);
+  await expect
+    .poll(() =>
+      templatePreviews.first().evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
+        const context = canvas.getContext("2d");
+        if (!context) return false;
+        const pixels = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        ).data;
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (
+            pixels[index] !== 255 ||
+            pixels[index + 1] !== 255 ||
+            pixels[index + 2] !== 255
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }),
+    )
+    .toBe(true);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,

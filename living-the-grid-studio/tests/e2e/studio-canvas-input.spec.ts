@@ -467,7 +467,7 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     const cellSize = Number(canvasElement.dataset.cellSize);
     const panX = Number(canvasElement.dataset.gridOriginX);
     const panY = Number(canvasElement.dataset.gridOriginY);
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = canvasElement.width / Math.max(1, canvasElement.clientWidth);
     const context = canvasElement.getContext("2d");
     if (!context) throw new Error("Canvas context unavailable");
     const read = (x: number, y: number) =>
@@ -654,7 +654,7 @@ test("paint tools change pixels and a mid-stroke shortcut keeps one undo entry",
         const targetCanvas = element as HTMLCanvasElement;
         const context = targetCanvas.getContext("2d");
         if (!context) throw new Error("Canvas context unavailable");
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = targetCanvas.width / Math.max(1, targetCanvas.clientWidth);
         const size = Number(targetCanvas.dataset.cellSize);
         const panX = Number(targetCanvas.dataset.gridOriginX);
         const panY = Number(targetCanvas.dataset.gridOriginY);
@@ -671,11 +671,20 @@ test("paint tools change pixels and a mid-stroke shortcut keeps one undo entry",
     );
 
   const selectPaletteColor = async (accessibleName: string) => {
-    await page.getByRole("button", { name: /Choose paint color/ }).click();
+    const paletteTrigger = page.getByRole("button", {
+      name: /Choose paint color/,
+    });
+    const paletteMatrix = page.getByTestId("studio-palette-matrix");
+    await paletteTrigger.click();
     await page
       .getByTestId("studio-palette-matrix")
       .getByRole("button", { name: accessibleName, exact: true })
       .click();
+    const selectedName = accessibleName.replace(/^Select \S+ /, "");
+    await expect(paletteTrigger).toHaveAccessibleName(
+      `Choose paint color. Current color ${selectedName}`,
+    );
+    await expect(paletteMatrix).toBeHidden();
   };
 
   await selectPaletteColor("Select R1C2 Red");
@@ -967,14 +976,14 @@ test("an imported image becomes a browser-local tracing layer on one canvas", as
   await expect(canvas).toHaveAttribute("data-reference-underlay", "visible");
 
   await expect(dock).toBeVisible();
-  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.locator("canvas[data-grid-width]")).toHaveCount(1);
   await expect(
     page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);
 
   await dock.getByRole("button", { name: "Remove local reference" }).click();
   await expect(dock).toHaveCount(0);
-  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.locator("canvas[data-grid-width]")).toHaveCount(1);
   await expect(
     page.getByRole("application", { name: /pixel grid/ }),
   ).toHaveCount(1);

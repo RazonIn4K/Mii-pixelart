@@ -5,7 +5,14 @@
  * workspace stays neutral so it never competes with cell boundaries.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Hand } from "lucide-react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
@@ -87,6 +94,7 @@ const MIN_ZOOM = 0.25;
 // Cell view promises a literal, paintable cell mesh, so allow enough zoom to
 // reach the 12–14px editing scale even for the largest supported canvas.
 const MAX_ZOOM = 16;
+const MAX_RENDER_DPR = 2;
 const TAP_MOVE_TOLERANCE = 5;
 const TOUCH_TAP_MOVE_TOLERANCE = 14;
 
@@ -171,20 +179,25 @@ export default function CanvasViewer({
     };
   }, [referenceUnderlay?.sourceUrl, referenceUnderlay?.visible]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const updateSize = () => {
-      const rect = container.getBoundingClientRect();
-      setViewportSize({
-        width: Math.max(1, Math.floor(rect.width)),
-        height: Math.max(1, Math.floor(rect.height)),
-      });
-    };
+    setViewportSize({
+      width: Math.max(1, Math.floor(container.clientWidth)),
+      height: Math.max(1, Math.floor(container.clientHeight)),
+    });
 
-    updateSize();
-    const observer = new ResizeObserver(updateSize);
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const width = Math.max(1, Math.floor(entry.contentRect.width));
+      const height = Math.max(1, Math.floor(entry.contentRect.height));
+      setViewportSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
+    });
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
@@ -215,10 +228,17 @@ export default function CanvasViewer({
 
   const getRenderMetrics = useCallback(
     (viewZoom = zoom, viewPan = pan) => {
+      // The mount effect pins the exact container dimensions before editing;
+      // ResizeObserver keeps them current afterward. Window dimensions are a
+      // defensive first-frame fallback for non-layout test environments.
       const width =
-        viewportSize.width || containerRef.current?.clientWidth || 800;
+        viewportSize.width ||
+        containerRef.current?.clientWidth ||
+        (typeof window === "undefined" ? 800 : window.innerWidth);
       const height =
-        viewportSize.height || containerRef.current?.clientHeight || 600;
+        viewportSize.height ||
+        containerRef.current?.clientHeight ||
+        (typeof window === "undefined" ? 600 : window.innerHeight);
       // Reserve real chrome space above and below the artboard. Controls and the
       // coordinate HUD stay visible without intercepting the first/last rows.
       // Tiny screens retain a compact ruler gutter and at least four-pixel cells.
@@ -259,15 +279,22 @@ export default function CanvasViewer({
     [doc.width, doc.height, pan, viewportSize, zoom],
   );
 
-  // Render
-  useEffect(() => {
+  // Keep the bitmap and the DOM-exposed grid metrics in the same committed
+  // frame. A passive effect briefly exposes new pointer coordinates over the
+  // previous bitmap after a resize or document edit, which can make a very
+  // fast first stroke land on the wrong cell.
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const metrics = getRenderMetrics();
-    const dpr = window.devicePixelRatio || 1;
+    // A 2x backing store keeps single-cell lines crisp while avoiding the
+    // multi-megapixel allocation cost of 3x/4x phone screens. Pixel art gains
+    // no useful detail above 2x because every project cell is intentionally
+    // rendered as a flat, nearest-neighbor block.
+    const dpr = Math.min(window.devicePixelRatio || 1, MAX_RENDER_DPR);
     const backingWidth = Math.max(1, Math.floor(metrics.width * dpr));
     const backingHeight = Math.max(1, Math.floor(metrics.height * dpr));
     // Reassigning a canvas backing dimension clears and reallocates its bitmap.

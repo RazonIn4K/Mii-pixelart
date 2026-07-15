@@ -1,6 +1,6 @@
 # Tomodachi Domain Launch Checklist
 
-Updated: 2026-07-13
+Updated: 2026-07-15
 Repo: RazonIn4K/Mii-pixelart
 Release evidence: record the exact reviewed commit and immutable deployment URL
 at each approved gate; do not reuse this checklist as proof for a later commit.
@@ -86,23 +86,32 @@ Do not overload the trust pages with ads. Put heavier monetization on guides, pa
 ## Launch follow-up gates
 
 1. Staging resources, the eight-secret bootstrap, migrations `0001` through
-   `0006`, and the read-only Worker are complete. Redeploy the exact reviewed
-   head and run the authenticated writable acceptance suite under its separate
-   approvals.
+   `0008`, and authenticated single-account writable acceptance are complete.
+   Exact source `18e36da` is the current staging deployment. Its homepage and
+   functional canvas/AI checks pass, but its Start blank and returning-draft
+   Studio performance paths do not. Deploy the follow-up source only through a
+   new exact-SHA staging approval and rerun Worker-hosted cold and interaction
+   traces.
 2. The complete public service address is approved and published, and David
    Ortiz confirmed ownership of the legal, privacy, security, help, abuse, and
    consult channels. Verify live delivery and escalation for each channel.
 3. Google staging consent branding and the isolated Stripe test key/webhook are
    complete. Run the real staging Google sign-in and signed Stripe acceptance
    probes without altering production.
-4. Capture the mandatory real Chrome performance trace; fallback Lighthouse
-   measurements are diagnostic evidence, not the launch gate.
+4. Preserve the existing real Chrome evidence and capture new Worker-hosted
+   traces after every exact-source change. Lighthouse remains supporting
+   accessibility/best-practices evidence, not a substitute for cold LCP, CLS,
+   and interaction INP traces.
 5. Add `ads.txt` only after ad approval.
 6. Keep privacy-safe analytics event payloads generic and non-personal for:
    - `studio_opened`
    - `guide_viewed`
    - `pack_download_clicked`
    - `affiliate_card_clicked`
+
+The complete ordered cutover and rollback gates are maintained in
+`production-readiness-plan.md`; this domain checklist does not itself authorize
+any deploy, migration, OAuth, secret, DNS, role, or production change.
 
 ## Source links for future reference
 
