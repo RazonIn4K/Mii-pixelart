@@ -46,9 +46,9 @@ the shared account and was not proven exclusive to Tomodachi.
 - A separate `tomodachi-studio-production` Worker does not yet exist; the live
   site remains the Pages deployment until the approved production cutover.
 
-## Application retirement candidate
+## Application retirement release
 
-The source candidate removes checkout, session verification, product catalog,
+The released source removes checkout, session verification, product catalog,
 tip, consultation, webhook, redirect-allowlist, and product-definition code.
 It removes payment bindings and CSP origins, updates the deployment contract to
 six secrets and six rate-limit bindings, and replaces the paid surfaces with:
@@ -60,10 +60,36 @@ six secrets and six rate-limit bindings, and replaces the paid surfaces with:
 - `/api/stripe/*` plus `/api/webhooks/stripe`: temporary provider-free
   `410 Gone`/`no-store` tombstones so stale clients never receive the SPA.
 
-This record does not claim that the application candidate is live. Provider
-containment prevents new Tomodachi payments now; the Pages and staging Worker
-still require exact-source deployment and hosted acceptance before their UI
-and historic API paths expose the new retirement behavior.
+### Production Pages release
+
+- GitHub PR #9 was squash-merged into `main` as
+  `c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`; the GitHub and GitLab `main`
+  refs were verified at that exact commit.
+- Cloudflare Pages production deployment
+  `b73cc5ba-c91f-4896-90e5-b7f22d4af80b` serves that source on
+  `tomodachi.pw`.
+- Hosted acceptance verified the homepage and AI status endpoint, the
+  canonical `/ai-plan` and `/support` surfaces, legacy aliases, payment
+  tombstones, payment-free crawler documents, and a CSP without Stripe
+  origins. The live JavaScript bundle contains no provider checkout host,
+  payment helper, or paid-consultation offer.
+
+### Staging Worker release
+
+- Staging was deployed from exact community commit
+  `80fdcd5da432b88d06d84bfd084e9f0993edc363` as deployment
+  `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
+  `c56f580f-2238-4775-846d-3d2c08f17c78`, at 100% traffic.
+- The release kept community mutations enabled and did not alter migrations,
+  D1 data, roles, OAuth settings, secrets, DNS, or production resources.
+- Read-only hosted acceptance verified `noindex,nofollow`, crawler blocking,
+  empty staging sitemaps, AI availability, canonical aliases, and a CSP with
+  no Stripe origin. Every retired payment path returned provider-free
+  `410 Gone`, `Cache-Control: no-store`, and `error.code=payments_retired`.
+
+The first edge response during propagation briefly exposed the prior CSP. All
+fresh root, index, page, crawler, and API probes after the new version reached
+100% traffic returned the release CSP without Stripe origins.
 
 ## Future $5 plan boundary
 
