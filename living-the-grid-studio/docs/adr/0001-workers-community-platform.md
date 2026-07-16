@@ -12,6 +12,10 @@ Cloudflare Pages. Pages Functions provide the AI, Stripe, webhook, and crawler
 routes. The anonymous editor is deliberately local-first and must remain usable
 without an account.
 
+> **Superseded payment note (2026-07-16):** ADR 0005 retired Stripe and all
+> payment behavior. References below to porting Stripe/webhook parity are
+> historical; current runtimes keep only provider-free `410 Gone` tombstones.
+
 The community expansion adds Google OIDC, server-owned sessions, private cloud
 projects, public and unlisted publishing, D1 relationships, private R2 objects,
 scheduled cleanup, and moderation. Implementing those features in parallel
@@ -37,8 +41,9 @@ application runtime. Deploy the Vite SPA as Worker Static Assets and bind it as
 - Configure `run_worker_first` only for `/api/*` and dynamic document routes
   that need canonical/Open Graph/index metadata. Ordinary hashed assets remain
   asset-first.
-- Port existing AI, Stripe, webhook, and crawler behavior before enabling any
-  community feature.
+- Port existing AI and crawler behavior before enabling any community feature.
+  Per ADR 0005, historic payment and webhook paths are provider-free
+  compatibility tombstones rather than integrations.
 - Use in-process bindings: D1 for relational state, private R2 for canonical
   project/media objects, KV for the existing bounded caches, Images for
   deterministic preview conversion, and Workers Rate Limiting for coarse edge
@@ -54,12 +59,12 @@ application runtime. Deploy the Vite SPA as Worker Static Assets and bind it as
 
 ## Options considered
 
-| Option | Advantages | Rejected because |
-| --- | --- | --- |
-| Extend Pages Functions | Small initial routing change; existing deploy remains | Duplicates Node development shims, weaker scheduled-job/observability story, and preserves split handler conventions |
-| Worker with Static Assets **(chosen)** | One runtime and deploy unit; direct D1/R2/KV/Images bindings; scheduled handler; stronger staging parity | Requires deliberate asset routing and a controlled domain cutover |
-| Separate SPA and API Worker | Independent scaling and releases | Adds CORS, cookie-domain, deployment-order, and rollback complexity without a current need |
-| Conventional regional server/database | Familiar relational tooling | Broadens operations, secrets, networking, and cost scope beyond the approved Cloudflare stack |
+| Option                                 | Advantages                                                                                               | Rejected because                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Extend Pages Functions                 | Small initial routing change; existing deploy remains                                                    | Duplicates Node development shims, weaker scheduled-job/observability story, and preserves split handler conventions |
+| Worker with Static Assets **(chosen)** | One runtime and deploy unit; direct D1/R2/KV/Images bindings; scheduled handler; stronger staging parity | Requires deliberate asset routing and a controlled domain cutover                                                    |
+| Separate SPA and API Worker            | Independent scaling and releases                                                                         | Adds CORS, cookie-domain, deployment-order, and rollback complexity without a current need                           |
+| Conventional regional server/database  | Familiar relational tooling                                                                              | Broadens operations, secrets, networking, and cost scope beyond the approved Cloudflare stack                        |
 
 ## Consequences
 

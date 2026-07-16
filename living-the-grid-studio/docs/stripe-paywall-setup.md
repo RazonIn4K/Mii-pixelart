@@ -14,8 +14,10 @@ or provider retry cannot fall through to the SPA and appear successful:
 - `/api/stripe/*`
 - `/api/webhooks/stripe`
 
-Every method on those paths returns a provider-free `410 Gone` JSON response
-with `Cache-Control: no-store`. No Stripe credential, SDK, network call, KV
+Requests that reach those retired handlers return a provider-free `410 Gone`
+JSON response with `Cache-Control: no-store`. The Worker's Origin and JSON
+controls can reject an unsafe request earlier; those responses also fail closed
+without contacting a provider. No Stripe credential, SDK, network call, KV
 event receipt, or payment state is required. Remove the tombstones only after
 traffic confirms that stale clients and provider retries have ended.
 

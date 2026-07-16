@@ -3,7 +3,7 @@
 **Date:** 2026-07-16 (America/Chicago)
 
 **Scope:** Tomodachi payment-provider containment, application retirement
-candidate, secret-name cleanup, and documentation. No secret value, customer
+deployments, secret-name cleanup, and documentation. No secret value, customer
 email, payment method, session token, OAuth identifier, or private project data
 is recorded here.
 
@@ -66,8 +66,8 @@ six secrets and six rate-limit bindings, and replaces the paid surfaces with:
   `c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`; the GitHub and GitLab `main`
   refs were verified at that exact commit.
 - Cloudflare Pages production deployment
-  `b73cc5ba-c91f-4896-90e5-b7f22d4af80b` serves that source on
-  `tomodachi.pw`.
+  `b73cc5ba-c91f-4896-90e5-b7f22d4af80b` serves that source at
+  `https://b73cc5ba.mii-pixelart.pages.dev` and on `tomodachi.pw`.
 - Hosted acceptance verified the homepage and AI status endpoint, the
   canonical `/ai-plan` and `/support` surfaces, legacy aliases, payment
   tombstones, payment-free crawler documents, and a CSP without Stripe
@@ -79,13 +79,16 @@ six secrets and six rate-limit bindings, and replaces the paid surfaces with:
 - Staging was deployed from exact community commit
   `80fdcd5da432b88d06d84bfd084e9f0993edc363` as deployment
   `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
-  `c56f580f-2238-4775-846d-3d2c08f17c78`, at 100% traffic.
+  `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19), at 100% traffic.
 - The release kept community mutations enabled and did not alter migrations,
   D1 data, roles, OAuth settings, secrets, DNS, or production resources.
 - Read-only hosted acceptance verified `noindex,nofollow`, crawler blocking,
   empty staging sitemaps, AI availability, canonical aliases, and a CSP with
-  no Stripe origin. Every retired payment path returned provider-free
-  `410 Gone`, `Cache-Control: no-store`, and `error.code=payments_retired`.
+  no Stripe origin. Same-origin requests reaching each retired payment handler
+  returned provider-free `410 Gone`, `Cache-Control: no-store`, and
+  `error.code=payments_retired`. Unsafe mutations can be rejected earlier by
+  the Worker's Origin/JSON guard; those responses remain `no-store` and
+  provider-free.
 
 The first edge response during propagation briefly exposed the prior CSP. All
 fresh root, index, page, crawler, and API probes after the new version reached
