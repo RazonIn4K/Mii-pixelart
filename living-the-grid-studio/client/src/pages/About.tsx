@@ -40,10 +40,7 @@ const ABOUT_STRUCTURED_DATA = [
       logo: "https://tomodachi.pw/og-image.png",
       description:
         "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
-      sameAs: [
-        "https://github.com/RazonIn4K",
-        "https://tomodachi.brave",
-      ],
+      sameAs: ["https://github.com/RazonIn4K", "https://tomodachi.brave"],
       knowsAbout: [
         "Tomodachi Life",
         "Mii pixel art",
@@ -73,7 +70,10 @@ export default function About() {
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-10 sm:py-12 space-y-10">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-10 sm:py-12 space-y-10"
+      >
         <section className="space-y-4">
           <p className="section-header">About</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
@@ -107,25 +107,27 @@ export default function About() {
             <h2 className="mt-3 text-sm font-semibold">Free first</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
               The editor, the password check, the AI assistant, and every guide
-              stay free. Optional paid extras live on /unlock; tips live on
-              /support.
+              stay free. Tomodachi currently accepts no payments, tips, or
+              consultation bookings.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Privacy on principle</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Photos never leave the browser. The password check uses k-anonymity
-              against Have I Been Pwned. No accounts, no tracking until you opt
-              in via the cookie banner.
+              Photos never leave the browser. The password check uses
+              k-anonymity against Have I Been Pwned. No accounts, no tracking
+              until you opt in via the cookie banner.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
             <Heart className="h-5 w-5 text-primary" />
-            <h2 className="mt-3 text-sm font-semibold">Solo-built, sponsor-supported</h2>
+            <h2 className="mt-3 text-sm font-semibold">
+              Solo-built, community-tested
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              One developer, open source, supported by Stripe tips and a small
-              paid recovery pack. GitHub Sponsors application in flight.
+              One developer, open source, improved by people who test real
+              workflows and report clear, reproducible feedback.
             </p>
           </div>
         </section>
@@ -147,9 +149,8 @@ export default function About() {
           <p className="text-sm leading-relaxed text-foreground/85">
             The site is hosted on Cloudflare Pages with Pages Functions for the
             API surface, a small KV namespace for caching the model catalog,
-            Stripe Checkout for the paid items, and the Have I Been Pwned API
-            for the password check. The full stack is documented in the repo
-            README.
+            OpenRouter for the AI assistant, and the Have I Been Pwned API for
+            the password check. The full stack is documented in the repo README.
           </p>
         </section>
 
@@ -189,18 +190,16 @@ export default function About() {
               schema.
             </li>
             <li>
-              <Link href="/unlock" className="underline">
-                Unlock
+              <Link href="/ai-plan" className="underline">
+                AI Action Plan
               </Link>
-              : a $9 printable 12-step recovery checklist and a $49 30-minute
-              one-on-one consult.
+              : free, reviewable next steps for a creation or recovery task.
             </li>
             <li>
               <Link href="/support" className="underline">
-                Support / tip jar
+                Support the workshop
               </Link>
-              : fixed $5 / $15 / $25 Stripe tips, plus Brave Rewards for the
-              .brave-verified audience.
+              : test the Studio, report issues, and send product feedback.
             </li>
           </ul>
         </section>
@@ -218,22 +217,25 @@ export default function About() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                github.com/RazonIn4K/Mii-pixelart <Github className="inline h-3.5 w-3.5" />
+                github.com/RazonIn4K/Mii-pixelart{" "}
+                <Github className="inline h-3.5 w-3.5" />
               </a>
             </li>
             <li>
               <strong>Press / partnership:</strong> open a GitHub issue tagged
-              <code className="ml-1 rounded bg-accent px-1.5 py-0.5 text-xs">press</code>
-              {" "}— it's the most reliable channel. We'll respond with whatever
+              <code className="ml-1 rounded bg-accent px-1.5 py-0.5 text-xs">
+                press
+              </code>{" "}
+              — it's the most reliable channel. We'll respond with whatever
               short bio, hero image, or numbers you need for the story.
             </li>
             <li>
-              <strong>Sponsorship:</strong> Stripe-backed tips and paid checklist
-              via the{" "}
+              <strong>Project support:</strong> testing, issue reports, and
+              product feedback via the{" "}
               <Link href="/support" className="underline">
                 support page
               </Link>
-              ; GitHub Sponsors via the repo's Sponsor button once approved.
+              .
             </li>
             <li>
               <strong>Brave Rewards:</strong> the domain is a verified Brave

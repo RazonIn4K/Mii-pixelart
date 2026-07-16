@@ -1,54 +1,23 @@
-# Tomodachi Domains: Breach-Response + Monetization Playbook
+# Trust and recovery product guidance
 
-## Positioning model
+Updated: 2026-07-16
 
-- `tomodachi.brave` should stay the hero creative domain.
-  - Primary use: Living The Grid Studio, pixel-repaint utility, templates, AI-powered guides.
-  - Monetize with:
-    - Google/Brave-compatible display ads on non-critical paths.
-    - Paid print-pack bundles (PNG/PDF exports, texture packs, model presets).
-    - Affiliate tie-ins (hardware/software used by creators).
-- `tomodachi.pw` should be the trust surface.
-  - Primary use: breach-awareness support hub, privacy check utilities, incident recovery runbooks.
-  - Monetize with:
-    - Lead capture (newsletter + status alerts).
-    - Sponsorship/affiliate links for security tools (password managers, VPNs, 2FA hardware).
-    - Conversion to digital services (security cleanup checklists, one-off consultation).
+This document supersedes the former breach monetization playbook. Breach
+traffic must not be used to pressure users into a purchase, consultation, tip,
+or affiliate conversion.
 
-## Breach page concept (already linked from your project)
+The trust surface should provide:
 
-Use the breach notice as an entry point:
+1. calm, plain-language recovery guidance;
+2. browser-first tools that do not require an account;
+3. the partial-hash password exposure check;
+4. an explicitly consented AI recovery helper;
+5. direct links to authoritative reporting and account-recovery resources.
 
-1. Show a calm “you are not alone” header and immediate actions.
-2. Offer browser tools that do not require sign-up:
-   - Password breach lookup (k-anonymity approach).
-   - AI-generated recovery plan from plain-language incident text.
-   - Checklist for account recovery.
-3. Offer ad-safe, high-trust UX: keep security and recovery content mostly free of ad noise.
-4. Offer a short paid or lead-capture CTA at the end.
+The creative surface should provide the Studio, templates, imports, reference
+packs, and anonymous exports without payment.
 
-## What I changed in this repo
-
-- Added trust-first blocks to `client/src/pages/Home.tsx`:
-  - breach recovery section
-  - browser-only password exposure check (HIBP-style prefix API flow)
-  - AI assistant using existing `/api/ai/chat` endpoint
-  - domain-specific monetization strategy cards
-  - optional AdSense slots behind environment flags
-
-## Environment keys needed for ads
-
-Set these in your hosting provider or `.env`:
-
-- `VITE_ADSENSE_PUBLISHER_ID` (for example `ca-pub-XXXXXXXXX`)
-- `VITE_ADSENSE_HOMEPAGE_SLOT_ID` (for homepage ad unit)
-
-If not set, the page shows a placeholder and does not inject ad scripts.
-
-## Practical launch sequence
-
-1. Connect the two domains in DNS to your Vercel/Netlify host.
-2. Keep ad scripts and affiliate placements disabled during the first trust-validation sprint.
-3. Push content for 10–14 days to establish baseline behavior and conversion intent.
-4. Enable ad serving after conversion events and trust flow metrics are healthy.
-5. Add newsletter and paid upgrade calls to the breach section only after you have a polished follow-up flow.
+Tomodachi currently accepts no payments and has no checkout. The only paid
+direction under consideration is a future one-time $5 creator plan described
+in ADR 0005; it is not for sale and no waitlist or payment details are
+collected.

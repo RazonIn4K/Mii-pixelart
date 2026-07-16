@@ -4,6 +4,12 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-07-16
+
+- **Payments retired:** removed the Stripe catalog, Checkout Session creation and verification, webhook processing, tips, recovery-product sales, consultation copy, payment secrets, and provider CSP origins. Historic payment routes now return provider-free `410 Gone` responses with `Cache-Control: no-store`.
+- **AI Action Plan:** added `/ai-plan` with the existing free AI beta and a clearly gated possible one-time $5 creator plan that is not for sale. `/unlock` redirects to the canonical plan and `/support` now lists only non-payment ways to help.
+- **Provider containment:** deactivated the Tomodachi Payment Link, disabled its live and staging webhook endpoints, and removed Tomodachi Stripe secret names from Doppler and Cloudflare configuration without touching unrelated objects in the shared Stripe account.
+
 ### 2026-05-20
 
 - **Image crop framing:** image import now has a draggable source crop rectangle with Full, Square, and Head shortcuts. Crop settings are applied before cover/contain/stretch placement, preserved in image-import metadata, and verified in both focused import tests and the Studio browser smoke test.

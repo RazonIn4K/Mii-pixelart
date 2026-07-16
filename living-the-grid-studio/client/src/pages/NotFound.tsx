@@ -19,28 +19,34 @@ const SUGGESTIONS: Array<{
   {
     href: "/studio",
     title: "Open the Studio",
-    description: "Browser-first pixel-art editor — import a face photo, get a paint-by-numbers Mii.",
+    description:
+      "Browser-first pixel-art editor — import a face photo, get a paint-by-numbers Mii.",
   },
   {
     href: "/guides",
     title: "Read the free guides",
-    description: "Mii creation, gameplay basics, Tomodachishare breach recovery, QR codes + save backup.",
+    description:
+      "Mii creation, gameplay basics, Tomodachishare breach recovery, QR codes + save backup.",
   },
   {
     href: "/help",
     title: "Breach recovery first steps",
-    description: "Free 24-hour action plan if you got a Tomodachishare breach notice.",
+    description:
+      "Free 24-hour action plan if you got a Tomodachishare breach notice.",
   },
   {
-    href: "/unlock",
-    title: "Paid recovery checklist + consult",
-    description: "$9 printable 12-step checklist or $49 30-minute one-on-one call.",
+    href: "/ai-plan",
+    title: "Build an AI action plan",
+    description: "Free, reviewable next steps for a creation or recovery task.",
   },
 ];
 
 export default function NotFound() {
   const [path] = useLocation();
-  useDocumentTitle("Page not found", "The page you're looking for doesn't exist. Try the studio, the free guides, or the recovery checklist.");
+  useDocumentTitle(
+    "Page not found",
+    "The page you're looking for doesn't exist. Try the studio, free guides, or AI action plan.",
+  );
 
   // SPA returns HTTP 200 for unmatched routes; inject a noindex hint so
   // Googlebot doesn't accidentally index 404 URLs as real pages.
@@ -65,7 +71,10 @@ export default function NotFound() {
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-12 sm:py-16 space-y-8">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-12 sm:py-16 space-y-8"
+      >
         <section className="space-y-3">
           <p className="section-header">404</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">

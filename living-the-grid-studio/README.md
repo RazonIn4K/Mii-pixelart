@@ -5,7 +5,7 @@
 [![Live site](https://img.shields.io/badge/live-tomodachi.pw-d94f4f?style=flat-square)](https://tomodachi.pw/)
 [![Brave mirror](https://img.shields.io/badge/web3%20mirror-tomodachi.brave-fb542b?style=flat-square)](https://tomodachi.brave)
 [![License: MIT](https://img.shields.io/badge/license-MIT-101016?style=flat-square)](./LICENSE)
-[![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-d94f4f?style=flat-square)](https://tomodachi.pw/support)
+[![Help improve it](https://img.shields.io/badge/help-test%20%26%20report-d94f4f?style=flat-square)](https://tomodachi.pw/support)
 
 <p align="center">
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
@@ -39,17 +39,17 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 - Long-form articles on Mii creation, gameplay basics (apartments / food / jobs / marriage), Tomodachishare recovery, QR codes + save backup
 
-**Paid extras** (optional)
+**AI action plan + project support**
 
-- [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist, $49 30-minute consult
-- [`/support`](https://tomodachi.pw/support) — $5 / $15 / $25 tip jar
+- [`/ai-plan`](https://tomodachi.pw/ai-plan) — free AI action-plan beta; a distinct one-time $5 creator plan is product direction only and is not for sale
+- [`/support`](https://tomodachi.pw/support) — non-payment ways to test the Studio, report issues, and send feedback
 
 ## Tech stack
 
 - **Frontend:** Vite, React 19, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui/Radix primitives, wouter
 - **Edge runtime:** Cloudflare Pages Functions (TypeScript)
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
-- **Payments:** Stripe Checkout with HMAC-SHA256 webhook verification at the edge
+- **Payments:** retired; legacy payment paths return provider-free `410 Gone` tombstones
 - **AI:** OpenRouter with free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
 - **Secrets:** Doppler → Cloudflare Pages integration
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
@@ -78,7 +78,7 @@ flowchart LR
     class REQ,CRAWL,USER terminal
 ```
 
-One TypeScript file at the edge UA-sniffs known search crawlers and serves route-appropriate JSON-LD: `WebApplication` on `/`, `SoftwareApplication` + `BreadcrumbList` on `/studio`, `CollectionPage` with embedded `HowTo` + `Article` on `/guides`, `FAQPage` on `/faq`, `AboutPage` + `Organization` on `/about`, `Article` on `/help`, `ItemList` of `Product` + `Offer` on `/unlock`, `WebPage` on `/support`. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
+One TypeScript file at the edge UA-sniffs known search crawlers and serves route-appropriate JSON-LD: `WebApplication` on `/`, `SoftwareApplication` + `BreadcrumbList` on `/studio`, `CollectionPage` with embedded `HowTo` + `Article` on `/guides`, `FAQPage` on `/faq`, `AboutPage` + `Organization` on `/about`, `Article` on `/help`, and informational `WebPage` shells on `/ai-plan` and `/support`. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
 
 See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation.
 
@@ -125,35 +125,33 @@ pnpm wrangler pages dev dist/public --compatibility-date=2025-05-01
 
 Required environment variables (set via `.env.local` for dev, via Doppler → Cloudflare Pages for prod):
 
-| Variable                        | Required for                   | Notes                                     |
-| ------------------------------- | ------------------------------ | ----------------------------------------- |
-| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                       |
-| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                          |
-| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard |
-| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`        |
-| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent          |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                          |
+| Variable                        | Required for                   | Notes                              |
+| ------------------------------- | ------------------------------ | ---------------------------------- |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw` |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent   |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                   |
 
 ## Project structure
 
 ```
 client/                  Vite + React SPA
   src/
-    pages/               Route components (Home, Studio, Unlock, Guides, FAQ, About, Help, Support, legal)
+    pages/               Route components (Home, Studio, AI Plan, Guides, FAQ, About, Help, Support, legal)
     components/
       studio/            AI panel, palette grid, import panel, etc.
       ui/                shadcn/ui primitives
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
-    lib/                 engine (JSON import/export, palette ops), breadcrumb, consent, stripeUrl
+    lib/                 engine (JSON import/export, palette ops), breadcrumb, consent
   public/                Static assets (sitemap.xml, og-image.png, robots.txt, _headers, manifest)
 functions/               Cloudflare Pages Functions
   _middleware.ts         Search-crawler pre-render + per-route JSON-LD
   api/
     ai/[[path]].ts       OpenRouter chat + KV-cached model list
-    stripe/[[path]].ts   Checkout + session verification + products
-    webhooks/stripe.ts   Stripe webhook with HMAC verification
+    stripe/[[path]].ts   Provider-free 410 tombstone for retired payment clients
+    webhooks/stripe.ts   Provider-free 410 tombstone for retired webhook deliveries
 server/                  Shared TS modules imported by Functions + dev middleware
-shared/                  Types shared between client + functions (ai, products, residents, const)
+shared/                  Types shared between client + functions (ai, residents, const)
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```
@@ -171,14 +169,15 @@ pnpm check        # tsc --noEmit
 pnpm verify       # Full verification suite
 ```
 
-## Support and sponsorship
+## Help improve the project
 
-If the studio or the guides have helped, a few ways to support the project:
+If the Studio or guides have helped, useful ways to support the project are:
 
-- **Tip jar:** [tomodachi.pw/support](https://tomodachi.pw/support) — $5 / $15 / $25 via Stripe
-- **Paid products:** [tomodachi.pw/unlock](https://tomodachi.pw/unlock) — $9 recovery checklist or $49 30-min consult
-- **GitHub Sponsors:** the [`Sponsor`](https://github.com/sponsors/RazonIn4K) button at the top of this repo (once GitHub Sponsors approval clears)
-- **Brave Creator:** [tomodachi.brave](https://tomodachi.brave) is verified for Brave Rewards if you tip with BAT
+- Test a real drawing, import, export, or AI workflow and send specific feedback.
+- Report reproducible bugs or accessibility issues through [GitHub Issues](https://github.com/RazonIn4K/Mii-pixelart/issues).
+- Try the free [AI Action Plan beta](https://tomodachi.pw/ai-plan) and verify every recommendation before acting.
+
+Tomodachi currently accepts no payments, tips, donations, or consultation bookings.
 
 ## License
 

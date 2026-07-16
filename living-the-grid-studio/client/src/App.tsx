@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CookieConsent from "./components/CookieConsent";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -16,8 +16,7 @@ import Privacy from "./pages/Privacy";
 import Studio from "./pages/Studio";
 import Support from "./pages/Support";
 import Terms from "./pages/Terms";
-import Unlock from "./pages/Unlock";
-
+import AiPlan from "./pages/AiPlan";
 
 function Router() {
   return (
@@ -33,7 +32,10 @@ function Router() {
       <Route path={"/guides"} component={Guides} />
       <Route path={"/faq"} component={Faq} />
       <Route path={"/about"} component={About} />
-      <Route path={"/unlock"} component={Unlock} />
+      <Route path={"/ai-plan"} component={AiPlan} />
+      <Route path={"/unlock"}>
+        <Redirect to="/ai-plan" replace />
+      </Route>
       <Route path={"/support"} component={Support} />
       <Route path={"/donate"} component={Support} />
       <Route path={"/404"} component={NotFound} />

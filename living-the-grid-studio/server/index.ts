@@ -7,12 +7,6 @@ import {
   getOpenRouterStatus,
   sendOpenRouterChat,
 } from "./openrouter";
-import {
-  createCheckoutSession,
-  listPublicProducts,
-  verifyCheckoutSession,
-} from "./stripe";
-import { formatPrice } from "../shared/products";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +14,22 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  const paymentsRetired = (_req: express.Request, res: express.Response) => {
+    res
+      .status(410)
+      .set("Cache-Control", "no-store")
+      .json({
+        error: {
+          code: "payments_retired",
+          message: "Payments and checkout are no longer offered by Tomodachi.",
+        },
+      });
+  };
+  // Install tombstones before JSON parsing so any stale request receives the
+  // same terminal response regardless of its old payload shape or size.
+  app.use("/api/stripe", paymentsRetired);
+  app.all("/api/webhooks/stripe", paymentsRetired);
 
   app.use(express.json({ limit: "1mb" }));
 
@@ -42,56 +52,6 @@ async function startServer() {
         configured: true,
         reply:
           error instanceof Error ? error.message : "AI request failed locally.",
-      });
-    }
-  });
-
-  app.get("/api/stripe/products", (req, res) => {
-    const categoryFilter =
-      typeof req.query.category === "string" ? req.query.category : null;
-    const products = listPublicProducts()
-      .filter(
-        (product) => !categoryFilter || product.category === categoryFilter,
-      )
-      .map((product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        priceLabel: formatPrice(product.amount, product.currency),
-        perks: product.perks ?? [],
-        caveat: product.caveat ?? null,
-        category: product.category,
-      }));
-    res.status(200).json({ products });
-  });
-
-  app.post("/api/stripe/checkout", async (req, res) => {
-    try {
-      const result = await createCheckoutSession(req.body);
-      res.status(result.status).json(result.body);
-    } catch (error) {
-      res.status(500).json({
-        configured: true,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Stripe checkout failed locally.",
-      });
-    }
-  });
-
-  app.get("/api/stripe/session", async (req, res) => {
-    try {
-      const sessionId = String(req.query.session_id ?? "");
-      const result = await verifyCheckoutSession(sessionId);
-      res.status(result.status).json(result.body);
-    } catch (error) {
-      res.status(500).json({
-        configured: true,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Stripe session verification failed locally.",
       });
     }
   });

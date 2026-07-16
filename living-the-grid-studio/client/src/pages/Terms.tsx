@@ -12,20 +12,25 @@ import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Terms() {
   useDocumentTitle("Terms");
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Terms", href: "/terms" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Terms", href: "/terms" },
+    ]),
+  ]);
 
   return (
     <LegalLayout
       title="Terms of Service"
-      lastUpdated="May 14, 2026"
+      lastUpdated="July 16, 2026"
       intro="These Terms govern your use of Tomodachi. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
       <p>
         Tomodachi is a browser-based Mii pixel-art studio paired with
-        breach-recovery tools and guides. We provide free tools (the studio,
-        the AI assistant, the password breach-check) and may also sell paid
-        digital products and consult bookings through the Site.
+        breach-recovery tools and guides. The Studio, AI assistant, password
+        breach check, and current AI Action Plan beta are free. We do not accept
+        payments, tips, donations, or consultation bookings through the Site.
       </p>
 
       <h2>2. Acceptable use</h2>
@@ -36,8 +41,8 @@ export default function Terms() {
           violent threats, or other content that violates applicable law.
         </li>
         <li>
-          Attempt to bypass rate limits, scrape paid content, or interfere with
-          the Site&apos;s normal operation.
+          Attempt to bypass rate limits, access controls, or interfere with the
+          Site&apos;s normal operation.
         </li>
         <li>
           Submit information about people other than yourself to the
@@ -52,8 +57,8 @@ export default function Terms() {
       <p>
         The breach recovery guidance and AI assistant output is informational
         only. It is not legal, security, medical, or financial advice. For an
-        incident affecting your business or personal safety, consult a
-        qualified professional.
+        incident affecting your business or personal safety, consult a qualified
+        professional.
       </p>
 
       <h2>4. AI output</h2>
@@ -66,21 +71,21 @@ export default function Terms() {
         de-identified prompts and outputs.
       </p>
 
-      <h2>5. Paid services</h2>
+      <h2>5. Payments</h2>
       <p>
-        Where the Site offers paid downloads, paid guides, or consult bookings,
-        the price, scope, and refund policy will be displayed at checkout.
-        Unless stated otherwise, digital downloads are non-refundable once the
-        download link has been delivered, and consult bookings can be
-        rescheduled with at least 24 hours&apos; notice.
+        Tomodachi currently offers no paid service and has no checkout. A
+        possible one-time expanded $5 creator plan is only product direction,
+        not an offer for sale. Before any paid version launches, we will publish
+        its scope, pricing, fulfillment, cancellation, refund, and data-handling
+        terms and test them end to end.
       </p>
 
       <h2>6. Intellectual property</h2>
       <p>
-        The Site, including code, design, and original written content, is
-        owned by Tomodachi and protected by intellectual-property
-        laws. The Tomodachi Life palette and references are used under fair
-        use for an unofficial fan tool. We do not bundle official game assets.
+        The Site, including code, design, and original written content, is owned
+        by Tomodachi and protected by intellectual-property laws. The Tomodachi
+        Life palette and references are used under fair use for an unofficial
+        fan tool. We do not bundle official game assets.
       </p>
 
       <h2>7. Disclaimers</h2>
@@ -92,12 +97,11 @@ export default function Terms() {
 
       <h2>8. Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, Tomodachi is not
-        liable for indirect, incidental, special, consequential, or punitive
-        damages, or any loss of data or profits, arising from your use of the
-        Site. Our total liability for any claim related to the Site will not
-        exceed the amount you paid us in the twelve months preceding the
-        claim, or USD 50 if you paid us nothing.
+        To the maximum extent permitted by law, Tomodachi is not liable for
+        indirect, incidental, special, consequential, or punitive damages, or
+        any loss of data or profits, arising from your use of the Site. To the
+        extent a monetary cap is permitted, our total liability for any claim
+        related to the free Site will not exceed USD 50.
       </p>
 
       <h2>9. Termination</h2>
@@ -108,10 +112,9 @@ export default function Terms() {
 
       <h2>10. Governing law</h2>
       <p>
-        These Terms are governed by the laws of your principal jurisdiction
-        unless otherwise required by mandatory consumer-protection law.
-        Substitute this section before launch with the operator&apos;s actual
-        chosen jurisdiction.
+        These Terms are governed by the laws of the State of Illinois and the
+        United States, without regard to conflict-of-law rules, except where
+        mandatory consumer-protection law requires otherwise.
       </p>
 
       <h2>11. Changes</h2>
@@ -122,8 +125,9 @@ export default function Terms() {
 
       <h2>12. Contact</h2>
       <p>
-        Questions:{" "}
-        <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
+        Operator: David Ortiz. Questions may be sent to{" "}
+        <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a> or by mail to
+        122 W Taylor St, DeKalb, Illinois, United States.
       </p>
     </LegalLayout>
   );

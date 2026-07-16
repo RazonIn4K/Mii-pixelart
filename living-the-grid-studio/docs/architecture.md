@@ -36,8 +36,7 @@ Mii-pixelart/
     │       └── pages/             ← Route-level page components
     ├── server/                    ← Thin Express server (dev only)
     │   ├── index.ts
-    │   ├── openrouter.ts
-    │   └── stripe.ts
+    │   └── openrouter.ts
     ├── functions/                 ← Cloudflare Pages Functions (edge)
     │   └── api/
     ├── shared/                    ← Shared types/constants
@@ -89,19 +88,17 @@ graph TB
     subgraph Edge["Cloudflare Pages (Edge)"]
         Static["Static Assets<br/>dist/public/"]
         Fn_AI["Function: /api/ai/*"]
-        Fn_Stripe["Function: /api/stripe/*"]
+        Fn_Retired["410 tombstones<br/>historic payment paths"]
     end
 
     subgraph External["External Services"]
         OR["OpenRouter API<br/>(AI models)"]
-        Stripe["Stripe API<br/>(payments)"]
     end
 
     Browser -->|"GET /"| Static
     Browser -->|"POST /api/ai/chat"| Fn_AI
-    Browser -->|"POST /api/stripe/checkout"| Fn_Stripe
     Fn_AI -->|"OPENROUTER_API_KEY"| OR
-    Fn_Stripe -->|"STRIPE_SECRET_KEY"| Stripe
+    Browser -.->|"historic payment request"| Fn_Retired
 
     style Browser fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -461,25 +458,21 @@ graph LR
         D1["GET /api/ai/status"]
         D2["GET /api/ai/models"]
         D3["POST /api/ai/chat"]
-        D4["GET /api/stripe/products"]
-        D5["POST /api/stripe/checkout"]
-        D6["GET /api/stripe/session"]
+        D4["historic payment paths<br/>410 Gone + no-store"]
     end
 
     subgraph Edge["Prod: functions/api/"]
         E1["ai/[[path]].ts"]
-        E2["stripe/[[path]].ts"]
+        E2["retired payment tombstones"]
     end
 
     subgraph Shared["Shared logic: server/"]
         OR["openrouter.ts\ngetOpenRouterStatus()\ngetOpenRouterModels()\nsendOpenRouterChat()"]
-        ST["stripe.ts\nlistPublicProducts()\ncreateCheckoutSession()\nverifyCheckoutSession()"]
     end
 
     D1 & D2 & D3 --> OR
-    D4 & D5 & D6 --> ST
     E1 --> OR
-    E2 --> ST
+    D4 -.-> E2
 
     style Dev fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -506,7 +499,7 @@ graph TB
         Build["Build step\npnpm install --frozen-lockfile\npnpm vite build\nRoot: living-the-grid-studio\nOutput: dist/public"]
         Preview["Preview deployment\n*.pages.dev"]
         Production["Production deployment\ntomodachi.pw"]
-        Fns["Pages Functions\n/api/ai/*\n/api/stripe/*"]
+        Fns["Pages Functions\n/api/ai/*\npayment 410 tombstones"]
     end
 
     Code -->|"git push → triggers build"| Build

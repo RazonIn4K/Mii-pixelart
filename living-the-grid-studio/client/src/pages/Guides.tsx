@@ -3,7 +3,7 @@
  *
  * Top of the page: short teaser cards for the four recovery + studio guides.
  *   The CTA points at the matching free tool (studio, password check, help)
- *   and optionally upsells to /unlock or /support.
+ *   and points to the free AI plan or non-payment support page.
  *
  * Below: four full-length Tomodachi Life player guides, rendered inline so
  * Google indexes the actual content. Each guide has an anchor ID so it can
@@ -59,7 +59,7 @@ const GUIDES: GuideCard[] = [
       "Free: a printable rotation order so you do the highest-value accounts first.",
     ],
     cta: { href: "/help", label: "Read the free 24-hour actions" },
-    upsell: { href: "/unlock", label: "Get the full paid checklist ($9)" },
+    upsell: { href: "/ai-plan", label: "Build a free AI action plan" },
   },
   {
     id: "mii-face-mask-from-image",
@@ -67,7 +67,8 @@ const GUIDES: GuideCard[] = [
     title: "Turn a photo into a repaintable Mii face mask",
     summary:
       "Walks through importing a face photo, choosing the right preset, and tuning the result so it actually paints square-by-square in-game.",
-    audience: "Players who want a custom Mii based on a real face or character.",
+    audience:
+      "Players who want a custom Mii based on a real face or character.",
     freePreview: [
       "Free: the import preset that works best for human faces.",
       "Free: when to drop to 16x16 vs stay at 32x32.",
@@ -103,8 +104,8 @@ const GUIDES: GuideCard[] = [
     ],
     cta: { href: "/", label: "Run the browser-only password check" },
     upsell: {
-      href: "/unlock",
-      label: "Pair it with the recovery checklist or 30-min consult",
+      href: "/ai-plan",
+      label: "Turn the steps into a free AI action plan",
     },
   },
 ];
@@ -134,14 +135,17 @@ const LONG_GUIDES: LongGuide[] = [
           default templates.
         </p>
 
-        <h4 className="font-semibold mt-4">Start from a real face, not a blank slate</h4>
+        <h4 className="font-semibold mt-4">
+          Start from a real face, not a blank slate
+        </h4>
         <p>
           The 3DS Mii Maker has a built-in "Look-Alike Mii" tool: from the home
           menu open Mii Maker, then Start from Scratch, then choose "Look-Alike
           Mii." It generates a Mii from a photo using the front-facing camera.
           The output is almost always wrong, but it's much faster to fix a wrong
           Mii than to build the right one from a blank canvas. Use it for the
-          rough head shape and skin tone, then go in by hand for everything else.
+          rough head shape and skin tone, then go in by hand for everything
+          else.
         </p>
         <p>
           On a Wii U, use the same flow from the Mii Maker app via the GamePad
@@ -150,7 +154,9 @@ const LONG_GUIDES: LongGuide[] = [
           starting point.
         </p>
 
-        <h4 className="font-semibold mt-4">Eyes first, then mouth, then everything else</h4>
+        <h4 className="font-semibold mt-4">
+          Eyes first, then mouth, then everything else
+        </h4>
         <p>
           Recognition lives in two features: the eyes and the mouth. Get those
           right and almost any other mistake feels like personality rather than
@@ -172,12 +178,14 @@ const LONG_GUIDES: LongGuide[] = [
           </li>
           <li>
             Eyebrows are the secret weapon. Tomodachi Life Miis read very
-            differently depending on brow thickness and angle. Try three different
-            brows on the same Mii and the difference is huge.
+            differently depending on brow thickness and angle. Try three
+            different brows on the same Mii and the difference is huge.
           </li>
         </ul>
 
-        <h4 className="font-semibold mt-4">Hair is the last thing you adjust</h4>
+        <h4 className="font-semibold mt-4">
+          Hair is the last thing you adjust
+        </h4>
         <p>
           New Mii builders almost always pick the hair first and then can't get
           the face to read. Build the face fully, then add hair, then re-tune
@@ -185,7 +193,9 @@ const LONG_GUIDES: LongGuide[] = [
           head, which throws off eye spacing and mouth position.
         </p>
 
-        <h4 className="font-semibold mt-4">Save variants, not just the final</h4>
+        <h4 className="font-semibold mt-4">
+          Save variants, not just the final
+        </h4>
         <p>
           Mii Maker lets you keep up to 100 Miis. Use that capacity. Save the
           Mii at each major version (rough cast, eyes-fixed, mouth-fixed,
@@ -195,14 +205,16 @@ const LONG_GUIDES: LongGuide[] = [
           editor is available.
         </p>
 
-        <h4 className="font-semibold mt-4">When the source is a drawing, not a photo</h4>
+        <h4 className="font-semibold mt-4">
+          When the source is a drawing, not a photo
+        </h4>
         <p>
-          For anime characters, mascots, and game characters, the
-          "Look-Alike" camera trick doesn't work. Instead, decompose the face
-          into Mii-shaped parts in your head: which oval head shape, which eye
-          set (round / sharp / closed), which mouth set, which hair silhouette.
-          Drawings exaggerate certain features on purpose, so pick the Mii part
-          that exaggerates the same thing.
+          For anime characters, mascots, and game characters, the "Look-Alike"
+          camera trick doesn't work. Instead, decompose the face into Mii-shaped
+          parts in your head: which oval head shape, which eye set (round /
+          sharp / closed), which mouth set, which hair silhouette. Drawings
+          exaggerate certain features on purpose, so pick the Mii part that
+          exaggerates the same thing.
         </p>
         <p>
           If you want to repaint the same face square-by-square as a pixel-art
@@ -211,9 +223,9 @@ const LONG_GUIDES: LongGuide[] = [
           <Link className="underline" href="/studio">
             Tomodachi Studio
           </Link>{" "}
-          and run the import-to-grid flow. The studio handles the color reduction
-          and exports a paint-by-numbers reference you can follow in the in-game
-          editor without guessing.
+          and run the import-to-grid flow. The studio handles the color
+          reduction and exports a paint-by-numbers reference you can follow in
+          the in-game editor without guessing.
         </p>
       </>
     ),
@@ -221,7 +233,8 @@ const LONG_GUIDES: LongGuide[] = [
   {
     id: "gameplay-basics",
     icon: Gamepad2,
-    title: "Tomodachi Life gameplay basics: apartments, food, jobs, friendship, marriage",
+    title:
+      "Tomodachi Life gameplay basics: apartments, food, jobs, friendship, marriage",
     tagline:
       "The shortest path from 'I just got a Mii apartment' to a stable island with paired-up Miis, satisfied appetites, and steady cash flow.",
     body: (
@@ -241,8 +254,8 @@ const LONG_GUIDES: LongGuide[] = [
           </li>
           <li>
             Feed any Mii showing the food icon. Each Mii has favorites and
-            dislikes — favorites give "all-time best" reactions and boost happiness
-            faster than neutral foods.
+            dislikes — favorites give "all-time best" reactions and boost
+            happiness faster than neutral foods.
           </li>
           <li>
             Solve any "Problem" notification. Problems are short mini-events
@@ -256,7 +269,9 @@ const LONG_GUIDES: LongGuide[] = [
           </li>
         </ol>
 
-        <h4 className="font-semibold mt-4">Food: don't waste it on neutral reactions</h4>
+        <h4 className="font-semibold mt-4">
+          Food: don't waste it on neutral reactions
+        </h4>
         <p>
           Every Mii has a hidden favorite-foods list. The first time you feed a
           new food, the reaction tells you the grade: "I love it!" is favorite,
@@ -283,7 +298,9 @@ const LONG_GUIDES: LongGuide[] = [
           on relationship progression is real.
         </p>
 
-        <h4 className="font-semibold mt-4">Friendship and relationship gating</h4>
+        <h4 className="font-semibold mt-4">
+          Friendship and relationship gating
+        </h4>
         <p>
           Two Miis become friends after a series of triggered events when you
           place them in the same apartment, send them to the park together, or
@@ -293,8 +310,8 @@ const LONG_GUIDES: LongGuide[] = [
           Romantic partners are stricter: a Mii has one "current crush" at a
           time, and confession events fire when the crush meter is high enough.
           You can nudge crushes by repeatedly placing two Miis in social
-          situations, but if the meter never fills it usually means a personality
-          mismatch — pair them with someone else.
+          situations, but if the meter never fills it usually means a
+          personality mismatch — pair them with someone else.
         </p>
 
         <h4 className="font-semibold mt-4">Marriage and the next generation</h4>
@@ -326,7 +343,8 @@ const LONG_GUIDES: LongGuide[] = [
   {
     id: "breach-recovery",
     icon: AlertTriangle,
-    title: "What to do after the Tomodachishare breach (post-shutdown recovery)",
+    title:
+      "What to do after the Tomodachishare breach (post-shutdown recovery)",
     tagline:
       "Step-by-step for players affected by the Tomodachishare credential leak — including what's recoverable, what's not, and how to protect linked accounts before damage spreads.",
     body: (
@@ -342,9 +360,9 @@ const LONG_GUIDES: LongGuide[] = [
         <h4 className="font-semibold mt-4">In the first hour</h4>
         <ol className="list-decimal pl-5 space-y-1">
           <li>
-            Don't change the password on Tomodachishare yet. The site is
-            shut down. Changing it there doesn't protect any account that
-            actually matters.
+            Don't change the password on Tomodachishare yet. The site is shut
+            down. Changing it there doesn't protect any account that actually
+            matters.
           </li>
           <li>
             Open the{" "}
@@ -386,14 +404,16 @@ const LONG_GUIDES: LongGuide[] = [
           sure the credential is no longer valid anywhere.
         </p>
 
-        <h4 className="font-semibold mt-4">Save data that's actually at risk</h4>
+        <h4 className="font-semibold mt-4">
+          Save data that's actually at risk
+        </h4>
         <p>
           If your Tomodachi Life save lived on a Nintendo Network ID that shared
           a password with the breach, the threat extends to your eShop balance
-          and downloadable game library. Sign in to your NNID at the
-          Nintendo Account site from a clean browser, change the password, and
-          turn on 2-Step Verification. Then check the recent login activity for
-          anything you don't recognize.
+          and downloadable game library. Sign in to your NNID at the Nintendo
+          Account site from a clean browser, change the password, and turn on
+          2-Step Verification. Then check the recent login activity for anything
+          you don't recognize.
         </p>
 
         <h4 className="font-semibold mt-4">A 30-day monitoring rhythm</h4>
@@ -407,14 +427,13 @@ const LONG_GUIDES: LongGuide[] = [
           next priority to lock down.
         </p>
         <p>
-          For a structured written plan you can hand to a less-technical friend
-          or family member, the paid{" "}
-          <Link className="underline" href="/unlock">
-            recovery checklist
-          </Link>{" "}
-          covers the same flow in a printable 12-step format, or you can book a
-          30-minute consult to walk through your specific account inventory
-          together.
+          For a structured set of next steps you can review with a
+          less-technical friend or family member, try the free{" "}
+          <Link className="underline" href="/ai-plan">
+            AI Action Plan beta
+          </Link>
+          . Never include passwords, recovery codes, payment details, or other
+          secrets in an AI prompt.
         </p>
       </>
     ),
@@ -429,9 +448,9 @@ const LONG_GUIDES: LongGuide[] = [
       <>
         <p>
           Tomodachi Life shipped before the era of always-on cloud saves, which
-          means the responsibility for protecting your island sits with you.
-          The good news: QR codes and the SD card backup pathway are reliable
-          if you set them up before something breaks.
+          means the responsibility for protecting your island sits with you. The
+          good news: QR codes and the SD card backup pathway are reliable if you
+          set them up before something breaks.
         </p>
 
         <h4 className="font-semibold mt-4">Exporting a Mii as a QR code</h4>
@@ -450,10 +469,10 @@ const LONG_GUIDES: LongGuide[] = [
 
         <h4 className="font-semibold mt-4">Importing a Mii from a QR code</h4>
         <p>
-          From the 3DS home screen: open Mii Maker, choose Receive a Mii from
-          QR Code/Image, hold the 3DS camera over the code. The Mii lands in
-          your Mii Maker but not yet in Tomodachi Life — open the game and
-          import from Mii Maker so it becomes a resident.
+          From the 3DS home screen: open Mii Maker, choose Receive a Mii from QR
+          Code/Image, hold the 3DS camera over the code. The Mii lands in your
+          Mii Maker but not yet in Tomodachi Life — open the game and import
+          from Mii Maker so it becomes a resident.
         </p>
         <p>
           Each QR records the original creator's name. That's fine; you can
@@ -461,28 +480,32 @@ const LONG_GUIDES: LongGuide[] = [
           locked once the Mii moves into a Tomodachi Life apartment.
         </p>
 
-        <h4 className="font-semibold mt-4">Sharing islands and Mii sets at scale</h4>
+        <h4 className="font-semibold mt-4">
+          Sharing islands and Mii sets at scale
+        </h4>
         <p>
-          A single QR code only encodes one Mii. To share an entire island
-          (cast members, voice tweaks, apartment themes), the path is to export
-          each Mii as a QR individually and bundle them. Community sites do
-          this by posting QR code galleries grouped by theme (anime cast,
-          presidents, K-pop, etc.). When importing a large set, take a
-          screenshot of each Mii in Mii Maker before you import to Tomodachi
-          Life — once a Mii is a resident, you can't easily get the original
-          QR back if you delete the source.
+          A single QR code only encodes one Mii. To share an entire island (cast
+          members, voice tweaks, apartment themes), the path is to export each
+          Mii as a QR individually and bundle them. Community sites do this by
+          posting QR code galleries grouped by theme (anime cast, presidents,
+          K-pop, etc.). When importing a large set, take a screenshot of each
+          Mii in Mii Maker before you import to Tomodachi Life — once a Mii is a
+          resident, you can't easily get the original QR back if you delete the
+          source.
         </p>
 
-        <h4 className="font-semibold mt-4">Backing up your Tomodachi Life save</h4>
+        <h4 className="font-semibold mt-4">
+          Backing up your Tomodachi Life save
+        </h4>
         <p>
           The 3DS does not natively back up game saves to cloud storage. The
           practical options:
         </p>
         <ul className="list-disc pl-5 space-y-1">
           <li>
-            <strong>System transfer:</strong> if you're moving to a new 3DS,
-            run the official system transfer from the source to the target
-            console. It moves saves, eShop content, and SD card data together.
+            <strong>System transfer:</strong> if you're moving to a new 3DS, run
+            the official system transfer from the source to the target console.
+            It moves saves, eShop content, and SD card data together.
           </li>
           <li>
             <strong>Save data import/export:</strong> from System Settings →
@@ -510,8 +533,8 @@ const LONG_GUIDES: LongGuide[] = [
         </p>
         <p>
           If you want to recreate Mii face masks (custom painted faces worn by
-          Miis in-game) from photos or character art before you lose access,
-          run the source images through the{" "}
+          Miis in-game) from photos or character art before you lose access, run
+          the source images through the{" "}
           <Link className="underline" href="/studio">
             Tomodachi Studio
           </Link>{" "}
@@ -528,7 +551,10 @@ const LONG_GUIDES: LongGuide[] = [
 // are real step-by-step procedures so they use HowTo; the other two are
 // closer to explainer articles so they use Article.
 const GUIDES_STRUCTURED_DATA = [
-  breadcrumbFor([{ name: "Home", href: "/" }, { name: "Guides", href: "/guides" }]),
+  breadcrumbFor([
+    { name: "Home", href: "/" },
+    { name: "Guides", href: "/guides" },
+  ]),
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
@@ -576,12 +602,19 @@ const GUIDES_STRUCTURED_DATA = [
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#gameplay-basics",
     image: "https://tomodachi.pw/og-image.png",
-    author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
+    author: {
+      "@type": "Organization",
+      name: "Tomodachi",
+      url: "https://tomodachi.pw/",
+    },
     publisher: {
       "@type": "Organization",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+      logo: {
+        "@type": "ImageObject",
+        url: "https://tomodachi.pw/og-image.png",
+      },
     },
   },
   {
@@ -594,12 +627,19 @@ const GUIDES_STRUCTURED_DATA = [
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#breach-recovery",
     image: "https://tomodachi.pw/og-image.png",
-    author: { "@type": "Organization", name: "Tomodachi", url: "https://tomodachi.pw/" },
+    author: {
+      "@type": "Organization",
+      name: "Tomodachi",
+      url: "https://tomodachi.pw/",
+    },
     publisher: {
       "@type": "Organization",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+      logo: {
+        "@type": "ImageObject",
+        url: "https://tomodachi.pw/og-image.png",
+      },
     },
   },
   {
@@ -642,7 +682,10 @@ const GUIDES_STRUCTURED_DATA = [
 ];
 
 export default function Guides() {
-  useDocumentTitle("Guides", "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.");
+  useDocumentTitle(
+    "Guides",
+    "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.",
+  );
   useStructuredData(GUIDES_STRUCTURED_DATA);
 
   return (
@@ -656,15 +699,18 @@ export default function Guides() {
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-4xl py-10 sm:py-12 space-y-10 sm:space-y-12">
+      <main
+        id="main-content"
+        className="container max-w-4xl py-10 sm:py-12 space-y-10 sm:space-y-12"
+      >
         <section>
           <h1 className="text-3xl sm:text-4xl font-semibold">Guides</h1>
           <p className="mt-2 text-muted-foreground">
             Practical walkthroughs for the people we actually serve: Tomodachi
             Life players turning faces and characters into Mii repaint plans,
             and visitors arriving from the Tomodachishare breach notice. Every
-            guide gives you the working actions for free first, then points at
-            an optional paid upgrade only if you want more depth.
+            guide gives you the working actions for free, with optional links to
+            the free AI beta when a structured checklist would help.
           </p>
           <nav
             aria-label="Jump to guide"
@@ -701,10 +747,7 @@ export default function Guides() {
           {GUIDES.map((guide) => {
             const Icon = guide.icon;
             return (
-              <Card
-                key={guide.id}
-                className="flex h-full flex-col gap-3 p-5"
-              >
+              <Card key={guide.id} className="flex h-full flex-col gap-3 p-5">
                 <header className="flex items-start gap-3">
                   <Icon className="mt-0.5 h-5 w-5 text-primary shrink-0" />
                   <div className="min-w-0">
@@ -722,12 +765,13 @@ export default function Guides() {
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
-                {/* Buttons always stack vertically inside the card. Trying to
-                    fit two buttons side-by-side breaks at <500px card widths
-                    because some upsell labels (e.g. "Pair it with the recovery
-                    checklist or 30-min consult") are too long to share a row. */}
+                {/* Buttons stack vertically so longer guide labels remain
+                    readable at narrow card widths. */}
                 <div className="mt-auto flex flex-col gap-2 pt-2">
-                  <Button asChild className="w-full whitespace-normal h-auto py-2">
+                  <Button
+                    asChild
+                    className="w-full whitespace-normal h-auto py-2"
+                  >
                     <Link href={guide.cta.href}>
                       <span className="text-left">{guide.cta.label}</span>
                       <ArrowRight className="ml-1 h-3.5 w-3.5 shrink-0" />
@@ -789,13 +833,9 @@ export default function Guides() {
               <footer className="pt-2 text-xs text-muted-foreground">
                 Found this helpful?{" "}
                 <Link href="/support" className="underline">
-                  Drop a tip
+                  Test another workflow or send feedback
                 </Link>{" "}
-                or{" "}
-                <Link href="/unlock" className="underline">
-                  pick up a paid checklist
-                </Link>{" "}
-                to fund the next one.
+                to help improve the next guide.
               </footer>
             </article>
           );
@@ -804,16 +844,12 @@ export default function Guides() {
         <section className="border-t border-border pt-6">
           <h2 className="text-lg font-semibold">Help keep guides free</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every guide here stays free. Tips, paid checklists, and consults
-            on{" "}
-            <Link href="/unlock" className="underline">
-              /unlock
-            </Link>{" "}
-            and{" "}
+            Every guide here stays free. The most useful support is testing a
+            real workflow and sharing clear feedback through{" "}
             <Link href="/support" className="underline">
               /support
-            </Link>{" "}
-            are what fund the next one.
+            </Link>
+            .
           </p>
         </section>
       </main>

@@ -20,7 +20,7 @@ Recommended routes:
 - `/studio` - Living The Grid Studio.
 - `/help` - trust and account-safety guidance.
 - `/guides` - SEO articles and creator tutorials.
-- `/packs` - paid or email-gated template packs.
+- `/ai-plan` - free AI action-plan beta and future product direction.
 - `/privacy` - privacy policy.
 - `/affiliate-disclosure` - affiliate and sponsored content disclosure.
 
@@ -59,19 +59,20 @@ Recommended uses:
 5. Add custom domains in Netlify domain settings.
 6. Use the exact DNS records Netlify displays.
 
-## Monetization ladder
+## Product ladder
 
-Start low-friction and trust-first:
+Keep the current product free and trust-first:
 
 1. Free studio usage and free guides.
-2. Display ads on guide pages and secondary creator pages.
-3. Affiliate links for creator tools and account-safety tools.
-4. Email capture for new template drops and status updates.
-5. Paid downloadable packs at $5 to $9.
-6. Premium creator workflow bundles at $19 to $49.
-7. Optional consult calls at $49 to $149 once the site has traffic.
+2. Free AI action-plan beta with explicit consent and reviewable output.
+3. Free exports, guides, templates, and community discovery.
+4. Explore one account-bound, one-time $5 creator plan only after entitlement,
+   refund, privacy, usage-limit, and fulfillment requirements are approved and
+   tested end to end.
 
-Do not overload the trust pages with ads. Put heavier monetization on guides, packs, and creative workflow pages.
+Tomodachi currently accepts no payments and offers no checkout or consultation
+booking. Do not publish a paid offer until a new ADR and launch gate explicitly
+approve the provider and complete fulfillment path.
 
 ## Disclosure copy
 

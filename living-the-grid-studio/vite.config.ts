@@ -10,12 +10,6 @@ import {
   sendOpenRouterChat,
   type ApiResult,
 } from "./server/openrouter";
-import {
-  createCheckoutSession,
-  listPublicProducts,
-  verifyCheckoutSession,
-} from "./server/stripe";
-import { formatPrice } from "./shared/products";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -173,7 +167,10 @@ function vitePluginStorageProxy(): Plugin {
           return;
         }
 
-        const forgeBaseUrl = (process.env.BUILT_IN_FORGE_API_URL || "").replace(/\/+$/, "");
+        const forgeBaseUrl = (process.env.BUILT_IN_FORGE_API_URL || "").replace(
+          /\/+$/,
+          "",
+        );
         const forgeKey = process.env.BUILT_IN_FORGE_API_KEY;
 
         if (!forgeBaseUrl || !forgeKey) {
@@ -183,7 +180,10 @@ function vitePluginStorageProxy(): Plugin {
         }
 
         try {
-          const forgeUrl = new URL("v1/storage/presign/get", forgeBaseUrl + "/");
+          const forgeUrl = new URL(
+            "v1/storage/presign/get",
+            forgeBaseUrl + "/",
+          );
           forgeUrl.searchParams.set("path", key);
 
           const forgeResp = await fetch(forgeUrl, {
@@ -278,62 +278,27 @@ function readRequestJson(req: IncomingMessage): Promise<unknown> {
   });
 }
 
-function vitePluginStripeApi(): Plugin {
+function vitePluginRetiredPaymentApi(): Plugin {
   return {
-    name: "stripe-api",
+    name: "retired-payment-api",
     configureServer(server: ViteDevServer) {
-      server.middlewares.use("/api/stripe", async (req, res, next) => {
-        try {
-          const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
-          if (req.method === "GET" && pathname === "/products") {
-            const categoryFilter = new URL(
-              req.url ?? "/",
-              "http://localhost",
-            ).searchParams.get("category");
-            const products = listPublicProducts()
-              .filter(
-                (product) =>
-                  !categoryFilter || product.category === categoryFilter,
-              )
-              .map((product) => ({
-                id: product.id,
-                name: product.name,
-                description: product.description,
-                priceLabel: formatPrice(product.amount, product.currency),
-                perks: product.perks ?? [],
-                caveat: product.caveat ?? null,
-                category: product.category,
-              }));
-            sendJson(res, { status: 200, body: { products } });
-            return;
-          }
-          if (req.method === "POST" && pathname === "/checkout") {
-            const body = (await readRequestJson(req)) as Record<string, unknown>;
-            sendJson(res, await createCheckoutSession(body));
-            return;
-          }
-          if (req.method === "GET" && pathname === "/session") {
-            const sessionId = new URL(
-              req.url ?? "/",
-              "http://localhost",
-            ).searchParams.get("session_id") ?? "";
-            sendJson(res, await verifyCheckoutSession(sessionId));
-            return;
-          }
-          next();
-        } catch (error) {
-          sendJson(res, {
-            status: 500,
-            body: {
-              configured: true,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Stripe request failed locally.",
+      const retired = (_req: IncomingMessage, res: ServerResponse) => {
+        res.writeHead(410, {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json",
+        });
+        res.end(
+          JSON.stringify({
+            error: {
+              code: "payments_retired",
+              message:
+                "Payments and checkout are no longer offered by Tomodachi.",
             },
-          });
-        }
-      });
+          }),
+        );
+      };
+      server.middlewares.use("/api/stripe", retired);
+      server.middlewares.use("/api/webhooks/stripe", retired);
     },
   };
 }
@@ -349,7 +314,7 @@ const plugins = [
   ...devOnlyPlugins,
   vitePluginStorageProxy(),
   vitePluginOpenRouterApi(),
-  vitePluginStripeApi(),
+  vitePluginRetiredPaymentApi(),
 ];
 
 export default defineConfig({

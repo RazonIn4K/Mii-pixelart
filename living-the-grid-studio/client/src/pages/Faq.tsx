@@ -30,15 +30,13 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Is Tomodachi Life still playable in 2026?",
         answer:
-          "Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The 3DS eShop is closed, so you can no longer buy the game digitally, but if you already own it (cartridge or downloaded), it works exactly as it always did. The online \"Tomodachi Life Travel\" service and StreetPass Plaza shutdowns affected QR-code-based Mii sharing very little; the local QR-code import/export still works. There's no Switch port.",
+          'Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The 3DS eShop is closed, so you can no longer buy the game digitally, but if you already own it (cartridge or downloaded), it works exactly as it always did. The online "Tomodachi Life Travel" service and StreetPass Plaza shutdowns affected QR-code-based Mii sharing very little; the local QR-code import/export still works. There\'s no Switch port.',
       },
       {
         question: "Can I make my Mii look like a real person?",
         answer:
-          "Yes — the 3DS Mii Maker has a built-in \"Look-Alike Mii\" tool that generates a rough Mii from a front-camera photo. The output is almost always wrong on details, but it's faster to correct a wrong Mii than to build one from a blank canvas. The Guides page has a step-by-step walkthrough.",
-        links: [
-          { label: "Mii creation guide", href: "/guides#mii-creation" },
-        ],
+          'Yes — the 3DS Mii Maker has a built-in "Look-Alike Mii" tool that generates a rough Mii from a front-camera photo. The output is almost always wrong on details, but it\'s faster to correct a wrong Mii than to build one from a blank canvas. The Guides page has a step-by-step walkthrough.',
+        links: [{ label: "Mii creation guide", href: "/guides#mii-creation" }],
       },
       {
         question: "What's a Mii face mask?",
@@ -47,7 +45,8 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
         links: [{ label: "Try the Studio", href: "/studio" }],
       },
       {
-        question: "Why can't I edit a Mii's face after it moves into Tomodachi Life?",
+        question:
+          "Why can't I edit a Mii's face after it moves into Tomodachi Life?",
         answer:
           "Mii face data is locked at the moment the Mii enters a Tomodachi Life apartment. After that, only personality, clothing, and voice are editable in-game. To change the face, you either re-import a fresh version of the Mii from Mii Maker (which replaces the old one and may lose relationships), or accept the existing face. The Studio's pixel-art face-mask path is the workaround — you can change the wearable face mask any time without touching the underlying Mii.",
       },
@@ -84,13 +83,14 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
           "Don't change the Tomodachishare password first — that site is shut down, fixing it there protects nothing. Change your primary email password first (because email controls every password reset), turn on two-factor authentication on that email, then work through other accounts in priority order: banks, cloud storage, identity (Apple/Google/Microsoft), social, everything else.",
         links: [
           { label: "Free 24-hour action plan", href: "/help" },
-          { label: "Paid 12-step recovery checklist ($9)", href: "/unlock" },
+          { label: "Free AI action plan", href: "/ai-plan" },
         ],
       },
       {
-        question: "Is the breach recovery checklist worth $9?",
+        question: "Can AI help me organize the recovery steps?",
         answer:
-          "Only if you'd rather follow a printable structured plan than improvise from the free 24-hour actions on /help. The free guidance already covers the four highest-value moves. The paid checklist is a longer printable PDF + Markdown for people who want to share a plan with less-technical family members, or who want a 30-day monitoring rhythm spelled out step by step.",
+          "Yes. The free AI Action Plan beta turns your situation into a short, reviewable checklist. Never include passwords, recovery codes, payment details, or other secrets, and verify every suggestion before acting.",
+        links: [{ label: "Try the AI Action Plan", href: "/ai-plan" }],
       },
     ],
   },
@@ -100,7 +100,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Is the Studio free to use?",
         answer:
-          "Yes. Importing a photo, generating a paint-by-numbers reference, exporting the reference pack — all free. No account needed. The optional paid extras live on /unlock and /support and have nothing to do with the editor itself.",
+          "Yes. Importing a photo, generating a paint-by-numbers reference, exporting the reference pack, and using the current AI beta are free. No account or checkout is required.",
       },
       {
         question: "Do you store my photos or my password?",
@@ -116,11 +116,8 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "How can I support the project?",
         answer:
-          "Three ways: drop a tip on /support ($5, $15, or $25 via Stripe), pick up the paid recovery checklist or 30-min consult on /unlock, or watch the GitHub repo for the Sponsor button once the application is approved.",
-        links: [
-          { label: "Tip jar", href: "/support" },
-          { label: "Paid recovery content", href: "/unlock" },
-        ],
+          "Test a real Studio workflow, report a reproducible bug or accessibility problem, and share clear product feedback. Tomodachi currently accepts no payments, tips, or consultation bookings.",
+        links: [{ label: "Ways to help", href: "/support" }],
       },
     ],
   },
@@ -148,7 +145,7 @@ function buildFaqJsonLd() {
 export default function Faq() {
   useDocumentTitle(
     "FAQ",
-    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and how this site is funded.",
+    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Mii face mask studio, and the free AI plan.",
   );
   useStructuredData([
     breadcrumbFor([
@@ -165,11 +162,16 @@ export default function Faq() {
           <Link href="/" className="text-sm font-medium hover:underline">
             ← Tomodachi
           </Link>
-          <span className="text-xs text-muted-foreground">Frequently asked questions</span>
+          <span className="text-xs text-muted-foreground">
+            Frequently asked questions
+          </span>
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-10 sm:py-12 space-y-10">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-10 sm:py-12 space-y-10"
+      >
         <section className="space-y-3">
           <p className="section-header">FAQ</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
