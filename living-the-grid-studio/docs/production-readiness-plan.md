@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-07-15
+**Last updated:** 2026-07-16
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -18,29 +18,29 @@ staging check does not authorize the next gate.
 ## Current checkpoint
 
 - Staging is serving exact source commit
-  `18e36dac9eb88ac862c2292471125f58199550b9` as Cloudflare deployment
-  `4bb2e58c-5cdb-441a-aa95-2e92d3d69d6c`, active Worker version
-  `d025b531-055f-46bf-be25-2089bedeef58`. The immediately preceding rollback
-  version is `ce30c9d9-1801-46ae-8485-ac029b08f54b`.
+  `406660bcfbef590d8da0e79a52b7ad7bc96e6590` as Cloudflare deployment
+  `4cb804a9-684c-4490-8fa1-1a40b0b15e57`, active Worker version
+  `e9bbf6f6-b14a-468a-94e3-0c4dcdde796b`. The immediately preceding rollback
+  version is `d025b531-055f-46bf-be25-2089bedeef58`.
 - The deployed staging flags are `COMMUNITY_MUTATIONS_ENABLED=true` and
   `CONSULT_SALES_ENABLED=false`. The staging D1 migration ledger contains
   `0001` through `0008`; that deployment did not apply a migration, rotate a
   secret, change OAuth, DNS, a role, production, or application data.
 - Anonymous routes, crawler controls, CSP/security headers, the authenticated
-  account menu, one authoritative Studio canvas, real AI advice with provider
-  data collection set to `deny`, and the publish-review dialog passed the
-  completed functional checks. No project was published during that smoke
-  test.
+  account menu, one authoritative true-256 Studio canvas, isolated drawing,
+  import/reference/Copy Guide, export-failure recovery, real AI advice, and the
+  publish-review dialog passed the completed functional checks. No project was
+  published and no existing cloud draft was changed during that gate.
 - The exact deployed commit does **not** pass the complete performance gate.
-  In the agreed 390 by 844, Slow 4G, 4-times CPU profile, the homepage passed
-  at a 2.185 second median LCP and 0.00 CLS and a normal grid interaction
-  measured 110 ms. However, **Start blank** measured about 544-553 ms and the
-  returning-draft Studio path measured a 3.067 second median LCP and 0.17 CLS.
-  The required limits remain LCP below 2.5 seconds, CLS below 0.1, and INP
-  below 200 ms.
-- Follow-up performance work may exist in a local worktree, but it is not a
-  release until it is committed, reviewed, green in both canonical and
-  security CI, approved by exact SHA, and deployed under a new staging gate.
+  In the agreed 390 by 844, DPR 3, Slow 4G, 4-times CPU profile, five cold
+  Studio runs measured 4.084 seconds p75 LCP and 0.00 CLS; the first canvas
+  interaction measured 76 ms INP. The required limits remain LCP below 2.5
+  seconds, CLS below 0.1, and INP below 200 ms.
+- A live Create request after Advice returned a safely rejected empty grid.
+  The current corrective candidate isolates sketch history at the server
+  boundary and paints an early Studio shell. It passes local functional,
+  bundle, and compressed-trace diagnostics, but is not a release until remote
+  CI is green, the exact SHA is approved, and that SHA passes hosted staging.
 - Production is unchanged and continues to run the retained Pages deployment.
   Nothing in this document authorizes a merge, production deployment, DNS
   change, migration, secret write, OAuth change, or new staging data.
@@ -70,7 +70,7 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Studio performance fix and new exact staging candidate | Current staging checkpoint | **Blocked:** deployed SHA misses Studio INP/LCP/CLS |
+| P1 | Studio performance fix and new exact staging candidate | Current staging checkpoint | **In review:** local candidate passes diagnostics; hosted exact-SHA approval remains |
 | P2 | Fail-closed writable hosted harness | P1 source candidate | Not implemented as a dedicated live harness |
 | P3 | Secret-free live-auth runner | P2 safety primitives | Not implemented as a repeatable runner |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete on live staging |

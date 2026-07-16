@@ -11,19 +11,20 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-07-15):** Exact source
-> `f03b428cb696baee4b7794aa74fea14b1db5e4d2` is the active deployment on
+> **Deployment status (2026-07-16):** Exact source
+> `406660bcfbef590d8da0e79a52b7ad7bc96e6590` is the active deployment on
 > [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) for the approved
-> authenticated Studio, accessibility, crawler, CSP, and mobile-performance
-> scope. It is functionally accepted, but its restored-Studio LCP misses the
-> launch threshold. Community mutations are enabled only on staging; consult
-> sales remains disabled. The current branch contains a corrective canonical
-> 256×256 canvas, reference, guide, cursor, and starter slice that is not yet
-> deployed and requires a new exact-SHA staging approval.
+> authenticated true-256 Studio, AI, accessibility, crawler, CSP, and
+> mobile-performance scope. It is functionally accepted, but its cold-Studio
+> LCP misses the launch threshold and a live mixed-history Create request
+> produced a safely rejected empty grid. Community mutations are enabled only
+> on staging; consult sales remains disabled. The current branch contains an
+> early Studio shell and server-side sketch-history isolation that are tested
+> but not deployed and require a new exact-SHA staging approval.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
 > Cloudflare Pages deployment until cross-user staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
-> [sanitized staging record](docs/release-evidence/2026-07-15-staging-canvas-game-match-f03b428.md).
+> [sanitized staging record](docs/release-evidence/2026-07-16-staging-true-256-406660b.md).
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 

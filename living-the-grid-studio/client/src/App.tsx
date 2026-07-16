@@ -11,6 +11,7 @@ import {
   setupPathForReturnTo,
 } from "./lib/community/return-to";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { StudioStartShell } from "./components/studio/StudioStartShell";
 import Home from "./pages/Home";
 
 const About = lazy(() => import("./pages/About"));
@@ -54,11 +55,19 @@ function OnboardedAccountRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function StudioRoute() {
+  return (
+    <Suspense fallback={<StudioStartShell />}>
+      <Studio />
+    </Suspense>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
-      <Route path={"/studio"} component={Studio} />
+      <Route path={"/studio"} component={StudioRoute} />
       <Route path={"/discover"} component={Discover} />
       <Route path={"/search"} component={Search} />
       <Route path={"/u/:username"} component={UserProfile} />

@@ -57,6 +57,7 @@ import {
   type StudioPanel,
 } from "@/components/studio/StudioWorkflowNav";
 import { CloudProjectControls } from "@/components/community/CloudProjectControls";
+import ImportPanel from "@/components/studio/ImportPanel";
 // ResidentPanel + Island tab removed — feature wasn't being used and the
 // ResidentSpec sidecar lived only in the AI tab's "validate JSON" path which
 // is now a non-feature.
@@ -109,7 +110,6 @@ const AiPanel = lazy(() => import("@/components/studio/AiPanel"));
 const CreationPanel = lazy(() => import("@/components/studio/CreationPanel"));
 const CopyGuidePanel = lazy(() => import("@/components/studio/CopyGuidePanel"));
 const ExportPanel = lazy(() => import("@/components/studio/ExportPanel"));
-const ImportPanel = lazy(() => import("@/components/studio/ImportPanel"));
 const OptimizerPanel = lazy(() => import("@/components/studio/OptimizerPanel"));
 const PalettePanel = lazy(() => import("@/components/studio/PalettePanel"));
 

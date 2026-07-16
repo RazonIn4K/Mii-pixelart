@@ -1,6 +1,6 @@
 # Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-07-15
+**Last Updated:** 2026-07-16
 
 ---
 
@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
-| 7     | Island Workshop Community  | Writable single-account staging; canvas correction and performance follow-up required | Exact `f03b428` is active and functionally accepted; its restored-Studio LCP fails the gate, and the canonical-256 corrective source still needs a new exact-SHA staging approval |
+| 7     | Island Workshop Community  | Writable single-account staging; performance and AI follow-up required | Exact `406660b` is active and functionally accepted; its cold-Studio LCP fails the gate, and the tested Studio-shell plus AI-history corrective candidate still needs a new exact-SHA staging approval |
 
 ---
 
@@ -205,7 +205,7 @@ human-authorized moderation.
 
 **Accepted on isolated staging:**
 
-- [x] Exact source `f03b428cb696baee4b7794aa74fea14b1db5e4d2`
+- [x] Exact source `406660bcfbef590d8da0e79a52b7ad7bc96e6590`
       deployed with community mutations enabled only on isolated staging and
       consult sales disabled; authenticated Studio, account navigation, share
       review, security, crawler, accessibility, CSP, and isolation checks pass
@@ -217,19 +217,20 @@ human-authorized moderation.
 - [x] Anonymous API/security/crawler, CSP/font, responsive browser,
       accessibility, local-only Studio stroke/undo, zero-write D1, and rollback
       checks
-- [x] Current exact-source homepage performance: 2,185 ms median LCP, 0.00
-      CLS, and 100 Accessibility/Best Practices Lighthouse scores
-- [ ] Current exact-source Studio performance closeout: `f03b428` records
-      3,244ms restored-Studio LCP under the agreed Slow-4G/4×-CPU profile. Its
-      functional canvas still uses a legacy 64×64 interpretation; the local
-      canonical-256 correction requires a new exact staging approval and fresh
-      Worker-hosted cold-load verification.
+- [x] Last unchanged-homepage acceptance: 2,185 ms median LCP, 0.00 CLS, and
+      100 Accessibility/Best Practices Lighthouse scores
+- [ ] Current exact-source Studio performance closeout: `406660b` records
+      4,084 ms cold-Studio p75 LCP and 0.00 CLS under the agreed Slow-4G/4×-CPU
+      profile. The true-256 canvas is functionally accepted; the tested early
+      Studio shell and AI-history isolation require a new exact staging
+      approval and Worker-hosted cold, restored-draft, and cloud-load checks.
 
 **Remaining approval gates:**
 
-- [ ] New exact-source staging deployment and hosted acceptance for the true
-      256×256 surface, exact cursor footprints, layered guides, transparent
-      starters, source comparisons, and Studio performance
+- [ ] New exact-source staging deployment for the tested Studio-shell and
+      AI-history corrective candidate, followed by Worker-hosted cold,
+      restored-draft, authenticated cloud-load, live Create, accessibility,
+      CSP/console, crawler, and mobile-performance acceptance
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
 - [x] Immutable preview and Worker asset-byte parity for the preceding accepted
@@ -242,7 +243,7 @@ The accepted staging deployment enables community mutations only in isolated
 staging for its approved single-account scope. Consult sales stays disabled
 everywhere, and no roadmap status grants approval for production. See the
 sanitized exact-source record in
-`docs/release-evidence/2026-07-15-staging-canvas-game-match-f03b428.md` and the remaining
+`docs/release-evidence/2026-07-16-staging-true-256-406660b.md` and the remaining
 gates in `docs/production-readiness-plan.md`.
 
 ---

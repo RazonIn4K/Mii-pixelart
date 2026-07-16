@@ -140,6 +140,9 @@ describe("OpenRouter untrusted response hardening", () => {
   const validRows = Array.from({ length: 8 }, (_, y) =>
     Array.from({ length: 8 }, (_, x) => (x === y ? "R10C1" : null)),
   );
+  const emptyRows = Array.from({ length: 8 }, () =>
+    Array.from({ length: 8 }, () => null),
+  );
 
   const openRouterResponse = (content: unknown, status = 200) =>
     new Response(
@@ -258,6 +261,73 @@ describe("OpenRouter untrusted response hardening", () => {
     expect(body.sketch).toMatchObject({ width: 8, height: 8 });
     expect(body.warning).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("isolates sketch creation from earlier advice conversation history", async () => {
+    const responses = [
+      openRouterResponse({
+        reply: "An island badge.",
+        sketch: { name: "Empty island", width: 8, height: 8, rows: emptyRows },
+      }),
+      openRouterResponse({
+        reply: "Done.",
+        sketch: { name: "Island", width: 8, height: 8, rows: validRows },
+      }),
+    ];
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) =>
+      responses.shift()!,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      {
+        ...sketchRequest(),
+        messages: [
+          { content: "Give me repaint advice.", role: "user" },
+          { content: "Start with the silhouette.", role: "assistant" },
+          { content: "Now draw an island badge.", role: "user" },
+        ],
+      },
+      { OPENROUTER_API_KEY: "test-shared-key" },
+    );
+
+    expect(result.body).toMatchObject({
+      sketch: { height: 8, name: "Island", width: 8 },
+      warning:
+        "The first grid failed validation; one corrected grid passed review.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const sentBodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse(String((call[1] as RequestInit | undefined)?.body ?? "{}")),
+    ) as Array<{ messages: OpenRouterTestMessage[] }>;
+    expect(sentBodies[0]?.messages.slice(1)).toEqual([
+      { content: "Now draw an island badge.", role: "user" },
+    ]);
+    expect(sentBodies[1]?.messages.slice(1, -1)).toEqual([
+      { content: "Now draw an island badge.", role: "user" },
+    ]);
+    expect(String(sentBodies[1]?.messages.at(-1)?.content)).toContain(
+      "at least one painted cell",
+    );
+  });
+
+  it("rejects sketch creation without a non-empty user instruction", async () => {
+    const fetchMock = upstreamReplying({ reply: "Done.", sketch: null });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      {
+        ...sketchRequest(),
+        messages: [{ content: "Previous assistant prose.", role: "assistant" }],
+      },
+      { OPENROUTER_API_KEY: "test-shared-key" },
+    );
+
+    expect(result).toMatchObject({
+      body: { reply: "Enter a message first." },
+      status: 400,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("routes recovery advice through its dedicated prompt without a session ID", async () => {
@@ -416,6 +486,26 @@ describe("OpenRouter untrusted response hardening", () => {
         "The model returned an invalid sketch (Sketch must contain exactly 8 rows.). Ask it to try again.",
     });
     expect((result.body as { usage?: unknown }).usage).toBeUndefined();
+  });
+
+  it("keeps two empty provider sketches safely non-applyable", async () => {
+    const fetchMock = upstreamReplying({
+      reply: "An empty badge.",
+      sketch: { height: 8, name: "Empty", rows: emptyRows, width: 8 },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(sketchRequest(), {
+      OPENROUTER_API_KEY: "test-shared-key",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.body).toMatchObject({
+      reply: "An empty badge.",
+      sketch: null,
+      warning:
+        "The model returned an invalid sketch (Sketch must contain at least one painted cell.). Ask it to try again.",
+    });
   });
 
   it("normalizes bare allowlisted palette tokens from otherwise valid JSON", async () => {

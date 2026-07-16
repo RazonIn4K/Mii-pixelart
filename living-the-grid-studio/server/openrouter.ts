@@ -296,6 +296,20 @@ export async function sendOpenRouterChat(
     };
   }
 
+  // Advice and create modes share a local transcript, but stale advice prose
+  // makes structured-grid models less reliable. Keep the complete history for
+  // advice while giving a sketch request only its latest user instruction.
+  // Canvas summaries and images remain separate, reviewed context below.
+  const conversationMessages = normalized.requestSketch
+    ? normalized.messages
+        .filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.trim().length > 0,
+        )
+        .slice(-1)
+    : normalized.messages;
   const messages: OpenRouterMessage[] = [
     {
       role: "system",
@@ -308,7 +322,7 @@ export async function sendOpenRouterChat(
       normalized.currentDocument,
       normalized.currentGridImage,
     ),
-    ...normalized.messages,
+    ...conversationMessages,
   ];
 
   const deadlineAt = Date.now() + OPENROUTER_CHAT_TIMEOUT_MS;
@@ -622,6 +636,18 @@ function normalizeAiRequest(
     };
   }
   const preserveDimensions = request.preserveDimensions === true;
+  const requestSketch = request.requestSketch === true;
+  if (
+    requestSketch &&
+    !messages.some(
+      (message) =>
+        message.role === "user" &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0,
+    )
+  ) {
+    return { ok: false, error: "Enter a message first." };
+  }
   const purpose: AiChatPurpose =
     request.purpose === "recovery" ? "recovery" : "studio";
   if (
@@ -669,7 +695,7 @@ function normalizeAiRequest(
     ok: true,
     preserveDimensions,
     purpose,
-    requestSketch: request.requestSketch === true,
+    requestSketch,
     sessionId:
       purpose === "recovery"
         ? undefined

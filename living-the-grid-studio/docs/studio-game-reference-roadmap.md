@@ -264,8 +264,10 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 
 ### Checkpoint A — game-matched easy drawing
 
-Status: corrected locally after the `f03b428` hosted audit; requires a new
-exact-SHA staging gate.
+Status: the true-256 slice is live on staging at exact source `406660b` and is
+functionally accepted. Its cold-Studio performance and live mixed-history AI
+findings have a tested corrective candidate that requires a new exact-SHA
+staging gate.
 
 - Keep one 256×256 coordinate surface so one Studio cell can represent one
   reported game-surface pixel without conflating document resolution and brush
@@ -353,11 +355,12 @@ Exit evidence:
 - provider failure cannot change project cells;
 - 120Hz sustained-stroke p95 processing stays below 16ms and INP below 200ms.
 
-## Local acceptance record — 2026-07-15
+## Historical local acceptance record — 2026-07-15
 
 This record applies to the game-matched drawing slice based on
 `d3ec2f9f889677a5859972c2e21935619e032f90`. It is local evidence, not a hosted
-staging approval or production result.
+staging approval or production result, and is superseded for release decisions
+by the hosted `406660b` record.
 
 - TypeScript client and Worker checks passed.
 - Worker tests passed: 37 files and 318 tests.
@@ -378,16 +381,17 @@ staging approval or production result.
   measured 74ms INP and 0.00 CLS. No console errors or failed network requests
   appeared in the traced workflow.
 
-### Remaining release gates
+### Current release gates after hosted `406660b` acceptance
 
-1. Commit the reviewed slice and push the same commit to GitHub and GitLab.
-2. Require the remote CI and security checks to pass at that exact commit.
-3. Request a new exact-SHA staging approval; the prior approval for `18e36dac`
-   does not authorize this newer commit.
-4. After approval only, deploy that exact commit to staging with the already
+1. Require the remote CI and security checks to pass on the mirrored corrective
+   commit containing the early Studio shell and AI-history isolation.
+2. Request a new exact-SHA staging approval; the approval for `406660b` does
+   not authorize a newer corrective commit.
+3. After approval only, deploy that exact commit to staging with the already
    approved feature flags and no unrelated DNS, secret, migration, OAuth, role,
    or production changes.
-5. Repeat authenticated Studio, profile, accessibility, CSP/console, crawler,
-   and mobile performance acceptance on the immutable hosted deployment URL.
-6. Keep production unchanged until staging evidence is reviewed and a separate
+4. Repeat authenticated Studio, profile, live Create, accessibility,
+   CSP/console, crawler, and mobile performance acceptance on the immutable
+   hosted deployment URL.
+5. Keep production unchanged until staging evidence is reviewed and a separate
    production cutover gate is explicitly approved.
