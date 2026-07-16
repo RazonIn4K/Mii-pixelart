@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
-import { onRequest as handleStripe } from "../functions/api/stripe/[[path]]";
-import { onRequestPost as handleStripeWebhook } from "../functions/api/webhooks/stripe";
+import { onRequest as handleRetiredPayment } from "../functions/api/stripe/[[path]]";
+import { onRequest as handleRetiredWebhook } from "../functions/api/webhooks/stripe";
 
 const jsonRequest = (url: string, body: string, contentLength?: number) =>
   new Request(url, {
@@ -30,74 +30,70 @@ describe("legacy Pages input handling", () => {
     });
   });
 
-  it("returns a controlled Stripe error for a JSON null body", async () => {
-    const response = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest("https://example.test/api/stripe/checkout", "null"),
-    });
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      configured: true,
-      error: "Unknown product id: (missing).",
-    });
-  });
+  it.each([
+    [
+      "products",
+      "GET",
+      "https://example.test/api/stripe/products",
+      handleRetiredPayment,
+    ],
+    [
+      "checkout",
+      "POST",
+      "https://example.test/api/stripe/checkout",
+      handleRetiredPayment,
+    ],
+    [
+      "session",
+      "GET",
+      "https://example.test/api/stripe/session?session_id=legacy",
+      handleRetiredPayment,
+    ],
+    [
+      "webhook",
+      "POST",
+      "https://example.test/api/webhooks/stripe",
+      handleRetiredWebhook,
+    ],
+  ])(
+    "returns a provider-free 410 tombstone for retired %s requests",
+    async (_label, method, url, handler) => {
+      const response = await handler({
+        request: new Request(url, {
+          body: method === "GET" ? undefined : "{}",
+          headers:
+            method === "GET"
+              ? undefined
+              : { "Content-Type": "application/json" },
+          method,
+        }),
+      });
+      expect(response.status).toBe(410);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "payments_retired" },
+      });
+    },
+  );
 
-  it("returns controlled 400 responses for malformed JSON", async () => {
-    const aiResponse = await handleAi({
+  it("returns a controlled 400 response for malformed AI JSON", async () => {
+    const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "{"),
     });
-    const stripeResponse = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest("https://example.test/api/stripe/checkout", "{"),
-    });
-    expect(aiResponse.status).toBe(400);
-    expect(stripeResponse.status).toBe(400);
-    await expect(aiResponse.json()).resolves.toMatchObject({
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
       reply: "Invalid JSON request body.",
-    });
-    await expect(stripeResponse.json()).resolves.toMatchObject({
-      error: "Invalid JSON request body.",
     });
   });
 
-  it("rejects declared oversized AI and Stripe bodies with 413", async () => {
-    const aiResponse = await handleAi({
+  it("rejects declared oversized AI bodies with 413", async () => {
+    const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "{}", 1_000_001),
     });
-    const stripeResponse = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest(
-        "https://example.test/api/stripe/checkout",
-        "{}",
-        100_001,
-      ),
-    });
-    expect(aiResponse.status).toBe(413);
-    expect(stripeResponse.status).toBe(413);
-  });
-
-  it("bounds Stripe webhook bodies before signature verification", async () => {
-    const response = await handleStripeWebhook({
-      env: { STRIPE_WEBHOOK_SECRET: "test-secret" },
-      request: new Request("https://example.test/api/webhooks/stripe", {
-        body: "{}",
-        headers: {
-          "Content-Length": "1000001",
-          "Stripe-Signature": "t=0,v1=invalid",
-        },
-        method: "POST",
-      }),
-    });
     expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({
-      error: "Request body is too large.",
-    });
   });
 });

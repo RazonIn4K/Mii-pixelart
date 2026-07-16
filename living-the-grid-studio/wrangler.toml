@@ -16,7 +16,7 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist/public"
 
 # Functions directory is auto-discovered at ./functions.
-# Secrets (OPENROUTER_API_KEY, STRIPE_SECRET_KEY, etc.) MUST be set via:
+# Secrets such as OPENROUTER_API_KEY MUST be set via:
 #   wrangler pages secret put OPENROUTER_API_KEY --project-name=tomodachi-studio
 # or via the Pages dashboard. Do not commit secret values to this file.
 

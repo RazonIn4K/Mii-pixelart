@@ -2,7 +2,7 @@
 
 Generated: 2026-05-20
 
-This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and payments.
+This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and the retired-payment compatibility boundary.
 
 The project is a browser-first React/TypeScript studio for turning images, JSON files, AI sketches, and starter templates into repaintable Tomodachi Life: Living the Dream style pixel guides. The important product idea is not only "make pixels"; it is "make a grid a person can repaint square by square without guessing."
 
@@ -41,8 +41,8 @@ Tomodachi Studio currently combines four product lanes:
    - Palette-ID validation before an AI sketch is converted into a `GridDocument`.
 
 4. **Public website support**
-   - Home, studio, guides, FAQ, help, legal, unlock, and support pages.
-   - Stripe checkout for support/recovery products.
+   - Home, studio, guides, FAQ, help, legal, AI Action Plan, and non-payment support pages.
+   - Provider-free `410 Gone` tombstones for retired payment clients.
    - Cloudflare Pages deployment with Pages Functions.
    - Security headers, robots policy, crawler controls, and Cloudflare security helper scripts.
 
@@ -52,7 +52,7 @@ Tomodachi Studio currently combines four product lanes:
 flowchart TD
   User["User in browser"] --> Routes["React app routes (wouter)"]
   Routes --> Studio["/studio workspace"]
-  Routes --> SitePages["Home, Guides, FAQ, Help, Legal, Unlock, Support"]
+  Routes --> SitePages["Home, Guides, FAQ, Help, Legal, AI Plan, Support"]
 
   Studio --> Import["ImportPanel"]
   Studio --> Create["CreationPanel"]
@@ -78,12 +78,12 @@ flowchart TD
   AI --> ApiAI["/api/ai/*"]
   ApiAI --> OpenRouter["OpenRouter"]
 
-  SitePages --> ApiStripe["/api/stripe/*"]
-  ApiStripe --> Stripe["Stripe Checkout"]
+  SitePages --> RetiredPayment["Retired payment paths"]
+  RetiredPayment --> Gone["Provider-free 410 Gone"]
 
   BrowserBuild["Vite build output"] --> CloudflarePages["Cloudflare Pages"]
   Functions["Cloudflare Pages Functions"] --> ApiAI
-  Functions --> ApiStripe
+  Functions --> RetiredPayment
   CloudflarePages --> Headers["Security headers + robots"]
 ```
 
@@ -100,7 +100,7 @@ This is how the user's abstraction-layer thinking maps onto the actual codebase.
 | L4 UI state and interactions | How the user edits the document                                                                              | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools                                                            |
 | L5 Local browser persistence | State that stays in this browser only                                                                        | AI chat sessions in `localStorage`, consent state, no database in V1                                                                       |
 | L6 API/runtime services      | Server or edge endpoints                                                                                     | Vite dev middleware, Express server, Cloudflare Pages Functions                                                                            |
-| L7 External integrations     | Services outside the app                                                                                     | OpenRouter, Stripe, Cloudflare KV, Have I Been Pwned password range API                                                                    |
+| L7 External integrations     | Services outside the app                                                                                     | OpenRouter, Cloudflare KV, Have I Been Pwned password range API                                                                            |
 | L8 Deployment/security/ops   | How it runs publicly and stays controlled                                                                    | Cloudflare Pages, `wrangler.toml`, `_headers`, `robots.txt`, Cloudflare Bot Management helper, Doppler-managed secrets                     |
 
 ## 4. Repository Layout
@@ -144,10 +144,8 @@ living-the-grid-studio/
   server/
     index.ts
     openrouter.ts
-    stripe.ts
   shared/
     ai.ts
-    products.ts
     residents.ts
   fixtures/
     living-the-grid-real.json
@@ -187,13 +185,13 @@ living-the-grid-studio/
 | Color matching   | CIELAB + CIE76 Delta E          | Match source pixels to the closest Tomodachi palette color                            |
 | State            | React state + `useGridDocument` | Holds `GridDocument`, image preview, undo/redo history, stroke transactions           |
 | AI               | OpenRouter Chat Completions     | Model picker, chat, optional image snapshot, applyable sketch JSON                    |
-| Payments         | Stripe REST API                 | Checkout sessions and checkout verification without Stripe Node SDK                   |
+| Payments         | Retired compatibility routes    | Legacy catalog, checkout, session, and webhook paths return provider-free `410 Gone`  |
 | ZIP export       | JSZip                           | Bundles reference-pack assets into one downloadable archive                           |
 | Edge hosting     | Cloudflare Pages                | Static site plus Pages Functions                                                      |
-| Edge functions   | Cloudflare Pages Functions      | `/api/ai/*`, `/api/stripe/*`, webhook route                                           |
+| Edge functions   | Cloudflare Pages Functions      | `/api/ai/*` plus retired-payment tombstone routes                                     |
 | Edge cache       | Cloudflare KV                   | OpenRouter model list cache through `EDGE_CACHE` binding                              |
 | Security         | Cloudflare + response headers   | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                   |
-| Secrets          | Doppler / env vars              | OpenRouter, Stripe, Cloudflare tokens are expected from environment, not committed    |
+| Secrets          | Doppler / env vars              | OpenRouter and Cloudflare tokens are expected from environment, not committed         |
 | Verification     | `pnpm verify` scripts           | Type-checking and fixture-based verification                                          |
 
 ## 6. App Entry And Routing
@@ -224,8 +222,9 @@ Routes are declared with `wouter`:
 | `/guides`               | `Guides`     | Guide content                      |
 | `/faq`                  | `Faq`        | FAQ                                |
 | `/about`                | `About`      | About                              |
-| `/unlock`               | `Unlock`     | Paid recovery/consult products     |
-| `/support`              | `Support`    | Tip/support products               |
+| `/ai-plan`              | `AiPlan`     | Free AI beta and future direction  |
+| `/unlock`               | `Redirect`   | Legacy alias to `/ai-plan`         |
+| `/support`              | `Support`    | Non-payment project support        |
 | `/donate`               | `Support`    | Alias route                        |
 | `/404`                  | `NotFound`   | Explicit 404                       |
 | fallback                | `NotFound`   | Unknown route                      |
@@ -952,10 +951,8 @@ id = "5129b5ce8d2d435cb704b398a437f355"
 | `/api/ai/status`       | `functions/api/ai/[[path]].ts`     | Report whether OpenRouter key is configured                              |
 | `/api/ai/models`       | `functions/api/ai/[[path]].ts`     | Return model presets with optional OpenRouter availability, cached in KV |
 | `/api/ai/chat`         | `functions/api/ai/[[path]].ts`     | Send chat/sketch requests to OpenRouter                                  |
-| `/api/stripe/products` | `functions/api/stripe/[[path]].ts` | List public products                                                     |
-| `/api/stripe/checkout` | `functions/api/stripe/[[path]].ts` | Create Stripe Checkout session                                           |
-| `/api/stripe/session`  | `functions/api/stripe/[[path]].ts` | Verify Checkout session                                                  |
-| Stripe webhook         | `functions/api/webhooks/stripe.ts` | Stripe webhook handler                                                   |
+| `/api/stripe/*`        | `functions/api/stripe/[[path]].ts` | Return provider-free `410 Gone` for retired payment clients              |
+| `/api/webhooks/stripe` | `functions/api/webhooks/stripe.ts` | Return provider-free `410 Gone` for retired webhook deliveries           |
 
 ### Edge Middleware
 
@@ -1031,36 +1028,22 @@ CLOUDFLARE_ZONE_NAME
 
 The user has indicated these are managed through Doppler.
 
-## 21. Stripe Product And Checkout Implementation
+## 21. Retired Payments And AI Action Plan
 
-Stripe code is split across:
+Tomodachi no longer accepts payments, tips, recovery-product purchases, or
+consultation bookings. The catalog, checkout/session provider client, webhook
+processing, client redirect guard, payment secrets, and provider CSP origins
+were removed.
 
-- `shared/products.ts`
-- `server/stripe.ts`
-- Vite dev middleware in `vite.config.ts`
-- Cloudflare Pages Function under `functions/api/stripe/[[path]].ts`
+Historic `/api/stripe/*` and `/api/webhooks/stripe` paths remain as temporary,
+provider-free `410 Gone` tombstones in Pages, Express, and Vite development.
+They use no payment credentials, perform no outbound request, and prevent a
+stale client from receiving a misleading SPA response.
 
-### Product Catalog
-
-`shared/products.ts` is the source of truth for sellable products.
-
-Current categories:
-
-- `recovery`
-- `consult`
-- `support`
-
-Current products include:
-
-- `breach-recovery-checklist`
-- `consult-30`
-- `support-jar-5`
-- `support-jar-15`
-- `support-jar-25`
-
-### Why The Stripe SDK Is Not Used
-
-`server/stripe.ts` uses direct REST calls instead of the official Stripe Node SDK because Cloudflare Workers do not support every Node crypto API the SDK expects. The project manually flattens nested objects into Stripe form encoding.
+`/ai-plan` exposes the current free AI action-plan beta. A distinct one-time $5
+creator plan is documented only as product direction and is not for sale. It
+requires a new architecture, entitlement, refund, privacy, usage-limit, and
+fulfillment gate before any payment provider can be reintroduced.
 
 ## 22. Local Development Runtime
 
@@ -1087,9 +1070,8 @@ The main scripts are in `package.json`.
 - `/api/ai/status`
 - `/api/ai/models`
 - `/api/ai/chat`
-- `/api/stripe/products`
-- `/api/stripe/checkout`
-- `/api/stripe/session`
+- `/api/stripe/*` (`410 Gone` tombstone)
+- `/api/webhooks/stripe` (`410 Gone` tombstone)
 
 This lets local development use the same endpoint shapes as Cloudflare Pages.
 
@@ -1101,16 +1083,14 @@ The Vite config includes Manus debug collector/runtime tooling only in dev mode.
 
 The project expects secrets from the shell, Doppler, Cloudflare Pages, or Wrangler, not from committed files.
 
-| Variable                                | Used By                           | Purpose                                   |
-| --------------------------------------- | --------------------------------- | ----------------------------------------- |
-| `OPENROUTER_API_KEY`                    | AI API                            | Authenticate OpenRouter requests          |
-| `PUBLIC_SITE_URL`                       | AI/Stripe/Cloudflare              | Referer, success URLs, canonical site URL |
-| `STRIPE_SECRET_KEY`                     | Stripe API                        | Create and verify checkout sessions       |
-| `STRIPE_WEBHOOK_SECRET`                 | Stripe webhook                    | Verify Stripe webhook signatures          |
-| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` | Cloudflare script                 | Bot/security config audit/apply           |
-| `CLOUDFLARE_ZONE_ID`                    | Cloudflare script                 | Optional direct zone lookup               |
-| `CLOUDFLARE_ZONE_NAME`                  | Cloudflare script                 | Defaults to `tomodachi.pw`                |
-| `EDGE_CACHE`                            | Cloudflare Pages Function binding | KV cache for OpenRouter models            |
+| Variable                                | Used By                           | Purpose                          |
+| --------------------------------------- | --------------------------------- | -------------------------------- |
+| `OPENROUTER_API_KEY`                    | AI API                            | Authenticate OpenRouter requests |
+| `PUBLIC_SITE_URL`                       | AI/Cloudflare                     | Referer and canonical site URL   |
+| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` | Cloudflare script                 | Bot/security config audit/apply  |
+| `CLOUDFLARE_ZONE_ID`                    | Cloudflare script                 | Optional direct zone lookup      |
+| `CLOUDFLARE_ZONE_NAME`                  | Cloudflare script                 | Defaults to `tomodachi.pw`       |
+| `EDGE_CACHE`                            | Cloudflare Pages Function binding | KV cache for OpenRouter models   |
 
 ## 24. Verification Coverage
 

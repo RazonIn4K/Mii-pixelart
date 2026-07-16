@@ -194,7 +194,9 @@ If you want `tomodachi.brave` to serve content directly via Web3 without dependi
 
 ### Option 3: Hybrid (link out for interactive features)
 
-Mirror the static breach-recovery content over IPFS (option 2) and add an obvious link from the IPFS site to `tomodachi.pw` for the AI assistant, paid checklists, and anything that needs server-side compute.
+Mirror only static breach-recovery content over IPFS (option 2) and add an
+obvious link from the IPFS site to `tomodachi.pw` for the consented AI assistant
+and any feature that needs server-side compute.
 
 ## 6. Caching strategy
 
@@ -316,4 +318,4 @@ The binding lives commented out in `wrangler.toml`. To activate:
 
 > Free tier KV gives us 100k reads, 1k writes, and 1k deletes per day. Plenty for caching the OpenRouter models list and basic rate limiting; the moment we approach those limits the answer is Workers Cache API at the request layer, not more KV.
 
-R2 (object storage, ideal for serving the paid recovery checklist PDF after Stripe verification) is gated behind a one-click **Enable R2** in the dashboard. Do that when you're ready to upload the first paid asset; this runbook gets a §10 R2 section the day you flip it on.
+R2 is not required by the current Pages application. Enable it only when a reviewed feature has a concrete object-storage need, retention policy, authorization model, and cleanup plan.

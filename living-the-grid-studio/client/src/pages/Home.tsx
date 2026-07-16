@@ -12,19 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
-import {
-  OPENROUTER_MODEL_PRESETS,
-  type AiModelPreset,
-} from "@shared/ai";
-import {
-  getConsent,
-  onConsentChange,
-  type ConsentState,
-} from "@/lib/consent";
+import { OPENROUTER_MODEL_PRESETS, type AiModelPreset } from "@shared/ai";
+import { getConsent, onConsentChange, type ConsentState } from "@/lib/consent";
 import {
   AlertTriangle,
   BotMessageSquare,
-  CheckCircle2,
   Search,
   ShieldCheck,
   Upload,
@@ -89,31 +81,6 @@ const features = [
     title: "Reference Pack Export",
     description:
       "Download a complete reference pack: the pixel guide image, the palette sheet, and the project JSON — everything needed to repaint.",
-    },
-  ];
-
-const domainMonetizationUseCases = [
-  {
-    domain: "tomodachi.pw",
-    role: "Canonical Public Site",
-    note: "Use this as the primary landing and monetization surface for SEO, ads, email capture, guides, and paid packs.",
-    monetization: [
-      "Offer a free trust-first /help route plus security guides and recovery paths.",
-      "Enable display ads on secondary creator/helpful pages after trust signals are in place.",
-      "Layer email capture around guides, packs, and template launches.",
-      "Run privacy/cyber affiliate placements aligned to user pain.",
-      "Launch $5-$9 packs and $19-$49 workflow bundles.",
-    ],
-  },
-  {
-    domain: "tomodachi.brave",
-    role: "Brave-native creator promo",
-    note: "Use as a short memorable referral domain in Brave/Web3 communities that points to the canonical experience on tomodachi.pw.",
-    monetization: [
-      "Point users to creator workflow pages on the canonical site.",
-      "Promote launch posts, studio demos, and social proof.",
-      "Use community messaging and vanity links to improve discovery.",
-    ],
   },
 ];
 
@@ -124,18 +91,13 @@ type PasswordBreachResult = {
   message: string;
   count?: number;
 };
-// ModelPresetWithAvailability removed — the `available?: boolean` field now
-// lives on the canonical AiModelPreset type in shared/ai.ts so both client +
-// server agree on the wire shape and type-drift errors surface at compile time.
 
-// `adsbygoogle` is the global command queue Google's AdSense script consumes.
-// You push command objects onto it; the script eventually replaces it with a
-// real implementation. Typing it as a plain array of command objects is
-// closer to reality than typing each entry as something that itself has a
-// `push` method.
 type WindowWithAds = Window & {
   adsbygoogle?: Array<Record<string, unknown>>;
 };
+// ModelPresetWithAvailability removed — the `available?: boolean` field now
+// lives on the canonical AiModelPreset type in shared/ai.ts so both client +
+// server agree on the wire shape and type-drift errors surface at compile time.
 
 const defaultErrorMessage = "Something went wrong while running this check.";
 // Source the default model from the shared preset list so we can never ship a
@@ -191,7 +153,9 @@ function formatNumber(value: number): string {
 export default function Home() {
   const [incidentPrompt, setIncidentPrompt] = useState("");
   const [incidentPlan, setIncidentPlan] = useState("");
-  const [incidentModel, setIncidentModel] = useState(BREACH_RECOVERY_DEFAULT_MODEL);
+  const [incidentModel, setIncidentModel] = useState(
+    BREACH_RECOVERY_DEFAULT_MODEL,
+  );
   const [incidentLoading, setIncidentLoading] = useState(false);
   const [incidentError, setIncidentError] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
@@ -211,7 +175,11 @@ export default function Home() {
         const data = (await response.json()) as {
           presets?: AiModelPreset[];
         };
-        if (canceled || !Array.isArray(data.presets) || data.presets.length === 0)
+        if (
+          canceled ||
+          !Array.isArray(data.presets) ||
+          data.presets.length === 0
+        )
           return;
         setIncidentModel(pickFirstAvailableModel(data.presets));
       } catch {
@@ -225,14 +193,12 @@ export default function Home() {
     };
   }, []);
 
-  // Track consent so we only inject ad scripts after the visitor opts in.
   const [consent, setConsentState] = useState<ConsentState | null>(null);
   useEffect(() => {
     setConsentState(getConsent());
     return onConsentChange(setConsentState);
   }, []);
-  const marketingOk = Boolean(consent?.marketing);
-  const adsEnabled = adsConfigured && marketingOk;
+  const adsEnabled = adsConfigured && Boolean(consent?.marketing);
 
   useEffect(() => {
     if (!adsEnabled) return;
@@ -328,10 +294,7 @@ export default function Home() {
     } catch (error) {
       setPasswordCheck({
         status: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : defaultErrorMessage,
+        message: error instanceof Error ? error.message : defaultErrorMessage,
       });
     }
   };
@@ -398,9 +361,7 @@ Keep it practical and concise.`,
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
             <div className="red-dot" />
-            <span className="font-medium text-sm tracking-wide">
-              Tomodachi
-            </span>
+            <span className="font-medium text-sm tracking-wide">Tomodachi</span>
           </div>
           <Link href="/studio">
             <Button size="sm" className="text-xs tracking-wide">
@@ -411,448 +372,205 @@ Keep it practical and concise.`,
       </nav>
 
       <main id="main-content">
-      {/* Hero Section */}
-      <section className="pt-14">
-        <div className="relative overflow-hidden">
-          <div className="graph-paper-fine">
-            <div className="container py-12 sm:py-16 lg:py-24 xl:py-28">
-              <div className="grid gap-8 lg:gap-12 md:grid-cols-2 items-center">
-                <div className="space-y-5 sm:space-y-6">
-                  <p className="section-header">
-                    Mii Face Mask + Pixel Art Tool
-                  </p>
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold leading-tight tracking-tight text-foreground">
-                    Make Mii masks
-                    <br />
-                    <span style={{ color: "oklch(0.58 0.2 25)" }}>
-                      and pixel art
-                    </span>
-                    <br />
-                    repaintable by hand.
-                  </h1>
-                  <p className="text-base text-muted-foreground leading-relaxed max-w-md">
-                    A browser-first repaint studio for Tomodachi Life: Living
-                    the Dream Mii face masks, user-supplied character
-                    references, brand-style logos, memes, clothing marks, book
-                    covers, and other creative pixel builds.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <Link href="/studio">
-                      <Button size="lg" className="tracking-wide">
-                        Open Studio
-                      </Button>
-                    </Link>
-                    <a
-                      href="https://github.com/RazonIn4K/Mii-pixelart"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="tracking-wide"
+        {/* Hero Section */}
+        <section className="pt-14">
+          <div className="relative overflow-hidden">
+            <div className="graph-paper-fine">
+              <div className="container py-12 sm:py-16 lg:py-24 xl:py-28">
+                <div className="grid gap-8 lg:gap-12 md:grid-cols-2 items-center">
+                  <div className="space-y-5 sm:space-y-6">
+                    <p className="section-header">
+                      Mii Face Mask + Pixel Art Tool
+                    </p>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold leading-tight tracking-tight text-foreground">
+                      Make Mii masks
+                      <br />
+                      <span style={{ color: "oklch(0.58 0.2 25)" }}>
+                        and pixel art
+                      </span>
+                      <br />
+                      repaintable by hand.
+                    </h1>
+                    <p className="text-base text-muted-foreground leading-relaxed max-w-md">
+                      A browser-first repaint studio for Tomodachi Life: Living
+                      the Dream Mii face masks, user-supplied character
+                      references, brand-style logos, memes, clothing marks, book
+                      covers, and other creative pixel builds.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <Link href="/studio">
+                        <Button size="lg" className="tracking-wide">
+                          Open Studio
+                        </Button>
+                      </Link>
+                      <a
+                        href="https://github.com/RazonIn4K/Mii-pixelart"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        View on GitHub
-                      </Button>
-                    </a>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="tracking-wide"
+                        >
+                          View on GitHub
+                        </Button>
+                      </a>
+                    </div>
                   </div>
-                </div>
-                <div className="relative">
-                  <div className="rounded-sm overflow-hidden shadow-sm border border-border">
-                    <img
-                      src={HERO_IMG}
-                      alt="Hand-drawn Mii face on engineering grid paper next to colored pencils, illustrating the studio's paint-by-numbers workflow."
-                      className="w-full h-auto"
-                      width={1920}
-                      height={1072}
-                      loading="eager"
-                      decoding="async"
-                      fetchPriority="high"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Breach Recovery and Trust Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <p className="section-header mb-3">
-            Tomodachishare Breach Recovery Hub
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-            Help users coming from breach-notice traffic with useful, browser-first
-            tools.
-          </h2>
-          <p className="text-muted-foreground leading-relaxed mb-8">
-            If people land here from the{" "}
-            <a
-              className="underline underline-offset-2"
-              href={BREACH_NOTICE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              public notice
-            </a>
-            , give them immediate value: a leak-aware checklist, password risk
-            test, and AI recovery guidance. For a structured written plan or a
-            short consult, see{" "}
-            <Link href="/unlock" className="underline underline-offset-2">
-              paid recovery guides
-            </Link>
-            .
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Password breach check</h3>
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  Browser-only + k-anonymity
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
-                Paste a password to check if it appears in known breach datasets.
-                Your full password never leaves the page; only a SHA-1 prefix is
-                sent.
-              </p>
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="password-leak-check" className="text-xs">
-                  Password candidate
-                </Label>
-                <Input
-                  id="password-leak-check"
-                  type="password"
-                  placeholder="Type a sample password (never paste credentials)"
-                  value={passwordInput}
-                  onChange={(event) => setPasswordInput(event.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={checkPasswordForBreaches}
-                  disabled={passwordCheck.status === "checking"}
-                >
-                  <Search className="h-4 w-4 mr-1" />
-                  {passwordCheck.status === "checking"
-                    ? "Checking..."
-                    : "Check password exposure"}
-                </Button>
-                <p
-                  className={`text-xs leading-relaxed ${
-                    passwordCheck.status === "found"
-                      ? "text-destructive"
-                      : passwordCheck.status === "safe"
-                        ? "text-green-700"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {passwordCheck.message || "Run a check to see results."}
-                </p>
-              </div>
-            </article>
-
-            <article className="p-5 rounded-sm border border-border bg-card">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">
-                  AI recovery assistant
-                </h3>
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <BotMessageSquare className="h-4 w-4 text-primary" />
-                  OpenRouter-backed
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-2">
-                Paste what happened in plain language. The assistant returns a
-                practical sequence you can hand to friends, family, or forum
-                users.
-              </p>
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="breach-situation" className="text-xs">
-                  Situation details
-                </Label>
-                <Textarea
-                  id="breach-situation"
-                  rows={5}
-                  placeholder="Example: I saw my email in a leaked list, and I used that password in multiple places."
-                  value={incidentPrompt}
-                  onChange={(event) => setIncidentPrompt(event.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  onClick={createBreachRecoveryPlan}
-                  disabled={incidentLoading}
-                >
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  {incidentLoading
-                    ? "Generating plan..."
-                    : "Generate 24-hour recovery plan"}
-                </Button>
-                {(incidentError || incidentPlan) && (
-                  <div className="mt-3 p-3 rounded-sm border border-border bg-background text-xs text-muted-foreground whitespace-pre-wrap">
-                    {incidentError ?? incidentPlan}
-                  </div>
-                  )}
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* Workflow Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <div className="max-w-2xl mb-14">
-            <p className="section-header mb-3">How It Works</p>
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-              From image to repaint guide in four steps
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              The studio handles the tedious conversion work so you can focus on
-              the creative part — actually painting your design in the Palette
-              House.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                step: "01",
-                label: "Import",
-                desc: "Upload a character, face, logo, meme, or JSON file",
-              },
-              {
-                step: "02",
-                label: "Preset",
-                desc: "Choose Mii mask, character, sprite, logo, or full-image framing",
-              },
-              {
-                step: "03",
-                label: "Optimize",
-                desc: "Merge colors, remove noise, simplify",
-              },
-              {
-                step: "04",
-                label: "Export",
-                desc: "Download your reference pack",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="p-5 rounded-sm border border-border bg-card"
-              >
-                <span
-                  className="font-mono text-xs font-medium"
-                  style={{ color: "oklch(0.58 0.2 25)" }}
-                >
-                  {item.step}
-                </span>
-                <h3 className="text-sm font-semibold mt-2 mb-1">
-                  {item.label}
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
-        <div className="container">
-          <div className="grid gap-8 md:gap-12 lg:gap-16 lg:grid-cols-2 items-start">
-            <div>
-              <p className="section-header mb-3">Features</p>
-              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-6 sm:mb-8">
-                Built for hand-painting precision
-              </h2>
-              <div className="space-y-6">
-                {features.map((f) => (
-                  <div key={f.title} className="flex gap-4">
-                    <div
-                      className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0 mt-0.5"
-                      style={{ backgroundColor: "oklch(0.95 0.02 25)" }}
-                    >
-                      <f.icon
-                        className="w-4 h-4"
-                        style={{ color: "oklch(0.58 0.2 25)" }}
+                  <div className="relative">
+                    <div className="rounded-sm overflow-hidden shadow-sm border border-border">
+                      <img
+                        src={HERO_IMG}
+                        alt="Hand-drawn Mii face on engineering grid paper next to colored pencils, illustrating the studio's paint-by-numbers workflow."
+                        className="w-full h-auto"
+                        width={1920}
+                        height={1072}
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
                       />
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold mb-1">{f.title}</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {f.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="rounded-sm overflow-hidden border border-border shadow-sm">
-                <img
-                  src={CANVAS_IMG}
-                  alt="Hand-painted pixel-art mushroom on graph paper — example output from the studio's color-reduction optimizer."
-                  className="w-full h-auto"
-                  width={1920}
-                  height={1920}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div className="rounded-sm overflow-hidden border border-border shadow-sm">
-                <img
-                  src={PALETTE_IMG}
-                  alt="Reference swatches of the 84-color Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching."
-                  className="w-full h-auto"
-                  width={1920}
-                  height={1434}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Roadmap Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
-        <div className="container">
-          <div className="max-w-2xl mx-auto">
-            <p className="section-header mb-3">Roadmap</p>
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8">
-              What comes next
-            </h2>
-            <div className="space-y-4">
-              {[
-                {
-                  phase: "0",
-                  title: "JSON Fixture Inspection",
-                  status: "done",
-                  desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata.",
-                },
-                {
-                  phase: "1",
-                  title: "JSON Round-Trip",
-                  status: "done",
-                  desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete.",
-                },
-                {
-                  phase: "2",
-                  title: "Palette Panel",
-                  status: "done",
-                  desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid.",
-                },
-                {
-                  phase: "3",
-                  title: "One-Click Optimizer",
-                  status: "done",
-                  desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting.",
-                },
-                {
-                  phase: "4",
-                  title: "Image Upload (remaining)",
-                  status: "current",
-                  desc: "Face-focused framing, cleanup, tone controls, and import preview are in. Remaining: drag crop/pan controls.",
-                },
-                {
-                  phase: "5",
-                  title: "Reference Pack Export (remaining)",
-                  status: "next",
-                  desc: "Palette sheet image, painting order suggestion, and ZIP bundle download.",
-                },
-                {
-                  phase: "6",
-                  title: "AI Suggestions",
-                  status: "current",
-                  desc: "OpenRouter chat, saved local sessions, 25 model presets, visual grid snapshots, and applyable sketch drafts are available; deeper cleanup suggestions are next.",
-                },
-              ].map((item) => (
-                <div
-                  key={item.phase}
-                  className="flex gap-4 p-4 rounded-sm border border-border bg-card"
-                >
-                  <div className="flex flex-col items-center gap-1 shrink-0">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      P{item.phase}
-                    </span>
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        item.status === "done"
-                          ? "bg-green-500"
-                          : item.status === "current"
-                            ? "bg-primary"
-                            : item.status === "next"
-                              ? "bg-primary/50"
-                              : "bg-border"
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">{item.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                      {item.desc}
-                    </p>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-            </div>
-        </div>
-      </section>
-
-      {/* Monetization Section */}
-      <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
-        <div className="container">
-          <p className="section-header mb-3">Monetization strategy</p>
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-            Turn Tomodachi domain traffic into recurring income
-          </h2>
-          <p className="text-muted-foreground leading-relaxed max-w-3xl mb-8">
-            Use the breach moment as a traffic catalyst for a two-domain setup:
-            one domain for creative conversion, one for trust and crisis support.
-            Keep ad content clearly separated from sensitive security guidance.
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {domainMonetizationUseCases.map((entry) => (
-              <article
-                key={entry.domain}
-                className="rounded-sm border border-border bg-background p-5"
-              >
-                <h3 className="text-sm font-semibold">{entry.domain}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{entry.role}</p>
-                <p className="text-xs leading-relaxed mt-4 text-muted-foreground">
-                  {entry.note}
-                </p>
-                <ul className="mt-4 space-y-2">
-                  {entry.monetization.map((item) => (
-                    <li
-                      key={item}
-                      className="text-xs flex items-start gap-2 text-muted-foreground"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
           </div>
+        </section>
 
-          <div className="mt-8 space-y-3">
-            {adsEnabled ? (
-              <div className="rounded-sm border border-border bg-background p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
-                  Monetization slot (AdSense)
+        {/* Breach Recovery and Trust Section */}
+        <section
+          id="recovery"
+          className="py-12 sm:py-16 lg:py-20 border-t border-border scroll-mt-20"
+        >
+          <div className="container">
+            <p className="section-header mb-3">
+              Tomodachishare Breach Recovery Hub
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
+              Help users coming from breach-notice traffic with useful,
+              browser-first tools.
+            </h2>
+            <p className="text-muted-foreground leading-relaxed mb-8">
+              If people land here from the{" "}
+              <a
+                className="underline underline-offset-2"
+                href={BREACH_NOTICE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                public notice
+              </a>
+              , give them immediate value: a leak-aware checklist, password risk
+              test, and AI recovery guidance. For a structured set of next
+              steps, try the free{" "}
+              <Link href="/ai-plan" className="underline underline-offset-2">
+                AI Action Plan beta
+              </Link>
+              . Tomodachi currently accepts no payments or consultation
+              bookings.
+            </p>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <article className="p-5 rounded-sm border border-border bg-card">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">
+                    Password breach check
+                  </h3>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    Browser-only + k-anonymity
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-2">
+                  Paste a password to check if it appears in known breach
+                  datasets. Your full password never leaves the page; only a
+                  SHA-1 prefix is sent.
                 </p>
+                <div className="mt-4 space-y-2">
+                  <Label htmlFor="password-leak-check" className="text-xs">
+                    Password candidate
+                  </Label>
+                  <Input
+                    id="password-leak-check"
+                    type="password"
+                    placeholder="Type a sample password (never paste credentials)"
+                    value={passwordInput}
+                    onChange={(event) => setPasswordInput(event.target.value)}
+                  />
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={checkPasswordForBreaches}
+                    disabled={passwordCheck.status === "checking"}
+                  >
+                    <Search className="h-4 w-4 mr-1" />
+                    {passwordCheck.status === "checking"
+                      ? "Checking..."
+                      : "Check password exposure"}
+                  </Button>
+                  <p
+                    className={`text-xs leading-relaxed ${
+                      passwordCheck.status === "found"
+                        ? "text-destructive"
+                        : passwordCheck.status === "safe"
+                          ? "text-green-700"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {passwordCheck.message || "Run a check to see results."}
+                  </p>
+                </div>
+              </article>
+
+              <article className="p-5 rounded-sm border border-border bg-card">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">
+                    AI recovery assistant
+                  </h3>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <BotMessageSquare className="h-4 w-4 text-primary" />
+                    OpenRouter-backed
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-2">
+                  Paste what happened in plain language. The assistant returns a
+                  practical sequence you can hand to friends, family, or forum
+                  users.
+                </p>
+                <div className="mt-4 space-y-2">
+                  <Label htmlFor="breach-situation" className="text-xs">
+                    Situation details
+                  </Label>
+                  <Textarea
+                    id="breach-situation"
+                    rows={5}
+                    placeholder="Example: I saw my email in a leaked list, and I used that password in multiple places."
+                    value={incidentPrompt}
+                    onChange={(event) => setIncidentPrompt(event.target.value)}
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={createBreachRecoveryPlan}
+                    disabled={incidentLoading}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    {incidentLoading
+                      ? "Generating plan..."
+                      : "Generate 24-hour recovery plan"}
+                  </Button>
+                  {(incidentError || incidentPlan) && (
+                    <div className="mt-3 p-3 rounded-sm border border-border bg-background text-xs text-muted-foreground whitespace-pre-wrap">
+                      {incidentError ?? incidentPlan}
+                    </div>
+                  )}
+                </div>
+              </article>
+            </div>
+
+            {adsEnabled ? (
+              <div className="mt-8 rounded-sm border border-border bg-background p-3">
+                <p className="sr-only">Advertisement</p>
                 <ins
                   className="adsbygoogle"
                   style={{ display: "block" }}
@@ -862,35 +580,260 @@ Keep it practical and concise.`,
                   data-full-width-responsive="true"
                 />
               </div>
-            ) : (
-              <div className="rounded-sm border border-dashed border-border bg-background p-4">
-                <p className="text-xs text-muted-foreground">
-                  {adsConfigured && !marketingOk
-                    ? "Ad slot held until the visitor accepts marketing cookies."
-                    : (
-                      <>
-                        Add environment vars{" "}
-                        <code>VITE_ADSENSE_PUBLISHER_ID</code> and{" "}
-                        <code>VITE_ADSENSE_HOMEPAGE_SLOT_ID</code> to enable ad
-                        slots on production.
-                      </>
-                    )}
-                </p>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  This page may include affiliate links. See our{" "}
-                  <Link
-                    href="/affiliate-disclosure"
-                    className="underline underline-offset-2"
-                  >
-                    Affiliate Disclosure
-                  </Link>
-                  .
-                </p>
-              </div>
-            )}
+            ) : null}
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* Workflow Section */}
+        <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
+          <div className="container">
+            <div className="max-w-2xl mb-14">
+              <p className="section-header mb-3">How It Works</p>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
+                From image to repaint guide in four steps
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                The studio handles the tedious conversion work so you can focus
+                on the creative part — actually painting your design in the
+                Palette House.
+              </p>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  step: "01",
+                  label: "Import",
+                  desc: "Upload a character, face, logo, meme, or JSON file",
+                },
+                {
+                  step: "02",
+                  label: "Preset",
+                  desc: "Choose Mii mask, character, sprite, logo, or full-image framing",
+                },
+                {
+                  step: "03",
+                  label: "Optimize",
+                  desc: "Merge colors, remove noise, simplify",
+                },
+                {
+                  step: "04",
+                  label: "Export",
+                  desc: "Download your reference pack",
+                },
+              ].map((item) => (
+                <div
+                  key={item.step}
+                  className="p-5 rounded-sm border border-border bg-card"
+                >
+                  <span
+                    className="font-mono text-xs font-medium"
+                    style={{ color: "oklch(0.58 0.2 25)" }}
+                  >
+                    {item.step}
+                  </span>
+                  <h3 className="text-sm font-semibold mt-2 mb-1">
+                    {item.label}
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
+          <div className="container">
+            <div className="grid gap-8 md:gap-12 lg:gap-16 lg:grid-cols-2 items-start">
+              <div>
+                <p className="section-header mb-3">Features</p>
+                <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-6 sm:mb-8">
+                  Built for hand-painting precision
+                </h2>
+                <div className="space-y-6">
+                  {features.map((f) => (
+                    <div key={f.title} className="flex gap-4">
+                      <div
+                        className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0 mt-0.5"
+                        style={{ backgroundColor: "oklch(0.95 0.02 25)" }}
+                      >
+                        <f.icon
+                          className="w-4 h-4"
+                          style={{ color: "oklch(0.58 0.2 25)" }}
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold mb-1">
+                          {f.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {f.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="rounded-sm overflow-hidden border border-border shadow-sm">
+                  <img
+                    src={CANVAS_IMG}
+                    alt="Hand-painted pixel-art mushroom on graph paper — example output from the studio's color-reduction optimizer."
+                    className="w-full h-auto"
+                    width={1920}
+                    height={1920}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <div className="rounded-sm overflow-hidden border border-border shadow-sm">
+                  <img
+                    src={PALETTE_IMG}
+                    alt="Reference swatches of the 84-color Tomodachi Life: Living the Dream palette, labeled by row and column for exact in-game matching."
+                    className="w-full h-auto"
+                    width={1920}
+                    height={1434}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Roadmap Section */}
+        <section className="py-12 sm:py-16 lg:py-20 border-t border-border">
+          <div className="container">
+            <div className="max-w-2xl mx-auto">
+              <p className="section-header mb-3">Roadmap</p>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8">
+                What comes next
+              </h2>
+              <div className="space-y-4">
+                {[
+                  {
+                    phase: "0",
+                    title: "JSON Fixture Inspection",
+                    status: "done",
+                    desc: "Real LTG v2 format confirmed. Adapter handles indexed-palette exports with RGB/H/S/B press metadata.",
+                  },
+                  {
+                    phase: "1",
+                    title: "JSON Round-Trip",
+                    status: "done",
+                    desc: "Import JSON → normalize to GridDocument → render canvas → export JSON. Complete.",
+                  },
+                  {
+                    phase: "2",
+                    title: "Palette Panel",
+                    status: "done",
+                    desc: "Usage counts, color locking, manual merges, and full 84-color game reference grid.",
+                  },
+                  {
+                    phase: "3",
+                    title: "One-Click Optimizer",
+                    status: "done",
+                    desc: "Deterministic color merging, island removal, single-cell cleanup, and palette limiting.",
+                  },
+                  {
+                    phase: "4",
+                    title: "Image Upload (remaining)",
+                    status: "current",
+                    desc: "Face-focused framing, cleanup, tone controls, and import preview are in. Remaining: drag crop/pan controls.",
+                  },
+                  {
+                    phase: "5",
+                    title: "Reference Pack Export (remaining)",
+                    status: "next",
+                    desc: "Palette sheet image, painting order suggestion, and ZIP bundle download.",
+                  },
+                  {
+                    phase: "6",
+                    title: "AI Suggestions",
+                    status: "current",
+                    desc: "OpenRouter chat, saved local sessions, 25 model presets, visual grid snapshots, and applyable sketch drafts are available; deeper cleanup suggestions are next.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.phase}
+                    className="flex gap-4 p-4 rounded-sm border border-border bg-card"
+                  >
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        P{item.phase}
+                      </span>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          item.status === "done"
+                            ? "bg-green-500"
+                            : item.status === "current"
+                              ? "bg-primary"
+                              : item.status === "next"
+                                ? "bg-primary/50"
+                                : "bg-border"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">{item.title}</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* AI plan direction */}
+        <section className="py-12 sm:py-16 lg:py-20 border-t border-border bg-card">
+          <div className="container">
+            <p className="section-header mb-3">Practical next steps</p>
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
+              Get a useful plan without booking a call
+            </h2>
+            <p className="text-muted-foreground leading-relaxed max-w-3xl mb-8">
+              The current AI beta turns a goal into a short, reviewable
+              checklist. It is free, never changes a project automatically, and
+              does not require a checkout.
+            </p>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <article className="rounded-sm border border-border bg-background p-5">
+                <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
+                <h3 className="mt-4 text-lg font-semibold">Free AI plan beta</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Describe what you are making or fixing, then review the
+                  quickest useful next action and an ordered checklist.
+                </p>
+                <Link
+                  href="/ai-plan"
+                  className="mt-5 inline-flex min-h-10 items-center rounded-sm border border-border px-4 text-sm font-medium hover:bg-accent"
+                >
+                  See the AI plan
+                </Link>
+              </article>
+              <article className="rounded-sm border border-dashed border-border bg-background p-5">
+                <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
+                <h3 className="mt-4 text-lg font-semibold">
+                  Possible one-time $5 creator plan
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Saved milestones, canvas-aware suggestions, one bounded
+                  regeneration, and a downloadable summary are product direction
+                  only. The plan is not for sale and no payment details are
+                  collected.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
@@ -898,9 +841,7 @@ Keep it practical and concise.`,
         <div className="container flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="red-dot-sm" />
-            <span className="text-xs text-muted-foreground">
-              Tomodachi
-            </span>
+            <span className="text-xs text-muted-foreground">Tomodachi</span>
           </div>
           <nav
             aria-label="Site"
@@ -915,8 +856,8 @@ Keep it practical and concise.`,
             <Link href="/about" className="hover:underline">
               About
             </Link>
-            <Link href="/unlock" className="hover:underline">
-              Unlock
+            <Link href="/ai-plan" className="hover:underline">
+              AI plan
             </Link>
             <Link href="/support" className="hover:underline">
               Support

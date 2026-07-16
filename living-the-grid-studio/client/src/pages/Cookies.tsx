@@ -13,14 +13,19 @@ import { breadcrumbFor } from "@/lib/breadcrumb";
 
 export default function Cookies() {
   useDocumentTitle("Cookies");
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Cookies", href: "/cookies" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Cookies", href: "/cookies" },
+    ]),
+  ]);
 
   const [reset, setReset] = useState(false);
 
   return (
     <LegalLayout
       title="Cookie Notice"
-      lastUpdated="May 14, 2026"
+      lastUpdated="July 16, 2026"
       intro="This page explains what we store in your browser and why. You can change your mind any time."
     >
       <h2>What we use</h2>
@@ -30,10 +35,6 @@ export default function Cookies() {
           <code>ltg.consent.v1</code> — your cookie preferences. Without this
           entry the banner would appear every visit.
         </li>
-        <li>
-          Server session cookies during a Stripe checkout flow, set by Stripe
-          directly. These cookies are required to complete a purchase.
-        </li>
       </ul>
 
       <h3>Analytics (opt-in)</h3>
@@ -41,16 +42,15 @@ export default function Cookies() {
         <li>
           Aggregate event counts (e.g. &quot;breach-check submitted&quot;,
           &quot;AI plan generated&quot;). No identifiers, no cross-site
-          tracking. Only loaded after you accept analytics in the cookie
-          banner.
+          tracking. Only loaded after you accept analytics in the cookie banner.
         </li>
       </ul>
 
       <h3>Marketing (opt-in)</h3>
       <ul>
         <li>
-          Google AdSense cookies for ad measurement and frequency capping.
-          Only loaded after you accept marketing cookies. AdSense&apos;s own{" "}
+          Google AdSense cookies for ad measurement and frequency capping. Only
+          loaded after you accept marketing cookies. AdSense&apos;s own{" "}
           <a href="https://policies.google.com/privacy" rel="noopener">
             privacy policy
           </a>{" "}
@@ -91,8 +91,8 @@ export default function Cookies() {
       <h2>Browser-level controls</h2>
       <p>
         Most browsers let you block cookies entirely or per-site. Blocking
-        essential cookies may break checkout. We recommend using the banner
-        controls above instead.
+        essential storage may make the consent banner reappear or reset local
+        preferences. You can use the banner controls above instead.
       </p>
     </LegalLayout>
   );
