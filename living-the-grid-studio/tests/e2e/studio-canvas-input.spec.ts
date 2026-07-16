@@ -121,6 +121,116 @@ test("Studio stays strict-CSP safe and gives every native form control metadata"
   ).toEqual([]);
 });
 
+test("game-matched drawing setup separates brush, cell lines, and game guides", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared game-matched setup state.",
+  );
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+
+  const canvas = page.getByRole("application", {
+    name: "Editable 64 by 64 pixel grid",
+  });
+  await expect(
+    page.getByTestId("game-brush-recipe").locator(".sr-only"),
+  ).toHaveText("4px game brush");
+  await expect(
+    page
+      .getByTestId("game-brush-recipe")
+      .locator('[aria-hidden="true"]')
+      .filter({ hasText: /^4px game brush$/ }),
+  ).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "8");
+  await expect(
+    page.getByRole("button", { name: "In-game grid view: 8×8" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "In-game grid view: Off" }).click();
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "0");
+  // Turning off the game overlay must not turn off the authoritative project
+  // cell mesh or mutate the grid document.
+  await expect(canvas).toHaveAttribute("data-grid-density", "cell");
+
+  await page.getByRole("button", { name: "Grid density: Off" }).click();
+  await page.getByRole("button", { name: "Show center guides" }).click();
+  await page
+    .getByRole("button", { name: "Mirror brush left to right" })
+    .click();
+  await page.getByRole("combobox", { name: "Brush size" }).selectOption("5");
+  await page.getByRole("button", { name: "Eraser tool" }).click();
+  await page.getByRole("button", { name: "Easy draw" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Pencil tool" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("combobox", { name: "Brush size" })).toHaveValue(
+    "1",
+  );
+  await expect(canvas).toHaveAttribute("data-grid-density", "cell");
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "8");
+  await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
+  await expect(
+    page.getByRole("button", { name: "Mirror brush left to right" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await page
+    .getByRole("button", { name: "Mirror brush left to right" })
+    .click();
+  await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "8");
+  await page
+    .getByRole("button", { name: "Mirror brush left to right" })
+    .click();
+  await expect
+    .poll(async () => Number(await canvas.getAttribute("data-cell-size")))
+    .toBeGreaterThanOrEqual(12);
+  await expect(page.locator("canvas[data-grid-width]")).toHaveCount(1);
+
+  // Paint one known project coordinate, export the canonical document, and
+  // prove the visual target became that exact row-major cell. This is the
+  // release-level one-to-one guarantee—not merely a screenshot comparison.
+  const targetCell = { x: 30, y: 30 };
+  const canvasBox = await canvas.boundingBox();
+  expect(canvasBox).not.toBeNull();
+  const metrics = await canvas.evaluate((element) => ({
+    cellSize: Number(element.getAttribute("data-cell-size")),
+    originX: Number(element.getAttribute("data-grid-origin-x")),
+    originY: Number(element.getAttribute("data-grid-origin-y")),
+  }));
+  await page.mouse.click(
+    canvasBox!.x + metrics.originX + (targetCell.x + 0.5) * metrics.cellSize,
+    canvasBox!.y + metrics.originY + (targetCell.y + 0.5) * metrics.cellSize,
+  );
+
+  await page.getByRole("tab", { name: "Export", exact: true }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Export JSON/ }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  expect(stream).not.toBeNull();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const exported = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+    cells: Array<string | null>;
+    width: number;
+  };
+  expect(exported.cells[targetCell.y * exported.width + targetCell.x]).toBe(
+    "R10C1",
+  );
+  expect(exported.cells.filter((cell) => cell !== null)).toEqual(["R10C1"]);
+  expect(exported.cells[targetCell.y * exported.width + targetCell.x - 1]).toBe(
+    null,
+  );
+  expect(exported.cells[targetCell.y * exported.width + targetCell.x + 1]).toBe(
+    null,
+  );
+});
+
 test("mobile Studio keeps the canvas bounded and paint controls within reach", async ({
   page,
 }, testInfo) => {
@@ -143,11 +253,13 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   const initialGridState = await canvas.getAttribute("data-grid-lines");
   expect(["suppressed", "visible"]).toContain(initialGridState);
   if (initialGridState === "suppressed") {
+    await expect(canvas).toHaveAttribute("data-project-grid-step", "off");
     await expect(page.getByTestId("grid-zoom-hint")).toHaveText(
       "Dense preview · choose Cell view to see cell lines",
     );
     await expect(canvas).toHaveAttribute("aria-describedby", /\S+ \S+ \S+/);
   } else {
+    await expect(canvas).toHaveAttribute("data-project-grid-step", "1");
     await expect(page.getByTestId("grid-zoom-hint")).toHaveCount(0);
     await expect(canvas).toHaveAttribute("aria-describedby", /^\S+ \S+$/);
   }
@@ -156,6 +268,22 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await expect(page.getByTestId("grid-zoom-hint")).toHaveCount(0);
   await expect(paintControls).toBeVisible();
   await expect(page.getByRole("button", { name: "Pencil tool" })).toBeVisible();
+  const gameSetup = page.getByRole("group", { name: "Game copy setup" });
+  await expect(gameSetup).toBeVisible();
+  await expect(gameSetup).toHaveAttribute("aria-describedby", /\S+/);
+  await expect(
+    page.getByText("Observed · verify", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "In-game grid view: Off" }).click();
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "0");
+  await page.getByRole("button", { name: "Easy draw" }).click();
+  await expect(canvas).toHaveAttribute("data-game-grid-sections", "8");
+  await page.getByRole("button", { name: /Cell line density: Cell/ }).click();
+  await page.getByRole("button", { name: "Grid density: Off" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-density", "off");
+  await page.getByRole("button", { name: /Cell line density: Off/ }).click();
+  await page.getByRole("button", { name: "Grid density: Cell" }).click();
+  await expect(canvas).toHaveAttribute("data-grid-density", "cell");
   await expect(
     page.getByRole("button", { name: "Mirror brush left to right" }),
   ).toBeVisible();
@@ -168,6 +296,77 @@ test("mobile Studio keeps the canvas bounded and paint controls within reach", a
   await expect(
     page.getByRole("button", { name: /Choose paint color/ }),
   ).toBeVisible();
+  await page.getByRole("button", { name: /Choose paint color/ }).click();
+  const palette = page.getByRole("group", {
+    name: "11 by 7 Studio color matrix",
+  });
+  await expect(palette).toBeVisible();
+  const paletteBounds = await page
+    .getByLabel("Complete paint palette")
+    .boundingBox();
+  const viewport = page.viewportSize();
+  expect(paletteBounds).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(paletteBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(paletteBounds!.x + paletteBounds!.width).toBeLessThanOrEqual(
+    viewport!.width,
+  );
+  expect(paletteBounds!.y).toBeGreaterThanOrEqual(0);
+  expect(paletteBounds!.y + paletteBounds!.height).toBeLessThanOrEqual(
+    viewport!.height,
+  );
+  const firstSwatch = palette.getByRole("button").nth(0);
+  const secondSwatch = palette.getByRole("button").nth(1);
+  await expect(firstSwatch).toHaveAttribute("aria-label", /^Select R1C1 /);
+  await expect(secondSwatch).toHaveAttribute("aria-label", /^Select R2C1 /);
+  await expect(firstSwatch).toHaveCSS("order", "0");
+  await expect(secondSwatch).toHaveCSS("order", "0");
+  const firstSwatchBounds = await firstSwatch.boundingBox();
+  const secondSwatchBounds = await secondSwatch.boundingBox();
+  expect(firstSwatchBounds).not.toBeNull();
+  expect(secondSwatchBounds).not.toBeNull();
+  expect(firstSwatchBounds!.width).toBeGreaterThanOrEqual(44);
+  expect(firstSwatchBounds!.height).toBeGreaterThanOrEqual(44);
+  expect(secondSwatchBounds!.x).toBeGreaterThan(firstSwatchBounds!.x);
+  expect(Math.abs(secondSwatchBounds!.y - firstSwatchBounds!.y)).toBeLessThan(
+    firstSwatchBounds!.height / 2,
+  );
+  await firstSwatch.focus();
+  await page.keyboard.press("Tab");
+  await expect(secondSwatch).toBeFocused();
+  await secondSwatch.click();
+
+  await page
+    .getByRole("button", { name: /Canvas background options: Light checker/ })
+    .click();
+  await page
+    .getByRole("button", { name: "Use dark checker canvas background" })
+    .click();
+  await expect(canvas).toHaveAttribute("data-canvas-background", "dark");
+  await page
+    .getByRole("button", { name: /Canvas background options: Dark checker/ })
+    .click();
+  await page
+    .getByRole("button", { name: "Use light checker canvas background" })
+    .click();
+  await expect(canvas).toHaveAttribute("data-canvas-background", "light");
+  for (const control of [
+    page.getByRole("button", { name: "In-game grid view: Off" }),
+    page.getByRole("button", { name: "In-game grid view: 8×8" }),
+    page.getByRole("button", { name: "Easy draw" }),
+    page.getByRole("button", { name: /Cell line density: Cell/ }),
+    page.getByRole("button", {
+      name: /Canvas background options: Light checker/,
+    }),
+    page.getByRole("button", { name: "Show center guides" }),
+  ]) {
+    const bounds = await control.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width);
+    expect(bounds!.width).toBeGreaterThanOrEqual(44);
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+  }
   await expect(page.getByText("Starter Designs", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
@@ -398,6 +597,9 @@ test("Studio canvas supports touch strokes, keyboard editing, and phone-friendly
     name: "Show center guides",
   });
   await expect(mirrorButton).toHaveAttribute("aria-pressed", "false");
+  await expect(guideButton).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute("data-center-guide", "hidden");
+  await guideButton.click();
   await expect(guideButton).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveAttribute("data-center-guide", "visible");
   await guideButton.click();

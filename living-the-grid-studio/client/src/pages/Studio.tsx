@@ -72,6 +72,7 @@ import {
   type ImageImportOptions,
 } from "@/lib/engine/image-import";
 import { buildPaintCells } from "@/lib/engine/paint-assists";
+import type { GameGridSections } from "@/lib/engine/game-match";
 import type { CopyGuideRun } from "@/lib/engine/copy-guide";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
@@ -125,6 +126,8 @@ export default function Studio() {
 
   const [highlightColorId, setHighlightColorId] = useState<string | null>(null);
   const [gridDensity, setGridDensity] = useState<GridDensity>("cell");
+  const [gameGridSections, setGameGridSections] = useState<GameGridSections>(8);
+  const [editViewRequest, setEditViewRequest] = useState(0);
   const [canvasBackground, setCanvasBackground] =
     useState<CanvasBackground>("light");
   const [showLabels, setShowLabels] = useState(false);
@@ -284,17 +287,30 @@ export default function Studio() {
         e.preventDefault();
         const next = !horizontalMirror;
         setHorizontalMirror(next);
-        if (next) setShowCenterGuide(true);
+        if (next && gameGridSections === 0) setShowCenterGuide(true);
         return;
       }
       if (key === "g" && doc && !imagePreview) {
         e.preventDefault();
-        setShowCenterGuide((current) => !current);
+        if (gameGridSections > 0) {
+          setGameGridSections(0);
+          setShowCenterGuide(true);
+        } else {
+          setShowCenterGuide((current) => !current);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePanel, doc, horizontalMirror, imagePreview, undo, redo]);
+  }, [
+    activePanel,
+    doc,
+    gameGridSections,
+    horizontalMirror,
+    imagePreview,
+    undo,
+    redo,
+  ]);
 
   // Show errors
   useEffect(() => {
@@ -500,7 +516,8 @@ export default function Studio() {
     clearImagePreview();
     setHighlightColorId(null);
     setPaintTool("pencil");
-    setShowCenterGuide(true);
+    setHorizontalMirror(false);
+    setShowCenterGuide(false);
     setActivePanel("create");
     toast.success("Blank tracing grid ready");
   }, [clearImagePreview, createNew, imagePreview]);
@@ -561,7 +578,8 @@ export default function Studio() {
         createNew(64, 64, "Untitled Canvas", null);
         setHighlightColorId(null);
         setPaintTool("pencil");
-        setShowCenterGuide(true);
+        setHorizontalMirror(false);
+        setShowCenterGuide(false);
         setIsPreparingBlankCanvas(false);
         // Mount the lightweight canvas previews in the same committed layout
         // as the editor. Keeping the sidebar stable prevents a fast first
@@ -572,13 +590,31 @@ export default function Studio() {
     });
   }, [createNew]);
 
+  const handleEasyDrawSetup = useCallback(() => {
+    setPaintTool("pencil");
+    setBrushSize(1);
+    setGridDensity("cell");
+    setGameGridSections(8);
+    setHorizontalMirror(false);
+    // The 8×8 overlay already contains the horizontal and vertical center
+    // boundaries. Keeping the separate center crosshair off prevents a dark,
+    // doubled line through the exact middle of the drawing.
+    setShowCenterGuide(false);
+    setShowLabels(false);
+    setEditViewRequest((current) => current + 1);
+    toast.success(
+      "Easy draw ready: one-cell pencil, 8×8 game guide, and precise Cell view.",
+    );
+  }, []);
+
   const handleCreateTemplate = useCallback(
     (templateId: CreativeTemplateId) => {
       const templateDoc = createCreativeTemplateDocument(templateId);
       setDoc(templateDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
-      setShowCenterGuide(true);
+      setHorizontalMirror(false);
+      setShowCenterGuide(false);
       setActivePanel("create");
       revealCanvasForEditing();
       toast.success(`Created ${templateDoc.meta.name}`);
@@ -707,7 +743,7 @@ export default function Studio() {
               <button
                 onClick={() => setShowLabels((v) => !v)}
                 disabled={isCopyMode}
-                className={`p-1.5 rounded-sm transition-colors ${
+                className={`inline-flex size-11 items-center justify-center rounded-lg transition-colors sm:size-8 ${
                   isCopyMode || showLabels
                     ? "bg-accent text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -742,7 +778,7 @@ export default function Studio() {
                   if (!isCopyMode) undo();
                 }}
                 disabled={!canUndo || isCopyMode}
-                className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 sm:size-8"
                 aria-label="Undo"
                 title="Undo"
               >
@@ -761,7 +797,7 @@ export default function Studio() {
                   if (!isCopyMode) redo();
                 }}
                 disabled={!canRedo || isCopyMode}
-                className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 sm:size-8"
                 aria-label="Redo"
                 title="Redo"
               >
@@ -800,22 +836,39 @@ export default function Studio() {
                   brushSize={brushSize}
                   doc={doc}
                   background={canvasBackground}
+                  gameGridSections={gameGridSections}
                   gridDensity={gridDensity}
                   horizontalMirror={horizontalMirror}
                   selectedColorId={selectedPaintColorId}
                   showCenterGuide={showCenterGuide}
                   onBrushSizeChange={setBrushSize}
                   onBackgroundChange={setCanvasBackground}
+                  onEasyDrawSetup={handleEasyDrawSetup}
+                  onGameGridSectionsChange={(sections) => {
+                    setGameGridSections(sections);
+                    if (sections > 0) {
+                      setShowCenterGuide(false);
+                    } else if (horizontalMirror) {
+                      setShowCenterGuide(true);
+                    }
+                  }}
                   onGridDensityChange={setGridDensity}
                   onHorizontalMirrorChange={(enabled) => {
                     setHorizontalMirror(enabled);
-                    if (enabled) setShowCenterGuide(true);
+                    if (enabled && gameGridSections === 0) {
+                      setShowCenterGuide(true);
+                    }
                   }}
                   onSelectedColorChange={(colorId) => {
                     setSelectedPaintColorId(colorId);
                     setHighlightColorId(null);
                   }}
-                  onShowCenterGuideChange={setShowCenterGuide}
+                  onShowCenterGuideChange={(enabled) => {
+                    if (enabled && gameGridSections > 0) {
+                      setGameGridSections(0);
+                    }
+                    setShowCenterGuide(enabled);
+                  }}
                   onToolChange={setPaintTool}
                   onAddReference={handleChooseImage}
                   onOpenCopyGuide={() => setActivePanel("copy")}
@@ -886,6 +939,8 @@ export default function Studio() {
                   <CanvasViewer
                     doc={visibleDoc}
                     background={canvasBackground}
+                    editViewRequest={editViewRequest}
+                    gameGridSections={gameGridSections}
                     highlightColorId={isCopyMode ? null : highlightColorId}
                     gridDensity={isCopyMode ? "cell" : gridDensity}
                     showLabels={isCopyMode || showLabels}

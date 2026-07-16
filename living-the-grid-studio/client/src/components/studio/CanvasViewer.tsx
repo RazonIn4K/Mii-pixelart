@@ -19,12 +19,17 @@ import {
   canvasToCell,
   gridStepForDensity,
   renderGrid,
+  snapGridStrip,
   shouldRenderGridLines,
   type CanvasBackground,
   type GridDensity,
 } from "@/lib/engine/canvas-renderer";
 import { bresenhamLine, getCell } from "@/lib/engine/grid";
 import { buildPaintCells, type BrushSize } from "@/lib/engine/paint-assists";
+import {
+  getGameGridBoundaries,
+  type GameGridSections,
+} from "@/lib/engine/game-match";
 import { formatCountLabel } from "@/lib/format-count";
 
 interface CanvasViewerProps {
@@ -45,6 +50,10 @@ interface CanvasViewerProps {
   showCenterGuide?: boolean;
   /** Local display surface behind transparent cells. */
   background?: CanvasBackground;
+  /** In-game reference overlay only; it never changes project cells. */
+  gameGridSections?: GameGridSections;
+  /** Increment to request the precise Cell view from an external setup action. */
+  editViewRequest?: number;
   /** Browser-local source aligned beneath the one authoritative cell grid. */
   referenceUnderlay?: {
     fit: "contain" | "cover";
@@ -98,6 +107,21 @@ const MAX_RENDER_DPR = 2;
 const TAP_MOVE_TOLERANCE = 5;
 const TOUCH_TAP_MOVE_TOLERANCE = 14;
 
+function resolveProjectGridStep(
+  requestedGridStep: number | null,
+  requestedGridVisible: boolean,
+  gameGridSections: GameGridSections,
+): number | null {
+  if (requestedGridStep !== 1 || requestedGridVisible) {
+    return requestedGridStep;
+  }
+
+  // A fitted game guide already provides the useful coarse boundaries. When
+  // it is off, retain the older eight-cell fallback so a tiny canvas still has
+  // orientation without attempting to render every project-cell line.
+  return gameGridSections > 0 ? null : 8;
+}
+
 export default function CanvasViewer({
   doc,
   highlightColorId,
@@ -107,6 +131,8 @@ export default function CanvasViewer({
   guideHighlight = null,
   showCenterGuide = false,
   background = "light",
+  gameGridSections = 8,
+  editViewRequest = 0,
   referenceUnderlay = null,
   paintPreview = null,
   onCellClick,
@@ -134,6 +160,7 @@ export default function CanvasViewer({
   // Last sample position during a drag, used to Bresenham-interpolate the
   // gap to the current position so fast strokes don't skip cells.
   const lastDragCellRef = useRef<{ x: number; y: number } | null>(null);
+  const lastEditViewRequestRef = useRef(editViewRequest);
   const instructionsId = useId();
   const statusId = useId();
   const zoomHintId = useId();
@@ -320,8 +347,11 @@ export default function CanvasViewer({
     // A fitted 64×64 canvas can make one-pixel cell lines consume a quarter
     // of every cell on a phone. Keep clean eight-cell sections at that scale;
     // Cell view reveals the complete per-cell mesh for exact copying.
-    const renderGridStep =
-      requestedGridStep === 1 && !requestedGridVisible ? 8 : requestedGridStep;
+    const renderGridStep = resolveProjectGridStep(
+      requestedGridStep,
+      requestedGridVisible,
+      gameGridSections,
+    );
     const renderGridLines =
       renderGridStep !== null &&
       shouldRenderGridLines(
@@ -355,15 +385,62 @@ export default function CanvasViewer({
           : "rgba(64, 83, 92, 0.42)",
       gridWidth: 1,
       majorGridColor: background === "dark" ? "#f7c75f" : "#29485a",
-      // Cell view is the literal one-project-cell mesh used while drawing and
-      // copying. Adding a second, heavy eight-cell cadence over that mesh made
-      // the surface read as two stacked grids. Coarse/medium views retain the
-      // section guides; the exact cell view stays one consistent grid, like the
-      // in-game repaint screen, with optional center guides providing the
-      // stronger orientation axis instead.
-      majorGridStep: renderGridStep === 1 ? 0 : 8,
+      // Game guide sections are rendered once, below, with their own visual
+      // language. Stacking renderGrid's legacy major cadence on top of them is
+      // what previously made the canvas look like two competing grids.
+      majorGridStep: 0,
       majorGridWidth: 1.5,
     });
+
+    // Mirror the game's independent 2×2 / 4×4 / 8×8 reference overlay.
+    // These section lines do not resize the document and do not create cells;
+    // they are orientation guides above the single authoritative cell mesh.
+    if (gameGridSections > 0) {
+      const verticalBoundaries = getGameGridBoundaries(
+        doc.width,
+        gameGridSections,
+      );
+      const horizontalBoundaries = getGameGridBoundaries(
+        doc.height,
+        gameGridSections,
+      );
+      const requestedLineWidth = Math.max(
+        2,
+        Math.min(3, metrics.scaledSize / 3),
+      );
+      const lineWidth = Math.max(
+        1 / dpr,
+        Math.round(requestedLineWidth * dpr) / dpr,
+      );
+
+      ctx.save();
+      ctx.fillStyle = "rgba(219, 105, 31, 0.78)";
+      for (const boundary of verticalBoundaries) {
+        const x = snapGridStrip(
+          metrics.panX + boundary * metrics.scaledSize - lineWidth / 2,
+          dpr,
+        );
+        ctx.fillRect(
+          x,
+          metrics.panY,
+          lineWidth,
+          doc.height * metrics.scaledSize,
+        );
+      }
+      for (const boundary of horizontalBoundaries) {
+        const y = snapGridStrip(
+          metrics.panY + boundary * metrics.scaledSize - lineWidth / 2,
+          dpr,
+        );
+        ctx.fillRect(
+          metrics.panX,
+          y,
+          doc.width * metrics.scaledSize,
+          lineWidth,
+        );
+      }
+      ctx.restore();
+    }
 
     // Coordinate rulers share the same metrics as the authoritative canvas.
     // They are deliberately drawn outside the grid so they cannot look like a
@@ -447,6 +524,7 @@ export default function CanvasViewer({
     background,
     highlightColorId,
     guideHighlight,
+    gameGridSections,
     getRenderMetrics,
     readOnly,
     referenceImage,
@@ -486,15 +564,45 @@ export default function CanvasViewer({
     );
   }, [getRenderMetrics, readOnly]);
 
-  // Mouse/trackpad wheel zoom. Touch users can use the explicit zoom buttons.
-  const handleWheel = useCallback((event: React.WheelEvent) => {
-    if (event.deltaY === 0) return;
-    event.preventDefault();
-    const delta = event.deltaY > 0 ? 0.9 : 1.1;
-    setZoom((current) =>
-      Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current * delta)),
-    );
-  }, []);
+  useEffect(() => {
+    if (lastEditViewRequestRef.current === editViewRequest) return;
+    lastEditViewRequestRef.current = editViewRequest;
+    editView();
+    window.requestAnimationFrame(() => {
+      canvasRef.current?.focus({ preventScroll: true });
+    });
+  }, [editView, editViewRequest]);
+
+  // Keep the cell beneath the pointer stationary while zooming. Center-only
+  // wheel zoom makes users lose the exact eye, mouth, or outline cell they were
+  // editing and is especially disorienting on a large 64×64 face grid.
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<HTMLCanvasElement>) => {
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      const currentMetrics = getRenderMetrics();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const localX = event.clientX - rect.left;
+      const localY = event.clientY - rect.top;
+      const world = {
+        x: (localX - currentMetrics.panX) / currentMetrics.scaledSize,
+        y: (localY - currentMetrics.panY) / currentMetrics.scaledSize,
+      };
+      const multiplier = event.deltaY > 0 ? 0.9 : 1.1;
+      const nextZoom = Math.max(
+        MIN_ZOOM,
+        Math.min(MAX_ZOOM, zoom * multiplier),
+      );
+      const targetMetrics = getRenderMetrics(nextZoom, { x: 0, y: 0 });
+
+      setZoom(nextZoom);
+      setPan({
+        x: localX - world.x * targetMetrics.scaledSize - targetMetrics.panX,
+        y: localY - world.y * targetMetrics.scaledSize - targetMetrics.panY,
+      });
+    },
+    [getRenderMetrics, zoom],
+  );
 
   const getEventCell = useCallback(
     (point: ClientPoint) => {
@@ -1101,6 +1209,11 @@ export default function CanvasViewer({
       : gridLinesVisible
         ? "visible"
         : "suppressed";
+  const renderedProjectGridStep = resolveProjectGridStep(
+    gridStep,
+    gridLinesVisible,
+    gameGridSections,
+  );
   const activeCell = hoverCell ?? (isKeyboardFocused ? keyboardCell : null);
   const quadrant = activeCell
     ? `${activeCell.y < doc.height / 2 ? "N" : "S"}${
@@ -1251,6 +1364,8 @@ export default function CanvasViewer({
         data-grid-origin-y={currentRenderMetrics.panY}
         data-cell-size={currentRenderMetrics.scaledSize}
         data-grid-density={gridDensity}
+        data-project-grid-step={renderedProjectGridStep ?? "off"}
+        data-game-grid-sections={gameGridSections}
         data-grid-lines={gridLineState}
         data-grid-renderer="crisp-layered"
         data-canvas-background={background}

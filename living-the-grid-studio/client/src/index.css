@@ -671,3 +671,17 @@
     transform: none;
   }
 }
+
+/* Sonner's upstream phone rule combines width: 100% with left/right offsets,
+   which makes its fixed container wider than the viewport. Keep the live
+   region and toast fully inside those offsets so notifications never create
+   horizontal page scrolling while someone is drawing. */
+@media (max-width: 600px) {
+  [data-sonner-toaster] {
+    width: auto !important;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] {
+    width: 100% !important;
+  }
+}

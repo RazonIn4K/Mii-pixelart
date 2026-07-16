@@ -1876,13 +1876,37 @@ test("Studio selection controls expose their current state", async ({
     page.getByText("Created Untitled Canvas", { exact: false }),
   ).toBeHidden();
   await page.getByRole("tab", { name: "Create" }).click();
-  const cellGrid = page.getByRole("button", { name: "Grid density: Cell" });
-  const hiddenGrid = page.getByRole("button", { name: "Grid density: Off" });
-  await expect(cellGrid).toHaveAttribute("aria-pressed", "true");
-  await expect(hiddenGrid).toHaveAttribute("aria-pressed", "false");
-  await hiddenGrid.click();
-  await expect(cellGrid).toHaveAttribute("aria-pressed", "false");
-  await expect(hiddenGrid).toHaveAttribute("aria-pressed", "true");
+  const mobileGridDensity = page.getByRole("button", {
+    name: /Cell line density:/,
+  });
+  if (await mobileGridDensity.isVisible()) {
+    await expect(mobileGridDensity).toHaveAccessibleName(
+      /Cell line density: Cell/,
+    );
+    await mobileGridDensity.click();
+    let cellGrid = page.getByRole("button", { name: "Grid density: Cell" });
+    let hiddenGrid = page.getByRole("button", { name: "Grid density: Off" });
+    await expect(cellGrid).toHaveAttribute("aria-pressed", "true");
+    await expect(hiddenGrid).toHaveAttribute("aria-pressed", "false");
+    await hiddenGrid.click();
+    await expect(mobileGridDensity).toHaveAccessibleName(
+      /Cell line density: Off/,
+    );
+    await mobileGridDensity.click();
+    cellGrid = page.getByRole("button", { name: "Grid density: Cell" });
+    hiddenGrid = page.getByRole("button", { name: "Grid density: Off" });
+    await expect(cellGrid).toHaveAttribute("aria-pressed", "false");
+    await expect(hiddenGrid).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+  } else {
+    const cellGrid = page.getByRole("button", { name: "Grid density: Cell" });
+    const hiddenGrid = page.getByRole("button", { name: "Grid density: Off" });
+    await expect(cellGrid).toHaveAttribute("aria-pressed", "true");
+    await expect(hiddenGrid).toHaveAttribute("aria-pressed", "false");
+    await hiddenGrid.click();
+    await expect(cellGrid).toHaveAttribute("aria-pressed", "false");
+    await expect(hiddenGrid).toHaveAttribute("aria-pressed", "true");
+  }
 
   const inspectTool = page.getByRole("button", { name: "Inspect tool" });
   const pencilTool = page.getByRole("button", { name: "Pencil tool" });

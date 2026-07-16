@@ -9,6 +9,7 @@ import {
   Crop,
   Crosshair,
   FileJson,
+  Gamepad2,
   Image as ImageIcon,
   Maximize2,
   RefreshCw,
@@ -71,6 +72,13 @@ const LOCAL_IMAGE_LIMITS = {
   pixels: 40_000_000,
 } as const;
 const LOCAL_JSON_LIMIT_BYTES = 2 * 1024 * 1024;
+
+const GAME_MATCHED_GRID_PRESETS = [
+  { brushPixels: 4, size: 64 },
+  { brushPixels: 8, size: 32 },
+  { brushPixels: 16, size: 16 },
+  { brushPixels: 32, size: 8 },
+] as const;
 
 const IMAGE_INPUT_ACCEPT = [
   "image/png",
@@ -622,6 +630,12 @@ export default function ImportPanel({
     setSamplingMode("crisp");
   }, [setCropValues]);
 
+  const applyGameMatchedGrid = useCallback((size: number) => {
+    setGridWidth(size);
+    setGridHeight(size);
+    setSamplingMode("crisp");
+  }, []);
+
   const hasPendingImageChanges =
     !!lastImageFile && !areImageOptionsEqual(imageOptions, lastAppliedOptions);
   const hasCurrentPreview = !!previewDoc && !hasPendingImageChanges;
@@ -967,6 +981,42 @@ export default function ImportPanel({
 
       {/* Grid Size Controls */}
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
+        <div className="rounded-xl border border-[#24786f]/25 bg-[#e8f5ef] p-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-black text-[#17384a]">
+            <Gamepad2 className="size-3.5" /> Game-matched size
+          </div>
+          <p className="mt-1 text-[0.68rem] leading-4 text-[#526975]">
+            Observed 256px square setup: one project cell equals one
+            pixel-perfect brush stamp. Verify it against your game version.
+          </p>
+          <div
+            className="mt-2 grid grid-cols-2 gap-1.5"
+            role="group"
+            aria-label="Game-matched grid size"
+          >
+            {GAME_MATCHED_GRID_PRESETS.map(({ brushPixels, size }) => {
+              const selected = gridWidth === size && gridHeight === size;
+              return (
+                <Button
+                  key={size}
+                  type="button"
+                  variant={selected ? "default" : "outline"}
+                  size="sm"
+                  className="h-auto min-h-10 flex-col gap-0 rounded-lg py-1.5 text-xs"
+                  aria-pressed={selected}
+                  onClick={() => applyGameMatchedGrid(size)}
+                >
+                  <span className="font-black">
+                    {size}×{size} cells
+                  </span>
+                  <span className="text-[0.62rem] opacity-80">
+                    {brushPixels}px game brush
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+        </div>
         <p className="text-xs font-semibold">Use Case Presets</p>
         <div className="grid grid-cols-2 gap-2">
           <Button

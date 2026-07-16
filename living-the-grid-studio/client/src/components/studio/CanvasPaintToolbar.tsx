@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   Crosshair,
   Eraser,
   FlipHorizontal2,
+  Gamepad2,
   ImagePlus,
   ListChecks,
   Moon,
@@ -12,6 +13,7 @@ import {
   Pencil,
   Pipette,
   Sun,
+  WandSparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +34,10 @@ import type {
   CanvasBackground,
   GridDensity,
 } from "@/lib/engine/canvas-renderer";
+import {
+  getGameMatchRecipe,
+  type GameGridSections,
+} from "@/lib/engine/game-match";
 
 export type { BrushSize } from "@/lib/engine/paint-assists";
 
@@ -68,28 +74,44 @@ const GRID_DENSITY_PRESETS: ReadonlyArray<{
   {
     density: "off",
     label: "Off",
-    visibleLabel: "Clean",
-    title: "Hide copy grid",
+    visibleLabel: "Off",
+    title: "Hide project cell lines",
   },
   {
     density: "coarse",
-    label: "Coarse",
-    visibleLabel: "8",
-    title: "Section guide every 8 cells",
+    label: "Coarse · every 8 cells",
+    visibleLabel: "8c",
+    title: "Project line every 8 cells",
   },
   {
     density: "medium",
-    label: "Medium",
-    visibleLabel: "4",
-    title: "Block guide every 4 cells with stronger 8-cell sections",
+    label: "Medium · every 4 cells",
+    visibleLabel: "4c",
+    title: "Project line every 4 cells",
   },
   {
     density: "cell",
-    label: "Cell",
-    visibleLabel: "Cells",
-    title: "Every cell with stronger 8-cell sections",
+    label: "Cell · every cell",
+    visibleLabel: "Every",
+    title: "Show the boundary of every project cell",
   },
 ];
+
+const GAME_GRID_PRESETS: ReadonlyArray<{
+  label: string;
+  sections: GameGridSections;
+}> = [
+  { label: "Off", sections: 0 },
+  { label: "2×2", sections: 2 },
+  { label: "4×4", sections: 4 },
+  { label: "8×8", sections: 8 },
+];
+
+const CANVAS_BACKGROUND_PRESETS = [
+  { icon: Palette, label: "Paper", value: "paper" },
+  { icon: Sun, label: "Light checker", value: "light" },
+  { icon: Moon, label: "Dark checker", value: "dark" },
+] as const;
 
 // The base palette is modeled as 11 hue families with 7 shades each. Sort by
 // shade first so the popover presents an 11-column by 7-row matrix, followed
@@ -106,12 +128,15 @@ export function CanvasPaintToolbar({
   background,
   brushSize,
   doc,
+  gameGridSections,
   gridDensity,
   horizontalMirror,
   selectedColorId,
   showCenterGuide,
   onBrushSizeChange,
   onBackgroundChange,
+  onEasyDrawSetup,
+  onGameGridSectionsChange,
   onGridDensityChange,
   onHorizontalMirrorChange,
   onSelectedColorChange,
@@ -124,12 +149,15 @@ export function CanvasPaintToolbar({
   background: CanvasBackground;
   brushSize: BrushSize;
   doc: GridDocument;
+  gameGridSections: GameGridSections;
   gridDensity: GridDensity;
   horizontalMirror: boolean;
   selectedColorId: string;
   showCenterGuide: boolean;
   onBrushSizeChange: (size: BrushSize) => void;
   onBackgroundChange: (background: CanvasBackground) => void;
+  onEasyDrawSetup: () => void;
+  onGameGridSectionsChange: (sections: GameGridSections) => void;
   onGridDensityChange: (density: GridDensity) => void;
   onHorizontalMirrorChange: (enabled: boolean) => void;
   onSelectedColorChange: (colorId: string) => void;
@@ -139,7 +167,14 @@ export function CanvasPaintToolbar({
   onOpenCopyGuide: () => void;
 }) {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [isBackgroundOpen, setIsBackgroundOpen] = useState(false);
+  const [isGridDensityOpen, setIsGridDensityOpen] = useState(false);
+  const gameMatchDescriptionId = useId();
   const selectedColor = getPaletteColor(selectedColorId);
+  const gameMatch = getGameMatchRecipe(doc.width, doc.height);
+  const ActiveBackgroundIcon =
+    CANVAS_BACKGROUND_PRESETS.find(({ value }) => value === background)?.icon ??
+    Sun;
   const quickColors = useMemo(
     () =>
       Array.from(
@@ -204,13 +239,120 @@ export function CanvasPaintToolbar({
           </Button>
         </div>
       </div>
-      <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-x-auto border-b border-[#26485a]/15 px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        className="mb-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-xl border border-[#24786f]/25 bg-[#e8f5ef] p-1.5 sm:flex sm:flex-nowrap sm:gap-2 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden"
+        data-testid="game-match-bar"
+        role="group"
+        aria-label="Game copy setup"
+        aria-describedby={gameMatchDescriptionId}
+        title="Observed 256px square face-paint profile for manual copying; verify against your game version."
+      >
+        <div className="col-span-2 flex min-w-0 items-center gap-1 sm:col-auto sm:min-w-max sm:gap-2 sm:px-1">
+          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#17384a]">
+            <Gamepad2 className="size-3.5" />
+            <span className="sm:hidden">Game setup</span>
+            <span className="hidden sm:inline">Game copy setup</span>
+          </span>
+          <span className="hidden rounded-full bg-white px-2 py-1 text-[0.68rem] font-black text-[#17384a] shadow-sm sm:inline-flex">
+            {doc.width}×{doc.height} cells
+          </span>
+          <span className="hidden rounded-full bg-white px-2 py-1 text-[0.68rem] font-black text-[#17384a] shadow-sm sm:inline-flex">
+            {gameMatch.exact ? "Pixel-perfect" : "Custom grid"}
+          </span>
+          <span
+            className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[0.68rem] font-black shadow-sm ${
+              gameMatch.exact
+                ? "bg-[#f6d67a] text-[#17384a]"
+                : "bg-white text-[#526975]"
+            }`}
+            data-testid="game-brush-recipe"
+          >
+            <span className="sr-only">
+              {gameMatch.exact
+                ? `${gameMatch.brushPixels}px game brush`
+                : "Custom placement"}
+            </span>
+            {gameMatch.exact ? (
+              <>
+                <span className="sm:hidden" aria-hidden="true">
+                  {gameMatch.brushPixels}px brush
+                </span>
+                <span className="hidden sm:inline" aria-hidden="true">
+                  {gameMatch.brushPixels}px game brush
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="sm:hidden" aria-hidden="true">
+                  Custom
+                </span>
+                <span className="hidden sm:inline" aria-hidden="true">
+                  Custom placement
+                </span>
+              </>
+            )}
+          </span>
+          <span
+            id={gameMatchDescriptionId}
+            className="ml-auto shrink-0 text-[0.58rem] font-semibold text-[#526975] sm:ml-0 sm:text-[0.62rem]"
+          >
+            <span className="sr-only">
+              Observed profile; verify against your game version.
+            </span>
+            <span aria-hidden="true">Observed · verify</span>
+          </span>
+        </div>
+
+        <span
+          className="hidden h-6 w-px shrink-0 bg-[#24786f]/25 sm:block"
+          aria-hidden="true"
+        />
+        <div
+          className="flex min-w-0 items-center gap-1 rounded-lg bg-white p-0.5 sm:min-w-max"
+          role="group"
+          aria-label="In-game grid view"
+        >
+          <span className="hidden px-1 text-[0.6rem] font-black uppercase tracking-[0.08em] text-[#526975] sm:inline">
+            Game grid
+          </span>
+          {GAME_GRID_PRESETS.map(({ label, sections }) => (
+            <button
+              key={sections}
+              type="button"
+              className={`h-11 min-w-11 rounded-md px-1 text-[0.65rem] font-black transition-colors sm:h-8 sm:min-w-9 sm:px-1.5 ${
+                gameGridSections === sections
+                  ? "bg-[#24786f] text-white shadow-sm"
+                  : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+              }`}
+              aria-label={`In-game grid view: ${label}`}
+              aria-pressed={gameGridSections === sections}
+              title={`${label} reference overlay; does not change the artwork`}
+              onClick={() => onGameGridSectionsChange(sections)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <Button
+          type="button"
+          size="sm"
+          className="h-11 min-w-max shrink-0 rounded-lg bg-[#17384a] px-2 text-[0.68rem] font-black text-white hover:bg-[#26485a] sm:h-9 sm:px-2.5"
+          aria-label="Easy draw"
+          onClick={onEasyDrawSetup}
+        >
+          <WandSparkles className="size-3.5" />
+          <span className="sm:hidden">Easy</span>
+          <span className="hidden sm:inline">Easy draw</span>
+        </Button>
+      </div>
+      <div className="mb-2 flex min-w-0 flex-nowrap items-center gap-1.5 border-b border-[#26485a]/15 px-1 pb-2 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
         <span className="shrink-0 text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#526975]">
-          Grid
+          Cell lines
         </span>
-        <div className="flex min-w-max items-center gap-1.5">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:min-w-max">
           <div
-            className="flex min-w-0 items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5"
+            className="hidden min-w-0 items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
             role="group"
             aria-label="Grid density"
           >
@@ -235,18 +377,66 @@ export function CanvasPaintToolbar({
             )}
           </div>
 
+          <Popover open={isGridDensityOpen} onOpenChange={setIsGridDensityOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-11 min-w-[4.75rem] items-center justify-center rounded-lg border border-[#26485a]/20 bg-white px-2 text-[0.68rem] font-black text-[#17384a] sm:hidden"
+                aria-label={`Cell line density: ${
+                  GRID_DENSITY_PRESETS.find(
+                    ({ density }) => density === gridDensity,
+                  )?.label ?? "Cell"
+                }`}
+              >
+                {GRID_DENSITY_PRESETS.find(
+                  ({ density }) => density === gridDensity,
+                )?.visibleLabel ?? "Every"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              collisionPadding={8}
+              className="w-56 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
+              aria-label="Cell line density options"
+            >
+              <div
+                className="grid gap-1"
+                role="group"
+                aria-label="Grid density"
+              >
+                {GRID_DENSITY_PRESETS.map(
+                  ({ density, label, title, visibleLabel }) => (
+                    <button
+                      key={density}
+                      type="button"
+                      className={`flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
+                        gridDensity === density
+                          ? "bg-[#24786f] text-white"
+                          : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+                      }`}
+                      aria-label={`Grid density: ${label}`}
+                      aria-pressed={gridDensity === density}
+                      title={title}
+                      onClick={() => {
+                        onGridDensityChange(density);
+                        setIsGridDensityOpen(false);
+                      }}
+                    >
+                      <span>{label}</span>
+                      <span aria-hidden="true">{visibleLabel}</span>
+                    </button>
+                  ),
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <div
-            className="flex items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5"
+            className="hidden items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
             role="group"
             aria-label="Canvas background"
           >
-            {(
-              [
-                { icon: Palette, label: "Paper", value: "paper" },
-                { icon: Sun, label: "Light checker", value: "light" },
-                { icon: Moon, label: "Dark checker", value: "dark" },
-              ] as const
-            ).map(({ icon: Icon, label, value }) => (
+            {CANVAS_BACKGROUND_PRESETS.map(({ icon: Icon, label, value }) => (
               <Tooltip key={value}>
                 <TooltipTrigger asChild>
                   <button
@@ -270,11 +460,61 @@ export function CanvasPaintToolbar({
             ))}
           </div>
 
+          <Popover open={isBackgroundOpen} onOpenChange={setIsBackgroundOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[#26485a]/20 bg-white text-[#526975] transition-colors hover:bg-[#fff0c2] hover:text-[#17384a] sm:hidden"
+                aria-label={`Canvas background options: ${
+                  CANVAS_BACKGROUND_PRESETS.find(
+                    ({ value }) => value === background,
+                  )?.label ?? "Light checker"
+                }`}
+              >
+                <ActiveBackgroundIcon className="size-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              collisionPadding={8}
+              className="w-52 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
+              aria-label="Canvas background options"
+            >
+              <div
+                className="grid gap-1"
+                role="group"
+                aria-label="Choose canvas background"
+              >
+                {CANVAS_BACKGROUND_PRESETS.map(
+                  ({ icon: Icon, label, value }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
+                        background === value
+                          ? "bg-[#f6d67a] text-[#17384a]"
+                          : "text-[#526975] hover:bg-[#fff0c2] hover:text-[#17384a]"
+                      }`}
+                      aria-label={`Use ${label.toLowerCase()} canvas background`}
+                      aria-pressed={background === value}
+                      onClick={() => {
+                        onBackgroundChange(value);
+                        setIsBackgroundOpen(false);
+                      }}
+                    >
+                      <Icon className="size-4" /> {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
-                className={`inline-flex size-10 items-center justify-center rounded-lg border transition-colors ${
+                className={`inline-flex size-11 items-center justify-center rounded-lg border transition-colors sm:size-10 ${
                   showCenterGuide
                     ? "border-[#2d8f86] bg-[#e8f5ef] text-[#17384a]"
                     : "border-[#26485a]/20 bg-white text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
@@ -335,7 +575,7 @@ export function CanvasPaintToolbar({
           htmlFor="studio-brush-size"
           className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground"
         >
-          Size
+          Stroke
           <select
             id="studio-brush-size"
             name="studio-brush-size"
@@ -350,7 +590,7 @@ export function CanvasPaintToolbar({
           >
             {[1, 2, 3, 5].map((size) => (
               <option key={size} value={size}>
-                {size}×{size}
+                {size === 1 ? "1 cell" : `${size}×${size} cells`}
               </option>
             ))}
           </select>
@@ -406,7 +646,8 @@ export function CanvasPaintToolbar({
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="max-h-[min(70vh,34rem)] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto p-3 data-[state=closed]:pointer-events-none"
+            collisionPadding={8}
+            className="max-h-[min(78vh,var(--radix-popover-content-available-height),38rem)] w-[min(38rem,calc(100vw-1rem))] overflow-y-auto p-2 data-[state=closed]:pointer-events-none data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:p-3"
             aria-label="Complete paint palette"
           >
             <div className="mb-3">
@@ -415,14 +656,14 @@ export function CanvasPaintToolbar({
                 Selecting a color switches back to the pencil when needed.
               </p>
             </div>
-            <div className="overflow-x-auto pb-1">
-              <div className="grid min-w-[34rem] grid-cols-[minmax(0,1fr)_auto] gap-3">
+            <div className="pb-1 sm:overflow-x-auto">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:min-w-[34rem] sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div>
                   <p className="mb-1.5 text-[0.68rem] font-bold text-muted-foreground">
                     Working shades · 11 families × 7 shades
                   </p>
                   <div
-                    className="grid grid-cols-11 gap-1.5"
+                    className="grid grid-cols-5 gap-1.5 sm:grid-cols-11"
                     role="group"
                     aria-label="11 by 7 Studio color matrix"
                     data-testid="studio-palette-matrix"
@@ -431,7 +672,7 @@ export function CanvasPaintToolbar({
                       <button
                         key={color.id}
                         type="button"
-                        className={`aspect-square min-h-8 rounded-md border ${
+                        className={`aspect-square min-h-11 rounded-md border sm:min-h-8 ${
                           selectedColorId === color.id
                             ? "border-primary ring-2 ring-primary/30"
                             : "border-black/15"
@@ -446,12 +687,12 @@ export function CanvasPaintToolbar({
                   </div>
                 </div>
 
-                <div className="border-l border-border pl-3">
-                  <p className="mb-1.5 text-center text-[0.68rem] font-bold text-muted-foreground">
+                <div className="border-t border-border pt-2 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+                  <p className="mb-1.5 text-left text-[0.68rem] font-bold text-muted-foreground sm:text-center">
                     Vivid
                   </p>
                   <div
-                    className="grid grid-cols-1 gap-1.5"
+                    className="grid grid-cols-5 gap-1.5 sm:grid-cols-1"
                     role="group"
                     aria-label="Saturated color rail"
                     data-testid="studio-saturated-color-rail"
@@ -460,7 +701,7 @@ export function CanvasPaintToolbar({
                       <button
                         key={color.id}
                         type="button"
-                        className={`size-8 rounded-md border ${
+                        className={`aspect-square min-h-11 rounded-md border sm:size-8 sm:min-h-0 ${
                           selectedColorId === color.id
                             ? "border-primary ring-2 ring-primary/30"
                             : "border-black/15"
@@ -512,7 +753,7 @@ export function CanvasPaintToolbar({
         <span className="shrink-0 px-1 text-[0.6rem] font-black uppercase tracking-[0.08em] text-[#526975]">
           Colors
         </span>
-        {quickColors.slice(0, 6).map((color) => (
+        {quickColors.slice(0, 5).map((color) => (
           <button
             key={color.id}
             type="button"
@@ -529,7 +770,7 @@ export function CanvasPaintToolbar({
           />
         ))}
       </div>
-      <p className="hidden px-1 pt-1 text-[0.68rem] font-medium text-muted-foreground sm:block">
+      <p className="truncate px-1 pt-1 text-[0.68rem] font-medium text-muted-foreground">
         {activeTool === "inspect"
           ? "Choose Pencil, Eraser, Fill, or Pick color to edit."
           : `${PAINT_TOOLS.find((entry) => entry.tool === activeTool)?.label ?? "Paint"} · ${selectedColor?.name ?? selectedColorId}${brushEnabled ? ` · ${brushSize}×${brushSize}${horizontalMirror ? " · mirrored" : ""}` : ""}. Drag with mouse, touch, or pen; use arrow keys and Space on the canvas.`}

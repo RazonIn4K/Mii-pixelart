@@ -83,6 +83,17 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
     page.getByRole("button", { name: "Browse starters" }),
   ).toBeVisible();
 
+  const gameMatchedSizes = page.getByRole("group", {
+    name: "Game-matched grid size",
+  });
+  await expect(
+    gameMatchedSizes.getByRole("button", { name: /32×32 cells/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await gameMatchedSizes.getByRole("button", { name: /64×64 cells/ }).click();
+  await expect(
+    gameMatchedSizes.getByRole("button", { name: /64×64 cells/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+
   const workflow = page.getByRole("tablist", { name: "Studio workflow" });
   for (const phase of ["Start", "Edit", "Improve", "Finish"]) {
     await expect(workflow.getByText(phase, { exact: true })).toBeVisible();
@@ -210,7 +221,9 @@ test("Studio notifications remain usable when the optional toast chunk fails", a
     "One desktop run covers the shared notification fallback.",
   );
 
-  await page.route("**/src/components/RuntimeToaster.tsx*", (route) =>
+  // Exercise the fallback against both Vite's source URL in development and
+  // the hashed lazy chunk emitted by the production build.
+  await page.route(/\/RuntimeToaster(?:-[^/]+\.js|\.tsx)(?:\?.*)?$/, (route) =>
     route.abort("failed"),
   );
   await page.goto("/studio");
