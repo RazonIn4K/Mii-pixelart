@@ -166,7 +166,7 @@ test("minimum-phone Studio exposes reference and Copy Guide actions without over
   }
 
   const canvas = page.getByRole("application", {
-    name: "Editable 64 by 64 pixel grid",
+    name: "Editable 256 by 256 pixel grid",
   });
   await canvas.focus();
   await canvas.press("Space");
@@ -174,7 +174,7 @@ test("minimum-phone Studio exposes reference and Copy Guide actions without over
 
   await expect(
     page.getByRole("application", {
-      name: "Read-only Copy Guide 64 by 64 pixel grid",
+      name: "Read-only Copy Guide 256 by 256 pixel grid",
     }),
   ).toBeVisible();
   const labelToggle = page.getByRole("button", {
@@ -208,7 +208,7 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
   await page.getByRole("button", { name: "Start blank" }).click();
 
   const editableCanvas = page.getByRole("application", {
-    name: "Editable 64 by 64 pixel grid",
+    name: "Editable 256 by 256 pixel grid",
   });
   const box = await editableCanvas.boundingBox();
   expect(box).not.toBeNull();
@@ -223,6 +223,9 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
       Number(await editableCanvas.getAttribute("data-grid-origin-y")) +
       (4 + 0.5) * cellSize,
   };
+  const beforeStroke = await editableCanvas.evaluate((canvas) =>
+    canvas.toDataURL(),
+  );
 
   await editableCanvas.dispatchEvent("pointerdown", {
     ...point,
@@ -232,16 +235,19 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
     pointerId: 31,
     pointerType: "pen",
   });
-  await expect(page.getByText(/^64×64 · 1 color(?: ·|$)/)).toBeVisible();
+  await expect
+    .poll(() => editableCanvas.evaluate((canvas) => canvas.toDataURL()))
+    .not.toBe(beforeStroke);
 
   await page
     .getByRole("button", { name: "Copy Guide", exact: true })
     .evaluate((element) => (element as HTMLButtonElement).click());
   await expect(
     page.getByRole("application", {
-      name: "Read-only Copy Guide 64 by 64 pixel grid",
+      name: "Read-only Copy Guide 256 by 256 pixel grid",
     }),
   ).toBeVisible();
+  await expect(page.getByText(/^256×256 · 1 color(?: ·|$)/)).toBeVisible();
   await page.locator("canvas").dispatchEvent("pointerup", {
     ...point,
     button: 0,
@@ -259,6 +265,6 @@ test("switching to Copy Guide finishes an active paint stroke", async ({
   await expect(labelToggle).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
-    page.getByText("64×64 · 0 colors", { exact: true }),
+    page.getByText("256×256 · 0 colors", { exact: true }),
   ).toBeVisible();
 });

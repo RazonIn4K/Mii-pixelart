@@ -84,15 +84,19 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
   ).toBeVisible();
 
   const gameMatchedSizes = page.getByRole("group", {
-    name: "Game-matched grid size",
+    name: "Game-matched surface",
   });
   await expect(
-    gameMatchedSizes.getByRole("button", { name: /32×32 cells/ }),
+    gameMatchedSizes.getByRole("button", { name: /256×256 game pixels/ }),
   ).toHaveAttribute("aria-pressed", "true");
-  await gameMatchedSizes.getByRole("button", { name: /64×64 cells/ }).click();
-  await expect(
-    gameMatchedSizes.getByRole("button", { name: /64×64 cells/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+  const snappedBrushes = gameMatchedSizes.locator(
+    '[aria-label="Available snapped brush footprints"]',
+  );
+  for (const footprint of ["4px", "8px", "16px", "32px"]) {
+    await expect(
+      snappedBrushes.getByText(footprint, { exact: true }),
+    ).toBeVisible();
+  }
 
   const workflow = page.getByRole("tablist", { name: "Studio workflow" });
   for (const phase of ["Start", "Edit", "Improve", "Finish"]) {
@@ -139,10 +143,21 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
     page.getByRole("heading", { name: "What would you like to make?" }),
   ).toHaveCount(0);
   await expect(
-    page.getByText("64×64 · 0 colors", { exact: true }),
+    page.getByText("256×256 · 0 colors", { exact: true }),
   ).toBeVisible();
   const templatePreviews = page.locator("canvas[data-template-preview]");
   await expect(templatePreviews).toHaveCount(28);
+  await expect(templatePreviews.first()).toHaveAttribute(
+    "data-template-preview-width",
+    "256",
+  );
+  await expect(templatePreviews.first()).toHaveAttribute(
+    "data-template-preview-height",
+    "256",
+  );
+  expect(
+    Number(await templatePreviews.first().getAttribute("width")),
+  ).toBeGreaterThan(24);
   expect(
     await page
       .locator("#studio-tools")
@@ -153,31 +168,96 @@ test("Studio opens with a task-oriented workflow and useful start choices", asyn
       templatePreviews.first().evaluate((element) => {
         const canvas = element as HTMLCanvasElement;
         const context = canvas.getContext("2d");
-        if (!context) return false;
+        if (!context) return { hasPaint: false, hasTransparency: false };
         const pixels = context.getImageData(
           0,
           0,
           canvas.width,
           canvas.height,
         ).data;
+        let hasPaint = false;
+        let hasTransparency = false;
         for (let index = 0; index < pixels.length; index += 4) {
-          if (
-            pixels[index] !== 255 ||
-            pixels[index + 1] !== 255 ||
-            pixels[index + 2] !== 255
-          ) {
-            return true;
-          }
+          if (pixels[index + 3] === 0) hasTransparency = true;
+          if (pixels[index + 3] > 0) hasPaint = true;
+          if (hasPaint && hasTransparency) break;
         }
-        return false;
+        return { hasPaint, hasTransparency };
       }),
     )
-    .toBe(true);
+    .toEqual({ hasPaint: true, hasTransparency: true });
+  for (const name of [
+    "Face Landmark Guide",
+    "Neon Challenger",
+    "Midnight Mascot",
+    "Twin-Stick Badge",
+  ]) {
+    const label = page
+      .getByRole("button", { name: new RegExp(name) })
+      .getByText(name, { exact: true });
+    await expect(label).toBeVisible();
+    expect(
+      await label.evaluate((element) => ({
+        fitsHorizontally: element.scrollWidth <= element.clientWidth,
+        textOverflow: getComputedStyle(element).textOverflow,
+        whiteSpace: getComputedStyle(element).whiteSpace,
+      })),
+    ).toEqual({
+      fitsHorizontally: true,
+      textOverflow: "clip",
+      whiteSpace: "normal",
+    });
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("starter metadata selects the matching copy guide and exact game stamp", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the shared starter-to-workbench metadata flow.",
+  );
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Browse starters" }).click();
+
+  await page.getByRole("button", { name: /Face Landmark Guide/ }).click();
+  await expect(
+    page.locator("header").getByText("Face Landmark Guide", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "In-game grid view: 8×8" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "4 pixel snapped stamp" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: /Twin-Stick Badge/ }).click();
+  await expect(
+    page.locator("header").getByText("Twin-Stick Badge", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "In-game grid view: 4×4" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "8 pixel snapped stamp" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: /^Smile Icon / }).click();
+  await expect(
+    page.locator("header").getByText("Smile Icon", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "In-game grid view: 4×4" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "16 pixel snapped stamp" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("queued Studio notifications survive the deferred toast runtime", async ({
@@ -206,7 +286,7 @@ test("queued Studio notifications survive the deferred toast runtime", async ({
 
   await page.getByRole("button", { name: "Start blank" }).click();
   await expect(
-    page.getByText("Created Untitled Canvas", { exact: true }),
+    page.getByText("Created transparent 256×256 game canvas", { exact: true }),
   ).toBeVisible();
   expect(runtimeRequests.some((url) => url.includes("RuntimeToaster"))).toBe(
     true,
@@ -232,7 +312,9 @@ test("Studio notifications remain usable when the optional toast chunk fails", a
   const notifications = page.getByRole("region", { name: "Notifications" });
   await expect(notifications).toBeVisible();
   await expect(
-    notifications.getByText("Created Untitled Canvas", { exact: true }),
+    notifications.getByText("Created transparent 256×256 game canvas", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     notifications.getByRole("button", { name: "Dismiss notification" }),
@@ -424,9 +506,6 @@ test("AI applies one validated document revision that Undo removes in one step",
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
   await expect(page.getByText("Text only", { exact: true })).toBeVisible();
   await page.getByText("Advanced AI settings", { exact: true }).click();
@@ -445,10 +524,12 @@ test("AI applies one validated document revision that Undo removes in one step",
   await expect(page.getByText("AI edit", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
 
-  await expect(page.getByText("8×8 · 1 color", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("256×256 · 1 color", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
-    page.getByText("64×64 · 0 colors", { exact: true }),
+    page.getByText("256×256 · 0 colors", { exact: true }),
   ).toBeVisible();
 });
 
@@ -533,9 +614,12 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
+  // Refine intentionally exercises the supported legacy/custom 64×64 path;
+  // the normal blank and every applied result use the canonical 256 surface.
+  await page.getByRole("button", { name: "64 Detail" }).click();
   await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
+    page.getByText("64×64 · 0 colors", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "AI" }).click();
   await page.getByRole("button", { name: "Refine this canvas" }).click();
   await expect(
@@ -558,7 +642,7 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
   await expect(
-    page.getByText("64×64 · 1 color", { exact: true }),
+    page.getByText("256×256 · 1 color", { exact: true }),
   ).toBeVisible();
 });
 
@@ -572,11 +656,7 @@ test("AI refine explains its 64 pixel canvas ceiling", async ({
   await page.goto("/studio");
   await page.getByRole("button", { name: "Start blank" }).click();
   await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
-  await page.getByRole("button", { name: "96 Detail" }).click();
-  await expect(
-    page.getByText("96×96 · 0 colors", { exact: true }),
+    page.getByText("256×256 · 0 colors", { exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "AI" }).click();
   await expect(
@@ -655,9 +735,6 @@ test("AI provider failure leaves manual painting available", async ({
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
   await page.getByRole("button", { name: "Create a sketch" }).click();
   await page.getByRole("button", { name: "Send to AI" }).click();
@@ -669,12 +746,12 @@ test("AI provider failure leaves manual painting available", async ({
 
   await page.getByRole("tab", { name: "Create" }).click();
   const canvas = page.getByRole("application", {
-    name: "Editable 64 by 64 pixel grid",
+    name: "Editable 256 by 256 pixel grid",
   });
   await canvas.focus();
   await canvas.press("Enter");
   await expect(
-    page.getByText("64×64 · 1 color", { exact: false }),
+    page.getByText("256×256 · 1 color", { exact: false }),
   ).toBeVisible();
 });
 
@@ -741,9 +818,6 @@ test("canceling an AI request restores the prompt and ignores a late reply", asy
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
   const prompt = page.getByRole("textbox", { name: "Your AI request" });
   await prompt.fill("Make a small lighthouse badge");
@@ -804,9 +878,6 @@ test("AI consent is requested again when provider data policy changes", async ({
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
   await page
     .getByRole("textbox", { name: "Your AI request" })
@@ -889,9 +960,6 @@ test("AI history and consent stay isolated between signed-in users", async ({
   });
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
-  await expect(
-    page.getByText("Created Untitled Canvas", { exact: false }),
-  ).toBeHidden();
   await page.getByRole("tab", { name: "AI" }).click();
   await page
     .getByPlaceholder(/Ask for a 32x32 horror icon/)
@@ -910,7 +978,7 @@ test("AI history and consent stay isolated between signed-in users", async ({
   await page.reload();
   await expect(
     page.getByRole("application", {
-      name: "Editable 64 by 64 pixel grid",
+      name: "Editable 256 by 256 pixel grid",
     }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "AI" }).click();

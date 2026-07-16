@@ -52,12 +52,19 @@ rest of the Studio workflow.
 
 **Controls:**
 - Pencil, eraser, eyedropper, fill, and inspect tools.
-- Brush-size, mirror, grid, center-guide, zoom, fit, and hand-pan controls.
+- Smooth 1/3/7/13/19/27px and snapped 4/8/16/32px brush footprints.
+- Mirror, independent cell/stamp/section/center guides, zoom, fit, and hand-pan controls.
 - Quick colors plus access to the complete Studio palette.
 - Undo and redo for bounded document edits.
 
 **Behavior:**
-- Pointer, pen, touch, mouse, and keyboard input edit one canonical canvas.
+- New work starts on one transparent 256×256 reference surface. Older/custom
+  documents remain editable but are never labeled one-for-one until explicitly
+  converted.
+- Pointer, pen, touch, mouse, and keyboard input edit one authoritative canvas.
+- The cursor outlines the exact cells a smooth or snapped footprint will mutate.
+- A browser-local source can remain beside the canvas or appear Under, Over, or
+  in a Split comparison without entering project data.
 - A completed stroke is one undoable operation.
 - Switching tools safely closes any active stroke.
 

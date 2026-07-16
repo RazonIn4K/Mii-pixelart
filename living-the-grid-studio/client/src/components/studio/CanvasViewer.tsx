@@ -24,10 +24,21 @@ import {
   type CanvasBackground,
   type GridDensity,
 } from "@/lib/engine/canvas-renderer";
-import { bresenhamLine, getCell } from "@/lib/engine/grid";
-import { buildPaintCells, type BrushSize } from "@/lib/engine/paint-assists";
+import { bresenhamLine, getCell, setCells } from "@/lib/engine/grid";
+import {
+  buildPaintCells,
+  getBrushGridStep,
+  getBrushPreviewRects,
+  resolveBrushSpec,
+  type BrushInput,
+  type BrushMode,
+  type BrushSize,
+  type BrushSpec,
+} from "@/lib/engine/paint-assists";
 import {
   getGameGridBoundaries,
+  getStepGridBoundaries,
+  isCanonicalGameSurface,
   type GameGridSections,
 } from "@/lib/engine/game-match";
 import { formatCountLabel } from "@/lib/format-count";
@@ -58,16 +69,28 @@ interface CanvasViewerProps {
   referenceUnderlay?: {
     fit: "contain" | "cover";
     flipped: boolean;
+    /** Under is the legacy/default tracing layer; over and split compare. */
+    mode?: "over" | "split" | "under";
     opacity: number;
     sourceUrl: string;
     visible: boolean;
   } | null;
   /** Exact local brush footprint preview; it never mutates the document. */
   paintPreview?: {
+    /** Omitted by legacy callers; numeric sizes are inferred safely. */
+    brushMode?: BrushMode;
     brushSize: BrushSize;
     horizontalMirror: boolean;
     tool: "eraser" | "pencil";
   } | null;
+  /** Color committed by a deferred pencil stroke; eraser strokes use null. */
+  paintColorId?: string | null;
+  /**
+   * Keep pointer samples in an imperative canvas draft, then commit one React
+   * document update after pointer-up. This keeps a 256×256 surface responsive
+   * without changing the public stroke/history semantics.
+   */
+  deferPaintUntilStrokeEnd?: boolean;
   onCellClick?: (x: number, y: number, colorId: string | null) => void;
   onCellDrag?: (x: number, y: number, colorId: string | null) => void;
   /**
@@ -79,6 +102,14 @@ interface CanvasViewerProps {
    * precedence; onCellDrag is only the fallback for the first cell.
    */
   onCellDragSegment?: (cells: { x: number; y: number }[]) => void;
+  /** Atomically commit the captured footprint against its exact base doc. */
+  onDeferredStrokeCommit?: (
+    baseDoc: GridDocument,
+    cells: ReadonlyArray<{ x: number; y: number }>,
+    colorId: string | null,
+  ) => void;
+  /** Announce the brief immutable/history reconciliation window to controls. */
+  onDeferredCommitPendingChange?: (pending: boolean) => void;
   onCellHover?: (x: number, y: number, colorId: string | null) => void;
   /**
    * Stroke lifecycle. Studio.tsx wires beginStroke() to pointer-down and
@@ -88,6 +119,8 @@ interface CanvasViewerProps {
   onStrokeBegin?: () => void;
   /** Roll back an in-flight stroke when navigation takes over. */
   onStrokeCancel?: () => void;
+  /** Drop a pending stroke without restoring over a newer document. */
+  onStrokeAbandon?: () => void;
   onStrokeEnd?: () => void;
 }
 
@@ -104,22 +137,29 @@ const MIN_ZOOM = 0.25;
 // reach the 12–14px editing scale even for the largest supported canvas.
 const MAX_ZOOM = 16;
 const MAX_RENDER_DPR = 2;
+const MIN_BRUSH_GRID_CADENCE_CSS_PIXELS = 8;
 const TAP_MOVE_TOLERANCE = 5;
 const TOUCH_TAP_MOVE_TOLERANCE = 14;
 
 function resolveProjectGridStep(
   requestedGridStep: number | null,
   requestedGridVisible: boolean,
-  gameGridSections: GameGridSections,
 ): number | null {
-  if (requestedGridStep !== 1 || requestedGridVisible) {
-    return requestedGridStep;
-  }
+  // Fine project cells are one independent layer. Never substitute the game
+  // section cadence or a brush cadence here: those are rendered below with
+  // their own color and weight so users can tell what each line means.
+  return requestedGridVisible ? requestedGridStep : null;
+}
 
-  // A fitted game guide already provides the useful coarse boundaries. When
-  // it is off, retain the older eight-cell fallback so a tiny canvas still has
-  // orientation without attempting to render every project-cell line.
-  return gameGridSections > 0 ? null : 8;
+function getPreviewBrushInput(
+  paintPreview: CanvasViewerProps["paintPreview"],
+): BrushInput | null {
+  if (!paintPreview) return null;
+  if (!paintPreview.brushMode) return paintPreview.brushSize;
+  return {
+    mode: paintPreview.brushMode,
+    size: paintPreview.brushSize,
+  } as BrushSpec;
 }
 
 export default function CanvasViewer({
@@ -135,12 +175,17 @@ export default function CanvasViewer({
   editViewRequest = 0,
   referenceUnderlay = null,
   paintPreview = null,
+  paintColorId = null,
+  deferPaintUntilStrokeEnd = false,
   onCellClick,
   onCellDrag,
   onCellDragSegment,
+  onDeferredStrokeCommit,
+  onDeferredCommitPendingChange,
   onCellHover,
   onStrokeBegin,
   onStrokeCancel,
+  onStrokeAbandon,
   onStrokeEnd,
 }: CanvasViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,6 +205,18 @@ export default function CanvasViewer({
   // Last sample position during a drag, used to Bresenham-interpolate the
   // gap to the current position so fast strokes don't skip cells.
   const lastDragCellRef = useRef<{ x: number; y: number } | null>(null);
+  const strokeDraftDocRef = useRef<GridDocument | null>(null);
+  const deferredVisualDocRef = useRef<GridDocument | null>(null);
+  const deferredStrokeCellsRef = useRef<{ x: number; y: number }[]>([]);
+  const deferredStrokeCellIdsRef = useRef(new Set<number>());
+  const strokeBrushInputRef = useRef<BrushInput | null>(null);
+  const strokeHorizontalMirrorRef = useRef(false);
+  const strokeTargetColorIdRef = useRef<string | null | undefined>(undefined);
+  const deferredCommitTimerRef = useRef<number | null>(null);
+  const deferredCommitBaseDocRef = useRef<GridDocument | null>(null);
+  const deferredStrokeEpochRef = useRef(0);
+  const latestDocRef = useRef(doc);
+  latestDocRef.current = doc;
   const lastEditViewRequestRef = useRef(editViewRequest);
   const instructionsId = useId();
   const statusId = useId();
@@ -185,6 +242,11 @@ export default function CanvasViewer({
   const [referenceImage, setReferenceImage] = useState<HTMLImageElement | null>(
     null,
   );
+  const canDeferPaint =
+    deferPaintUntilStrokeEnd &&
+    Boolean(onDeferredStrokeCommit) &&
+    Boolean(paintPreview) &&
+    (paintPreview?.tool === "eraser" || Boolean(paintColorId));
 
   useEffect(() => {
     if (!referenceUnderlay?.sourceUrl || !referenceUnderlay.visible) {
@@ -306,232 +368,475 @@ export default function CanvasViewer({
     [doc.width, doc.height, pan, viewportSize, zoom],
   );
 
+  const drawCanvasDocument = useCallback(
+    (renderDoc: GridDocument) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const metrics = getRenderMetrics();
+      // A 2x backing store keeps single-cell lines crisp while avoiding the
+      // multi-megapixel allocation cost of 3x/4x phone screens. Pixel art gains
+      // no useful detail above 2x because every project cell is intentionally
+      // rendered as a flat, nearest-neighbor block.
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_RENDER_DPR);
+      const backingWidth = Math.max(1, Math.floor(metrics.width * dpr));
+      const backingHeight = Math.max(1, Math.floor(metrics.height * dpr));
+      // Reassigning a canvas backing dimension clears and reallocates its bitmap.
+      // Avoid that expensive path on every painted cell when the viewport did not
+      // actually resize.
+      if (canvas.width !== backingWidth) canvas.width = backingWidth;
+      if (canvas.height !== backingHeight) canvas.height = backingHeight;
+      canvas.style.width = `${metrics.width}px`;
+      canvas.style.height = `${metrics.height}px`;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+
+      const requestedGridStep = gridStepForDensity(gridDensity);
+      const requestedGridVisible =
+        requestedGridStep !== null &&
+        shouldRenderGridLines(
+          true,
+          metrics.cellSize,
+          metrics.renderZoom,
+          requestedGridStep,
+        );
+      const renderGridStep = resolveProjectGridStep(
+        requestedGridStep,
+        requestedGridVisible,
+      );
+      const renderGridLines = renderGridStep !== null;
+
+      renderGrid(ctx, renderDoc, {
+        cellSize: metrics.cellSize,
+        zoom: metrics.renderZoom,
+        panX: metrics.panX,
+        panY: metrics.panY,
+        showGrid: renderGridLines,
+        gridStep: renderGridStep ?? 1,
+        showLabels,
+        highlightColorId,
+        // Transparent cells must stay visibly transparent. Even the warm-paper
+        // preset keeps a subtle checker instead of silently turning null pixels
+        // into an opaque-looking white canvas.
+        checkerboard:
+          background === "paper"
+            ? "warm"
+            : background === "dark"
+              ? "dark"
+              : "light",
+        devicePixelRatio: dpr,
+        gridBackground: null,
+        referenceImage,
+        referenceMode: referenceUnderlay?.mode ?? "under",
+        referenceOpacity: (referenceUnderlay?.opacity ?? 45) / 100,
+        referenceFlipped: referenceUnderlay?.flipped ?? false,
+        referenceFit: referenceUnderlay?.fit ?? "contain",
+        // Keep the only visible cell grid above the 3:1 non-text contrast target
+        // and at least one CSS pixel wide, including fitted mobile canvases.
+        gridColor:
+          background === "dark"
+            ? "rgba(231, 240, 236, 0.48)"
+            : "rgba(64, 83, 92, 0.42)",
+        gridWidth: 1,
+        majorGridColor: background === "dark" ? "#f7c75f" : "#29485a",
+        // Game guide sections are rendered once, below, with their own visual
+        // language. Stacking renderGrid's legacy major cadence on top of them is
+        // what previously made the canvas look like two competing grids.
+        majorGridStep: 0,
+        majorGridWidth: 1.5,
+      });
+
+      const paintBrushInput = getPreviewBrushInput(paintPreview);
+      const brushGridStep = paintBrushInput
+        ? getBrushGridStep(paintBrushInput)
+        : null;
+      const verticalGameBoundaries = getGameGridBoundaries(
+        renderDoc.width,
+        gameGridSections,
+      );
+      const horizontalGameBoundaries = getGameGridBoundaries(
+        renderDoc.height,
+        gameGridSections,
+      );
+      const centerColumn = renderDoc.width / 2;
+      const centerRow = renderDoc.height / 2;
+
+      const drawGuideBoundaries = (
+        verticalBoundaries: ReadonlyArray<number>,
+        horizontalBoundaries: ReadonlyArray<number>,
+        color: string,
+        requestedWidth: number,
+      ) => {
+        const lineWidth = Math.max(
+          1 / dpr,
+          Math.round(requestedWidth * dpr) / dpr,
+        );
+        ctx.save();
+        ctx.fillStyle = color;
+        for (const boundary of verticalBoundaries) {
+          const x = snapGridStrip(
+            metrics.panX + boundary * metrics.scaledSize - lineWidth / 2,
+            dpr,
+          );
+          ctx.fillRect(
+            x,
+            metrics.panY,
+            lineWidth,
+            renderDoc.height * metrics.scaledSize,
+          );
+        }
+        for (const boundary of horizontalBoundaries) {
+          const y = snapGridStrip(
+            metrics.panY + boundary * metrics.scaledSize - lineWidth / 2,
+            dpr,
+          );
+          ctx.fillRect(
+            metrics.panX,
+            y,
+            renderDoc.width * metrics.scaledSize,
+            lineWidth,
+          );
+        }
+        ctx.restore();
+      };
+
+      // A snapped stamp grid is useful at Fit even when the literal 1px mesh is
+      // too dense to render. Coincident section/center lines are omitted here so
+      // the stronger semantic layer below is painted exactly once.
+      const brushGridVisible =
+        brushGridStep !== null &&
+        brushGridStep * metrics.scaledSize >= MIN_BRUSH_GRID_CADENCE_CSS_PIXELS;
+      if (brushGridVisible) {
+        const gameColumns = new Set(verticalGameBoundaries);
+        const gameRows = new Set(horizontalGameBoundaries);
+        const brushColumns = getStepGridBoundaries(
+          renderDoc.width,
+          brushGridStep,
+        ).filter(
+          (boundary) =>
+            !gameColumns.has(boundary) &&
+            (!showCenterGuide || boundary !== centerColumn),
+        );
+        const brushRows = getStepGridBoundaries(
+          renderDoc.height,
+          brushGridStep,
+        ).filter(
+          (boundary) =>
+            !gameRows.has(boundary) &&
+            (!showCenterGuide || boundary !== centerRow),
+        );
+        drawGuideBoundaries(
+          brushColumns,
+          brushRows,
+          background === "dark"
+            ? "rgba(159, 226, 216, 0.54)"
+            : "rgba(25, 94, 91, 0.42)",
+          1,
+        );
+      }
+
+      // Mirror the game's independent 2×2 / 4×4 / 8×8 reference overlay.
+      // These section lines do not resize the document and do not create cells;
+      // they are orientation guides above the single authoritative cell mesh.
+      if (gameGridSections > 0) {
+        drawGuideBoundaries(
+          verticalGameBoundaries.filter(
+            (boundary) => !showCenterGuide || boundary !== centerColumn,
+          ),
+          horizontalGameBoundaries.filter(
+            (boundary) => !showCenterGuide || boundary !== centerRow,
+          ),
+          "rgba(219, 105, 31, 0.82)",
+          Math.max(2, Math.min(3, metrics.scaledSize / 3)),
+        );
+      }
+
+      if (!renderGridLines) {
+        // Keep the editable surface edge unambiguous when the fine mesh is
+        // suppressed at Fit. This is one border, not another cell grid.
+        ctx.save();
+        ctx.strokeStyle = background === "dark" ? "#f4e6b4" : "#26485a";
+        ctx.lineWidth = Math.max(1, 1 / dpr);
+        ctx.strokeRect(
+          metrics.panX,
+          metrics.panY,
+          renderDoc.width * metrics.scaledSize,
+          renderDoc.height * metrics.scaledSize,
+        );
+        ctx.restore();
+      }
+
+      // Coordinate rulers share the same metrics as the authoritative canvas.
+      // They are deliberately drawn outside the grid so they cannot look like a
+      // second set of cells or intercept paint input.
+      const scaledSize = metrics.scaledSize;
+      if (scaledSize >= 4) {
+        ctx.save();
+        ctx.fillStyle = "#17384a";
+        ctx.font = `700 10px ui-monospace, "SFMono-Regular", Menlo, monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        for (let x = 0; x < renderDoc.width; x += 8) {
+          ctx.fillText(
+            String(x + 1),
+            metrics.panX + (x + 0.5) * scaledSize,
+            metrics.panY - 5,
+          );
+        }
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (let y = 0; y < renderDoc.height; y += 8) {
+          ctx.fillText(
+            String(y + 1),
+            metrics.panX - 5,
+            metrics.panY + (y + 0.5) * scaledSize,
+          );
+        }
+
+        ctx.restore();
+      }
+
+      if (guideHighlight) {
+        const scaledSize = metrics.scaledSize;
+        const startColumn = Math.max(
+          1,
+          Math.min(renderDoc.width, guideHighlight.startColumn),
+        );
+        const endColumn = Math.max(
+          startColumn,
+          Math.min(renderDoc.width, guideHighlight.endColumn),
+        );
+        const row = Math.max(1, Math.min(renderDoc.height, guideHighlight.row));
+        const x = metrics.panX + (startColumn - 1) * scaledSize;
+        const y = metrics.panY + (row - 1) * scaledSize;
+        const width = (endColumn - startColumn + 1) * scaledSize;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(255, 178, 0, 0.24)";
+        ctx.fillRect(x, y, width, scaledSize);
+        ctx.strokeStyle = "#c2410c";
+        ctx.lineWidth = Math.max(2, Math.min(4, scaledSize / 3));
+        ctx.setLineDash([
+          Math.max(3, scaledSize / 2),
+          Math.max(2, scaledSize / 3),
+        ]);
+        ctx.strokeRect(x, y, width, scaledSize);
+        ctx.restore();
+      }
+
+      if (showCenterGuide) {
+        // Center axes coexist with every grid choice. The matching game/brush
+        // boundary was filtered above, so this high-contrast gold axis is drawn
+        // once instead of producing a doubled or fuzzy middle line.
+        drawGuideBoundaries(
+          [centerColumn],
+          [centerRow],
+          background === "dark" ? "#ffd36a" : "#c87500",
+          2.5,
+        );
+      }
+    },
+    [
+      background,
+      gameGridSections,
+      getRenderMetrics,
+      gridDensity,
+      guideHighlight,
+      highlightColorId,
+      paintPreview?.brushMode,
+      paintPreview?.brushSize,
+      readOnly,
+      referenceImage,
+      referenceUnderlay?.fit,
+      referenceUnderlay?.flipped,
+      referenceUnderlay?.mode,
+      referenceUnderlay?.opacity,
+      showCenterGuide,
+      showLabels,
+    ],
+  );
+
   // Keep the bitmap and the DOM-exposed grid metrics in the same committed
   // frame. A passive effect briefly exposes new pointer coordinates over the
   // previous bitmap after a resize or document edit, which can make a very
   // fast first stroke land on the wrong cell.
   useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const metrics = getRenderMetrics();
-    // A 2x backing store keeps single-cell lines crisp while avoiding the
-    // multi-megapixel allocation cost of 3x/4x phone screens. Pixel art gains
-    // no useful detail above 2x because every project cell is intentionally
-    // rendered as a flat, nearest-neighbor block.
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_RENDER_DPR);
-    const backingWidth = Math.max(1, Math.floor(metrics.width * dpr));
-    const backingHeight = Math.max(1, Math.floor(metrics.height * dpr));
-    // Reassigning a canvas backing dimension clears and reallocates its bitmap.
-    // Avoid that expensive path on every painted cell when the viewport did not
-    // actually resize.
-    if (canvas.width !== backingWidth) canvas.width = backingWidth;
-    if (canvas.height !== backingHeight) canvas.height = backingHeight;
-    canvas.style.width = `${metrics.width}px`;
-    canvas.style.height = `${metrics.height}px`;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-
-    const requestedGridStep = gridStepForDensity(gridDensity);
-    const requestedGridVisible =
-      requestedGridStep !== null &&
-      shouldRenderGridLines(
-        true,
-        metrics.cellSize,
-        metrics.renderZoom,
-        requestedGridStep,
-      );
-    // A fitted 64×64 canvas can make one-pixel cell lines consume a quarter
-    // of every cell on a phone. Keep clean eight-cell sections at that scale;
-    // Cell view reveals the complete per-cell mesh for exact copying.
-    const renderGridStep = resolveProjectGridStep(
-      requestedGridStep,
-      requestedGridVisible,
-      gameGridSections,
+    const deferredVisual = deferredVisualDocRef.current;
+    drawCanvasDocument(
+      deferredVisual && deferredCommitBaseDocRef.current === doc
+        ? deferredVisual
+        : doc,
     );
-    const renderGridLines =
-      renderGridStep !== null &&
-      shouldRenderGridLines(
-        true,
-        metrics.cellSize,
-        metrics.renderZoom,
-        renderGridStep,
-      );
+  }, [doc, drawCanvasDocument]);
 
-    renderGrid(ctx, doc, {
-      cellSize: metrics.cellSize,
-      zoom: metrics.renderZoom,
-      panX: metrics.panX,
-      panY: metrics.panY,
-      showGrid: renderGridLines,
-      gridStep: renderGridStep ?? 1,
-      showLabels,
-      highlightColorId,
-      checkerboard: background === "paper" ? "none" : background,
-      devicePixelRatio: dpr,
-      gridBackground: background === "paper" ? "#fffaf0" : null,
-      referenceImage,
-      referenceOpacity: (referenceUnderlay?.opacity ?? 45) / 100,
-      referenceFlipped: referenceUnderlay?.flipped ?? false,
-      referenceFit: referenceUnderlay?.fit ?? "contain",
-      // Keep the only visible cell grid above the 3:1 non-text contrast target
-      // and at least one CSS pixel wide, including fitted mobile canvases.
-      gridColor:
-        background === "dark"
-          ? "rgba(231, 240, 236, 0.48)"
-          : "rgba(64, 83, 92, 0.42)",
-      gridWidth: 1,
-      majorGridColor: background === "dark" ? "#f7c75f" : "#29485a",
-      // Game guide sections are rendered once, below, with their own visual
-      // language. Stacking renderGrid's legacy major cadence on top of them is
-      // what previously made the canvas look like two competing grids.
-      majorGridStep: 0,
-      majorGridWidth: 1.5,
-    });
-
-    // Mirror the game's independent 2×2 / 4×4 / 8×8 reference overlay.
-    // These section lines do not resize the document and do not create cells;
-    // they are orientation guides above the single authoritative cell mesh.
-    if (gameGridSections > 0) {
-      const verticalBoundaries = getGameGridBoundaries(
-        doc.width,
-        gameGridSections,
-      );
-      const horizontalBoundaries = getGameGridBoundaries(
-        doc.height,
-        gameGridSections,
-      );
-      const requestedLineWidth = Math.max(
-        2,
-        Math.min(3, metrics.scaledSize / 3),
-      );
-      const lineWidth = Math.max(
-        1 / dpr,
-        Math.round(requestedLineWidth * dpr) / dpr,
-      );
-
-      ctx.save();
-      ctx.fillStyle = "rgba(219, 105, 31, 0.78)";
-      for (const boundary of verticalBoundaries) {
-        const x = snapGridStrip(
-          metrics.panX + boundary * metrics.scaledSize - lineWidth / 2,
-          dpr,
-        );
-        ctx.fillRect(
-          x,
-          metrics.panY,
-          lineWidth,
-          doc.height * metrics.scaledSize,
-        );
-      }
-      for (const boundary of horizontalBoundaries) {
-        const y = snapGridStrip(
-          metrics.panY + boundary * metrics.scaledSize - lineWidth / 2,
-          dpr,
-        );
-        ctx.fillRect(
-          metrics.panX,
-          y,
-          doc.width * metrics.scaledSize,
-          lineWidth,
-        );
-      }
-      ctx.restore();
-    }
-
-    // Coordinate rulers share the same metrics as the authoritative canvas.
-    // They are deliberately drawn outside the grid so they cannot look like a
-    // second set of cells or intercept paint input.
-    const scaledSize = metrics.scaledSize;
-    if (scaledSize >= 4) {
-      ctx.save();
-      ctx.fillStyle = "#17384a";
-      ctx.font = `700 10px ui-monospace, "SFMono-Regular", Menlo, monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      for (let x = 0; x < doc.width; x += 8) {
-        ctx.fillText(
-          String(x + 1),
-          metrics.panX + (x + 0.5) * scaledSize,
-          metrics.panY - 5,
-        );
-      }
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      for (let y = 0; y < doc.height; y += 8) {
-        ctx.fillText(
-          String(y + 1),
-          metrics.panX - 5,
-          metrics.panY + (y + 0.5) * scaledSize,
-        );
+  const applyDeferredStrokeSegment = useCallback(
+    (sampledCells: ReadonlyArray<{ x: number; y: number }>): boolean => {
+      if (
+        !canDeferPaint ||
+        !paintPreview ||
+        !onDeferredStrokeCommit ||
+        (paintPreview.tool === "pencil" && !paintColorId)
+      ) {
+        return false;
       }
 
-      ctx.restore();
-    }
-
-    if (guideHighlight) {
-      const scaledSize = metrics.scaledSize;
-      const startColumn = Math.max(
-        1,
-        Math.min(doc.width, guideHighlight.startColumn),
+      const brushInput =
+        strokeBrushInputRef.current ?? getPreviewBrushInput(paintPreview);
+      if (!brushInput) return false;
+      const draft = strokeDraftDocRef.current ?? doc;
+      const targetColorId =
+        strokeTargetColorIdRef.current !== undefined
+          ? strokeTargetColorIdRef.current
+          : paintPreview.tool === "eraser"
+            ? null
+            : paintColorId;
+      const footprint = buildPaintCells(
+        sampledCells,
+        brushInput,
+        draft,
+        strokeHorizontalMirrorRef.current,
       );
-      const endColumn = Math.max(
-        startColumn,
-        Math.min(doc.width, guideHighlight.endColumn),
-      );
-      const row = Math.max(1, Math.min(doc.height, guideHighlight.row));
-      const x = metrics.panX + (startColumn - 1) * scaledSize;
-      const y = metrics.panY + (row - 1) * scaledSize;
-      const width = (endColumn - startColumn + 1) * scaledSize;
+      const nextDraft = setCells(draft, footprint, targetColorId);
 
-      ctx.save();
-      ctx.fillStyle = "rgba(255, 178, 0, 0.24)";
-      ctx.fillRect(x, y, width, scaledSize);
-      ctx.strokeStyle = "#c2410c";
-      ctx.lineWidth = Math.max(2, Math.min(4, scaledSize / 3));
-      ctx.setLineDash([
-        Math.max(3, scaledSize / 2),
-        Math.max(2, scaledSize / 3),
-      ]);
-      ctx.strokeRect(x, y, width, scaledSize);
-      ctx.restore();
+      for (const cell of footprint) {
+        const index = cell.y * doc.width + cell.x;
+        if (deferredStrokeCellIdsRef.current.has(index)) continue;
+        deferredStrokeCellIdsRef.current.add(index);
+        deferredStrokeCellsRef.current.push(cell);
+      }
+
+      strokeDraftDocRef.current = nextDraft;
+      deferredVisualDocRef.current = nextDraft;
+      if (nextDraft !== draft) drawCanvasDocument(nextDraft);
+      return true;
+    },
+    [
+      canDeferPaint,
+      doc,
+      drawCanvasDocument,
+      onDeferredStrokeCommit,
+      paintColorId,
+      paintPreview,
+    ],
+  );
+
+  const cancelDeferredStroke = useCallback(() => {
+    deferredStrokeEpochRef.current += 1;
+    strokeDraftDocRef.current = null;
+    deferredVisualDocRef.current = null;
+    deferredStrokeCellsRef.current = [];
+    deferredStrokeCellIdsRef.current.clear();
+    strokeBrushInputRef.current = null;
+    strokeHorizontalMirrorRef.current = false;
+    strokeTargetColorIdRef.current = undefined;
+    deferredCommitBaseDocRef.current = null;
+    drawCanvasDocument(doc);
+  }, [doc, drawCanvasDocument]);
+
+  const finishDeferredStrokeCommit = useCallback(
+    (deferUntilAfterPaint: boolean): boolean => {
+      if (!strokeDraftDocRef.current) return false;
+
+      const cells = deferredStrokeCellsRef.current;
+      const targetColorId = strokeTargetColorIdRef.current;
+      const baseDoc = deferredCommitBaseDocRef.current ?? doc;
+      const strokeEpoch = deferredStrokeEpochRef.current;
+      strokeDraftDocRef.current = null;
+      deferredStrokeCellsRef.current = [];
+      deferredStrokeCellIdsRef.current.clear();
+      strokeBrushInputRef.current = null;
+      strokeHorizontalMirrorRef.current = false;
+      strokeTargetColorIdRef.current = undefined;
+      onDeferredCommitPendingChange?.(true);
+
+      const commit = () => {
+        deferredCommitTimerRef.current = null;
+        if (latestDocRef.current !== baseDoc) {
+          deferredVisualDocRef.current = null;
+          deferredCommitBaseDocRef.current = null;
+          onStrokeAbandon?.();
+        } else if (cells.length > 0 && targetColorId !== undefined) {
+          onDeferredStrokeCommit?.(baseDoc, cells, targetColorId);
+        }
+        onDeferredCommitPendingChange?.(false);
+        window.requestAnimationFrame(() => {
+          if (
+            deferredCommitTimerRef.current === null &&
+            deferredStrokeEpochRef.current === strokeEpoch &&
+            deferredCommitBaseDocRef.current === baseDoc
+          ) {
+            deferredVisualDocRef.current = null;
+            deferredCommitBaseDocRef.current = null;
+          }
+        });
+      };
+
+      if (deferUntilAfterPaint) {
+        // The imperative draft is already visible. Let the browser present
+        // that frame before reconciling the immutable React document and
+        // history. This keeps pointer-up responsive on constrained phones.
+        deferredCommitTimerRef.current = window.setTimeout(commit, 24);
+      } else {
+        // Entering a read-only surface (notably Copy Guide) must preserve a
+        // pointer that is still held down. Commit before that surface reads
+        // the document so the visible draft cannot disappear on navigation.
+        commit();
+      }
+      return true;
+    },
+    [
+      doc,
+      onDeferredCommitPendingChange,
+      onDeferredStrokeCommit,
+      onStrokeAbandon,
+    ],
+  );
+
+  const scheduleDeferredStrokeCommit = useCallback(() => {
+    finishDeferredStrokeCommit(true);
+  }, [finishDeferredStrokeCommit]);
+
+  useLayoutEffect(() => {
+    if (readOnly) finishDeferredStrokeCommit(false);
+  }, [finishDeferredStrokeCommit, readOnly]);
+
+  const discardPendingDeferredCommit = useCallback(
+    (announce: boolean) => {
+      if (deferredCommitTimerRef.current !== null) {
+        window.clearTimeout(deferredCommitTimerRef.current);
+        deferredCommitTimerRef.current = null;
+      }
+      deferredStrokeEpochRef.current += 1;
+      deferredCommitBaseDocRef.current = null;
+      strokeDraftDocRef.current = null;
+      deferredVisualDocRef.current = null;
+      deferredStrokeCellsRef.current = [];
+      deferredStrokeCellIdsRef.current.clear();
+      strokeBrushInputRef.current = null;
+      strokeHorizontalMirrorRef.current = false;
+      strokeTargetColorIdRef.current = undefined;
+      onStrokeAbandon?.();
+      if (announce) onDeferredCommitPendingChange?.(false);
+    },
+    [onDeferredCommitPendingChange, onStrokeAbandon],
+  );
+
+  useEffect(() => {
+    const baseDoc = deferredCommitBaseDocRef.current;
+    if (deferredCommitTimerRef.current !== null && baseDoc && doc !== baseDoc) {
+      discardPendingDeferredCommit(true);
     }
+  }, [discardPendingDeferredCommit, doc]);
 
-    if (showCenterGuide) {
-      const scaledSize = metrics.scaledSize;
-      const centerX = metrics.panX + (doc.width * scaledSize) / 2;
-      const centerY = metrics.panY + (doc.height * scaledSize) / 2;
-      const left = metrics.panX;
-      const right = metrics.panX + doc.width * scaledSize;
-      const top = metrics.panY;
-      const bottom = metrics.panY + doc.height * scaledSize;
-
-      ctx.save();
-      ctx.fillStyle = "#b84426";
-      ctx.fillRect(Math.round(centerX) - 1, top, 2, bottom - top);
-      ctx.fillRect(left, Math.round(centerY) - 1, right - left, 2);
-      ctx.restore();
-    }
-  }, [
-    doc,
-    zoom,
-    gridDensity,
-    showLabels,
-    showCenterGuide,
-    background,
-    highlightColorId,
-    guideHighlight,
-    gameGridSections,
-    getRenderMetrics,
-    readOnly,
-    referenceImage,
-    referenceUnderlay?.fit,
-    referenceUnderlay?.flipped,
-    referenceUnderlay?.opacity,
-  ]);
+  useEffect(
+    () => () => {
+      discardPendingDeferredCommit(false);
+    },
+    [discardPendingDeferredCommit],
+  );
 
   const zoomOut = useCallback(() => {
     setZoom((current) => Math.max(MIN_ZOOM, current * 0.8));
@@ -675,6 +980,11 @@ export default function CanvasViewer({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (deferredCommitTimerRef.current !== null) {
+        event.preventDefault();
+        setStatusMessage("Finishing the previous stroke.");
+        return;
+      }
       if (event.pointerType === "touch") {
         touchPointsRef.current.set(event.pointerId, {
           clientX: event.clientX,
@@ -693,6 +1003,7 @@ export default function CanvasViewer({
           return;
         }
         if (pointerGestureRef.current === "draw") {
+          if (strokeDraftDocRef.current) cancelDeferredStroke();
           onStrokeCancel?.();
         }
         pinchStartRef.current = createPinchStart(
@@ -756,7 +1067,24 @@ export default function CanvasViewer({
         // undo entry. Stroke lifecycle is owned by the parent.
         onStrokeBegin?.();
         lastDragCellRef.current = { x: cell.x, y: cell.y };
-        if (onCellDragSegment) {
+        strokeDraftDocRef.current = canDeferPaint ? doc : null;
+        if (canDeferPaint) deferredStrokeEpochRef.current += 1;
+        deferredCommitBaseDocRef.current = canDeferPaint ? doc : null;
+        deferredStrokeCellsRef.current = [];
+        deferredStrokeCellIdsRef.current.clear();
+        strokeBrushInputRef.current = canDeferPaint
+          ? getPreviewBrushInput(paintPreview)
+          : null;
+        strokeHorizontalMirrorRef.current =
+          canDeferPaint && paintPreview ? paintPreview.horizontalMirror : false;
+        strokeTargetColorIdRef.current = canDeferPaint
+          ? paintPreview?.tool === "eraser"
+            ? null
+            : paintColorId
+          : undefined;
+        if (applyDeferredStrokeSegment([{ x: cell.x, y: cell.y }])) {
+          // The local canvas draft already provides immediate visual feedback.
+        } else if (onCellDragSegment) {
           onCellDragSegment([{ x: cell.x, y: cell.y }]);
         } else {
           onCellDrag?.(cell.x, cell.y, cell.colorId);
@@ -776,7 +1104,11 @@ export default function CanvasViewer({
     },
     [
       capturePointer,
+      applyDeferredStrokeSegment,
+      canDeferPaint,
+      cancelDeferredStroke,
       createPinchStart,
+      doc,
       getEventCell,
       onCellDrag,
       onCellDragSegment,
@@ -785,6 +1117,8 @@ export default function CanvasViewer({
       onStrokeEnd,
       pan,
       panMode,
+      paintColorId,
+      paintPreview,
       readOnly,
       zoom,
     ],
@@ -891,7 +1225,10 @@ export default function CanvasViewer({
                 ? []
                 : [{ x: cell.x, y: cell.y }];
           if (segment.length > 0) {
-            if (onCellDragSegment) {
+            if (applyDeferredStrokeSegment(segment)) {
+              // Keep high-frequency samples out of React; pointer-up commits
+              // the complete stroke exactly once.
+            } else if (onCellDragSegment) {
               onCellDragSegment(segment);
             } else if (onCellDrag) {
               for (const point of segment) {
@@ -900,8 +1237,10 @@ export default function CanvasViewer({
             }
           }
           lastDragCellRef.current = { x: cell.x, y: cell.y };
-          setHoverCell({ x: cell.x, y: cell.y });
-          setKeyboardCell({ x: cell.x, y: cell.y });
+          if (!strokeDraftDocRef.current) {
+            setHoverCell({ x: cell.x, y: cell.y });
+            setKeyboardCell({ x: cell.x, y: cell.y });
+          }
           return;
         }
       }
@@ -919,6 +1258,7 @@ export default function CanvasViewer({
       }
     },
     [
+      applyDeferredStrokeSegment,
       getEventCell,
       getRenderMetrics,
       hoverCell,
@@ -989,9 +1329,13 @@ export default function CanvasViewer({
       lastDragCellRef.current = null;
 
       if (gesture === "draw") {
-        // A canceled pointer still commits the pixels already drawn as exactly
-        // one undoable stroke instead of leaving the transaction open.
-        onStrokeEnd?.();
+        if (strokeDraftDocRef.current) {
+          // A canceled pointer still commits the pixels already drawn as one
+          // undoable stroke, matching the established transaction behavior.
+          scheduleDeferredStrokeCommit();
+        } else {
+          onStrokeEnd?.();
+        }
       }
       setIsPanning(false);
 
@@ -1030,6 +1374,7 @@ export default function CanvasViewer({
       onStrokeEnd,
       pan,
       readOnly,
+      scheduleDeferredStrokeCommit,
       zoom,
     ],
   );
@@ -1190,10 +1535,23 @@ export default function CanvasViewer({
     ? isPanning
       ? "cursor-grabbing"
       : "cursor-grab"
-    : !readOnly && (onCellDrag || onCellDragSegment)
-      ? "cursor-crosshair"
-      : "cursor-cell";
+    : paintPreview && hoverCell && !readOnly
+      ? "cursor-none"
+      : !readOnly && (onCellDrag || onCellDragSegment)
+        ? "cursor-crosshair"
+        : "cursor-cell";
   const currentRenderMetrics = getRenderMetrics();
+  const previewBrushInput = getPreviewBrushInput(paintPreview);
+  const resolvedPreviewBrush = previewBrushInput
+    ? resolveBrushSpec(previewBrushInput)
+    : null;
+  const brushGridStep = previewBrushInput
+    ? getBrushGridStep(previewBrushInput)
+    : null;
+  const brushGridLinesVisible =
+    brushGridStep !== null &&
+    brushGridStep * currentRenderMetrics.scaledSize >=
+      MIN_BRUSH_GRID_CADENCE_CSS_PIXELS;
   const gridStep = gridStepForDensity(gridDensity);
   const gridLinesVisible =
     gridStep !== null &&
@@ -1212,7 +1570,6 @@ export default function CanvasViewer({
   const renderedProjectGridStep = resolveProjectGridStep(
     gridStep,
     gridLinesVisible,
-    gameGridSections,
   );
   const activeCell = hoverCell ?? (isKeyboardFocused ? keyboardCell : null);
   const quadrant = activeCell
@@ -1220,15 +1577,54 @@ export default function CanvasViewer({
         activeCell.x < doc.width / 2 ? "W" : "E"
       }`
     : null;
-  const hoverFootprint =
+  const hoverFootprintRects =
     hoverCell && paintPreview && !readOnly
-      ? buildPaintCells(
-          [hoverCell],
-          paintPreview.brushSize,
+      ? getBrushPreviewRects(
+          hoverCell,
+          previewBrushInput ?? paintPreview.brushSize,
           doc,
           paintPreview.horizontalMirror,
         )
       : [];
+  const hoverFootprintCellCount = hoverFootprintRects.reduce(
+    (total, rect) => total + rect.width * rect.height,
+    0,
+  );
+  const primaryFootprint = hoverFootprintRects[0] ?? null;
+  // Anchor the visibility aid to the exact mutation footprint, not the raw
+  // pointer cell. A snapped 4px stamp can begin several cells before the
+  // pointer, so centering on the pointer would make the cursor appear offset
+  // from the pixels that will actually change.
+  const pointerCenter = primaryFootprint
+    ? {
+        x:
+          currentRenderMetrics.panX +
+          (primaryFootprint.x + primaryFootprint.width / 2) *
+            currentRenderMetrics.scaledSize,
+        y:
+          currentRenderMetrics.panY +
+          (primaryFootprint.y + primaryFootprint.height / 2) *
+            currentRenderMetrics.scaledSize,
+      }
+    : null;
+  const showSmallFootprintAid =
+    pointerCenter !== null &&
+    primaryFootprint !== null &&
+    Math.min(primaryFootprint.width, primaryFootprint.height) *
+      currentRenderMetrics.scaledSize <
+      8;
+  const cursorChip = pointerCenter
+    ? {
+        x: Math.max(
+          4,
+          Math.min(currentRenderMetrics.width - 136, pointerCenter.x + 12),
+        ),
+        y: Math.max(
+          4,
+          Math.min(currentRenderMetrics.height - 24, pointerCenter.y - 25),
+        ),
+      }
+    : null;
 
   return (
     <div
@@ -1369,8 +1765,26 @@ export default function CanvasViewer({
         data-grid-lines={gridLineState}
         data-grid-renderer="crisp-layered"
         data-canvas-background={background}
+        data-transparent-cells="checkerboard"
         data-reference-underlay={referenceImage ? "visible" : "hidden"}
+        data-reference-mode={referenceUnderlay?.mode ?? "under"}
         data-brush-preview={paintPreview ? paintPreview.brushSize : "none"}
+        data-brush-preview-mode={resolvedPreviewBrush?.mode ?? "none"}
+        data-brush-grid-step={brushGridStep ?? "off"}
+        data-brush-grid-lines={
+          brushGridStep === null
+            ? "off"
+            : brushGridLinesVisible
+              ? "visible"
+              : "suppressed"
+        }
+        data-brush-footprint-cells={hoverFootprintCellCount || "none"}
+        data-game-surface={
+          isCanonicalGameSurface(doc.width, doc.height)
+            ? "canonical-256"
+            : "compatible-custom"
+        }
+        data-guide-layers="fine,brush,game,center"
         data-document-modified-at={doc.meta.modifiedAt}
         data-center-guide={showCenterGuide ? "visible" : "hidden"}
         data-canvas-mode={readOnly ? "copy" : "edit"}
@@ -1425,29 +1839,99 @@ export default function CanvasViewer({
             />
           </>
         ) : null}
-        {hoverFootprint.map((cell) => (
-          <rect
-            key={`${cell.x}:${cell.y}`}
-            x={
-              currentRenderMetrics.panX +
-              cell.x * currentRenderMetrics.scaledSize
-            }
-            y={
-              currentRenderMetrics.panY +
-              cell.y * currentRenderMetrics.scaledSize
-            }
-            width={currentRenderMetrics.scaledSize}
-            height={currentRenderMetrics.scaledSize}
-            fill={
-              paintPreview?.tool === "eraser"
-                ? "rgba(255, 250, 240, 0.6)"
-                : "rgba(239, 107, 59, 0.26)"
-            }
-            stroke={paintPreview?.tool === "eraser" ? "#526975" : "#b84426"}
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
+        {hoverFootprintRects.map((rect) => {
+          const x =
+            currentRenderMetrics.panX +
+            rect.x * currentRenderMetrics.scaledSize;
+          const y =
+            currentRenderMetrics.panY +
+            rect.y * currentRenderMetrics.scaledSize;
+          const width = rect.width * currentRenderMetrics.scaledSize;
+          const height = rect.height * currentRenderMetrics.scaledSize;
+          const stroke =
+            paintPreview?.tool === "eraser" ? "#17384a" : "#b84426";
+          return (
+            <g
+              key={`${rect.x}:${rect.y}:${rect.width}:${rect.height}`}
+              data-testid="brush-footprint"
+            >
+              <rect
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                fill="none"
+                stroke="#fffaf0"
+                strokeWidth={4}
+                vectorEffect="non-scaling-stroke"
+              />
+              <rect
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                fill={
+                  paintPreview?.tool === "eraser"
+                    ? "rgba(255, 250, 240, 0.48)"
+                    : "rgba(239, 107, 59, 0.3)"
+                }
+                stroke={stroke}
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
+          );
+        })}
+        {showSmallFootprintAid && pointerCenter && cursorChip ? (
+          <g data-testid="small-brush-cursor-aid">
+            <circle
+              cx={pointerCenter.x}
+              cy={pointerCenter.y}
+              r={9}
+              fill="none"
+              stroke="#fffaf0"
+              strokeWidth={5}
+            />
+            <circle
+              cx={pointerCenter.x}
+              cy={pointerCenter.y}
+              r={9}
+              fill="none"
+              stroke="#17384a"
+              strokeWidth={2}
+            />
+            <path
+              d={`M ${pointerCenter.x - 14} ${pointerCenter.y} H ${pointerCenter.x - 8} M ${pointerCenter.x + 8} ${pointerCenter.y} H ${pointerCenter.x + 14} M ${pointerCenter.x} ${pointerCenter.y - 14} V ${pointerCenter.y - 8} M ${pointerCenter.x} ${pointerCenter.y + 8} V ${pointerCenter.y + 14}`}
+              fill="none"
+              stroke="#b84426"
+              strokeWidth={2}
+            />
+            <g transform={`translate(${cursorChip.x} ${cursorChip.y})`}>
+              <rect
+                width={132}
+                height={21}
+                rx={7}
+                fill="#17384a"
+                stroke="#fffaf0"
+                strokeWidth={2}
+              />
+              <text
+                x={66}
+                y={14}
+                fill="#fffaf0"
+                fontFamily='ui-monospace, "SFMono-Regular", Menlo, monospace'
+                fontSize={9}
+                fontWeight={800}
+                textAnchor="middle"
+              >
+                {resolvedPreviewBrush?.mode === "pixel-perfect"
+                  ? `${resolvedPreviewBrush.size}px stamp`
+                  : `${resolvedPreviewBrush?.size ?? 1}px smooth`}
+                {hoverCell ? ` · C${hoverCell.x + 1} R${hoverCell.y + 1}` : ""}
+              </text>
+            </g>
+          </g>
+        ) : null}
         {isKeyboardFocused ? (
           <rect
             x={

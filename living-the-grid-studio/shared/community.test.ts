@@ -25,6 +25,9 @@ function validDocument() {
         templateId: "heart-sticker",
         templateCategory: "Marks & Objects",
         templateName: "Heart Sticker",
+        templateLegacyName: "Heart Sticker",
+        guideSections: 4,
+        recommendedBrushPixels: 4,
         arbitrarySecret: "must not persist",
       },
     },
@@ -49,6 +52,9 @@ describe("GridDocumentV1Schema", () => {
       templateId: "heart-sticker",
       templateCategory: "Marks & Objects",
       templateName: "Heart Sticker",
+      templateLegacyName: "Heart Sticker",
+      guideSections: 4,
+      recommendedBrushPixels: 4,
     });
   });
 

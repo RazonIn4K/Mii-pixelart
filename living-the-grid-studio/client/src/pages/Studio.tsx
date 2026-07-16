@@ -45,9 +45,13 @@ import CanvasViewer from "@/components/studio/CanvasViewer";
 import type { PaintTool } from "@/components/studio/CreationPanel";
 import {
   CanvasPaintToolbar,
+  type BrushMode,
   type BrushSize,
 } from "@/components/studio/CanvasPaintToolbar";
-import { ReferenceDock } from "@/components/studio/ReferenceDock";
+import {
+  ReferenceDock,
+  type ReferenceComparisonMode,
+} from "@/components/studio/ReferenceDock";
 import {
   StudioWorkflowNav,
   type StudioPanel,
@@ -59,9 +63,10 @@ import { CloudProjectControls } from "@/components/community/CloudProjectControl
 // import ResidentPanel from "@/components/studio/ResidentPanel";
 import {
   createCreativeTemplateDocument,
+  getCreativeTemplateDefinition,
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
-import type { GridDocument } from "@/lib/engine/grid";
+import { containGridNearest, type GridDocument } from "@/lib/engine/grid";
 import type {
   CanvasBackground,
   GridDensity,
@@ -71,13 +76,35 @@ import {
   getImagePreview,
   type ImageImportOptions,
 } from "@/lib/engine/image-import";
-import { buildPaintCells } from "@/lib/engine/paint-assists";
-import type { GameGridSections } from "@/lib/engine/game-match";
+import {
+  buildPaintCells,
+  SMOOTH_BRUSH_SIZES,
+  type BrushSpec,
+} from "@/lib/engine/paint-assists";
+import {
+  GAME_CANVAS_PIXELS,
+  PIXEL_PERFECT_GAME_BRUSHES,
+  type GameGridSections,
+} from "@/lib/engine/game-match";
 import type { CopyGuideRun } from "@/lib/engine/copy-guide";
 // Resident spec type retired alongside the Island tab.
 // import type { MiiResidentSpec } from "@shared/residents";
 
 const EMPTY_STATE_IMG = "/empty-state.webp";
+
+function getBrushSpec(brushMode: BrushMode, brushSize: BrushSize): BrushSpec {
+  if (brushMode === "pixel-perfect") {
+    const size =
+      PIXEL_PERFECT_GAME_BRUSHES.find((candidate) => candidate === brushSize) ??
+      4;
+    return { mode: brushMode, size };
+  }
+
+  const size =
+    SMOOTH_BRUSH_SIZES.find((candidate) => candidate === brushSize) ?? 1;
+  return { mode: brushMode, size };
+}
+
 const AiPanel = lazy(() => import("@/components/studio/AiPanel"));
 const CreationPanel = lazy(() => import("@/components/studio/CreationPanel"));
 const CopyGuidePanel = lazy(() => import("@/components/studio/CopyGuidePanel"));
@@ -114,7 +141,9 @@ export default function Studio() {
     paintCells,
     fillRegion,
     beginStroke,
+    abandonStroke,
     cancelStroke,
+    commitDeferredStroke,
     endStroke,
     resampleCanvas,
     mergeColors,
@@ -135,7 +164,9 @@ export default function Studio() {
   const [showCenterGuide, setShowCenterGuide] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [paintTool, setPaintTool] = useState<PaintTool>("pencil");
-  const [brushSize, setBrushSize] = useState<BrushSize>(1);
+  const [isStrokeCommitPending, setIsStrokeCommitPending] = useState(false);
+  const [brushMode, setBrushMode] = useState<BrushMode>("pixel-perfect");
+  const [brushSize, setBrushSize] = useState<BrushSize>(4);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
   const [isPreparingBlankCanvas, setIsPreparingBlankCanvas] = useState(false);
@@ -151,8 +182,10 @@ export default function Studio() {
   >("idle");
   const [referenceOpacity, setReferenceOpacity] = useState(40);
   const [referenceFlipped, setReferenceFlipped] = useState(false);
+  const [referenceComparisonMode, setReferenceComparisonMode] =
+    useState<ReferenceComparisonMode>("side");
   const [referenceUnderlayVisible, setReferenceUnderlayVisible] =
-    useState(true);
+    useState(false);
   const imagePickerRequestRef = useRef(0);
   const referencePreviewRequestRef = useRef(0);
   const blankCanvasFrameRef = useRef<number | null>(null);
@@ -185,7 +218,8 @@ export default function Studio() {
     setReferenceSourceUrl(nextUrl);
     setReferenceOpacity(40);
     setReferenceFlipped(false);
-    setReferenceUnderlayVisible(true);
+    setReferenceComparisonMode("side");
+    setReferenceUnderlayVisible(false);
   }, []);
 
   const clearLocalReference = useCallback(() => {
@@ -195,6 +229,8 @@ export default function Studio() {
     setReferenceSourceUrl(null);
     setReferenceUnderlayUrl(null);
     setReferenceUnderlayStatus("idle");
+    setReferenceComparisonMode("side");
+    setReferenceUnderlayVisible(false);
   }, []);
 
   const handlePreviewImage = useCallback(
@@ -210,7 +246,16 @@ export default function Studio() {
         file,
         resolvedOptions.gridWidth,
         resolvedOptions.gridHeight,
-        8,
+        Math.max(
+          1,
+          Math.min(
+            8,
+            Math.floor(
+              512 /
+                Math.max(resolvedOptions.gridWidth, resolvedOptions.gridHeight),
+            ),
+          ),
+        ),
         resolvedOptions,
       )
         .then((previewUrl) => {
@@ -256,6 +301,7 @@ export default function Studio() {
       }
       if ((e.metaKey || e.ctrlKey) && key === "z") {
         e.preventDefault();
+        if (isStrokeCommitPending) return;
         if (e.shiftKey) {
           redo();
         } else {
@@ -265,6 +311,7 @@ export default function Studio() {
       }
       if ((e.metaKey || e.ctrlKey) && key === "y") {
         e.preventDefault();
+        if (isStrokeCommitPending) return;
         redo();
         return;
       }
@@ -287,17 +334,12 @@ export default function Studio() {
         e.preventDefault();
         const next = !horizontalMirror;
         setHorizontalMirror(next);
-        if (next && gameGridSections === 0) setShowCenterGuide(true);
+        if (next) setShowCenterGuide(true);
         return;
       }
       if (key === "g" && doc && !imagePreview) {
         e.preventDefault();
-        if (gameGridSections > 0) {
-          setGameGridSections(0);
-          setShowCenterGuide(true);
-        } else {
-          setShowCenterGuide((current) => !current);
-        }
+        setShowCenterGuide((current) => !current);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -308,6 +350,7 @@ export default function Studio() {
     gameGridSections,
     horizontalMirror,
     imagePreview,
+    isStrokeCommitPending,
     undo,
     redo,
   ]);
@@ -363,7 +406,12 @@ export default function Studio() {
 
       if (paintTool === "pencil") {
         paintCells(
-          buildPaintCells([{ x, y }], brushSize, doc, horizontalMirror),
+          buildPaintCells(
+            [{ x, y }],
+            getBrushSpec(brushMode, brushSize),
+            doc,
+            horizontalMirror,
+          ),
           selectedPaintColorId,
         );
         setHighlightColorId(null);
@@ -372,7 +420,12 @@ export default function Studio() {
 
       if (paintTool === "eraser") {
         paintCells(
-          buildPaintCells([{ x, y }], brushSize, doc, horizontalMirror),
+          buildPaintCells(
+            [{ x, y }],
+            getBrushSpec(brushMode, brushSize),
+            doc,
+            horizontalMirror,
+          ),
           null,
         );
         return;
@@ -403,6 +456,7 @@ export default function Studio() {
       doc,
       mergeSource,
       paintTool,
+      brushMode,
       brushSize,
       horizontalMirror,
       selectedPaintColorId,
@@ -417,7 +471,7 @@ export default function Studio() {
       if (imagePreview || !doc) return;
       const cells = buildPaintCells(
         [{ x, y }],
-        brushSize,
+        getBrushSpec(brushMode, brushSize),
         doc,
         horizontalMirror,
       );
@@ -428,6 +482,7 @@ export default function Studio() {
       }
     },
     [
+      brushMode,
       brushSize,
       doc,
       horizontalMirror,
@@ -450,7 +505,7 @@ export default function Studio() {
       if (imagePreview || !doc) return;
       const brushCells = buildPaintCells(
         cells,
-        brushSize,
+        getBrushSpec(brushMode, brushSize),
         doc,
         horizontalMirror,
       );
@@ -461,6 +516,7 @@ export default function Studio() {
       }
     },
     [
+      brushMode,
       brushSize,
       doc,
       horizontalMirror,
@@ -491,37 +547,6 @@ export default function Studio() {
     cancelStroke();
   }, [cancelStroke]);
 
-  const handleCreateCanvas = useCallback(
-    (
-      width: number,
-      height: number,
-      name: string,
-      fillColorId: string | null,
-    ) => {
-      createNew(width, height, name, fillColorId);
-      setHighlightColorId(null);
-      toast.success(`Created ${name}`);
-    },
-    [createNew],
-  );
-
-  const handleTraceReferenceOnBlank = useCallback(() => {
-    if (!imagePreview) return;
-    createNew(
-      imagePreview.width,
-      imagePreview.height,
-      `${imagePreview.meta.name} Trace`,
-      null,
-    );
-    clearImagePreview();
-    setHighlightColorId(null);
-    setPaintTool("pencil");
-    setHorizontalMirror(false);
-    setShowCenterGuide(false);
-    setActivePanel("create");
-    toast.success("Blank tracing grid ready");
-  }, [clearImagePreview, createNew, imagePreview]);
-
   const revealPanel = useCallback((panel: StudioPanel) => {
     setActivePanel(panel);
     window.requestAnimationFrame(() => {
@@ -542,6 +567,49 @@ export default function Studio() {
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, []);
+
+  const handleCreateCanvas = useCallback(
+    (
+      width: number,
+      height: number,
+      name: string,
+      fillColorId: string | null,
+    ) => {
+      createNew(width, height, name, fillColorId);
+      setHighlightColorId(null);
+      if (width === GAME_CANVAS_PIXELS && height === GAME_CANVAS_PIXELS) {
+        setBrushMode("pixel-perfect");
+        setBrushSize(4);
+        setGridDensity("cell");
+        setGameGridSections(8);
+        setShowCenterGuide(true);
+      }
+      toast.success(`Created ${name}`);
+      revealCanvasForEditing();
+    },
+    [createNew, revealCanvasForEditing],
+  );
+
+  const handleTraceReferenceOnBlank = useCallback(() => {
+    if (!imagePreview) return;
+    createNew(
+      GAME_CANVAS_PIXELS,
+      GAME_CANVAS_PIXELS,
+      `${imagePreview.meta.name} Trace`,
+      null,
+    );
+    clearImagePreview();
+    setHighlightColorId(null);
+    setPaintTool("pencil");
+    setBrushMode("pixel-perfect");
+    setBrushSize(4);
+    setHorizontalMirror(false);
+    setGameGridSections(8);
+    setShowCenterGuide(true);
+    setActivePanel("create");
+    toast.success("Blank tracing grid ready");
+    revealCanvasForEditing();
+  }, [clearImagePreview, createNew, imagePreview, revealCanvasForEditing]);
 
   const handleChooseImage = useCallback(() => {
     setActivePanel("import");
@@ -575,46 +643,69 @@ export default function Studio() {
     blankCanvasFrameRef.current = window.requestAnimationFrame(() => {
       blankCanvasFrameRef.current = window.requestAnimationFrame(() => {
         blankCanvasFrameRef.current = null;
-        createNew(64, 64, "Untitled Canvas", null);
+        createNew(
+          GAME_CANVAS_PIXELS,
+          GAME_CANVAS_PIXELS,
+          "Untitled Game Canvas",
+          null,
+        );
         setHighlightColorId(null);
         setPaintTool("pencil");
+        setBrushMode("pixel-perfect");
+        setBrushSize(4);
         setHorizontalMirror(false);
-        setShowCenterGuide(false);
+        setGridDensity("cell");
+        setGameGridSections(8);
+        setShowCenterGuide(true);
         setIsPreparingBlankCanvas(false);
         // Mount the lightweight canvas previews in the same committed layout
         // as the editor. Keeping the sidebar stable prevents a fast first
         // paint gesture from racing a second geometry-changing render.
         setActivePanel("create");
-        toast.success("Created Untitled Canvas");
+        toast.success("Created transparent 256×256 game canvas");
+        revealCanvasForEditing();
       });
     });
-  }, [createNew]);
+  }, [createNew, revealCanvasForEditing]);
 
   const handleEasyDrawSetup = useCallback(() => {
+    if (
+      doc &&
+      (doc.width !== GAME_CANVAS_PIXELS || doc.height !== GAME_CANVAS_PIXELS)
+    ) {
+      setDoc(containGridNearest(doc, GAME_CANVAS_PIXELS, GAME_CANVAS_PIXELS));
+    }
     setPaintTool("pencil");
-    setBrushSize(1);
+    setBrushMode("pixel-perfect");
+    setBrushSize(4);
     setGridDensity("cell");
     setGameGridSections(8);
     setHorizontalMirror(false);
-    // The 8×8 overlay already contains the horizontal and vertical center
-    // boundaries. Keeping the separate center crosshair off prevents a dark,
-    // doubled line through the exact middle of the drawing.
-    setShowCenterGuide(false);
+    setShowCenterGuide(true);
     setShowLabels(false);
     setEditViewRequest((current) => current + 1);
     toast.success(
-      "Easy draw ready: one-cell pencil, 8×8 game guide, and precise Cell view.",
+      "Game match ready: 256×256 surface, snapped 4px stamp, center axes, and 8×8 guide.",
     );
+  }, [doc, setDoc]);
+
+  const handleBrushModeChange = useCallback((mode: BrushMode) => {
+    setBrushMode(mode);
+    setBrushSize(mode === "pixel-perfect" ? 4 : 1);
   }, []);
 
   const handleCreateTemplate = useCallback(
     (templateId: CreativeTemplateId) => {
+      const template = getCreativeTemplateDefinition(templateId);
       const templateDoc = createCreativeTemplateDocument(templateId);
       setDoc(templateDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
+      setBrushMode("pixel-perfect");
+      setBrushSize(template.recommendedBrushPixels);
       setHorizontalMirror(false);
-      setShowCenterGuide(false);
+      setGameGridSections(template.guideSections);
+      setShowCenterGuide(true);
       setActivePanel("create");
       revealCanvasForEditing();
       toast.success(`Created ${templateDoc.meta.name}`);
@@ -624,12 +715,27 @@ export default function Studio() {
 
   const handleApplyAiSketch = useCallback(
     (sketchDoc: NonNullable<typeof doc>) => {
-      setDoc(sketchDoc);
+      const gameSurfaceDoc =
+        sketchDoc.width === GAME_CANVAS_PIXELS &&
+        sketchDoc.height === GAME_CANVAS_PIXELS
+          ? sketchDoc
+          : containGridNearest(
+              sketchDoc,
+              GAME_CANVAS_PIXELS,
+              GAME_CANVAS_PIXELS,
+            );
+      setDoc(gameSurfaceDoc);
       setHighlightColorId(null);
       setPaintTool("pencil");
+      setBrushMode("pixel-perfect");
+      setBrushSize(4);
+      setGameGridSections(8);
+      setShowCenterGuide(true);
       setActivePanel("create");
       revealCanvasForEditing();
-      toast.success(`Applied ${sketchDoc.meta.name}`);
+      toast.success(
+        `Applied ${gameSurfaceDoc.meta.name} on the 256×256 game surface`,
+      );
     },
     [revealCanvasForEditing, setDoc],
   );
@@ -777,7 +883,7 @@ export default function Studio() {
                 onClick={() => {
                   if (!isCopyMode) undo();
                 }}
-                disabled={!canUndo || isCopyMode}
+                disabled={!canUndo || isCopyMode || isStrokeCommitPending}
                 className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 sm:size-8"
                 aria-label="Undo"
                 title="Undo"
@@ -796,7 +902,7 @@ export default function Studio() {
                 onClick={() => {
                   if (!isCopyMode) redo();
                 }}
-                disabled={!canRedo || isCopyMode}
+                disabled={!canRedo || isCopyMode || isStrokeCommitPending}
                 className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 sm:size-8"
                 aria-label="Redo"
                 title="Redo"
@@ -824,8 +930,8 @@ export default function Studio() {
             visibleDoc
               ? referenceSourceUrl
                 ? "min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
-                : "h-[88svh] min-h-[41rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
-              : "h-[88svh] min-h-[41rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
+                : "h-[94svh] min-h-[56rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
+              : "h-[94svh] min-h-[56rem] min-w-0 flex-none p-3 lg:h-auto lg:min-h-0 lg:flex-1"
           }
         >
           {visibleDoc ? (
@@ -833,6 +939,7 @@ export default function Studio() {
               {!imagePreview && doc && !isCopyMode ? (
                 <CanvasPaintToolbar
                   activeTool={paintTool}
+                  brushMode={brushMode}
                   brushSize={brushSize}
                   doc={doc}
                   background={canvasBackground}
@@ -842,31 +949,22 @@ export default function Studio() {
                   selectedColorId={selectedPaintColorId}
                   showCenterGuide={showCenterGuide}
                   onBrushSizeChange={setBrushSize}
+                  onBrushModeChange={handleBrushModeChange}
                   onBackgroundChange={setCanvasBackground}
                   onEasyDrawSetup={handleEasyDrawSetup}
                   onGameGridSectionsChange={(sections) => {
                     setGameGridSections(sections);
-                    if (sections > 0) {
-                      setShowCenterGuide(false);
-                    } else if (horizontalMirror) {
-                      setShowCenterGuide(true);
-                    }
                   }}
                   onGridDensityChange={setGridDensity}
                   onHorizontalMirrorChange={(enabled) => {
                     setHorizontalMirror(enabled);
-                    if (enabled && gameGridSections === 0) {
-                      setShowCenterGuide(true);
-                    }
+                    if (enabled) setShowCenterGuide(true);
                   }}
                   onSelectedColorChange={(colorId) => {
                     setSelectedPaintColorId(colorId);
                     setHighlightColorId(null);
                   }}
                   onShowCenterGuideChange={(enabled) => {
-                    if (enabled && gameGridSections > 0) {
-                      setGameGridSections(0);
-                    }
                     setShowCenterGuide(enabled);
                   }}
                   onToolChange={setPaintTool}
@@ -903,17 +1001,22 @@ export default function Studio() {
               <div
                 className={
                   referenceSourceUrl
-                    ? "grid min-h-0 flex-none grid-rows-[20rem_auto] gap-2 sm:grid-rows-[24rem_auto] lg:flex-1 lg:grid-cols-[14rem_minmax(0,1fr)] lg:grid-rows-1"
+                    ? "grid min-h-0 flex-none grid-rows-[auto_32rem] gap-2 sm:grid-rows-[auto_36rem] lg:flex-1 lg:grid-cols-[14rem_minmax(0,1fr)] lg:grid-rows-1"
                     : "min-h-0 flex-1"
                 }
               >
                 {referenceSourceUrl ? (
                   <ReferenceDock
-                    className="order-2 lg:order-1"
+                    className="order-1"
+                    comparisonMode={referenceComparisonMode}
                     flipped={referenceFlipped}
                     opacity={referenceOpacity}
                     sourceUrl={referenceSourceUrl}
                     onClear={clearLocalReference}
+                    onComparisonModeChange={(mode) => {
+                      setReferenceComparisonMode(mode);
+                      setReferenceUnderlayVisible(mode !== "side");
+                    }}
                     onFlippedChange={setReferenceFlipped}
                     onOpacityChange={setReferenceOpacity}
                     onTraceBlank={
@@ -922,6 +1025,12 @@ export default function Studio() {
                         : undefined
                     }
                     onUnderlayVisibleChange={setReferenceUnderlayVisible}
+                    supportedComparisonModes={[
+                      "side",
+                      "under",
+                      "over",
+                      "split",
+                    ]}
                     traceStatus={
                       imagePreview
                         ? referenceUnderlayStatus === "idle"
@@ -935,7 +1044,7 @@ export default function Studio() {
                     underlayVisible={referenceUnderlayVisible}
                   />
                 ) : null}
-                <div className="order-1 h-full min-h-0 min-w-0 lg:order-2">
+                <div className="order-2 h-full min-h-0 min-w-0">
                   <CanvasViewer
                     doc={visibleDoc}
                     background={canvasBackground}
@@ -951,20 +1060,31 @@ export default function Studio() {
                       !isCopyMode &&
                       (paintTool === "pencil" || paintTool === "eraser")
                         ? {
+                            brushMode,
                             brushSize,
                             horizontalMirror,
                             tool: paintTool,
                           }
                         : null
                     }
+                    paintColorId={
+                      paintTool === "eraser" ? null : selectedPaintColorId
+                    }
+                    deferPaintUntilStrokeEnd={!isCopyMode}
                     referenceUnderlay={
                       referenceUnderlayUrl && !imagePreview
                         ? {
                             fit: "contain",
                             flipped: referenceFlipped,
+                            mode:
+                              referenceComparisonMode === "side"
+                                ? "under"
+                                : referenceComparisonMode,
                             opacity: referenceOpacity,
                             sourceUrl: referenceUnderlayUrl,
-                            visible: referenceUnderlayVisible,
+                            visible:
+                              referenceUnderlayVisible &&
+                              referenceComparisonMode !== "side",
                           }
                         : null
                     }
@@ -981,9 +1101,12 @@ export default function Studio() {
                         ? handleCellDragSegment
                         : undefined
                     }
+                    onDeferredStrokeCommit={commitDeferredStroke}
+                    onDeferredCommitPendingChange={setIsStrokeCommitPending}
                     onCellHover={handleCellHover}
-                    onStrokeBegin={isCopyMode ? undefined : handleStrokeBegin}
-                    onStrokeCancel={isCopyMode ? undefined : handleStrokeCancel}
+                    onStrokeBegin={handleStrokeBegin}
+                    onStrokeCancel={handleStrokeCancel}
+                    onStrokeAbandon={abandonStroke}
                     onStrokeEnd={handleStrokeEnd}
                   />
                 </div>
@@ -1015,8 +1138,8 @@ export default function Studio() {
                   What would you like to make?
                 </h2>
                 <p className="mx-auto mt-2 max-w-lg text-xs leading-5 text-muted-foreground sm:text-sm">
-                  Turn an image into a paintable grid, begin with a clean 64×64
-                  canvas, or choose a starter design.
+                  Turn an image into a paintable guide, begin with a transparent
+                  256×256 game canvas, or choose an original starter design.
                 </p>
                 <div className="mt-5 grid gap-2 sm:grid-cols-3">
                   <Button

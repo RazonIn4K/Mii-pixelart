@@ -29,7 +29,10 @@ Creative gamers who play _Tomodachi Life: Living the Dream_ on Nintendo Switch a
 The studio follows a linear pipeline that the user controls at every step:
 
 1. **Import** a character reference, face photo, logo/mark, meme, image file, or a Living The Grid JSON file, or **create** a blank starter canvas.
-2. **Choose a use-case preset** such as Face Paint, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, or Pixel 256.
+2. **Choose a use-case preset** for face paint, a portrait, character art, a
+   logo/mark, sticker, icon, or full image. These presets keep the canonical
+   256×256 surface and tune framing, sampling, and palette limits instead of
+   silently changing what one cell means.
 3. **Adjust framing and source type** with Fill/Fit/Stretch, focus controls, and Photo vs Pixel/Logo sampling so the face, logo, or subject lands where the repaint needs it.
 4. **Preview** the palette-limited grid before replacing the active project.
 5. **Commit or cancel** the image preview.
@@ -48,7 +51,7 @@ The studio follows a linear pipeline that the user controls at every step:
 | Feature            | Description                                                                                                                                                                                                                                 | Priority |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | Image import       | Upload PNG/JPG/GIF/WebP/AVIF/BMP, resize to grid, map to palette                                                                                                                                                                            | P0       |
-| Use-case presets   | Face-paint, character, high-detail face/character, sprite, logo/mark, sticker, icon, full-image, and 256px pixel-art import settings                                                                                                                | P0       |
+| Use-case presets   | Face-paint, portrait, character, sprite, logo/mark, sticker, icon, and full-image framing/sampling settings on the canonical 256×256 surface                                                                                                                        | P0       |
 | Face/subject focus | Nudge crop position with sliders or a draggable subject target before quantization                                                                                                                                                          | P0       |
 | Import preview     | Review generated image grids before committing them to history                                                                                                                                                                              | P0       |
 | Creation tools     | 28 original starter templates, saved JSON fixtures, blank starters, canvas detail resampling, inspect, pencil, eraser, eyedropper, and fill bucket tools                                                                                    | P0       |

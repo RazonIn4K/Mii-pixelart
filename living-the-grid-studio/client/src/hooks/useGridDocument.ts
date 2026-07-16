@@ -2,17 +2,18 @@
  * useGridDocument — Central state management hook for the grid editor
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type { GridDocument } from "@/lib/engine/grid";
 import {
   createGridDocument,
-  replaceColor,
   getColorUsageCounts,
+  recomputeUsedColors,
+  replaceColor,
   resampleGridNearest,
+  setCells,
 } from "@/lib/engine/grid";
 import {
   applyStudioTransaction,
-  buildPaintCellsTransaction,
   type StudioCommand,
 } from "@/lib/engine/studio-commands";
 import {
@@ -69,6 +70,8 @@ export function useGridDocument() {
     isLoading: false,
     error: null,
   });
+  const currentDocRef = useRef<GridDocument | null>(state.doc);
+  currentDocRef.current = state.doc;
 
   const rollbackActiveStroke = useCallback((): boolean => {
     if (!strokeActiveRef.current) return false;
@@ -270,21 +273,31 @@ export function useGridDocument() {
   const beginStroke = useCallback(() => {
     if (strokeActiveRef.current) return;
     strokeActiveRef.current = true;
-    // Capture the pre-stroke doc so we know what to compare against on end.
-    setState((prev) => {
-      strokeStartDocRef.current = prev.doc;
-      return prev;
-    });
+    // Capture synchronously. Mutating a ref inside a no-op state updater is not
+    // safe: React may defer or skip that updater, leaving pointer-up without a
+    // history anchor when the canvas commits its deferred stroke.
+    strokeStartDocRef.current = currentDocRef.current;
   }, []);
 
   const endStroke = useCallback(() => {
     if (!strokeActiveRef.current) return;
     strokeActiveRef.current = false;
+    const startDoc = strokeStartDocRef.current;
+    strokeStartDocRef.current = null;
     setState((prev) => {
-      const startDoc = strokeStartDocRef.current;
-      strokeStartDocRef.current = null;
       // Nothing happened or the user erased back to the start state — skip.
       if (!prev.doc || !startDoc || prev.doc === startDoc) return prev;
+      // Recompute derived palette data once at pointer-up. Doing this on every
+      // 256×256 pointer sample was a full-document scan in the hottest path.
+      const usedColorSet = new Set(
+        prev.doc.cells.filter((colorId): colorId is string => colorId !== null),
+      );
+      const paletteAlreadyAccurate =
+        usedColorSet.size === prev.doc.usedColors.length &&
+        prev.doc.usedColors.every((colorId) => usedColorSet.has(colorId));
+      const finalDoc = paletteAlreadyAccurate
+        ? prev.doc
+        : recomputeUsedColors(prev.doc);
       // Promote the in-flight stroke result to a real history entry.
       // We replace whatever in-stroke state was set so undo lands on the
       // pre-stroke doc, not on a mid-stroke frame.
@@ -293,15 +306,61 @@ export function useGridDocument() {
       if (trimmed[trimmed.length - 1] !== startDoc) {
         trimmed.push(startDoc);
       }
-      trimmed.push(prev.doc);
+      trimmed.push(finalDoc);
       // Keep the 50-frame cap.
       while (trimmed.length > 50) trimmed.shift();
       return {
         ...prev,
+        doc: finalDoc,
         history: trimmed,
         historyIndex: trimmed.length - 1,
       };
     });
+  }, []);
+
+  /**
+   * Atomically commit an imperative canvas draft against the document it was
+   * created from. The base identity check prevents a delayed pointer commit
+   * from crossing a template/import/project replacement.
+   */
+  const commitDeferredStroke = useCallback(
+    (
+      baseDoc: GridDocument,
+      cells: ReadonlyArray<{ x: number; y: number }>,
+      colorId: string | null,
+    ) => {
+      const ownsStroke =
+        strokeActiveRef.current && strokeStartDocRef.current === baseDoc;
+      strokeActiveRef.current = false;
+      strokeStartDocRef.current = null;
+      if (!ownsStroke || cells.length === 0) return;
+
+      setState((prev) => {
+        if (prev.doc !== baseDoc) return prev;
+        const paintedDoc = setCells(baseDoc, cells, colorId);
+        if (paintedDoc === baseDoc) return prev;
+        const finalDoc = recomputeUsedColors(paintedDoc);
+        const trimmed = prev.history.slice(0, prev.historyIndex);
+        if (trimmed[trimmed.length - 1] !== baseDoc) trimmed.push(baseDoc);
+        trimmed.push(finalDoc);
+        while (trimmed.length > 50) trimmed.shift();
+        return {
+          ...prev,
+          doc: finalDoc,
+          imagePreview: null,
+          history: trimmed,
+          historyIndex: trimmed.length - 1,
+          error: null,
+        };
+      });
+    },
+    [],
+  );
+
+  /** Drop a deferred stroke without restoring its base over newer content. */
+  const abandonStroke = useCallback(() => {
+    strokeActiveRef.current = false;
+    strokeStartDocRef.current = null;
   }, []);
 
   /**
@@ -314,6 +373,7 @@ export function useGridDocument() {
 
   const paintCell = useCallback(
     (x: number, y: number, colorId: string | null) => {
+      const joinsActiveStroke = strokeActiveRef.current;
       setState((prev) => {
         if (!prev.doc) return prev;
         let newDoc: GridDocument;
@@ -334,7 +394,7 @@ export function useGridDocument() {
 
         // During a stroke, mutate the live doc without appending history —
         // endStroke will promote the final state to one history entry.
-        if (strokeActiveRef.current) {
+        if (joinsActiveStroke) {
           return { ...prev, doc: newDoc, imagePreview: null, error: null };
         }
         return appendHistory(prev, newDoc);
@@ -359,28 +419,24 @@ export function useGridDocument() {
       colorId: string | null,
     ) => {
       if (cells.length === 0) return;
+      // Capture this before enqueueing the state updater. Deferred canvas
+      // strokes enqueue their one paint update and endStroke together after a
+      // browser paint; the ref may be false by the time React evaluates the
+      // updater even though this mutation belongs to the active transaction.
+      const joinsActiveStroke = strokeActiveRef.current;
       setState((prev) => {
         if (!prev.doc) return prev;
-        let newDoc: GridDocument;
-        try {
-          newDoc = applyStudioTransaction(
-            prev.doc,
-            buildPaintCellsTransaction(cells, colorId),
-          ).doc;
-        } catch (error) {
-          return {
-            ...prev,
-            error:
-              error instanceof Error
-                ? error.message
-                : "The stroke could not be painted.",
-          };
-        }
+        // Coordinates have already been produced and bounded by CanvasViewer
+        // + paint-assists. Clone the 65,536-cell surface once, then defer the
+        // full used-color scan until pointer-up. AI and generic commands still
+        // pass through applyStudioTransaction's schema and authorization-safe
+        // bounds checks; this is the trusted manual-input fast path only.
+        const newDoc = setCells(prev.doc, cells, colorId);
         if (newDoc === prev.doc) return prev;
-        if (strokeActiveRef.current) {
+        if (joinsActiveStroke) {
           return { ...prev, doc: newDoc, imagePreview: null, error: null };
         }
-        return appendHistory(prev, newDoc);
+        return appendHistory(prev, recomputeUsedColors(newDoc));
       });
     },
     [],
@@ -458,9 +514,11 @@ export function useGridDocument() {
     return exportGridJson(state.doc);
   }, [state.doc]);
 
-  const colorCounts = state.doc
-    ? getColorUsageCounts(state.doc)
-    : new Map<string, number>();
+  const colorCounts = useMemo(
+    () =>
+      state.doc ? getColorUsageCounts(state.doc) : new Map<string, number>(),
+    [state.doc],
+  );
 
   return {
     doc: state.doc,
@@ -482,7 +540,9 @@ export function useGridDocument() {
     fillRegion,
     applyCommands,
     beginStroke,
+    abandonStroke,
     cancelStroke,
+    commitDeferredStroke,
     endStroke,
     resampleCanvas,
     mergeColors,

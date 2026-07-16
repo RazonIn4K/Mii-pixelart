@@ -5,10 +5,11 @@
 import {
   createGridDocument,
   recomputeUsedColors,
+  resampleGridNearest,
   type GridDocument,
 } from "./grid";
 
-export const CREATIVE_TEMPLATES = [
+const CREATIVE_TEMPLATE_SOURCES = [
   {
     id: "face-guide",
     name: "Face Guide",
@@ -31,7 +32,7 @@ export const CREATIVE_TEMPLATES = [
     name: "Space Crew",
     category: "Characters",
     description:
-      "An original rounded space-suit character starter for social-deduction style builds.",
+      "An original bubble-pod explorer with a round window, tool arms, and tripod feet.",
     width: 64,
     height: 64,
   },
@@ -39,7 +40,8 @@ export const CREATIVE_TEMPLATES = [
     id: "tiny-dino",
     name: "Tiny Dino",
     category: "Characters",
-    description: "A small side-view creature starter with readable pose.",
+    description:
+      "An original pocket drake with a quilted shell, leaf plates, and a curled tail.",
     width: 64,
     height: 64,
   },
@@ -56,7 +58,7 @@ export const CREATIVE_TEMPLATES = [
     name: "Haunted Mascot",
     category: "Horror & Spooky",
     description:
-      "An original spooky stage-mascot head with exaggerated eyes and teeth.",
+      "An original midnight moth mascot with crescent wings and mismatched starry eyes.",
     width: 64,
     height: 64,
   },
@@ -65,7 +67,7 @@ export const CREATIVE_TEMPLATES = [
     name: "Bald Teacher",
     category: "Horror & Spooky",
     description:
-      "A generic schoolhouse teacher portrait starter with glasses and ruler.",
+      "An original geometric coach-bot with a timer visor, whistle, and clipboard.",
     width: 64,
     height: 64,
   },
@@ -73,7 +75,8 @@ export const CREATIVE_TEMPLATES = [
     id: "masked-slasher",
     name: "Masked Slasher",
     category: "Horror & Spooky",
-    description: "A generic masked villain portrait starter.",
+    description:
+      "An original celestial festival mask with moon panels, star eyes, and ribbon tails.",
     width: 64,
     height: 64,
   },
@@ -113,7 +116,8 @@ export const CREATIVE_TEMPLATES = [
     id: "creepy-clown",
     name: "Creepy Clown",
     category: "Horror & Spooky",
-    description: "A spooky clown face starter with bold makeup.",
+    description:
+      "An original angular carnival mask with jewel tones, tiny bells, and a zigzag grin.",
     width: 64,
     height: 64,
   },
@@ -153,7 +157,8 @@ export const CREATIVE_TEMPLATES = [
     id: "red-cap-hero",
     name: "Red Cap Hero",
     category: "Characters",
-    description: "A generic cap-wearing platform hero starter.",
+    description:
+      "An original trail courier portrait with a teal hood, compass visor, scarf, and satchel strap.",
     width: 64,
     height: 64,
   },
@@ -161,7 +166,8 @@ export const CREATIVE_TEMPLATES = [
     id: "green-adventurer",
     name: "Green Adventurer",
     category: "Characters",
-    description: "A generic fantasy adventurer starter.",
+    description:
+      "An original owl forest scout with leaf plumage, field goggles, and a bright neckerchief.",
     width: 64,
     height: 64,
   },
@@ -169,7 +175,8 @@ export const CREATIVE_TEMPLATES = [
     id: "blue-speed-mascot",
     name: "Blue Speed Mascot",
     category: "Characters",
-    description: "A generic fast mascot head starter.",
+    description:
+      "An original comet courier-bot with a glass visor, orbit fin, and ribbon-like thruster trail.",
     width: 64,
     height: 64,
   },
@@ -217,7 +224,8 @@ export const CREATIVE_TEMPLATES = [
     id: "racing-kart",
     name: "Racing Kart",
     category: "Marks & Objects",
-    description: "A small kart-style vehicle icon for fun room and item builds.",
+    description:
+      "A small kart-style vehicle icon for fun room and item builds.",
     width: 64,
     height: 64,
   },
@@ -239,11 +247,106 @@ export const CREATIVE_TEMPLATES = [
   },
 ] as const;
 
-export type CreativeTemplateId = (typeof CREATIVE_TEMPLATES)[number]["id"];
+const TEMPLATE_WORKFLOW_BY_CATEGORY = {
+  "Faces & Portraits": {
+    guideSections: 8,
+    guideLabel: "Center + 8×8 guide",
+  },
+  Characters: {
+    guideSections: 8,
+    guideLabel: "8×8 section guide",
+  },
+  "Horror & Spooky": {
+    guideSections: 8,
+    guideLabel: "8×8 section guide",
+  },
+  "Marks & Objects": {
+    guideSections: 4,
+    guideLabel: "4×4 section guide",
+  },
+} as const;
+
+const SUPPORTED_TEMPLATE_BRUSH_PIXELS = [4, 8, 16, 32] as const;
+
+export type CreativeTemplateGuideSections = 4 | 8;
+export type CreativeTemplateBrushPixels =
+  (typeof SUPPORTED_TEMPLATE_BRUSH_PIXELS)[number];
+
+function getRecommendedBrushPixels(
+  sourceWidth: number,
+): CreativeTemplateBrushPixels {
+  const expandedCellWidth = 256 / sourceWidth;
+
+  return SUPPORTED_TEMPLATE_BRUSH_PIXELS.reduce((closest, candidate) =>
+    Math.abs(candidate - expandedCellWidth) <
+    Math.abs(closest - expandedCellWidth)
+      ? candidate
+      : closest,
+  );
+}
+
+const ORIGINAL_DISPLAY_NAME_BY_ID: Readonly<Record<string, string>> = {
+  "face-guide": "Face Landmark Guide",
+  "mascot-head": "Island Mascot",
+  "space-crew": "Bubble Explorer",
+  "tiny-dino": "Pocket Dino",
+  "cute-monster": "Pebble Monster",
+  "haunted-mascot": "Midnight Mascot",
+  "bald-teacher": "Grid Coach",
+  "masked-slasher": "Moon Mask",
+  "red-cap-hero": "Trail Courier",
+  "green-adventurer": "Forest Scout",
+  "blue-speed-mascot": "Comet Runner",
+  "arcade-fighter": "Neon Challenger",
+  "controller-icon": "Twin-Stick Badge",
+  "racing-kart": "Solar Buggy",
+};
+
+/**
+ * Template IDs intentionally remain stable internal provenance keys. Some
+ * local projects and exported Studio JSON may already carry these values;
+ * changing them would break traceability without improving the user-facing
+ * catalog, which exposes only the original display names above.
+ */
+
+/**
+ * Every starter opens on the game's full 256×256 planning surface. The source
+ * drawings below deliberately stay compact and are expanded with nearest-
+ * neighbour blocks so their marks remain easy to count and copy in-game.
+ */
+export const CREATIVE_TEMPLATES = CREATIVE_TEMPLATE_SOURCES.map((template) => {
+  const workflow = TEMPLATE_WORKFLOW_BY_CATEGORY[template.category];
+  const recommendedBrushPixels = getRecommendedBrushPixels(template.width);
+
+  return {
+    ...template,
+    displayName: ORIGINAL_DISPLAY_NAME_BY_ID[template.id] ?? template.name,
+    sourceWidth: template.width,
+    sourceHeight: template.height,
+    width: 256,
+    height: 256,
+    surfaceLabel: "256×256 transparent",
+    ...workflow,
+    guideSections: workflow.guideSections as CreativeTemplateGuideSections,
+    recommendedBrushPixels,
+    brushLabel: `${recommendedBrushPixels} px game stamp`,
+  };
+});
+
+export type CreativeTemplateId =
+  (typeof CREATIVE_TEMPLATE_SOURCES)[number]["id"];
+
+export function getCreativeTemplateDefinition(templateId: CreativeTemplateId) {
+  const template = CREATIVE_TEMPLATES.find((entry) => entry.id === templateId);
+  if (!template) {
+    throw new Error(`Unknown creative template: ${templateId}`);
+  }
+  return template;
+}
 
 type MutableCells = (string | null)[];
 
-export function createCreativeTemplateDocument(
+function createCreativeTemplateSourceDocument(
   templateId: CreativeTemplateId,
 ): GridDocument {
   switch (templateId) {
@@ -306,6 +409,50 @@ export function createCreativeTemplateDocument(
     default:
       return exhaustive(templateId);
   }
+}
+
+/** Expand one compact, transparent source design onto the game surface. */
+export function createCreativeTemplateDocument(
+  templateId: CreativeTemplateId,
+): GridDocument {
+  const template = getCreativeTemplateDefinition(templateId);
+  const expanded = resampleGridNearest(
+    createCreativeTemplateSourceDocument(templateId),
+    256,
+    256,
+  );
+
+  return {
+    ...expanded,
+    meta: {
+      ...expanded.meta,
+      name: template.displayName,
+      notes: template.description,
+      sourceFormat: "creative-template",
+      sourceMetadata: {
+        templateId: template.id,
+        templateCategory: template.category,
+        templateName: template.displayName,
+        templateLegacyName: template.name,
+        guideSections: template.guideSections,
+        recommendedBrushPixels: template.recommendedBrushPixels,
+      },
+    },
+  };
+}
+
+/**
+ * Compact, lossless fixture form used by repository verification.
+ *
+ * Runtime starters stay canonical 256×256 documents. The generated artwork is
+ * composed of exact nearest-neighbour blocks, so downsampling it to its source
+ * dimensions and expanding it again is lossless while avoiding tens of
+ * megabytes of repetitive checked-in JSON.
+ */
+export function createCreativeTemplateFixtureDocument(
+  templateId: CreativeTemplateId,
+): GridDocument {
+  return createCreativeTemplateSourceDocument(templateId);
 }
 
 function createFaceGuideTemplate(): GridDocument {
@@ -398,33 +545,123 @@ function createMascotHeadTemplate(): GridDocument {
 function createSpaceCrewTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  ellipse(cells, width, height, 30, 31, 17, 23, "R10C1");
-  rect(cells, width, 18, 25, 42, 50, "R10C1");
-  rect(cells, width, 20, 53, 30, 59, "R10C1");
-  rect(cells, width, 34, 53, 44, 59, "R10C1");
-  rect(cells, width, 44, 29, 50, 46, "R10C1");
-  ellipse(cells, width, height, 31, 31, 14, 20, "R1C2");
-  rect(cells, width, 21, 26, 41, 48, "R1C2");
-  rect(cells, width, 22, 52, 29, 57, "R1C2");
-  rect(cells, width, 35, 52, 42, 57, "R1C2");
-  rect(cells, width, 45, 31, 48, 44, "R1C1");
-  rect(cells, width, 24, 21, 34, 24, "R1C4");
-  rect(cells, width, 27, 15, 44, 26, "R10C1");
-  rect(cells, width, 28, 16, 43, 25, "R6C5");
-  rect(cells, width, 31, 17, 43, 20, "R6C6");
-  rect(cells, width, 28, 22, 38, 24, "R6C1");
-  rect(cells, width, 16, 38, 20, 51, "R1C1");
-  rect(cells, width, 21, 58, 31, 60, "R11C1");
-  rect(cells, width, 35, 58, 45, 60, "R11C1");
-  rect(cells, width, 22, 34, 25, 38, "R1C5");
-  rect(cells, width, 23, 47, 39, 49, "R1C1");
-  rect(cells, width, 14, 31, 18, 45, "R10C1");
-  rect(cells, width, 15, 33, 18, 43, "R1C1");
-  rect(cells, width, 23, 27, 40, 29, "R1C4");
-  rect(cells, width, 27, 55, 30, 57, "R1C1");
-  rect(cells, width, 37, 55, 40, 57, "R1C1");
+  // A round bubble-pod with tool arms and a three-point landing base. The
+  // silhouette is deliberately radial instead of a one-piece space suit.
+  line(cells, width, 31, 10, 36, 4, "R11C1");
+  circle(cells, width, height, 37, 4, 4, "R11C1");
+  circle(cells, width, height, 37, 4, 2, "R3C3");
+  circle(cells, width, height, 53, 12, 3, "R5C2");
+  circle(cells, width, height, 57, 18, 2, "R5C4");
+
+  circle(cells, width, height, 32, 28, 22, "R11C1");
+  circle(cells, width, height, 32, 28, 19, "R5C2");
+  circle(cells, width, height, 32, 27, 15, "R5C5");
+  ellipse(cells, width, height, 34, 26, 12, 10, "R6C5");
+  rect(cells, width, 21, 27, 45, 33, "R6C4");
+  rect(cells, width, 25, 26, 29, 30, "R10C1");
+  rect(cells, width, 38, 26, 42, 30, "R10C1");
+  rect(cells, width, 27, 27, 28, 28, "R10C7");
+  rect(cells, width, 40, 27, 41, 28, "R10C7");
+  line(cells, width, 29, 34, 38, 34, "R6C1");
+  rect(cells, width, 18, 37, 46, 42, "R11C1");
+  rect(cells, width, 21, 38, 43, 42, "R3C3");
+  rect(cells, width, 29, 39, 35, 41, "R3C6");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [14, 39],
+      [5, 45],
+      [10, 51],
+      [20, 45],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [15, 40],
+      [8, 45],
+      [11, 48],
+      [20, 43],
+    ],
+    "R2C3",
+  );
+  rect(cells, width, 5, 48, 10, 53, "R11C1");
+  rect(cells, width, 6, 49, 9, 52, "R3C3");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [47, 39],
+      [57, 35],
+      [60, 42],
+      [47, 47],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [46, 41],
+      [56, 38],
+      [57, 41],
+      [46, 45],
+    ],
+    "R7C4",
+  );
+  circle(cells, width, height, 59, 38, 3, "R11C1");
+  circle(cells, width, height, 59, 38, 1, "R3C3");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 43],
+      [28, 43],
+      [25, 59],
+      [15, 59],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [36, 43],
+      [44, 43],
+      [49, 59],
+      [39, 59],
+    ],
+    "R11C1",
+  );
+  rect(cells, width, 18, 55, 26, 60, "R5C2");
+  rect(cells, width, 39, 55, 47, 60, "R5C2");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [29, 43],
+      [35, 43],
+      [36, 61],
+      [28, 61],
+    ],
+    "R11C1",
+  );
+  rect(cells, width, 30, 44, 34, 58, "R2C3");
 
   return createTemplateDocument(width, height, "Space Crew Template", cells);
 }
@@ -432,34 +669,56 @@ function createSpaceCrewTemplate(): GridDocument {
 function createTinyDinoTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  ellipse(cells, width, height, 30, 37, 22, 15, "R10C1");
-  ellipse(cells, width, height, 31, 37, 19, 12, "R4C2");
-  rect(cells, width, 39, 22, 54, 36, "R10C1");
-  rect(cells, width, 41, 24, 53, 35, "R4C2");
-  polygon(cells, width, height, [[12, 36], [4, 30], [8, 46]], "R10C1");
-  polygon(cells, width, height, [[13, 37], [6, 32], [9, 44]], "R4C2");
-  polygon(cells, width, height, [[21, 21], [26, 29], [16, 29]], "R3C4");
-  polygon(cells, width, height, [[31, 20], [36, 29], [26, 29]], "R3C4");
-  polygon(cells, width, height, [[42, 19], [47, 27], [37, 27]], "R3C4");
-  rect(cells, width, 47, 28, 50, 31, "R10C1");
-  rect(cells, width, 49, 29, 50, 30, "R10C7");
-  rect(cells, width, 39, 36, 49, 38, "R9C6");
-  rect(cells, width, 25, 47, 31, 56, "R10C1");
-  rect(cells, width, 26, 47, 30, 54, "R4C2");
-  rect(cells, width, 40, 46, 46, 56, "R10C1");
-  rect(cells, width, 41, 46, 45, 54, "R4C2");
-  rect(cells, width, 23, 55, 32, 57, "R10C1");
-  rect(cells, width, 38, 55, 48, 57, "R10C1");
-  rect(cells, width, 18, 36, 21, 39, "R4C4");
-  rect(cells, width, 24, 33, 27, 36, "R4C4");
-  rect(cells, width, 31, 40, 34, 43, "R4C4");
-  rect(cells, width, 52, 34, 56, 38, "R10C1");
-  rect(cells, width, 52, 35, 55, 37, "R4C3");
-  line(cells, width, 14, 34, 9, 30, "R11C1");
-  rect(cells, width, 20, 46, 24, 48, "R11C1");
-  rect(cells, width, 34, 47, 38, 49, "R11C1");
+  // A low, quilted pocket drake: round leaf plates and a curled tail keep it
+  // visually separate from familiar upright dinosaur mascots.
+  circle(cells, width, height, 12, 37, 10, "R11C1");
+  circle(cells, width, height, 12, 37, 7, "R7C4");
+  circle(cells, width, height, 13, 36, 3, "R5C4");
+  rect(cells, width, 12, 27, 22, 43, "R11C1");
+
+  ellipse(cells, width, height, 31, 38, 22, 15, "R11C1");
+  ellipse(cells, width, height, 31, 38, 19, 12, "R7C5");
+  ellipse(cells, width, height, 29, 39, 15, 9, "R5C5");
+  line(cells, width, 19, 31, 38, 46, "R7C2");
+  line(cells, width, 22, 47, 41, 31, "R7C2");
+  circle(cells, width, height, 25, 36, 3, "R2C4");
+  circle(cells, width, height, 35, 41, 3, "R2C4");
+  circle(cells, width, height, 38, 32, 2, "R3C4");
+
+  circle(cells, width, height, 22, 22, 7, "R11C1");
+  circle(cells, width, height, 22, 22, 5, "R4C4");
+  circle(cells, width, height, 32, 20, 8, "R11C1");
+  circle(cells, width, height, 32, 20, 6, "R4C5");
+  circle(cells, width, height, 42, 22, 7, "R11C1");
+  circle(cells, width, height, 42, 22, 5, "R4C4");
+
+  ellipse(cells, width, height, 49, 30, 11, 10, "R11C1");
+  ellipse(cells, width, height, 49, 31, 8, 7, "R4C4");
+  rect(cells, width, 50, 33, 60, 38, "R11C1");
+  rect(cells, width, 51, 33, 58, 36, "R4C5");
+  circle(cells, width, height, 51, 28, 3, "R10C1");
+  set(cells, width, 52, 27, "R10C7");
+  rect(cells, width, 57, 35, 60, 36, "R2C3");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [44, 21],
+      [50, 12],
+      [53, 24],
+    ],
+    "R3C3",
+  );
+
+  rect(cells, width, 21, 47, 28, 56, "R11C1");
+  rect(cells, width, 23, 47, 27, 53, "R7C5");
+  rect(cells, width, 19, 54, 29, 58, "R11C1");
+  rect(cells, width, 39, 46, 46, 55, "R11C1");
+  rect(cells, width, 40, 46, 44, 52, "R7C5");
+  rect(cells, width, 38, 53, 48, 57, "R11C1");
 
   return createTemplateDocument(width, height, "Tiny Dino Template", cells);
 }
@@ -469,10 +728,50 @@ function createCuteMonsterTemplate(): GridDocument {
   const height = 64;
   const cells = filledCells(width, height, "R10C7");
 
-  polygon(cells, width, height, [[19, 18], [25, 7], [30, 21]], "R10C1");
-  polygon(cells, width, height, [[45, 18], [39, 7], [34, 21]], "R10C1");
-  polygon(cells, width, height, [[20, 17], [25, 9], [28, 21]], "R3C4");
-  polygon(cells, width, height, [[44, 17], [39, 9], [36, 21]], "R3C4");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [19, 18],
+      [25, 7],
+      [30, 21],
+    ],
+    "R10C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [45, 18],
+      [39, 7],
+      [34, 21],
+    ],
+    "R10C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 17],
+      [25, 9],
+      [28, 21],
+    ],
+    "R3C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [44, 17],
+      [39, 9],
+      [36, 21],
+    ],
+    "R3C4",
+  );
   ellipse(cells, width, height, 32, 35, 24, 23, "R10C1");
   ellipse(cells, width, height, 32, 35, 21, 20, "R7C3");
   ellipse(cells, width, height, 32, 38, 17, 14, "R7C4");
@@ -502,70 +801,237 @@ function createCuteMonsterTemplate(): GridDocument {
 function createHauntedMascotTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  circle(cells, width, height, 17, 16, 12, "R11C1");
-  circle(cells, width, height, 47, 16, 12, "R11C1");
-  circle(cells, width, height, 17, 16, 8, "R9C1");
-  circle(cells, width, height, 47, 16, 8, "R9C1");
-  ellipse(cells, width, height, 32, 36, 25, 24, "R11C1");
-  ellipse(cells, width, height, 32, 36, 22, 21, "R9C2");
-  rect(cells, width, 18, 22, 46, 27, "R9C1");
-  rect(cells, width, 20, 18, 44, 23, "R11C1");
-  rect(cells, width, 23, 12, 41, 18, "R9C1");
-  rect(cells, width, 19, 29, 29, 39, "R10C1");
-  rect(cells, width, 35, 29, 45, 39, "R10C1");
-  rect(cells, width, 21, 31, 27, 37, "R1C4");
-  rect(cells, width, 37, 31, 43, 37, "R1C4");
-  rect(cells, width, 23, 33, 24, 34, "R10C7");
-  rect(cells, width, 39, 33, 40, 34, "R10C7");
-  rect(cells, width, 30, 37, 34, 41, "R10C1");
-  ellipse(cells, width, height, 32, 45, 15, 10, "R11C1");
-  ellipse(cells, width, height, 32, 44, 12, 7, "R9C5");
-  rect(cells, width, 22, 48, 42, 53, "R10C1");
-  rect(cells, width, 24, 48, 27, 52, "R10C7");
-  rect(cells, width, 30, 48, 33, 52, "R10C7");
-  rect(cells, width, 36, 48, 39, 52, "R10C7");
-  line(cells, width, 20, 42, 24, 45, "R1C2");
-  line(cells, width, 44, 42, 40, 45, "R1C2");
-  rect(cells, width, 14, 38, 17, 42, "R1C2");
-  rect(cells, width, 47, 38, 50, 42, "R1C2");
+  // Midnight moth mascot: broad crescent wings, a diamond head, antennae,
+  // and mismatched celestial eyes instead of animal ears and teeth.
+  line(cells, width, 28, 16, 22, 6, "R11C1");
+  line(cells, width, 36, 16, 43, 6, "R11C1");
+  circle(cells, width, height, 21, 5, 3, "R3C3");
+  circle(cells, width, height, 44, 5, 3, "R5C4");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [27, 18],
+      [7, 9],
+      [10, 36],
+      [24, 46],
+      [30, 36],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [25, 20],
+      [10, 13],
+      [13, 32],
+      [24, 40],
+      [28, 34],
+    ],
+    "R7C2",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [37, 18],
+      [57, 9],
+      [54, 36],
+      [40, 46],
+      [34, 36],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [39, 20],
+      [54, 13],
+      [51, 32],
+      [40, 40],
+      [36, 34],
+    ],
+    "R6C1",
+  );
+  line(cells, width, 14, 20, 24, 27, "R7C5");
+  line(cells, width, 50, 20, 40, 27, "R6C5");
 
-  return createTemplateDocument(width, height, "Haunted Mascot Template", cells);
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 13],
+      [47, 29],
+      [40, 47],
+      [32, 53],
+      [24, 47],
+      [17, 29],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 17],
+      [43, 30],
+      [37, 44],
+      [32, 48],
+      [27, 44],
+      [21, 30],
+    ],
+    "R7C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [26, 27],
+      [30, 31],
+      [26, 35],
+      [22, 31],
+    ],
+    "R3C3",
+  );
+  circle(cells, width, height, 38, 31, 6, "R5C5");
+  circle(cells, width, height, 40, 29, 5, "R7C2");
+  rect(cells, width, 31, 35, 34, 39, "R2C3");
+  line(cells, width, 27, 42, 32, 44, "R5C4");
+  line(cells, width, 32, 44, 37, 41, "R5C4");
+  circle(cells, width, height, 32, 44, 2, "R3C3");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [22, 49],
+      [32, 53],
+      [26, 61],
+      [17, 55],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [42, 49],
+      [32, 53],
+      [38, 61],
+      [47, 55],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 51],
+      [30, 54],
+      [26, 58],
+    ],
+    "R5C2",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [43, 51],
+      [34, 54],
+      [38, 58],
+    ],
+    "R2C3",
+  );
+
+  return createTemplateDocument(
+    width,
+    height,
+    "Haunted Mascot Template",
+    cells,
+  );
 }
 
 function createBaldTeacherTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  rect(cells, width, 15, 51, 49, 63, "R11C1");
-  rect(cells, width, 18, 52, 46, 63, "R4C2");
-  rect(cells, width, 27, 46, 37, 55, "R9C4");
-  ellipse(cells, width, height, 32, 30, 20, 23, "R11C1");
-  ellipse(cells, width, height, 32, 30, 17, 20, "R9C5");
-  ellipse(cells, width, height, 32, 31, 13, 15, "R9C6");
-  rect(cells, width, 17, 28, 21, 39, "R9C4");
-  rect(cells, width, 43, 28, 47, 39, "R9C4");
-  rect(cells, width, 19, 14, 25, 17, "R11C2");
-  rect(cells, width, 39, 14, 45, 17, "R11C2");
-  line(cells, width, 23, 25, 30, 24, "R11C1");
-  line(cells, width, 34, 24, 41, 25, "R11C1");
-  rect(cells, width, 20, 28, 29, 36, "R10C1");
-  rect(cells, width, 35, 28, 44, 36, "R10C1");
-  rect(cells, width, 22, 30, 28, 35, "R10C7");
-  rect(cells, width, 37, 30, 43, 35, "R10C7");
-  rect(cells, width, 25, 32, 27, 35, "R10C1");
-  rect(cells, width, 38, 32, 40, 35, "R10C1");
-  rect(cells, width, 30, 31, 34, 32, "R10C1");
-  rect(cells, width, 31, 36, 33, 42, "R9C3");
-  line(cells, width, 25, 45, 39, 45, "R1C2");
-  line(cells, width, 28, 47, 36, 47, "R1C4");
-  rect(cells, width, 45, 20, 49, 60, "R3C4");
-  line(cells, width, 45, 20, 52, 16, "R3C4");
-  rect(cells, width, 44, 20, 50, 22, "R11C1");
-  rect(cells, width, 24, 53, 29, 63, "R10C7");
-  rect(cells, width, 35, 53, 40, 63, "R10C7");
+  // A geometric coach-bot with an LED timer face, whistle, clipboard, and
+  // checker jersey. It reads as equipment rather than a human teacher.
+  line(cells, width, 32, 10, 32, 3, "R11C1");
+  circle(cells, width, height, 32, 3, 3, "R2C3");
+  rect(cells, width, 14, 14, 50, 39, "R11C1");
+  rect(cells, width, 17, 17, 47, 36, "R5C2");
+  rect(cells, width, 20, 20, 44, 30, "R10C1");
+  rect(cells, width, 23, 23, 29, 27, "R3C3");
+  rect(cells, width, 35, 23, 41, 27, "R3C3");
+  rect(cells, width, 30, 22, 34, 28, "R5C4");
+  rect(cells, width, 25, 31, 39, 33, "R10C7");
+  rect(cells, width, 27, 31, 29, 33, "R10C1");
+  rect(cells, width, 35, 31, 37, 33, "R10C1");
+  rect(cells, width, 9, 22, 14, 32, "R11C1");
+  rect(cells, width, 10, 24, 13, 30, "R2C3");
+  rect(cells, width, 50, 22, 55, 32, "R11C1");
+  rect(cells, width, 51, 24, 54, 30, "R7C4");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 39],
+      [46, 39],
+      [51, 61],
+      [13, 61],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 41],
+      [44, 41],
+      [47, 58],
+      [17, 58],
+    ],
+    "R2C3",
+  );
+  rect(cells, width, 20, 42, 27, 49, "R5C5");
+  rect(cells, width, 28, 42, 35, 49, "R7C4");
+  rect(cells, width, 36, 42, 43, 49, "R5C5");
+  rect(cells, width, 20, 50, 27, 57, "R7C4");
+  rect(cells, width, 28, 50, 35, 57, "R5C5");
+  rect(cells, width, 36, 50, 43, 57, "R7C4");
+
+  line(cells, width, 32, 39, 32, 46, "R3C3");
+  circle(cells, width, height, 32, 48, 4, "R11C1");
+  circle(cells, width, height, 32, 48, 2, "R3C3");
+  line(cells, width, 14, 45, 6, 50, "R11C1");
+  circle(cells, width, height, 5, 51, 3, "R5C2");
+
+  rect(cells, width, 46, 39, 60, 57, "R11C1");
+  rect(cells, width, 48, 41, 58, 55, "R3C6");
+  rect(cells, width, 51, 39, 55, 42, "R2C3");
+  line(cells, width, 50, 46, 56, 46, "R10C3");
+  line(cells, width, 50, 50, 55, 50, "R10C3");
+  line(cells, width, 50, 54, 54, 54, "R10C3");
 
   return createTemplateDocument(width, height, "Bald Teacher Template", cells);
 }
@@ -573,30 +1039,148 @@ function createBaldTeacherTemplate(): GridDocument {
 function createMaskedSlasherTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  rect(cells, width, 13, 50, 51, 63, "R11C1");
-  rect(cells, width, 17, 51, 47, 63, "R7C1");
-  ellipse(cells, width, height, 32, 31, 20, 24, "R11C1");
-  ellipse(cells, width, height, 32, 31, 17, 21, "R10C6");
-  rect(cells, width, 18, 18, 46, 25, "R10C5");
-  rect(cells, width, 20, 26, 44, 48, "R10C7");
-  rect(cells, width, 20, 27, 44, 29, "R10C6");
-  rect(cells, width, 22, 32, 29, 36, "R10C1");
-  rect(cells, width, 35, 32, 42, 36, "R10C1");
-  rect(cells, width, 24, 32, 27, 34, "R1C1");
-  rect(cells, width, 37, 32, 40, 34, "R1C1");
-  rect(cells, width, 31, 37, 33, 42, "R10C5");
-  rect(cells, width, 27, 45, 37, 47, "R10C5");
-  rect(cells, width, 24, 40, 26, 42, "R1C2");
-  rect(cells, width, 39, 40, 41, 42, "R1C2");
-  rect(cells, width, 30, 22, 34, 24, "R1C2");
-  line(cells, width, 17, 17, 12, 10, "R11C1");
-  line(cells, width, 47, 17, 52, 10, "R11C1");
-  rect(cells, width, 21, 53, 27, 63, "R10C7");
-  rect(cells, width, 37, 53, 43, 63, "R10C7");
+  // A floating celestial festival mask. The split moon panels, star windows,
+  // forehead gem, and ribbon tails avoid the language of a human slasher mask.
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 6],
+      [49, 12],
+      [58, 29],
+      [50, 47],
+      [32, 55],
+      [14, 47],
+      [6, 29],
+      [15, 12],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [31, 10],
+      [28, 50],
+      [16, 44],
+      [10, 29],
+      [17, 15],
+    ],
+    "R6C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [33, 10],
+      [47, 15],
+      [54, 29],
+      [48, 44],
+      [32, 51],
+    ],
+    "R7C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 11],
+      [37, 18],
+      [32, 23],
+      [27, 18],
+    ],
+    "R3C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 24],
+      [26, 29],
+      [21, 34],
+      [16, 29],
+    ],
+    "R5C5",
+  );
+  circle(cells, width, height, 43, 29, 7, "R3C4");
+  circle(cells, width, height, 46, 27, 6, "R7C3");
+  rect(cells, width, 30, 27, 34, 39, "R2C3");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [23, 40],
+      [32, 45],
+      [41, 40],
+      [36, 47],
+      [28, 47],
+    ],
+    "R5C4",
+  );
+  circle(cells, width, height, 14, 18, 3, "R2C3");
+  circle(cells, width, height, 50, 18, 3, "R3C3");
 
-  return createTemplateDocument(width, height, "Masked Slasher Template", cells);
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [22, 49],
+      [30, 53],
+      [25, 63],
+      [15, 56],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [42, 49],
+      [34, 53],
+      [39, 63],
+      [49, 56],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [22, 51],
+      [28, 54],
+      [24, 59],
+    ],
+    "R6C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [42, 51],
+      [36, 54],
+      [40, 59],
+    ],
+    "R7C4",
+  );
+
+  return createTemplateDocument(
+    width,
+    height,
+    "Masked Slasher Template",
+    cells,
+  );
 }
 
 function createPumpkinGhoulTemplate(): GridDocument {
@@ -612,10 +1196,44 @@ function createPumpkinGhoulTemplate(): GridDocument {
   ellipse(cells, width, height, 32, 33, 21, 17, "R2C3");
   ellipse(cells, width, height, 24, 33, 9, 15, "R2C4");
   ellipse(cells, width, height, 40, 33, 9, 15, "R2C4");
-  polygon(cells, width, height, [[21, 29], [29, 24], [29, 35]], "R10C1");
-  polygon(cells, width, height, [[43, 29], [35, 24], [35, 35]], "R10C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 29],
+      [29, 24],
+      [29, 35],
+    ],
+    "R10C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [43, 29],
+      [35, 24],
+      [35, 35],
+    ],
+    "R10C1",
+  );
   rect(cells, width, 30, 34, 34, 38, "R10C1");
-  polygon(cells, width, height, [[20, 43], [26, 39], [32, 43], [38, 39], [45, 43], [39, 48], [25, 48]], "R10C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 43],
+      [26, 39],
+      [32, 43],
+      [38, 39],
+      [45, 43],
+      [39, 48],
+      [25, 48],
+    ],
+    "R10C1",
+  );
   rect(cells, width, 25, 43, 29, 45, "R3C4");
   rect(cells, width, 35, 43, 39, 45, "R3C4");
   line(cells, width, 19, 32, 45, 32, "R2C2");
@@ -633,14 +1251,74 @@ function createGhostSheetTemplate(): GridDocument {
 
   ellipse(cells, width, height, 32, 28, 22, 20, "R11C1");
   rect(cells, width, 11, 28, 53, 51, "R11C1");
-  polygon(cells, width, height, [[11, 51], [20, 59], [29, 51]], "R11C1");
-  polygon(cells, width, height, [[26, 51], [34, 60], [42, 51]], "R11C1");
-  polygon(cells, width, height, [[39, 51], [48, 59], [53, 51]], "R11C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [11, 51],
+      [20, 59],
+      [29, 51],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [26, 51],
+      [34, 60],
+      [42, 51],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [39, 51],
+      [48, 59],
+      [53, 51],
+    ],
+    "R11C1",
+  );
   ellipse(cells, width, height, 32, 28, 19, 17, "R10C7");
   rect(cells, width, 14, 29, 50, 50, "R10C7");
-  polygon(cells, width, height, [[15, 50], [21, 55], [28, 50]], "R10C7");
-  polygon(cells, width, height, [[28, 50], [34, 56], [40, 50]], "R10C7");
-  polygon(cells, width, height, [[41, 50], [47, 55], [50, 50]], "R10C7");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [15, 50],
+      [21, 55],
+      [28, 50],
+    ],
+    "R10C7",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [28, 50],
+      [34, 56],
+      [40, 50],
+    ],
+    "R10C7",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [41, 50],
+      [47, 55],
+      [50, 50],
+    ],
+    "R10C7",
+  );
   ellipse(cells, width, height, 24, 31, 5, 7, "R10C1");
   ellipse(cells, width, height, 40, 31, 5, 7, "R10C1");
   rect(cells, width, 29, 42, 36, 45, "R10C1");
@@ -656,16 +1334,80 @@ function createVampireCountTemplate(): GridDocument {
   const height = 64;
   const cells = filledCells(width, height, "R10C7");
 
-  polygon(cells, width, height, [[12, 51], [26, 40], [32, 63], [15, 63]], "R11C1");
-  polygon(cells, width, height, [[52, 51], [38, 40], [32, 63], [49, 63]], "R11C1");
-  polygon(cells, width, height, [[16, 53], [28, 44], [31, 63], [18, 63]], "R1C1");
-  polygon(cells, width, height, [[48, 53], [36, 44], [33, 63], [46, 63]], "R1C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [12, 51],
+      [26, 40],
+      [32, 63],
+      [15, 63],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [52, 51],
+      [38, 40],
+      [32, 63],
+      [49, 63],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [16, 53],
+      [28, 44],
+      [31, 63],
+      [18, 63],
+    ],
+    "R1C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [48, 53],
+      [36, 44],
+      [33, 63],
+      [46, 63],
+    ],
+    "R1C1",
+  );
   rect(cells, width, 20, 51, 44, 63, "R11C1");
   rect(cells, width, 23, 52, 41, 63, "R7C1");
   ellipse(cells, width, height, 32, 30, 19, 22, "R11C1");
   ellipse(cells, width, height, 32, 31, 16, 19, "R9C5");
-  polygon(cells, width, height, [[13, 19], [24, 8], [32, 19]], "R11C1");
-  polygon(cells, width, height, [[51, 19], [40, 8], [32, 19]], "R11C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [13, 19],
+      [24, 8],
+      [32, 19],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [51, 19],
+      [40, 8],
+      [32, 19],
+    ],
+    "R11C1",
+  );
   rect(cells, width, 18, 19, 46, 25, "R11C1");
   rect(cells, width, 20, 22, 44, 27, "R11C2");
   rect(cells, width, 23, 32, 29, 35, "R10C1");
@@ -714,29 +1456,191 @@ function createZombieBuddyTemplate(): GridDocument {
 function createCreepyClownTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  circle(cells, width, height, 16, 25, 10, "R1C2");
-  circle(cells, width, height, 48, 25, 10, "R1C2");
-  ellipse(cells, width, height, 32, 33, 22, 25, "R11C1");
-  ellipse(cells, width, height, 32, 33, 19, 22, "R10C7");
-  rect(cells, width, 18, 14, 46, 21, "R1C2");
-  rect(cells, width, 22, 10, 42, 16, "R1C4");
-  rect(cells, width, 21, 30, 29, 37, "R10C1");
-  rect(cells, width, 35, 30, 43, 37, "R10C1");
-  rect(cells, width, 23, 31, 27, 35, "R10C7");
-  rect(cells, width, 37, 31, 41, 35, "R10C7");
-  rect(cells, width, 25, 32, 27, 36, "R10C1");
-  rect(cells, width, 37, 32, 39, 36, "R10C1");
-  circle(cells, width, height, 32, 40, 4, "R1C2");
-  rect(cells, width, 24, 48, 40, 52, "R1C2");
-  rect(cells, width, 26, 47, 38, 49, "R10C7");
-  rect(cells, width, 27, 52, 30, 54, "R10C7");
-  rect(cells, width, 34, 52, 37, 54, "R10C7");
-  line(cells, width, 22, 38, 16, 45, "R1C2");
-  line(cells, width, 42, 38, 48, 45, "R1C2");
-  rect(cells, width, 17, 54, 47, 63, "R11C1");
-  rect(cells, width, 20, 55, 44, 63, "R7C2");
+  // Angular jewel-toned carnival mask. A bell crown, split-color planes, and
+  // geometric makeup replace the red-hair/white-face horror-clown shorthand.
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 19],
+      [17, 4],
+      [28, 16],
+      [32, 2],
+      [37, 16],
+      [49, 5],
+      [46, 21],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 16],
+      [20, 8],
+      [27, 17],
+    ],
+    "R5C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [29, 15],
+      [32, 6],
+      [35, 15],
+    ],
+    "R2C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [38, 17],
+      [46, 9],
+      [44, 18],
+    ],
+    "R7C4",
+  );
+  circle(cells, width, height, 18, 5, 3, "R3C3");
+  circle(cells, width, height, 32, 3, 3, "R5C4");
+  circle(cells, width, height, 49, 6, 3, "R2C3");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 12],
+      [51, 22],
+      [48, 46],
+      [32, 57],
+      [16, 46],
+      [13, 22],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [31, 16],
+      [30, 52],
+      [19, 44],
+      [17, 24],
+    ],
+    "R5C2",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [33, 16],
+      [47, 24],
+      [45, 44],
+      [33, 52],
+    ],
+    "R7C2",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [23, 25],
+      [30, 30],
+      [24, 36],
+      [18, 30],
+    ],
+    "R3C3",
+  );
+  circle(cells, width, height, 24, 30, 3, "R10C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [40, 24],
+      [46, 31],
+      [39, 36],
+      [34, 29],
+    ],
+    "R5C4",
+  );
+  circle(cells, width, height, 40, 30, 3, "R10C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 32],
+      [38, 39],
+      [32, 44],
+      [26, 39],
+    ],
+    "R2C3",
+  );
+  line(cells, width, 21, 44, 27, 48, "R10C1");
+  line(cells, width, 27, 48, 32, 45, "R10C1");
+  line(cells, width, 32, 45, 38, 49, "R10C1");
+  line(cells, width, 38, 49, 44, 44, "R10C1");
+  circle(cells, width, height, 18, 40, 2, "R8C4");
+  circle(cells, width, height, 46, 40, 2, "R4C4");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [15, 50],
+      [26, 54],
+      [32, 62],
+      [8, 58],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [49, 50],
+      [38, 54],
+      [32, 62],
+      [56, 58],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [13, 52],
+      [26, 56],
+      [29, 59],
+    ],
+    "R2C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [51, 52],
+      [38, 56],
+      [35, 59],
+    ],
+    "R5C3",
+  );
 
   return createTemplateDocument(width, height, "Creepy Clown Template", cells);
 }
@@ -855,8 +1759,30 @@ function createPortraitBustTemplate(): GridDocument {
   line(cells, width, 28, 44, 36, 44, "R1C4");
   rect(cells, width, 20, 37, 24, 39, "R1C6");
   rect(cells, width, 40, 37, 44, 39, "R1C6");
-  polygon(cells, width, height, [[19, 52], [30, 52], [26, 63], [15, 63]], "R10C7");
-  polygon(cells, width, height, [[45, 52], [34, 52], [38, 63], [49, 63]], "R10C7");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [19, 52],
+      [30, 52],
+      [26, 63],
+      [15, 63],
+    ],
+    "R10C7",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [45, 52],
+      [34, 52],
+      [38, 63],
+      [49, 63],
+    ],
+    "R10C7",
+  );
   rect(cells, width, 30, 52, 34, 63, "R1C2");
 
   return createTemplateDocument(width, height, "Portrait Bust Template", cells);
@@ -865,35 +1791,96 @@ function createPortraitBustTemplate(): GridDocument {
 function createRedCapHeroTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  ellipse(cells, width, height, 31, 17, 23, 10, "R11C1");
-  ellipse(cells, width, height, 31, 17, 20, 8, "R1C2");
-  rect(cells, width, 14, 18, 48, 25, "R1C2");
-  rect(cells, width, 38, 23, 56, 29, "R11C1");
-  rect(cells, width, 40, 23, 54, 27, "R1C1");
-  rect(cells, width, 25, 14, 38, 21, "R10C7");
-  rect(cells, width, 28, 16, 35, 20, "R1C5");
-  ellipse(cells, width, height, 32, 36, 19, 17, "R11C1");
-  ellipse(cells, width, height, 32, 36, 16, 14, "R9C5");
-  rect(cells, width, 16, 29, 23, 42, "R11C2");
-  rect(cells, width, 41, 29, 48, 42, "R11C2");
-  rect(cells, width, 23, 32, 28, 34, "R10C1");
-  rect(cells, width, 38, 32, 43, 34, "R10C1");
-  rect(cells, width, 31, 35, 34, 42, "R9C3");
-  rect(cells, width, 24, 44, 40, 48, "R11C1");
-  rect(cells, width, 26, 44, 38, 46, "R9C6");
-  rect(cells, width, 18, 50, 46, 63, "R11C1");
-  rect(cells, width, 22, 49, 42, 63, "R6C3");
-  rect(cells, width, 14, 47, 25, 63, "R1C2");
-  rect(cells, width, 39, 47, 50, 63, "R1C2");
-  rect(cells, width, 27, 50, 31, 56, "R3C3");
-  rect(cells, width, 35, 50, 39, 56, "R3C3");
-  rect(cells, width, 21, 55, 27, 58, "R6C5");
-  rect(cells, width, 37, 55, 43, 58, "R6C5");
-  rect(cells, width, 20, 60, 29, 63, "R11C1");
-  rect(cells, width, 35, 60, 44, 63, "R11C1");
-  rect(cells, width, 29, 25, 35, 27, "R11C1");
+  // Trail courier portrait: a teal weather hood and compass visor replace the
+  // cap silhouette, while the orange scarf and satchel strap tell the role.
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 5],
+      [48, 13],
+      [53, 31],
+      [45, 47],
+      [19, 47],
+      [11, 31],
+      [16, 13],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 8],
+      [45, 15],
+      [49, 30],
+      [42, 42],
+      [22, 42],
+      [15, 30],
+      [19, 15],
+    ],
+    "R5C2",
+  );
+  ellipse(cells, width, height, 32, 30, 14, 16, "R11C1");
+  ellipse(cells, width, height, 32, 31, 12, 14, "R9C4");
+  rect(cells, width, 20, 20, 44, 27, "R11C1");
+  rect(cells, width, 22, 21, 42, 25, "R3C4");
+  circle(cells, width, height, 32, 16, 5, "R11C1");
+  circle(cells, width, height, 32, 16, 3, "R2C3");
+  line(cells, width, 32, 14, 32, 18, "R3C6");
+  line(cells, width, 30, 16, 34, 16, "R3C6");
+  rect(cells, width, 23, 29, 28, 32, "R10C1");
+  rect(cells, width, 36, 29, 41, 32, "R10C1");
+  set(cells, width, 26, 29, "R10C7");
+  set(cells, width, 39, 29, "R10C7");
+  rect(cells, width, 30, 32, 34, 38, "R9C2");
+  line(cells, width, 27, 41, 37, 41, "R8C2");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [17, 43],
+      [47, 43],
+      [55, 63],
+      [9, 63],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 46],
+      [44, 46],
+      [50, 63],
+      [14, 63],
+    ],
+    "R6C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 45],
+      [32, 51],
+      [46, 45],
+      [40, 58],
+      [24, 58],
+    ],
+    "R2C3",
+  );
+  line(cells, width, 21, 47, 43, 63, "R11C1");
+  line(cells, width, 23, 47, 45, 63, "R9C2");
+  rect(cells, width, 39, 53, 48, 61, "R11C1");
+  rect(cells, width, 41, 55, 46, 59, "R3C4");
 
   return createTemplateDocument(width, height, "Red Cap Hero Template", cells);
 }
@@ -901,31 +1888,181 @@ function createRedCapHeroTemplate(): GridDocument {
 function createGreenAdventurerTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  polygon(cells, width, height, [[16, 21], [33, 5], [53, 23], [43, 25], [37, 31], [22, 31]], "R11C1");
-  polygon(cells, width, height, [[18, 20], [33, 8], [50, 23], [40, 23], [36, 29], [24, 29]], "R4C1");
-  rect(cells, width, 20, 25, 44, 31, "R4C2");
-  ellipse(cells, width, height, 32, 37, 18, 18, "R11C1");
-  ellipse(cells, width, height, 32, 37, 15, 15, "R9C5");
-  rect(cells, width, 18, 32, 22, 42, "R9C4");
-  rect(cells, width, 42, 32, 46, 42, "R9C4");
-  rect(cells, width, 23, 35, 29, 37, "R10C1");
-  rect(cells, width, 36, 35, 42, 37, "R10C1");
-  rect(cells, width, 25, 36, 26, 37, "R10C7");
-  rect(cells, width, 38, 36, 39, 37, "R10C7");
-  rect(cells, width, 30, 38, 33, 45, "R9C3");
-  line(cells, width, 25, 47, 39, 47, "R1C2");
-  rect(cells, width, 18, 51, 46, 63, "R11C1");
-  rect(cells, width, 21, 51, 43, 63, "R4C2");
-  rect(cells, width, 29, 51, 35, 63, "R9C4");
-  rect(cells, width, 44, 40, 47, 60, "R10C5");
-  rect(cells, width, 47, 37, 49, 42, "R10C7");
-  rect(cells, width, 15, 41, 20, 55, "R11C1");
-  rect(cells, width, 16, 43, 20, 53, "R4C1");
-  rect(cells, width, 23, 58, 30, 63, "R11C1");
-  rect(cells, width, 36, 58, 43, 63, "R11C1");
-  line(cells, width, 45, 36, 54, 28, "R10C5");
+  // An owl field scout with layered leaf plumage, large round goggles, and a
+  // neckerchief—no pointed cap, sword, or humanoid fantasy-hero silhouette.
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 20],
+      [12, 6],
+      [29, 14],
+      [32, 4],
+      [36, 14],
+      [52, 6],
+      [43, 21],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 18],
+      [15, 9],
+      [29, 16],
+    ],
+    "R4C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [35, 16],
+      [49, 9],
+      [43, 18],
+    ],
+    "R4C2",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [29, 15],
+      [32, 7],
+      [35, 15],
+    ],
+    "R3C3",
+  );
+
+  ellipse(cells, width, height, 32, 34, 24, 22, "R11C1");
+  ellipse(cells, width, height, 32, 34, 21, 19, "R4C2");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [12, 34],
+      [4, 44],
+      [20, 50],
+      [25, 35],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [13, 36],
+      [8, 43],
+      [19, 47],
+      [23, 37],
+    ],
+    "R4C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [52, 34],
+      [60, 44],
+      [44, 50],
+      [39, 35],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [51, 36],
+      [56, 43],
+      [45, 47],
+      [41, 37],
+    ],
+    "R4C4",
+  );
+
+  circle(cells, width, height, 23, 31, 10, "R11C1");
+  circle(cells, width, height, 41, 31, 10, "R11C1");
+  circle(cells, width, height, 23, 31, 7, "R3C6");
+  circle(cells, width, height, 41, 31, 7, "R3C6");
+  circle(cells, width, height, 23, 31, 3, "R10C1");
+  circle(cells, width, height, 41, 31, 3, "R10C1");
+  set(cells, width, 24, 30, "R10C7");
+  set(cells, width, 42, 30, "R10C7");
+  rect(cells, width, 31, 29, 33, 32, "R3C3");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [27, 39],
+      [37, 39],
+      [32, 46],
+    ],
+    "R2C3",
+  );
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 47],
+      [32, 53],
+      [46, 47],
+      [50, 63],
+      [14, 63],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [21, 50],
+      [32, 55],
+      [43, 50],
+      [46, 61],
+      [18, 61],
+    ],
+    "R4C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [22, 48],
+      [32, 53],
+      [27, 60],
+    ],
+    "R2C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [42, 48],
+      [32, 53],
+      [37, 60],
+    ],
+    "R3C3",
+  );
+  circle(cells, width, height, 32, 55, 4, "R11C1");
+  circle(cells, width, height, 32, 55, 2, "R5C4");
 
   return createTemplateDocument(
     width,
@@ -938,33 +2075,143 @@ function createGreenAdventurerTemplate(): GridDocument {
 function createBlueSpeedMascotTemplate(): GridDocument {
   const width = 64;
   const height = 64;
-  const cells = filledCells(width, height, "R10C7");
+  const cells = filledCells(width, height, null);
 
-  ellipse(cells, width, height, 32, 35, 24, 22, "R11C1");
-  polygon(cells, width, height, [[20, 25], [9, 12], [28, 20]], "R11C1");
-  polygon(cells, width, height, [[32, 18], [30, 3], [43, 21]], "R11C1");
-  polygon(cells, width, height, [[44, 25], [58, 13], [49, 32]], "R11C1");
-  ellipse(cells, width, height, 32, 35, 21, 19, "R6C3");
-  polygon(cells, width, height, [[20, 25], [12, 15], [27, 21]], "R6C3");
-  polygon(cells, width, height, [[32, 18], [31, 7], [40, 21]], "R6C3");
-  polygon(cells, width, height, [[43, 25], [55, 16], [48, 30]], "R6C3");
-  ellipse(cells, width, height, 31, 40, 16, 12, "R9C6");
-  rect(cells, width, 20, 30, 31, 37, "R10C7");
-  rect(cells, width, 34, 30, 45, 37, "R10C7");
-  rect(cells, width, 26, 34, 31, 39, "R10C1");
-  rect(cells, width, 37, 34, 42, 39, "R10C1");
-  rect(cells, width, 29, 34, 30, 35, "R10C7");
-  rect(cells, width, 40, 34, 41, 35, "R10C7");
-  rect(cells, width, 31, 41, 35, 44, "R10C1");
-  line(cells, width, 25, 49, 42, 49, "R1C2");
-  line(cells, width, 28, 51, 39, 51, "R1C4");
-  rect(cells, width, 17, 43, 20, 47, "R10C7");
-  rect(cells, width, 44, 43, 47, 47, "R10C7");
-  polygon(cells, width, height, [[12, 33], [5, 38], [16, 40]], "R11C1");
-  polygon(cells, width, height, [[12, 34], [7, 38], [16, 39]], "R6C4");
-  rect(cells, width, 24, 23, 29, 26, "R6C6");
-  rect(cells, width, 37, 23, 42, 26, "R6C6");
-  rect(cells, width, 28, 54, 38, 56, "R11C1");
+  // Comet courier-bot: a single glass eye, orbit fin, wheel-foot, and layered
+  // thruster ribbons produce motion without an animal mascot silhouette.
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [28, 18],
+      [5, 8],
+      [18, 25],
+      [3, 31],
+      [20, 34],
+      [7, 50],
+      [31, 41],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [25, 20],
+      [9, 12],
+      [20, 27],
+    ],
+    "R8C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [20, 29],
+      [7, 31],
+      [22, 33],
+    ],
+    "R3C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [26, 38],
+      [11, 46],
+      [29, 40],
+    ],
+    "R5C3",
+  );
+
+  ellipse(cells, width, height, 39, 31, 20, 18, "R11C1");
+  ellipse(cells, width, height, 39, 31, 17, 15, "R7C3");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [35, 15],
+      [44, 3],
+      [48, 19],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [39, 15],
+      [44, 7],
+      [46, 18],
+    ],
+    "R2C3",
+  );
+  ellipse(cells, width, height, 45, 29, 13, 10, "R5C5");
+  rect(cells, width, 38, 23, 57, 34, "R6C5");
+  circle(cells, width, height, 49, 28, 5, "R10C1");
+  circle(cells, width, height, 50, 27, 2, "R10C7");
+  rect(cells, width, 35, 36, 51, 40, "R2C3");
+  line(cells, width, 37, 42, 52, 42, "R3C3");
+  line(cells, width, 34, 18, 55, 11, "R5C4");
+  circle(cells, width, height, 57, 10, 3, "R3C3");
+
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [30, 42],
+      [41, 44],
+      [37, 54],
+      [23, 52],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [31, 44],
+      [38, 46],
+      [35, 51],
+      [27, 50],
+    ],
+    "R5C2",
+  );
+  circle(cells, width, height, 42, 51, 9, "R11C1");
+  circle(cells, width, height, 42, 51, 6, "R3C3");
+  circle(cells, width, height, 42, 51, 2, "R10C1");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [48, 38],
+      [60, 41],
+      [54, 48],
+      [45, 43],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [49, 40],
+      [57, 42],
+      [53, 45],
+      [47, 42],
+    ],
+    "R8C4",
+  );
 
   return createTemplateDocument(
     width,
@@ -1125,8 +2372,28 @@ function createRacingKartTemplate(): GridDocument {
 
   rect(cells, width, 15, 34, 50, 49, "R11C1");
   rect(cells, width, 18, 32, 47, 47, "R1C2");
-  polygon(cells, width, height, [[23, 30], [33, 20], [43, 30]], "R11C1");
-  polygon(cells, width, height, [[25, 30], [33, 23], [41, 30]], "R6C5");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [23, 30],
+      [33, 20],
+      [43, 30],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [25, 30],
+      [33, 23],
+      [41, 30],
+    ],
+    "R6C5",
+  );
   rect(cells, width, 27, 25, 39, 30, "R6C6");
   rect(cells, width, 30, 16, 36, 24, "R11C1");
   rect(cells, width, 31, 17, 35, 23, "R10C7");
@@ -1148,10 +2415,52 @@ function createPizzaSliceTemplate(): GridDocument {
   const height = 64;
   const cells = filledCells(width, height, "R10C7");
 
-  polygon(cells, width, height, [[14, 10], [54, 18], [28, 57]], "R11C1");
-  polygon(cells, width, height, [[18, 13], [50, 19], [29, 52]], "R3C4");
-  polygon(cells, width, height, [[16, 10], [56, 17], [53, 25], [15, 18]], "R9C3");
-  polygon(cells, width, height, [[18, 12], [53, 18], [51, 22], [17, 17]], "R9C4");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [14, 10],
+      [54, 18],
+      [28, 57],
+    ],
+    "R11C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 13],
+      [50, 19],
+      [29, 52],
+    ],
+    "R3C4",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [16, 10],
+      [56, 17],
+      [53, 25],
+      [15, 18],
+    ],
+    "R9C3",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [18, 12],
+      [53, 18],
+      [51, 22],
+      [17, 17],
+    ],
+    "R9C4",
+  );
   circle(cells, width, height, 31, 27, 4, "R1C2");
   circle(cells, width, height, 41, 33, 4, "R1C2");
   circle(cells, width, height, 29, 41, 3, "R1C2");
@@ -1172,8 +2481,32 @@ function createSwordBadgeTemplate(): GridDocument {
   circle(cells, width, height, 32, 32, 28, "R11C1");
   circle(cells, width, height, 32, 32, 25, "R7C1");
   circle(cells, width, height, 32, 32, 20, "R7C2");
-  polygon(cells, width, height, [[32, 7], [40, 17], [35, 42], [29, 42], [24, 17]], "R10C1");
-  polygon(cells, width, height, [[32, 10], [37, 18], [34, 40], [30, 40], [27, 18]], "R10C6");
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 7],
+      [40, 17],
+      [35, 42],
+      [29, 42],
+      [24, 17],
+    ],
+    "R10C1",
+  );
+  polygon(
+    cells,
+    width,
+    height,
+    [
+      [32, 10],
+      [37, 18],
+      [34, 40],
+      [30, 40],
+      [27, 18],
+    ],
+    "R10C6",
+  );
   line(cells, width, 32, 12, 32, 40, "R10C7");
   rect(cells, width, 22, 41, 42, 46, "R10C1");
   rect(cells, width, 25, 42, 39, 44, "R3C3");
@@ -1194,10 +2527,20 @@ function createTemplateDocument(
   const template = CREATIVE_TEMPLATES.find((entry) =>
     name.startsWith(entry.name),
   );
-  const doc = createGridDocument(width, height, name);
+  const transparentSource = clearEdgeConnectedColor(
+    cells,
+    width,
+    height,
+    "R10C7",
+  );
+  const doc = createGridDocument(
+    width,
+    height,
+    template ? `${template.displayName} Template` : name,
+  );
   return recomputeUsedColors({
     ...doc,
-    cells,
+    cells: transparentSource,
     meta: {
       ...doc.meta,
       notes: template?.description,
@@ -1206,11 +2549,58 @@ function createTemplateDocument(
         ? {
             templateId: template.id,
             templateCategory: template.category,
-            templateName: template.name,
+            templateName: template.displayName,
+            templateLegacyName: template.name,
           }
         : undefined,
     },
   });
+}
+
+/**
+ * Removes only the white field connected to the source boundary. Enclosed
+ * white details such as eyes, teeth, shine, or mask panels remain intentional
+ * paint while the surrounding canvas becomes genuinely transparent.
+ */
+function clearEdgeConnectedColor(
+  source: MutableCells,
+  width: number,
+  height: number,
+  colorId: string,
+): MutableCells {
+  const cells = [...source];
+  const visited = new Uint8Array(cells.length);
+  const queue: number[] = [];
+
+  const enqueue = (x: number, y: number) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    const index = y * width + x;
+    if (visited[index] || cells[index] !== colorId) return;
+    visited[index] = 1;
+    queue.push(index);
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const index = queue[cursor];
+    cells[index] = null;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    enqueue(x - 1, y);
+    enqueue(x + 1, y);
+    enqueue(x, y - 1);
+    enqueue(x, y + 1);
+  }
+
+  return cells;
 }
 
 function filledCells(

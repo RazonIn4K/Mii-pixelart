@@ -28,7 +28,11 @@ import {
 } from "@/components/ui/tooltip";
 import type { PaintTool } from "@/components/studio/CreationPanel";
 import type { GridDocument } from "@/lib/engine/grid";
-import type { BrushSize } from "@/lib/engine/paint-assists";
+import {
+  SMOOTH_BRUSH_SIZES,
+  type BrushMode,
+  type BrushSize,
+} from "@/lib/engine/paint-assists";
 import { getPaletteColor, TOMODACHI_PALETTE } from "@/lib/engine/palette";
 import type {
   CanvasBackground,
@@ -36,10 +40,11 @@ import type {
 } from "@/lib/engine/canvas-renderer";
 import {
   getGameMatchRecipe,
+  PIXEL_PERFECT_GAME_BRUSHES,
   type GameGridSections,
 } from "@/lib/engine/game-match";
 
-export type { BrushSize } from "@/lib/engine/paint-assists";
+export type { BrushMode, BrushSize } from "@/lib/engine/paint-assists";
 
 const PAINT_TOOLS: ReadonlyArray<{
   icon: typeof Pencil;
@@ -108,7 +113,7 @@ const GAME_GRID_PRESETS: ReadonlyArray<{
 ];
 
 const CANVAS_BACKGROUND_PRESETS = [
-  { icon: Palette, label: "Paper", value: "paper" },
+  { icon: Palette, label: "Warm checker", value: "paper" },
   { icon: Sun, label: "Light checker", value: "light" },
   { icon: Moon, label: "Dark checker", value: "dark" },
 ] as const;
@@ -126,6 +131,7 @@ const SATURATED_PALETTE_RAIL = TOMODACHI_PALETTE.filter(
 export function CanvasPaintToolbar({
   activeTool,
   background,
+  brushMode,
   brushSize,
   doc,
   gameGridSections,
@@ -134,6 +140,7 @@ export function CanvasPaintToolbar({
   selectedColorId,
   showCenterGuide,
   onBrushSizeChange,
+  onBrushModeChange,
   onBackgroundChange,
   onEasyDrawSetup,
   onGameGridSectionsChange,
@@ -147,6 +154,7 @@ export function CanvasPaintToolbar({
 }: {
   activeTool: PaintTool;
   background: CanvasBackground;
+  brushMode: BrushMode;
   brushSize: BrushSize;
   doc: GridDocument;
   gameGridSections: GameGridSections;
@@ -155,6 +163,7 @@ export function CanvasPaintToolbar({
   selectedColorId: string;
   showCenterGuide: boolean;
   onBrushSizeChange: (size: BrushSize) => void;
+  onBrushModeChange: (mode: BrushMode) => void;
   onBackgroundChange: (background: CanvasBackground) => void;
   onEasyDrawSetup: () => void;
   onGameGridSectionsChange: (sections: GameGridSections) => void;
@@ -186,6 +195,10 @@ export function CanvasPaintToolbar({
     [doc.usedColors, selectedColorId],
   );
   const brushEnabled = activeTool === "pencil" || activeTool === "eraser";
+  const brushSizes =
+    brushMode === "pixel-perfect"
+      ? PIXEL_PERFECT_GAME_BRUSHES
+      : SMOOTH_BRUSH_SIZES;
 
   const selectColor = (colorId: string) => {
     onSelectedColorChange(colorId);
@@ -210,7 +223,7 @@ export function CanvasPaintToolbar({
             <span className="hidden sm:inline">Island Copy Workbench</span>
           </p>
           <p className="hidden text-[0.68rem] font-medium text-muted-foreground sm:block">
-            One cell on screen = one project cell
+            One Studio cell = one pixel on the 256×256 game surface
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -254,40 +267,44 @@ export function CanvasPaintToolbar({
             <span className="hidden sm:inline">Game copy setup</span>
           </span>
           <span className="hidden rounded-full bg-white px-2 py-1 text-[0.68rem] font-black text-[#17384a] shadow-sm sm:inline-flex">
-            {doc.width}×{doc.height} cells
+            {doc.width}×{doc.height} surface
           </span>
           <span className="hidden rounded-full bg-white px-2 py-1 text-[0.68rem] font-black text-[#17384a] shadow-sm sm:inline-flex">
-            {gameMatch.exact ? "Pixel-perfect" : "Custom grid"}
+            {gameMatch.exact ? "Game matched" : "Legacy canvas"}
           </span>
           <span
             className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[0.68rem] font-black shadow-sm ${
-              gameMatch.exact
+              gameMatch.canonicalSurface
                 ? "bg-[#f6d67a] text-[#17384a]"
                 : "bg-white text-[#526975]"
             }`}
             data-testid="game-brush-recipe"
           >
             <span className="sr-only">
-              {gameMatch.exact
-                ? `${gameMatch.brushPixels}px game brush`
-                : "Custom placement"}
+              {gameMatch.canonicalSurface
+                ? `${brushMode === "pixel-perfect" ? "Pixel-perfect" : "Smooth"} ${brushSize}px brush on the 256 by 256 game surface`
+                : "Convert to the 256 by 256 game surface"}
             </span>
-            {gameMatch.exact ? (
+            {gameMatch.canonicalSurface ? (
               <>
                 <span className="sm:hidden" aria-hidden="true">
-                  {gameMatch.brushPixels}px brush
+                  {brushSize}px{" "}
+                  {brushMode === "pixel-perfect" ? "stamp" : "smooth"}
                 </span>
                 <span className="hidden sm:inline" aria-hidden="true">
-                  {gameMatch.brushPixels}px game brush
+                  {brushSize}px{" "}
+                  {brushMode === "pixel-perfect"
+                    ? "snapped stamp"
+                    : "smooth brush"}
                 </span>
               </>
             ) : (
               <>
                 <span className="sm:hidden" aria-hidden="true">
-                  Custom
+                  Convert
                 </span>
                 <span className="hidden sm:inline" aria-hidden="true">
-                  Custom placement
+                  Convert to 256×256
                 </span>
               </>
             )}
@@ -299,7 +316,7 @@ export function CanvasPaintToolbar({
             <span className="sr-only">
               Observed profile; verify against your game version.
             </span>
-            <span aria-hidden="true">Observed · verify</span>
+            <span aria-hidden="true">256px · verify</span>
           </span>
         </div>
 
@@ -343,7 +360,7 @@ export function CanvasPaintToolbar({
         >
           <WandSparkles className="size-3.5" />
           <span className="sm:hidden">Easy</span>
-          <span className="hidden sm:inline">Easy draw</span>
+          <span className="hidden sm:inline">Match game</span>
         </Button>
       </div>
       <div className="mb-2 flex min-w-0 flex-nowrap items-center gap-1.5 border-b border-[#26485a]/15 px-1 pb-2 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
@@ -570,59 +587,115 @@ export function CanvasPaintToolbar({
         </div>
       </div>
 
-      <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-x-auto rounded-xl border border-[#26485a]/15 bg-white/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <label
-          htmlFor="studio-brush-size"
-          className="flex shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground"
+      <div className="mt-1 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-1.5 rounded-xl border border-[#26485a]/15 bg-white/70 p-1">
+        <div
+          className="flex min-w-max items-center gap-1 rounded-lg border border-border bg-white p-0.5"
+          role="group"
+          aria-label="Brush mode"
         >
-          Stroke
-          <select
-            id="studio-brush-size"
-            name="studio-brush-size"
-            autoComplete="off"
-            value={brushSize}
-            disabled={!brushEnabled}
-            onChange={(event) =>
-              onBrushSizeChange(Number(event.target.value) as BrushSize)
-            }
-            className="h-10 rounded-lg border border-border bg-white px-2 font-mono text-xs text-foreground disabled:opacity-45"
-            aria-label="Brush size"
-          >
-            {[1, 2, 3, 5].map((size) => (
-              <option key={size} value={size}>
-                {size === 1 ? "1 cell" : `${size}×${size} cells`}
-              </option>
-            ))}
-          </select>
-        </label>
+          {(
+            [
+              ["pixel-perfect", "Game pixels"],
+              ["smooth", "Smooth"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              className={`min-h-10 rounded-md px-2.5 text-[0.68rem] font-black transition-colors ${
+                brushMode === mode
+                  ? "bg-[#24786f] text-white shadow-sm"
+                  : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+              }`}
+              aria-pressed={brushMode === mode}
+              onClick={() => onBrushModeChange(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <div
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-white p-0.5"
+          className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="group"
-          aria-label="Symmetry assist"
+          aria-label={
+            brushMode === "pixel-perfect"
+              ? "Pixel-perfect brush footprint"
+              : "Smooth brush footprint"
+          }
         >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className={`inline-flex size-11 items-center justify-center rounded-md transition-colors ${
-                  horizontalMirror
-                    ? "bg-[#24786f] text-white shadow-sm"
-                    : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
-                }`}
-                aria-keyshortcuts="M"
-                aria-label="Mirror brush left to right"
-                aria-pressed={horizontalMirror}
-                title="Mirror brush left to right (M)"
-                onClick={() => onHorizontalMirrorChange(!horizontalMirror)}
-              >
-                <FlipHorizontal2 className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Mirror pencil and eraser · M</p>
-            </TooltipContent>
-          </Tooltip>
+          {brushSizes.map((size) => (
+            <button
+              key={size}
+              type="button"
+              className={`inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border px-2 font-mono text-xs font-black transition-colors ${
+                brushSize === size
+                  ? "border-[#96381e] bg-[#b84426] text-white shadow-sm"
+                  : "border-[#26485a]/20 bg-white text-[#526975] hover:border-[#ef6b3b]/50 hover:text-[#17384a]"
+              }`}
+              aria-label={`${size} pixel ${brushMode === "pixel-perfect" ? "snapped stamp" : "smooth brush"}`}
+              aria-pressed={brushSize === size}
+              onClick={() => onBrushSizeChange(size)}
+            >
+              {size}px
+            </button>
+          ))}
+        </div>
+
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <label
+            htmlFor="studio-brush-size"
+            className="hidden shrink-0 items-center gap-1 text-[0.68rem] font-bold text-muted-foreground sm:flex"
+          >
+            Exact size
+            <select
+              id="studio-brush-size"
+              name="studio-brush-size"
+              autoComplete="off"
+              value={brushSize}
+              disabled={!brushEnabled}
+              onChange={(event) =>
+                onBrushSizeChange(Number(event.target.value) as BrushSize)
+              }
+              className="h-10 rounded-lg border border-border bg-white px-2 font-mono text-xs text-foreground disabled:opacity-45"
+              aria-label="Brush size"
+            >
+              {brushSizes.map((size) => (
+                <option key={size} value={size}>
+                  {size}px {brushMode === "pixel-perfect" ? "stamp" : "smooth"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-white p-0.5"
+            role="group"
+            aria-label="Symmetry assist"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex size-11 items-center justify-center rounded-md transition-colors ${
+                    horizontalMirror
+                      ? "bg-[#24786f] text-white shadow-sm"
+                      : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+                  }`}
+                  aria-keyshortcuts="M"
+                  aria-label="Mirror brush left to right"
+                  aria-pressed={horizontalMirror}
+                  title="Mirror brush left to right (M)"
+                  onClick={() => onHorizontalMirrorChange(!horizontalMirror)}
+                >
+                  <FlipHorizontal2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Mirror pencil and eraser · M</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
         <Popover open={isPaletteOpen} onOpenChange={setIsPaletteOpen}>
@@ -721,7 +794,7 @@ export function CanvasPaintToolbar({
         </Popover>
 
         <div
-          className="hidden w-auto min-w-max shrink-0 items-center gap-1 pl-1 lg:flex"
+          className="hidden w-auto min-w-max shrink-0 items-center gap-1 pl-1 lg:col-span-full lg:flex"
           role="group"
           aria-label="Quick paint colors"
         >
@@ -773,7 +846,7 @@ export function CanvasPaintToolbar({
       <p className="truncate px-1 pt-1 text-[0.68rem] font-medium text-muted-foreground">
         {activeTool === "inspect"
           ? "Choose Pencil, Eraser, Fill, or Pick color to edit."
-          : `${PAINT_TOOLS.find((entry) => entry.tool === activeTool)?.label ?? "Paint"} · ${selectedColor?.name ?? selectedColorId}${brushEnabled ? ` · ${brushSize}×${brushSize}${horizontalMirror ? " · mirrored" : ""}` : ""}. Drag with mouse, touch, or pen; use arrow keys and Space on the canvas.`}
+          : `${PAINT_TOOLS.find((entry) => entry.tool === activeTool)?.label ?? "Paint"} · ${selectedColor?.name ?? selectedColorId}${brushEnabled ? ` · ${brushMode === "pixel-perfect" ? "snapped" : "smooth"} ${brushSize}px${horizontalMirror ? " · mirrored" : ""}` : ""}. Drag with mouse, touch, or pen; use arrow keys and Space on the canvas.`}
       </p>
     </section>
   );

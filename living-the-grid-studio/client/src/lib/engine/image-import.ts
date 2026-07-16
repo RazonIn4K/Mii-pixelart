@@ -48,9 +48,9 @@ export interface ImageCrop {
 
 /** Options for image import */
 export interface ImageImportOptions {
-  /** Target grid width in cells (default: 32) */
+  /** Target grid width in cells (default: 256 game-surface pixels) */
   gridWidth: number;
-  /** Target grid height in cells (default: 32) */
+  /** Target grid height in cells (default: 256 game-surface pixels) */
   gridHeight: number;
   /** Maximum number of colors to use (0 = no limit) */
   maxColors: number;
@@ -85,8 +85,8 @@ export interface ImageImportOptions {
 }
 
 export const DEFAULT_IMPORT_OPTIONS: ImageImportOptions = {
-  gridWidth: 32,
-  gridHeight: 32,
+  gridWidth: 256,
+  gridHeight: 256,
   maxColors: 24,
   frameMode: "cover",
   focusX: 50,
@@ -505,10 +505,7 @@ export async function imageToGridDocument(
   URL.revokeObjectURL(img.src);
 
   const imported = recomputeUsedColors(doc);
-  if (
-    opts.maxColors > 0 &&
-    imported.usedColors.length > opts.maxColors
-  ) {
+  if (opts.maxColors > 0 && imported.usedColors.length > opts.maxColors) {
     return passLimitPalette(imported, {
       ...DEFAULT_CONFIG,
       maxColors: opts.maxColors,

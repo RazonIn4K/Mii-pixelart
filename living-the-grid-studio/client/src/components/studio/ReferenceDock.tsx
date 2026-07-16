@@ -11,6 +11,35 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+export type ReferenceComparisonMode = "side" | "under" | "over" | "split";
+
+const COMPARISON_MODES: readonly {
+  label: string;
+  mode: ReferenceComparisonMode;
+  help: string;
+}[] = [
+  {
+    mode: "side",
+    label: "Side",
+    help: "Keep the original beside the drawing surface.",
+  },
+  {
+    mode: "under",
+    label: "Under",
+    help: "Trace the framed source beneath your paint.",
+  },
+  {
+    mode: "over",
+    label: "Over",
+    help: "Compare the framed source above your paint.",
+  },
+  {
+    mode: "split",
+    label: "Split",
+    help: "Compare source and paint across a center split.",
+  },
+];
+
 /**
  * A read-only, browser-local visual reference. This preview controls a dim
  * tracing layer inside the authoritative canvas; it never receives drawing
@@ -18,40 +47,68 @@ import { cn } from "@/lib/utils";
  */
 export function ReferenceDock({
   className,
+  comparisonMode,
   flipped,
   onClear,
+  onComparisonModeChange,
   onFlippedChange,
   onOpacityChange,
   onTraceBlank,
   onUnderlayVisibleChange,
   opacity,
   sourceUrl,
+  supportedComparisonModes,
   traceStatus,
   underlayEnabled,
   underlayVisible,
 }: {
   className?: string;
+  comparisonMode?: ReferenceComparisonMode;
   flipped: boolean;
   onClear: () => void;
+  onComparisonModeChange?: (mode: ReferenceComparisonMode) => void;
   onFlippedChange: (flipped: boolean) => void;
   onOpacityChange: (opacity: number) => void;
   onTraceBlank?: () => void;
   onUnderlayVisibleChange: (visible: boolean) => void;
   opacity: number;
   sourceUrl: string;
+  supportedComparisonModes?: readonly ReferenceComparisonMode[];
   traceStatus: "error" | "preparing" | "ready" | null;
   underlayEnabled: boolean;
   underlayVisible: boolean;
 }) {
   const opacityId = useId();
+  const activeComparisonMode =
+    comparisonMode ?? (underlayEnabled && underlayVisible ? "under" : "side");
+  const supportedModes = new Set<ReferenceComparisonMode>(
+    supportedComparisonModes ??
+      (onComparisonModeChange
+        ? (["side", "under", "over", "split"] as const)
+        : (["side", "under"] as const)),
+  );
+
+  const isModeAvailable = (mode: ReferenceComparisonMode) => {
+    if (mode === "side") return true;
+    if (!underlayEnabled) return false;
+    if (mode === "under") return true;
+    return supportedModes.has(mode) && Boolean(onComparisonModeChange);
+  };
+
+  const selectComparisonMode = (mode: ReferenceComparisonMode) => {
+    if (!isModeAvailable(mode)) return;
+    onComparisonModeChange?.(mode);
+    onUnderlayVisibleChange(mode !== "side");
+  };
 
   return (
     <aside
       className={cn(
-        "flex min-h-0 flex-col rounded-[1.25rem] border-2 border-[#26485a]/20 bg-[#fffaf0] p-2.5 shadow-[0_4px_0_rgba(38,72,90,0.12)]",
+        "flex min-h-0 flex-col rounded-[1.25rem] border-2 border-[#26485a]/20 bg-[#fffaf0] p-2.5 shadow-[0_4px_0_rgba(38,72,90,0.12)] lg:overflow-y-auto",
         className,
       )}
       aria-label="Local reference image"
+      data-reference-comparison={activeComparisonMode}
       data-testid="studio-reference-dock"
     >
       <div className="flex items-start justify-between gap-2">
@@ -60,7 +117,7 @@ export function ReferenceDock({
             Source board
           </p>
           <p className="mt-0.5 text-[0.65rem] leading-4 text-muted-foreground">
-            Raw preview · framing follows the Import controls.
+            Original source · visible immediately and kept browser-local.
           </p>
         </div>
         <Button
@@ -76,7 +133,7 @@ export function ReferenceDock({
         </Button>
       </div>
 
-      <div className="mt-2 flex min-h-28 flex-1 items-center justify-center overflow-hidden rounded-xl border-2 border-[#26485a]/15 bg-[linear-gradient(45deg,#fffaf0_25%,transparent_25%),linear-gradient(-45deg,#fffaf0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#fffaf0_75%),linear-gradient(-45deg,transparent_75%,#fffaf0_75%)] bg-[#e8dfcf] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px] sm:min-h-36 lg:min-h-0">
+      <div className="mt-2 flex h-36 min-h-0 flex-none items-center justify-center overflow-hidden rounded-xl border-2 border-[#ef6b3b]/35 bg-[linear-gradient(45deg,#f4ead8_25%,transparent_25%),linear-gradient(-45deg,#f4ead8_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f4ead8_75%),linear-gradient(-45deg,transparent_75%,#f4ead8_75%)] bg-[#cfc2ad] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px] shadow-inner sm:h-44 lg:h-auto lg:flex-1">
         <img
           src={sourceUrl}
           alt="Imported source reference"
@@ -89,6 +146,68 @@ export function ReferenceDock({
       </div>
 
       <div className="mt-2 grid gap-2">
+        <div>
+          <div
+            className="grid grid-cols-4 gap-1 rounded-xl border border-[#26485a]/15 bg-white p-1"
+            role="group"
+            aria-label="Reference comparison mode"
+          >
+            {COMPARISON_MODES.map((mode) => {
+              const available = isModeAvailable(mode.mode);
+              const active = activeComparisonMode === mode.mode;
+              const underlayCompatibilityLabel =
+                mode.mode === "under"
+                  ? !underlayEnabled
+                    ? "Under reference · commit or trace first"
+                    : active
+                      ? "Under reference · visible"
+                      : "Under reference · show"
+                  : undefined;
+
+              return (
+                <button
+                  key={mode.mode}
+                  type="button"
+                  className={cn(
+                    "min-h-11 rounded-lg px-1 text-[0.62rem] font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ef6b3b]",
+                    active
+                      ? "bg-[#24786f] text-white"
+                      : "text-[#26485a] hover:bg-[#fff0c2]",
+                    !available && "cursor-not-allowed opacity-40",
+                  )}
+                  aria-label={underlayCompatibilityLabel}
+                  aria-pressed={active}
+                  disabled={!available}
+                  title={
+                    available
+                      ? mode.help
+                      : mode.mode === "under"
+                        ? "Commit or trace the framed source first."
+                        : "Available when the canvas enables this comparison layer."
+                  }
+                  onClick={() =>
+                    selectComparisonMode(
+                      active && mode.mode !== "side" ? "side" : mode.mode,
+                    )
+                  }
+                >
+                  {mode.mode === "under" ? (
+                    active ? (
+                      <Eye className="mx-auto mb-0.5 size-3" />
+                    ) : (
+                      <EyeOff className="mx-auto mb-0.5 size-3" />
+                    )
+                  ) : null}
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[0.6rem] leading-4 text-muted-foreground">
+            {COMPARISON_MODES.find((mode) => mode.mode === activeComparisonMode)
+              ?.help ?? COMPARISON_MODES[0].help}
+          </p>
+        </div>
         {traceStatus ? (
           <Button
             type="button"
@@ -111,35 +230,11 @@ export function ReferenceDock({
                 : "Trace framed source"}
           </Button>
         ) : null}
-        <Button
-          type="button"
-          size="sm"
-          className={`h-10 w-full justify-center text-xs font-black ${
-            underlayVisible && underlayEnabled
-              ? "bg-[#24786f] text-white hover:bg-[#1d625b]"
-              : "bg-[#fffaf0] text-[#26485a] hover:bg-[#fff0c2]"
-          }`}
-          variant={underlayVisible ? "default" : "outline"}
-          aria-pressed={underlayEnabled ? underlayVisible : false}
-          disabled={!underlayEnabled}
-          onClick={() => onUnderlayVisibleChange(!underlayVisible)}
-        >
-          {underlayVisible && underlayEnabled ? (
-            <Eye className="size-3.5" />
-          ) : (
-            <EyeOff className="size-3.5" />
-          )}
-          {!underlayEnabled
-            ? "Commit or trace first"
-            : underlayVisible
-              ? "Reference visible"
-              : "Show reference"}
-        </Button>
         <label
           htmlFor={opacityId}
           className="grid grid-cols-[1fr_auto] items-center gap-2 text-[0.65rem] font-bold text-muted-foreground"
         >
-          Underlay strength
+          Reference strength
           <span className="font-mono text-foreground">{opacity}%</span>
           <input
             id={opacityId}
@@ -149,7 +244,7 @@ export function ReferenceDock({
             step="5"
             value={opacity}
             className="col-span-2 w-full accent-primary"
-            disabled={!underlayEnabled || !underlayVisible}
+            disabled={!underlayEnabled || activeComparisonMode === "side"}
             onChange={(event) => onOpacityChange(Number(event.target.value))}
           />
         </label>

@@ -11,18 +11,19 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-07-14):** Exact source
-> `1bded7eda46f9be9f9a184656e535256467919d4` is the accepted deployment on
+> **Deployment status (2026-07-15):** Exact source
+> `f03b428cb696baee4b7794aa74fea14b1db5e4d2` is the active deployment on
 > [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) for the approved
-> authenticated single-account profile, showcase, generated-avatar fallback,
-> Guided Copy, Studio, accessibility, crawler, and performance scope. Community
-> mutations are enabled only on staging; consult sales remains disabled. The
-> current branch contains post-gate Studio refinements that are available only
-> in the Pages branch preview, not on the staging Worker or production.
+> authenticated Studio, accessibility, crawler, CSP, and mobile-performance
+> scope. It is functionally accepted, but its restored-Studio LCP misses the
+> launch threshold. Community mutations are enabled only on staging; consult
+> sales remains disabled. The current branch contains a corrective canonical
+> 256×256 canvas, reference, guide, cursor, and starter slice that is not yet
+> deployed and requires a new exact-SHA staging approval.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
 > Cloudflare Pages deployment until cross-user staging, merge, production
 > provisioning, cutover, and soak receive their independent approvals. See the
-> [sanitized staging record](docs/release-evidence/2026-07-14-staging-profile-guided-copy-1bded7e.md).
+> [sanitized staging record](docs/release-evidence/2026-07-15-staging-canvas-game-match-f03b428.md).
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
@@ -36,7 +37,10 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 **Studio** — [`/studio`](https://tomodachi.pw/studio)
 
-- 16×16 through 256×256 import/detail presets that reduce images to the Studio's 84-color working palette
+- Canonical 256×256 game-reference surface plus explicitly labeled 8–256 custom/legacy imports
+- Observed smooth 1/3/7/13/19/27px footprints and snapped 4/8/16/32px planning stamps, with exact cursor previews
+- Independent cell, snapped-stamp, 2×2/4×4/8×8 section, and center-axis guides without a doubled grid
+- Browser-local source board with Side, Under, Over, and Split comparison modes
 - Every color labeled by row + column (R9C5, R10C1, etc.) for consistent manual matching in the Copy Guide
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
@@ -120,7 +124,7 @@ flowchart LR
     IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> FRAME[Crop + frame source<br/>face / head / full image]
     FRAME --> QUANT[Color reduction<br/>Studio 84-color<br/>working palette]
     QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
-    PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
+    PREVIEW --> GRID[Editable 256×256 reference surface<br/>optional custom/legacy import<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}
     AI -- yes --> SKETCH[AI sketch helper<br/>vision-capability gate<br/>review then apply once]
     SKETCH --> GRID

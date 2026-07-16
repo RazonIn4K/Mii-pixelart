@@ -73,12 +73,7 @@ const LOCAL_IMAGE_LIMITS = {
 } as const;
 const LOCAL_JSON_LIMIT_BYTES = 2 * 1024 * 1024;
 
-const GAME_MATCHED_GRID_PRESETS = [
-  { brushPixels: 4, size: 64 },
-  { brushPixels: 8, size: 32 },
-  { brushPixels: 16, size: 16 },
-  { brushPixels: 32, size: 8 },
-] as const;
+const GAME_BRUSH_FOOTPRINTS = [4, 8, 16, 32] as const;
 
 const IMAGE_INPUT_ACCEPT = [
   "image/png",
@@ -110,8 +105,8 @@ export default function ImportPanel({
   const sourcePreviewRef = useRef<HTMLDivElement>(null);
   const cropDragRef = useRef<CropDragState | null>(null);
   const validationRequestRef = useRef(0);
-  const [gridWidth, setGridWidth] = useState(32);
-  const [gridHeight, setGridHeight] = useState(32);
+  const [gridWidth, setGridWidth] = useState(256);
+  const [gridHeight, setGridHeight] = useState(256);
   const [frameMode, setFrameMode] = useState<ImageFrameMode>("cover");
   const [focusX, setFocusX] = useState(50);
   const [focusY, setFocusY] = useState(50);
@@ -471,8 +466,8 @@ export default function ImportPanel({
   }, [setCropValues, sourceImageSize]);
 
   const applyFacePaintPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(38);
@@ -487,8 +482,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyCharacterPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(44);
@@ -503,8 +498,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyFaceDetailPreset = useCallback(() => {
-    setGridWidth(96);
-    setGridHeight(96);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(38);
@@ -519,8 +514,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyCharacterDetailPreset = useCallback(() => {
-    setGridWidth(128);
-    setGridHeight(128);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(45);
@@ -535,8 +530,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applySpritePreset = useCallback(() => {
-    setGridWidth(32);
-    setGridHeight(32);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -551,8 +546,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyLogoPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -567,8 +562,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyStickerPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -583,8 +578,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyIconPreset = useCallback(() => {
-    setGridWidth(16);
-    setGridHeight(16);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -599,8 +594,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyFullImagePreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -630,9 +625,9 @@ export default function ImportPanel({
     setSamplingMode("crisp");
   }, [setCropValues]);
 
-  const applyGameMatchedGrid = useCallback((size: number) => {
-    setGridWidth(size);
-    setGridHeight(size);
+  const applyGameMatchedGrid = useCallback(() => {
+    setGridWidth(256);
+    setGridHeight(256);
     setSamplingMode("crisp");
   }, []);
 
@@ -983,38 +978,47 @@ export default function ImportPanel({
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
         <div className="rounded-xl border border-[#24786f]/25 bg-[#e8f5ef] p-2.5">
           <div className="flex items-center gap-1.5 text-xs font-black text-[#17384a]">
-            <Gamepad2 className="size-3.5" /> Game-matched size
+            <Gamepad2 className="size-3.5" /> Game-matched surface
           </div>
           <p className="mt-1 text-[0.68rem] leading-4 text-[#526975]">
-            Observed 256px square setup: one project cell equals one
-            pixel-perfect brush stamp. Verify it against your game version.
+            The drawing surface stays 256×256: one Studio cell equals one game
+            pixel. Choose a 4, 8, 16, or 32px snapped stamp after import.
           </p>
           <div
-            className="mt-2 grid grid-cols-2 gap-1.5"
+            className="mt-2 grid gap-1.5"
             role="group"
-            aria-label="Game-matched grid size"
+            aria-label="Game-matched surface"
           >
-            {GAME_MATCHED_GRID_PRESETS.map(({ brushPixels, size }) => {
-              const selected = gridWidth === size && gridHeight === size;
-              return (
-                <Button
-                  key={size}
-                  type="button"
-                  variant={selected ? "default" : "outline"}
-                  size="sm"
-                  className="h-auto min-h-10 flex-col gap-0 rounded-lg py-1.5 text-xs"
-                  aria-pressed={selected}
-                  onClick={() => applyGameMatchedGrid(size)}
+            <Button
+              type="button"
+              variant={
+                gridWidth === 256 && gridHeight === 256 ? "default" : "outline"
+              }
+              size="sm"
+              className="h-auto min-h-11 justify-between rounded-lg py-2 text-xs"
+              aria-pressed={gridWidth === 256 && gridHeight === 256}
+              onClick={applyGameMatchedGrid}
+            >
+              <span className="font-black">256×256 game pixels</span>
+              <span className="text-[0.62rem] opacity-80">
+                one-for-one surface
+              </span>
+            </Button>
+            <div
+              className="grid grid-cols-4 gap-1"
+              role="list"
+              aria-label="Available snapped brush footprints"
+            >
+              {GAME_BRUSH_FOOTPRINTS.map((brushPixels) => (
+                <span
+                  key={brushPixels}
+                  className="rounded-md bg-white px-1 py-1.5 text-center font-mono text-[0.62rem] font-black text-[#526975]"
+                  role="listitem"
                 >
-                  <span className="font-black">
-                    {size}×{size} cells
-                  </span>
-                  <span className="text-[0.62rem] opacity-80">
-                    {brushPixels}px game brush
-                  </span>
-                </Button>
-              );
-            })}
+                  {brushPixels}px
+                </span>
+              ))}
+            </div>
           </div>
         </div>
         <p className="text-xs font-semibold">Use Case Presets</p>
@@ -1035,7 +1039,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyCharacterPreset}
           >
-            Character 64
+            Character
           </Button>
           <Button
             type="button"
@@ -1044,7 +1048,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyFaceDetailPreset}
           >
-            Face 96
+            Face detail
           </Button>
           <Button
             type="button"
@@ -1053,7 +1057,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyCharacterDetailPreset}
           >
-            Character 128
+            Character detail
           </Button>
           <Button
             type="button"
@@ -1062,7 +1066,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applySpritePreset}
           >
-            Sprite 32
+            Sprite blocks
           </Button>
           <Button
             type="button"
@@ -1071,7 +1075,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyLogoPreset}
           >
-            Logo 64
+            Logo
           </Button>
           <Button
             type="button"
@@ -1080,7 +1084,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyStickerPreset}
           >
-            Sticker 64
+            Sticker
           </Button>
           <Button
             type="button"
@@ -1089,7 +1093,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyIconPreset}
           >
-            Icon 16
+            Icon blocks
           </Button>
           <Button
             type="button"
@@ -1098,7 +1102,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyFullImagePreset}
           >
-            Full 64
+            Full image
           </Button>
           <Button
             type="button"
@@ -1107,7 +1111,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyPixelDetailPreset}
           >
-            Pixel 256
+            Pixel detail
           </Button>
         </div>
         <div className="space-y-2">

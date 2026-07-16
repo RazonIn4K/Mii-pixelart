@@ -42,7 +42,9 @@ The useful interaction pattern is specific:
 - project resolution, pixel-perfect brush guidance, palette controls, and display controls remain visible while drawing;
 - the editable cell mesh is distinct from the in-game 2×2, 4×4, or 8×8 reference overlay;
 - zoom, project statistics, and the manual recreation recipe stay beside the single canvas;
-- import resolution communicates the corresponding observed brush size instead of presenting an unexplained number;
+- the 256×256 drawing surface stays distinct from the selected observed smooth
+  or snapped brush footprint instead of disguising a brush stamp as one larger
+  project cell;
 - paint-by-numbers and the step-by-step recipe are completion aids, not separate drawing surfaces.
 
 That site is not authoritative Nintendo documentation. Tomodachi Studio may adopt the general usability model while retaining original visuals and clearly labeling observed/custom geometry and the Studio-defined palette.
@@ -262,21 +264,44 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 
 ### Checkpoint A — game-matched easy drawing
 
-Status: implemented locally; requires a new exact-SHA staging gate.
+Status: corrected locally after the `f03b428` hosted audit; requires a new
+exact-SHA staging gate.
 
-- Show `64×64 → 4px`, `32×32 → 8px`, `16×16 → 16px`, and `8×8 → 32px` as observed pixel-perfect geometry profiles for the 256px square face-paint workflow.
-- Label other dimensions as custom placement; never imply exact official compatibility.
-- Keep **Cell lines** separate from **Game grid** so changing Off/2×2/4×4/8×8 cannot resize or mutate the project.
-- Make **Easy Draw** select Pencil, one-cell strokes, every-cell lines, the 8×8 reference overlay, non-mirrored painting, and a precise 14px-per-cell view.
+- Keep one 256×256 coordinate surface so one Studio cell can represent one
+  reported game-surface pixel without conflating document resolution and brush
+  size.
+- Offer the independently observed smooth 1/3/7/13/19/27px footprints and
+  snapped pixel-perfect 4/8/16/32px footprints. The on-canvas cursor must show
+  the exact mutation rectangle, including its snapped origin.
+- Keep the fine cell mesh, snapped-stamp cadence, Off/2×2/4×4/8×8 section
+  overlay, and center axes independent. Coincident lines render once.
+- Keep custom and legacy 8–256 documents editable/exportable, but never label
+  them one-for-one until the user explicitly converts to 256×256.
+- Make **Match game** select Pencil, a snapped 4px footprint, the 8×8 section
+  guide, visible center axes, non-mirrored painting, and Cell view.
+- New blank work and starters use transparent 256×256 surfaces. Starter art
+  expands from small original source fixtures with nearest-neighbor blocks;
+  previews retain alpha without allocating all full documents at panel load.
+- Character starters use original silhouettes and role-driven names such as
+  Bubble Explorer, Midnight Mascot, Trail Courier, Forest Scout, and Comet
+  Runner. Older source IDs remain internal provenance keys so existing local
+  projects and exported JSON keep their traceability; cards and public-facing
+  metadata use the original catalog names.
+- Keep a visible browser-local source board plus Side, Under, Over, and Split
+  comparison modes that never enter the saved document.
 - Keep wheel zoom anchored to the cell beneath the pointer.
-- Ensure the game overlay and optional center crosshair do not stack into a doubled center line.
+- Keep a high-contrast cursor aid visible when the exact footprint is smaller
+  than eight CSS pixels, anchored to the footprint rather than the raw pointer.
 
 Exit evidence:
 
-- geometry unit tests;
-- canonical JSON export proves the clicked cell is the expected row-major cell;
+- geometry unit tests covering every mode and the snapped 4×4 mutation block;
+- canonical JSON export proves smooth 1px changes one row-major cell and the
+  snapped 4px footprint changes exactly the expected 16 cells;
 - desktop and 320px browser acceptance;
-- no second interactive canvas, horizontal page overflow, console errors, or failed expected requests;
+- visible source controls and a usable canvas at 320/390px with no clipping;
+- no second interactive canvas, doubled guide, opaque fake background,
+  horizontal page overflow, console errors, or failed expected requests;
 - hosted mobile performance remains under the agreed INP budget.
 
 ### Checkpoint B — mobile drawing dock and precise touch targeting

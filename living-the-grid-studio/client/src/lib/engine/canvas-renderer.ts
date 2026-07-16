@@ -11,7 +11,7 @@
  */
 
 import type { GridDocument } from "./grid";
-import { getCell, getColorUsageCounts } from "./grid";
+import { getCell, getColorUsageCounts, takeGridMutationHint } from "./grid";
 import { TOMODACHI_PALETTE, type PaletteColor } from "./palette";
 import { formatCountLabel } from "../format-count";
 
@@ -52,9 +52,11 @@ export interface RenderOptions {
   /** Optional paper color behind the editable grid only. */
   gridBackground: string | null;
   /** Optional checkerboard behind transparent project cells. */
-  checkerboard: "none" | "light" | "dark";
-  /** Optional browser-local image drawn beneath the authoritative grid. */
+  checkerboard: "none" | "warm" | "light" | "dark";
+  /** Optional browser-local image aligned with the authoritative grid. */
   referenceImage: CanvasImageSource | null;
+  /** Paint order for the browser-local image; split clips it to the left half. */
+  referenceMode: "under" | "over" | "split";
   referenceOpacity: number;
   referenceFlipped: boolean;
   referenceFit: "contain" | "cover";
@@ -80,6 +82,7 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   gridBackground: null,
   checkerboard: "none",
   referenceImage: null,
+  referenceMode: "under",
   referenceOpacity: 0.45,
   referenceFlipped: false,
   referenceFit: "contain",
@@ -123,6 +126,141 @@ export function shouldRenderGridLines(
 function colorIdToHex(colorId: string): string {
   const c = TOMODACHI_PALETTE.find((p) => p.id === colorId);
   return c ? c.hex : colorId; // fallback to raw value if not found
+}
+
+const cellRasterCache = new WeakMap<GridDocument, HTMLCanvasElement>();
+const checkerTileCache = new WeakMap<object, Map<string, HTMLCanvasElement>>();
+
+function parseRasterColor(
+  value: string,
+): [red: number, green: number, blue: number, alpha: number] | null {
+  const clean = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-f]+$/i.test(clean)) return null;
+  if (clean.length === 3 || clean.length === 4) {
+    return [
+      Number.parseInt(clean[0] + clean[0], 16),
+      Number.parseInt(clean[1] + clean[1], 16),
+      Number.parseInt(clean[2] + clean[2], 16),
+      clean.length === 4 ? Number.parseInt(clean[3] + clean[3], 16) : 255,
+    ];
+  }
+  if (clean.length === 6 || clean.length === 8) {
+    return [
+      Number.parseInt(clean.slice(0, 2), 16),
+      Number.parseInt(clean.slice(2, 4), 16),
+      Number.parseInt(clean.slice(4, 6), 16),
+      clean.length === 8 ? Number.parseInt(clean.slice(6, 8), 16) : 255,
+    ];
+  }
+  return null;
+}
+
+/**
+ * Build one native-resolution transparent bitmap for an immutable document.
+ *
+ * A canonical starter can contain tens of thousands of painted cells. Calling
+ * `fillRect` once per cell made a single 4px stroke repaint 30k+ rectangles.
+ * The bitmap path still validates every palette value, but turns the visible
+ * artwork into one nearest-neighbour `drawImage`. The WeakMap follows document
+ * history without retaining discarded in-stroke documents.
+ */
+function getCellRaster(
+  ctx: CanvasRenderingContext2D,
+  doc: GridDocument,
+): HTMLCanvasElement | null {
+  const cached = cellRasterCache.get(doc);
+  if (cached) {
+    // A cached bitmap no longer needs its base-document delta. Consume it so a
+    // rendered history entry cannot retain discarded in-stroke documents.
+    takeGridMutationHint(doc);
+    return cached;
+  }
+
+  // A real HTMLCanvasElement always exposes its own document. Avoid falling
+  // back to a global document for test doubles or OffscreenCanvas-like
+  // contexts: that can accidentally reuse the destination canvas as its own
+  // raster source.
+  const ownerDocument = (ctx.canvas as HTMLCanvasElement).ownerDocument;
+  if (!ownerDocument?.createElement) return null;
+
+  const mutation = takeGridMutationHint(doc);
+  if (mutation) {
+    const baseRaster = getCellRaster(ctx, mutation.base);
+    if (baseRaster) {
+      // Metadata-only canonicalization can share the immutable source bitmap.
+      if (mutation.updates.length === 0) {
+        cellRasterCache.set(doc, baseRaster);
+        return baseRaster;
+      }
+
+      const incrementalCanvas = ownerDocument.createElement("canvas");
+      incrementalCanvas.width = doc.width;
+      incrementalCanvas.height = doc.height;
+      const incrementalContext = incrementalCanvas.getContext("2d");
+      if (
+        incrementalContext &&
+        typeof incrementalContext.drawImage === "function" &&
+        typeof incrementalContext.clearRect === "function" &&
+        typeof incrementalContext.fillRect === "function"
+      ) {
+        incrementalContext.imageSmoothingEnabled = false;
+        incrementalContext.drawImage(baseRaster, 0, 0);
+        let valid = true;
+        for (const update of mutation.updates) {
+          const x = update.index % doc.width;
+          const y = Math.floor(update.index / doc.width);
+          incrementalContext.clearRect(x, y, 1, 1);
+          if (!update.colorId) continue;
+          const value = colorIdToHex(update.colorId);
+          if (!parseRasterColor(value)) {
+            valid = false;
+            break;
+          }
+          incrementalContext.fillStyle = value;
+          incrementalContext.fillRect(x, y, 1, 1);
+        }
+        if (valid) {
+          cellRasterCache.set(doc, incrementalCanvas);
+          return incrementalCanvas;
+        }
+      }
+    }
+  }
+
+  const canvas = ownerDocument.createElement("canvas");
+  canvas.width = doc.width;
+  canvas.height = doc.height;
+  const rasterContext = canvas.getContext("2d");
+  if (
+    !rasterContext ||
+    typeof rasterContext.createImageData !== "function" ||
+    typeof rasterContext.putImageData !== "function"
+  ) {
+    return null;
+  }
+
+  const image = rasterContext.createImageData(doc.width, doc.height);
+  const colors = new Map<string, ReturnType<typeof parseRasterColor>>();
+  for (let index = 0; index < doc.cells.length; index += 1) {
+    const colorId = doc.cells[index];
+    if (!colorId) continue;
+    let color = colors.get(colorId);
+    if (color === undefined) {
+      color = parseRasterColor(colorIdToHex(colorId));
+      colors.set(colorId, color);
+    }
+    // Unknown raw colors retain the compatibility fillRect renderer instead
+    // of silently changing their appearance.
+    if (!color) return null;
+    const offset = index * 4;
+    image.data[offset] = color[0];
+    image.data[offset + 1] = color[1];
+    image.data[offset + 2] = color[2];
+    image.data[offset + 3] = color[3];
+  }
+  rasterContext.putImageData(image, 0, 0);
+  cellRasterCache.set(doc, canvas);
+  return canvas;
 }
 
 /** Determine if a color is "light" (needs dark label text) */
@@ -169,7 +307,9 @@ function drawCheckerboard(
   const colors =
     mode === "dark"
       ? (["#33424b", "#465963"] as const)
-      : (["#fffaf0", "#eee5d6"] as const);
+      : mode === "warm"
+        ? (["#fffaf0", "#eee5d6"] as const)
+        : (["#f8fafc", "#dce5e8"] as const);
   const tileSize = Math.max(8, Math.min(24, Math.round(scaledSize * 2)));
   const left = Math.max(0, Math.min(width, visibleX));
   const top = Math.max(0, Math.min(height, visibleY));
@@ -182,6 +322,42 @@ function drawCheckerboard(
     Math.min(height, visibleY + Math.max(0, visibleHeight)),
   );
   if (right <= left || bottom <= top) return;
+
+  const ownerDocument = (ctx.canvas as HTMLCanvasElement).ownerDocument;
+  if (ownerDocument?.createElement && typeof ctx.createPattern === "function") {
+    let tiles = checkerTileCache.get(ownerDocument);
+    if (!tiles) {
+      tiles = new Map();
+      checkerTileCache.set(ownerDocument, tiles);
+    }
+    const key = `${mode}:${tileSize}`;
+    let tile = tiles.get(key);
+    if (!tile) {
+      const candidate = ownerDocument.createElement("canvas");
+      candidate.width = tileSize * 2;
+      candidate.height = tileSize * 2;
+      const tileContext = candidate.getContext("2d");
+      if (tileContext) {
+        tileContext.fillStyle = colors[0];
+        tileContext.fillRect(0, 0, candidate.width, candidate.height);
+        tileContext.fillStyle = colors[1];
+        tileContext.fillRect(tileSize, 0, tileSize, tileSize);
+        tileContext.fillRect(0, tileSize, tileSize, tileSize);
+        tile = candidate;
+        tiles.set(key, tile);
+      }
+    }
+    if (tile) {
+      const pattern = ctx.createPattern(tile, "repeat");
+      if (pattern) {
+        ctx.save();
+        ctx.fillStyle = pattern;
+        ctx.fillRect(left, top, right - left, bottom - top);
+        ctx.restore();
+        return;
+      }
+    }
+  }
 
   ctx.fillStyle = colors[0];
   ctx.fillRect(left, top, right - left, bottom - top);
@@ -222,6 +398,7 @@ function drawReference(
   opacity: number,
   flipped: boolean,
   fit: RenderOptions["referenceFit"],
+  mode: RenderOptions["referenceMode"],
 ): void {
   const source = imageDimensions(image);
   const scale =
@@ -235,7 +412,12 @@ function drawReference(
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, canvasWidth, canvasHeight);
+  ctx.rect(
+    0,
+    0,
+    mode === "split" ? canvasWidth / 2 : canvasWidth,
+    canvasHeight,
+  );
   ctx.clip();
   ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
   if (flipped) {
@@ -244,6 +426,16 @@ function drawReference(
   }
   ctx.drawImage(image, x, y, width, height);
   ctx.restore();
+
+  if (mode === "split") {
+    const dividerX = canvasWidth / 2;
+    ctx.save();
+    ctx.fillStyle = "#fffaf0";
+    ctx.fillRect(dividerX - 2, 0, 4, canvasHeight);
+    ctx.fillStyle = "#17384a";
+    ctx.fillRect(dividerX - 1, 0, 2, canvasHeight);
+    ctx.restore();
+  }
 }
 
 /** Snap a grid strip edge to a physical pixel boundary. */
@@ -394,7 +586,7 @@ export function renderGrid(
   // A browser-local tracing sheet belongs below the project paint. Keeping
   // this ordering explicit makes fresh strokes remain fully opaque and avoids
   // tinting completed artwork while the source is visible.
-  if (opts.referenceImage) {
+  if (opts.referenceImage && opts.referenceMode === "under") {
     drawReference(
       ctx,
       opts.referenceImage,
@@ -403,21 +595,49 @@ export function renderGrid(
       opts.referenceOpacity,
       opts.referenceFlipped,
       opts.referenceFit,
+      opts.referenceMode,
     );
   }
 
-  // Draw cells
-  for (let y = visibleStartY; y < visibleEndY; y++) {
-    for (let x = visibleStartX; x < visibleEndX; x++) {
-      const colorId = getCell(doc, x, y);
-      const px = x * scaledSize;
-      const py = y * scaledSize;
+  // Draw the immutable artwork as one native bitmap whenever the browser
+  // exposes a real canvas context. Test doubles and unusual raw-color imports
+  // retain the bounded visible-cell compatibility path.
+  const cellRaster = getCellRaster(ctx, doc);
+  if (cellRaster) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cellRaster, 0, 0, canvasW, canvasH);
+  } else {
+    for (let y = visibleStartY; y < visibleEndY; y++) {
+      for (let x = visibleStartX; x < visibleEndX; x++) {
+        const colorId = getCell(doc, x, y);
+        const px = x * scaledSize;
+        const py = y * scaledSize;
 
-      if (colorId) {
-        ctx.fillStyle = colorIdToHex(colorId);
-        ctx.fillRect(px, py, scaledSize, scaledSize);
+        if (colorId) {
+          ctx.fillStyle = colorIdToHex(colorId);
+          ctx.fillRect(px, py, scaledSize, scaledSize);
+        }
       }
     }
+  }
+
+  // Comparison layers belong above project paint but below every editing aid.
+  // Keeping this inside renderGrid ensures fine-cell lines, highlights, and
+  // paint-by-number labels remain readable even at high reference opacity.
+  if (
+    opts.referenceImage &&
+    (opts.referenceMode === "over" || opts.referenceMode === "split")
+  ) {
+    drawReference(
+      ctx,
+      opts.referenceImage,
+      canvasW,
+      canvasH,
+      opts.referenceOpacity,
+      opts.referenceFlipped,
+      opts.referenceFit,
+      opts.referenceMode,
+    );
   }
 
   // Draw grid lines

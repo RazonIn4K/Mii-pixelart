@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   CREATIVE_TEMPLATES,
   createCreativeTemplateDocument,
+  createCreativeTemplateFixtureDocument,
 } from "../client/src/lib/engine/templates";
 import { resampleGridNearest } from "../client/src/lib/engine/grid";
 import { importGridJson } from "../client/src/lib/engine/json-io";
@@ -57,16 +58,26 @@ for (const template of CREATIVE_TEMPLATES) {
   );
 
   const fixtureDoc = importGridJson(readFileSync(fixturePath, "utf8"));
-  assert.equal(fixtureDoc.width, doc.width, `${template.name} fixture width`);
+  const expectedFixture = createCreativeTemplateFixtureDocument(template.id);
+  assert.equal(
+    fixtureDoc.width,
+    expectedFixture.width,
+    `${template.name} fixture width`,
+  );
   assert.equal(
     fixtureDoc.height,
-    doc.height,
+    expectedFixture.height,
     `${template.name} fixture height`,
   );
   assert.deepEqual(
     fixtureDoc.cells,
-    doc.cells,
+    expectedFixture.cells,
     `${template.name} fixture cells`,
+  );
+  assert.deepEqual(
+    resampleGridNearest(fixtureDoc, doc.width, doc.height).cells,
+    doc.cells,
+    `${template.name} compact fixture should expand losslessly`,
   );
 
   const resizedDoc = resampleGridNearest(doc, doc.width * 2, doc.height * 2);

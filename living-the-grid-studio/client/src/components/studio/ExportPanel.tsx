@@ -24,37 +24,81 @@ interface ExportPanelProps {
   disabledReason?: string;
 }
 
+const MAX_CLEAN_EXPORT_DIMENSION = 2048;
+const MAX_LABELED_EXPORT_DIMENSION = 3072;
+
+/**
+ * Bound PNG dimensions for the canonical 256×256 surface. Labeled guides keep
+ * 12 pixels per cell; smaller legacy documents retain up to the old 16px
+ * detail without allocating a 4096×4096 canvas on phones.
+ */
+export function getExportCellSize(
+  doc: Pick<GridDocument, "height" | "width">,
+  labeled: boolean,
+): number {
+  const maxDimension = Math.max(1, doc.width, doc.height);
+  const outputLimit = labeled
+    ? MAX_LABELED_EXPORT_DIMENSION
+    : MAX_CLEAN_EXPORT_DIMENSION;
+  return Math.max(1, Math.min(16, Math.floor(outputLimit / maxDimension)));
+}
+
 export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
   const [isBuildingPack, setIsBuildingPack] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleExportJson = () => {
     if (!doc) return;
-    downloadGridDocument(doc);
+    setExportError(null);
+    try {
+      downloadGridDocument(doc);
+    } catch {
+      setExportError(getExportFailureMessage("json"));
+    }
   };
 
   const handleExportPng = () => {
     if (!doc) return;
-    const safeName = getSafeProjectName(doc);
-    downloadGridAsPng(
-      doc,
-      { cellSize: 16, showGrid: true, showLabels: true },
-      `${safeName}-guide-labeled.png`,
-    );
+    setExportError(null);
+    try {
+      const safeName = getSafeProjectName(doc);
+      downloadGridAsPng(
+        doc,
+        {
+          cellSize: getExportCellSize(doc, true),
+          showGrid: true,
+          showLabels: true,
+        },
+        `${safeName}-guide-labeled.png`,
+      );
+    } catch {
+      setExportError(getExportFailureMessage("image"));
+    }
   };
 
   const handleExportPngClean = () => {
     if (!doc) return;
-    const safeName = getSafeProjectName(doc);
-    downloadGridAsPng(
-      doc,
-      { cellSize: 16, showGrid: false, showLabels: false },
-      `${safeName}-clean.png`,
-    );
+    setExportError(null);
+    try {
+      const safeName = getSafeProjectName(doc);
+      downloadGridAsPng(
+        doc,
+        {
+          cellSize: getExportCellSize(doc, false),
+          showGrid: false,
+          showLabels: false,
+        },
+        `${safeName}-clean.png`,
+      );
+    } catch {
+      setExportError(getExportFailureMessage("image"));
+    }
   };
 
   const handleExportReferencePack = async () => {
     if (!doc || isBuildingPack) return;
     setIsBuildingPack(true);
+    setExportError(null);
 
     try {
       const json = exportGridJson(doc);
@@ -66,7 +110,7 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
         "guide-labeled.png",
         dataUrlToUint8Array(
           exportGridAsPng(doc, {
-            cellSize: 16,
+            cellSize: getExportCellSize(doc, true),
             showGrid: true,
             showLabels: true,
           }),
@@ -77,7 +121,7 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
         "guide-clean.png",
         dataUrlToUint8Array(
           exportGridAsPng(doc, {
-            cellSize: 16,
+            cellSize: getExportCellSize(doc, false),
             showGrid: false,
             showLabels: false,
           }),
@@ -96,6 +140,8 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
 
       const blob = await zip.generateAsync({ type: "blob" });
       downloadBlob(blob, `${safeName}-reference-pack.zip`);
+    } catch {
+      setExportError(getExportFailureMessage("pack"));
     } finally {
       setIsBuildingPack(false);
     }
@@ -109,9 +155,25 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
           Download Studio project data, images, and manual Copy Guides. These
           are not Nintendo game or save files.
         </p>
+        {doc && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Labeled guide: {doc.width * getExportCellSize(doc, true)}×
+            {doc.height * getExportCellSize(doc, true)} px · Clean image:{" "}
+            {doc.width * getExportCellSize(doc, false)}×
+            {doc.height * getExportCellSize(doc, false)} px
+          </p>
+        )}
         {disabledReason && (
           <p className="mt-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs leading-relaxed text-amber-950">
             {disabledReason}
+          </p>
+        )}
+        {exportError && (
+          <p
+            className="mt-2 rounded-sm border border-red-300 bg-red-50 px-2 py-1.5 text-xs leading-relaxed text-red-950"
+            role="alert"
+          >
+            {exportError}
           </p>
         )}
       </div>
@@ -174,6 +236,18 @@ export default function ExportPanel({ doc, disabledReason }: ExportPanelProps) {
       </div>
     </div>
   );
+}
+
+export function getExportFailureMessage(
+  kind: "image" | "json" | "pack",
+): string {
+  if (kind === "json") {
+    return "The project JSON could not be downloaded. Check browser download permissions and try again.";
+  }
+  if (kind === "image") {
+    return "The image could not be generated in this browser. Close other tabs or try a desktop browser, then export again.";
+  }
+  return "The reference pack could not be built in this browser. Try the individual JSON or PNG exports, close other tabs, or use a desktop browser.";
 }
 
 export function buildReferenceHtml(doc: GridDocument, json: string): string {

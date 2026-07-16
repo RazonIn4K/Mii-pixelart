@@ -370,6 +370,11 @@ const CreativeTemplateMetadataSchema = z
     templateId: z.string().min(1).max(80),
     templateCategory: z.string().min(1).max(80),
     templateName: z.string().min(1).max(120),
+    templateLegacyName: z.string().min(1).max(120).optional(),
+    guideSections: z.union([z.literal(4), z.literal(8)]).optional(),
+    recommendedBrushPixels: z
+      .union([z.literal(4), z.literal(8), z.literal(16), z.literal(32)])
+      .optional(),
   })
   .strip();
 

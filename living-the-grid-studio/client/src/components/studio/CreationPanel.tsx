@@ -2,13 +2,13 @@
  * CreationPanel.tsx — Manual creation and touch-up controls
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPaletteColor } from "@/lib/engine/palette";
 import {
   CREATIVE_TEMPLATES,
-  createCreativeTemplateDocument,
+  createCreativeTemplateFixtureDocument,
   type CreativeTemplateId,
 } from "@/lib/engine/templates";
 import type { GridDocument } from "@/lib/engine/grid";
@@ -30,12 +30,10 @@ interface CreationPanelProps {
 }
 
 const STARTER_PRESETS = [
-  { label: "Face Paint", name: "Face Paint Canvas", width: 64, height: 64 },
-  { label: "Character 64", name: "Character Canvas", width: 64, height: 64 },
-  { label: "Sprite 32", name: "Sprite Canvas", width: 32, height: 32 },
-  { label: "Sticker 64", name: "Sticker Canvas", width: 64, height: 64 },
-  { label: "Icon 16", name: "Icon Canvas", width: 16, height: 16 },
-  { label: "Full 64", name: "Full Image Canvas", width: 64, height: 64 },
+  { label: "Face paint", name: "Face Paint Canvas", width: 256, height: 256 },
+  { label: "Portrait", name: "Portrait Practice", width: 256, height: 256 },
+  { label: "Sticker", name: "Sticker Practice", width: 256, height: 256 },
+  { label: "Free draw", name: "Free Draw Canvas", width: 256, height: 256 },
 ];
 
 const TEMPLATE_CATEGORY_ORDER = [
@@ -45,6 +43,73 @@ const TEMPLATE_CATEGORY_ORDER = [
   "Marks & Objects",
 ] as const;
 
+const TEMPLATE_GROUPS = (() => {
+  const cards = CREATIVE_TEMPLATES.map((template) => ({
+    doc: createCreativeTemplateFixtureDocument(template.id),
+    template,
+  }));
+  return TEMPLATE_CATEGORY_ORDER.map((category) => ({
+    category,
+    templates: cards.filter((card) => card.template.category === category),
+  })).filter((group) => group.templates.length > 0);
+})();
+
+const StarterDesignGallery = memo(function StarterDesignGallery({
+  onActiveToolChange,
+  onCreateTemplate,
+}: Pick<CreationPanelProps, "onActiveToolChange" | "onCreateTemplate">) {
+  return (
+    <div className="space-y-3 rounded-sm border border-border bg-card p-3">
+      <div>
+        <p className="text-xs font-semibold">Starter Designs</p>
+        <p className="mt-1 text-[0.68rem] leading-4 text-muted-foreground">
+          Original practice art with transparent space around every shape. Each
+          one opens at the full game-copy resolution.
+        </p>
+      </div>
+      <div className="space-y-4">
+        {TEMPLATE_GROUPS.map((group) => (
+          <div key={group.category} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3 w-3 text-muted-foreground" />
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {group.category}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {group.templates.map(({ doc, template }) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="group rounded-xl border border-[#26485a]/20 bg-[#fffaf0] p-2.5 text-left shadow-[0_2px_0_rgba(38,72,90,0.1)] transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-[#ef6b3b]/60 hover:shadow-[0_4px_0_rgba(38,72,90,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ef6b3b] focus-visible:ring-offset-2"
+                  onClick={() => {
+                    onCreateTemplate(template.id);
+                    onActiveToolChange("pencil");
+                  }}
+                >
+                  <TemplatePreview doc={doc} />
+                  <span className="mt-2 block min-h-8 break-words text-xs font-black leading-4 text-[#26485a]">
+                    {template.displayName}
+                  </span>
+                  <span className="mt-1 block text-[0.62rem] font-bold leading-4 text-[#24786f]">
+                    {template.surfaceLabel}
+                  </span>
+                  <span className="block text-[0.6rem] leading-4 text-muted-foreground">
+                    {template.brushLabel} · {template.guideLabel}
+                  </span>
+                  <span className="block font-mono text-[0.6rem] text-muted-foreground">
+                    {formatCountLabel(doc.usedColors.length, "color")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
 export default function CreationPanel({
   currentDoc,
   onActiveToolChange,
@@ -52,25 +117,15 @@ export default function CreationPanel({
   onCreateTemplate,
   onResampleCanvas,
 }: CreationPanelProps) {
-  const [fillColorId, setFillColorId] = useState<string | null>("R10C7");
-  const templateGroups = useMemo(() => {
-    const cards = CREATIVE_TEMPLATES.map((template) => ({
-      doc: createCreativeTemplateDocument(template.id),
-      template,
-    }));
-
-    return TEMPLATE_CATEGORY_ORDER.map((category) => ({
-      category,
-      templates: cards.filter((card) => card.template.category === category),
-    })).filter((group) => group.templates.length > 0);
-  }, []);
+  const [fillColorId, setFillColorId] = useState<string | null>(null);
 
   return (
     <div className="space-y-4 p-4">
       <div>
         <p className="section-header mb-1">Create / Fix</p>
         <p className="text-xs text-muted-foreground">
-          Start blank, paint details, or touch up an imported guide.
+          Start on a transparent 256×256 game surface, then copy each block with
+          the matching brush and guide.
         </p>
       </div>
 
@@ -122,43 +177,10 @@ export default function CreationPanel({
         </div>
       )}
 
-      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
-        <p className="text-xs font-semibold">Starter Designs</p>
-        <div className="space-y-4">
-          {templateGroups.map((group) => (
-            <div key={group.category} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3 w-3 text-muted-foreground" />
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  {group.category}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {group.templates.map(({ doc, template }) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className="group rounded-sm border border-border bg-background p-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
-                    onClick={() => {
-                      onCreateTemplate(template.id);
-                      onActiveToolChange("pencil");
-                    }}
-                  >
-                    <TemplatePreview doc={doc} />
-                    <span className="mt-2 block truncate text-xs font-medium">
-                      {template.name}
-                    </span>
-                    <span className="block font-mono text-[0.65rem] text-muted-foreground">
-                      {template.width}x{template.height} ·{" "}
-                      {formatCountLabel(doc.usedColors.length, "color")}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <StarterDesignGallery
+        onActiveToolChange={onActiveToolChange}
+        onCreateTemplate={onCreateTemplate}
+      />
 
       <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
@@ -172,7 +194,7 @@ export default function CreationPanel({
               aria-pressed={fillColorId === null}
               onClick={() => setFillColorId(null)}
             >
-              Empty
+              Transparent
             </Button>
             <Button
               type="button"
@@ -182,7 +204,7 @@ export default function CreationPanel({
               aria-pressed={fillColorId === "R10C7"}
               onClick={() => setFillColorId("R10C7")}
             >
-              White
+              White fill
             </Button>
           </div>
         </div>
@@ -208,7 +230,7 @@ export default function CreationPanel({
               <Plus className="mr-2 h-3.5 w-3.5" />
               <span>{preset.label}</span>
               <span className="ml-auto font-mono text-[0.65rem] text-muted-foreground">
-                {preset.width}x{preset.height}
+                256²
               </span>
             </Button>
           ))}
@@ -234,10 +256,11 @@ function TemplatePreview({ doc }: { doc: GridDocument }) {
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
 
-    const image = context.createImageData(preview.size, preview.size);
+    const image = context.createImageData(preview.width, preview.height);
     const resolvedColors = new Map<string, [number, number, number]>();
 
     preview.colors.forEach((color, index) => {
+      if (!color) return;
       let rgb = resolvedColors.get(color);
       if (!rgb) {
         const value = Number.parseInt(color.slice(1), 16);
@@ -257,43 +280,38 @@ function TemplatePreview({ doc }: { doc: GridDocument }) {
 
   return (
     <div
-      className="aspect-square overflow-hidden rounded-sm border border-border bg-white"
+      className="aspect-square overflow-hidden rounded-lg border border-[#26485a]/20 bg-[linear-gradient(45deg,#eee4d2_25%,transparent_25%),linear-gradient(-45deg,#eee4d2_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#eee4d2_75%),linear-gradient(-45deg,transparent_75%,#eee4d2_75%)] bg-[#cfc2ad] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0px]"
       aria-hidden="true"
     >
       <canvas
         ref={canvasRef}
         className="h-full w-full [image-rendering:pixelated]"
         data-template-preview
-        width={preview.size}
-        height={preview.size}
+        data-template-preview-width={256}
+        data-template-preview-height={256}
+        data-template-preview-source-width={preview.width}
+        data-template-preview-source-height={preview.height}
+        width={preview.width}
+        height={preview.height}
       />
     </div>
   );
 }
 
 function buildTemplatePreview(doc: GridDocument): {
-  colors: string[];
-  size: number;
+  colors: (string | null)[];
+  width: number;
+  height: number;
 } {
-  const size = Math.min(24, doc.width, doc.height);
-  const colors: string[] = [];
+  const resolvedColors = new Map<string, string>();
+  const colors = doc.cells.map((colorId) => {
+    if (!colorId) return null;
+    const existing = resolvedColors.get(colorId);
+    if (existing) return existing;
+    const color = getPaletteColor(colorId)?.hex ?? "#FF00FF";
+    resolvedColors.set(colorId, color);
+    return color;
+  });
 
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const sourceX = Math.min(
-        doc.width - 1,
-        Math.floor(((x + 0.5) / size) * doc.width),
-      );
-      const sourceY = Math.min(
-        doc.height - 1,
-        Math.floor(((y + 0.5) / size) * doc.height),
-      );
-      const colorId = doc.cells[sourceY * doc.width + sourceX];
-      colors.push(
-        colorId ? (getPaletteColor(colorId)?.hex ?? "#FFFFFF") : "#FFFFFF",
-      );
-    }
-  }
-
-  return { colors, size };
+  return { colors, width: doc.width, height: doc.height };
 }

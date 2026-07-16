@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGridDocument, setCell } from "./grid";
+import { createGridDocument, setCell, setCells } from "./grid";
 import {
   exportGridAsPng,
   gridStepForDensity,
@@ -20,6 +20,7 @@ function installCanvasDouble() {
     clearRect: vi.fn(),
     clip: vi.fn(),
     drawImage,
+    fillStyle: "",
     fillRect,
     lineTo,
     moveTo,
@@ -76,7 +77,7 @@ describe("canvas export rendering", () => {
     expect(fillRect).toHaveBeenCalledWith(0, 0, 32, 32);
   });
 
-  it("clips a local tracing image to the authoritative grid bounds", () => {
+  it("draws an under reference before project paint", () => {
     const { context, drawImage, fillRect } = installCanvasDouble();
     const doc = setCell(createGridDocument(8, 8), 0, 0, "#123456");
     const image = {
@@ -88,6 +89,7 @@ describe("canvas export rendering", () => {
       cellSize: 4,
       referenceFit: "cover",
       referenceImage: image,
+      referenceMode: "under",
       showGrid: false,
     });
 
@@ -96,6 +98,85 @@ describe("canvas export rendering", () => {
     expect(drawImage).toHaveBeenCalledOnce();
     expect(drawImage.mock.invocationCallOrder[0]).toBeLessThan(
       fillRect.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("draws an over reference after paint and before the fine grid", () => {
+    const { context, drawImage, fillRect } = installCanvasDouble();
+    const doc = setCell(createGridDocument(4, 4), 0, 0, "#123456");
+    const image = {
+      naturalHeight: 16,
+      naturalWidth: 16,
+    } as unknown as CanvasImageSource;
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 8,
+      gridStep: 1,
+      majorGridStep: 0,
+      referenceImage: image,
+      referenceMode: "over",
+      showGrid: true,
+    });
+
+    const paintedCellIndex = fillRect.mock.calls.findIndex(
+      (call) =>
+        call[0] === 0 && call[1] === 0 && call[2] === 8 && call[3] === 8,
+    );
+    const firstGridStripIndex = fillRect.mock.calls.findIndex(
+      (call) =>
+        call[0] === 8 && call[1] === 0 && call[2] === 1 && call[3] === 32,
+    );
+    expect(paintedCellIndex).toBeGreaterThanOrEqual(0);
+    expect(firstGridStripIndex).toBeGreaterThanOrEqual(0);
+    expect(fillRect.mock.invocationCallOrder[paintedCellIndex]).toBeLessThan(
+      drawImage.mock.invocationCallOrder[0],
+    );
+    expect(drawImage.mock.invocationCallOrder[0]).toBeLessThan(
+      fillRect.mock.invocationCallOrder[firstGridStripIndex],
+    );
+  });
+
+  it("clips a split reference and paints its divider before the fine grid", () => {
+    const { context, drawImage, fillRect } = installCanvasDouble();
+    const doc = setCell(createGridDocument(4, 4), 0, 0, "#123456");
+    const image = {
+      naturalHeight: 16,
+      naturalWidth: 16,
+    } as unknown as CanvasImageSource;
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 8,
+      gridStep: 1,
+      majorGridStep: 0,
+      referenceImage: image,
+      referenceMode: "split",
+      showGrid: true,
+    });
+
+    const paintedCellIndex = fillRect.mock.calls.findIndex(
+      (call) =>
+        call[0] === 0 && call[1] === 0 && call[2] === 8 && call[3] === 8,
+    );
+    const dividerIndex = fillRect.mock.calls.findIndex(
+      (call) =>
+        call[0] === 14 && call[1] === 0 && call[2] === 4 && call[3] === 32,
+    );
+    const firstGridStripIndex = fillRect.mock.calls.findIndex(
+      (call) =>
+        call[0] === 8 && call[1] === 0 && call[2] === 1 && call[3] === 32,
+    );
+    expect(context.rect).toHaveBeenCalledWith(0, 0, 16, 32);
+    expect(paintedCellIndex).toBeGreaterThanOrEqual(0);
+    expect(dividerIndex).toBeGreaterThanOrEqual(0);
+    expect(firstGridStripIndex).toBeGreaterThanOrEqual(0);
+    expect(fillRect.mock.invocationCallOrder[paintedCellIndex]).toBeLessThan(
+      drawImage.mock.invocationCallOrder[0],
+    );
+    expect(drawImage.mock.invocationCallOrder[0]).toBeLessThan(
+      fillRect.mock.invocationCallOrder[dividerIndex],
+    );
+    expect(fillRect.mock.invocationCallOrder[dividerIndex]).toBeLessThan(
+      fillRect.mock.invocationCallOrder[firstGridStripIndex],
     );
   });
 
@@ -112,6 +193,113 @@ describe("canvas export rendering", () => {
     });
 
     expect(fillRect).toHaveBeenCalledTimes(16);
+  });
+
+  it("rasterizes a canonical document once and draws it as one crisp bitmap", () => {
+    const { context, drawImage, fillRect } = installCanvasDouble();
+    const createImageData = vi.fn((width: number, height: number) => ({
+      data: new Uint8ClampedArray(width * height * 4),
+    }));
+    const putImageData = vi.fn();
+    const rasterContext = { createImageData, putImageData };
+    const rasterCanvas = {
+      getContext: vi.fn(() => rasterContext),
+      height: 0,
+      width: 0,
+    };
+    (context.canvas as { ownerDocument?: unknown }).ownerDocument = {
+      createElement: vi.fn(() => rasterCanvas),
+    };
+    context.canvas.width = 512;
+    context.canvas.height = 512;
+    const doc = createGridDocument(256, 256, "Canonical", "R1C1");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 2,
+      showGrid: false,
+    });
+
+    expect(createImageData).toHaveBeenCalledWith(256, 256);
+    expect(putImageData).toHaveBeenCalledOnce();
+    expect(drawImage).toHaveBeenCalledOnce();
+    expect(drawImage).toHaveBeenCalledWith(rasterCanvas, 0, 0, 512, 512);
+    expect(fillRect).not.toHaveBeenCalled();
+    const image = putImageData.mock.calls[0][0] as {
+      data: Uint8ClampedArray;
+    };
+    expect(image.data[(12 * 256 + 10) * 4 + 3]).toBe(255);
+  });
+
+  it("updates a cached bitmap from an immutable cell delta", () => {
+    const { context, drawImage, fillRect } = installCanvasDouble();
+    const baseImage = {
+      data: new Uint8ClampedArray(256 * 256 * 4),
+    };
+    const baseContext = {
+      createImageData: vi.fn(() => baseImage),
+      putImageData: vi.fn(),
+    };
+    const incrementalContext = {
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: "",
+      imageSmoothingEnabled: true,
+    };
+    const baseCanvas = {
+      getContext: vi.fn(() => baseContext),
+      height: 0,
+      width: 0,
+    };
+    const incrementalCanvas = {
+      getContext: vi.fn(() => incrementalContext),
+      height: 0,
+      width: 0,
+    };
+    const ownerDocument = {
+      createElement: vi
+        .fn()
+        .mockReturnValueOnce(baseCanvas)
+        .mockReturnValueOnce(incrementalCanvas),
+    };
+    (context.canvas as { ownerDocument?: unknown }).ownerDocument =
+      ownerDocument;
+    context.canvas.width = 512;
+    context.canvas.height = 512;
+    const base = createGridDocument(256, 256, "Incremental");
+
+    renderGrid(context as unknown as CanvasRenderingContext2D, base, {
+      cellSize: 2,
+      showGrid: false,
+    });
+    const changed = setCells(
+      base,
+      [
+        { x: 8, y: 12 },
+        { x: 9, y: 12 },
+      ],
+      "R1C1",
+    );
+    renderGrid(context as unknown as CanvasRenderingContext2D, changed, {
+      cellSize: 2,
+      showGrid: false,
+    });
+
+    expect(baseContext.createImageData).toHaveBeenCalledOnce();
+    expect(incrementalContext.drawImage).toHaveBeenCalledWith(baseCanvas, 0, 0);
+    expect(incrementalContext.clearRect).toHaveBeenCalledTimes(2);
+    expect(incrementalContext.fillRect).toHaveBeenCalledWith(8, 12, 1, 1);
+    expect(incrementalContext.fillRect).toHaveBeenCalledWith(9, 12, 1, 1);
+    expect(drawImage).toHaveBeenNthCalledWith(1, baseCanvas, 0, 0, 512, 512);
+    expect(drawImage).toHaveBeenNthCalledWith(
+      2,
+      incrementalCanvas,
+      0,
+      0,
+      512,
+      512,
+    );
+    expect(fillRect).not.toHaveBeenCalled();
   });
 
   it("uses the full logical viewport and clears it at a fractional DPR", () => {
@@ -150,6 +338,25 @@ describe("canvas export rendering", () => {
     expect(fillRect).toHaveBeenCalledWith(12, 24, 12, 24);
     expect(fillRect).toHaveBeenCalledWith(48, 24, 12, 24);
     expect(fillRect).toHaveBeenCalledWith(24, 48, 24, 12);
+  });
+
+  it("keeps warm and neutral transparency backgrounds visually distinct", () => {
+    const warm = installCanvasDouble();
+    const doc = createGridDocument(8, 8, "Transparent");
+    renderGrid(warm.context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 4,
+      checkerboard: "warm",
+      showGrid: false,
+    });
+    expect(warm.context.fillStyle).toBe("#eee5d6");
+
+    const neutral = installCanvasDouble();
+    renderGrid(neutral.context as unknown as CanvasRenderingContext2D, doc, {
+      cellSize: 4,
+      checkerboard: "light",
+      showGrid: false,
+    });
+    expect(neutral.context.fillStyle).toBe("#dce5e8");
   });
 
   it("uses a bounded tint instead of a negative highlight stroke on dense cells", () => {

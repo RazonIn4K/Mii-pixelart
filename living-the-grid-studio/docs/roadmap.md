@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
-| 7     | Island Workshop Community  | Writable single-account staging; performance follow-up required | Exact `18e36da` is deployed and functionally accepted for its canvas/AI scope; a new exact-source performance gate, cross-user acceptance, and production gates remain separate |
+| 7     | Island Workshop Community  | Writable single-account staging; canvas correction and performance follow-up required | Exact `f03b428` is active and functionally accepted; its restored-Studio LCP fails the gate, and the canonical-256 corrective source still needs a new exact-SHA staging approval |
 
 ---
 
@@ -205,10 +205,10 @@ human-authorized moderation.
 
 **Accepted on isolated staging:**
 
-- [x] Exact source `18e36dac9eb88ac862c2292471125f58199550b9`
+- [x] Exact source `f03b428cb696baee4b7794aa74fea14b1db5e4d2`
       deployed with community mutations enabled only on isolated staging and
-      consult sales disabled; canvas, real AI advice, account navigation,
-      share review, security, crawler, accessibility, and isolation checks pass
+      consult sales disabled; authenticated Studio, account navigation, share
+      review, security, crawler, accessibility, CSP, and isolation checks pass
 - [x] Authenticated single-account profile setup and Terms reacceptance,
       generated/custom avatar lifecycle, private cloud restore, showcase-image
       lifecycle, generated-avatar fallback, and empty moderation workspace
@@ -219,15 +219,17 @@ human-authorized moderation.
       checks
 - [x] Current exact-source homepage performance: 2,185 ms median LCP, 0.00
       CLS, and 100 Accessibility/Best Practices Lighthouse scores
-- [ ] Current exact-source Studio performance closeout: the deployed source
-      misses Start blank INP and returning-draft LCP/CLS gates. A local
-      follow-up reduces Start blank trace p75 to 86 ms, but requires a new exact
-      staging approval and Worker-hosted cold-load verification.
+- [ ] Current exact-source Studio performance closeout: `f03b428` records
+      3,244ms restored-Studio LCP under the agreed Slow-4G/4×-CPU profile. Its
+      functional canvas still uses a legacy 64×64 interpretation; the local
+      canonical-256 correction requires a new exact staging approval and fresh
+      Worker-hosted cold-load verification.
 
 **Remaining approval gates:**
 
-- [ ] New exact-source staging deployment and hosted performance acceptance for
-      the Studio starter-preview, canvas-start, and layout-stability follow-up
+- [ ] New exact-source staging deployment and hosted acceptance for the true
+      256×256 surface, exact cursor footprints, layered guides, transparent
+      starters, source comparisons, and Studio performance
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
 - [x] Immutable preview and Worker asset-byte parity for the preceding accepted
@@ -240,7 +242,7 @@ The accepted staging deployment enables community mutations only in isolated
 staging for its approved single-account scope. Consult sales stays disabled
 everywhere, and no roadmap status grants approval for production. See the
 sanitized exact-source record in
-`docs/release-evidence/2026-07-15-staging-canvas-ai-18e36da.md` and the remaining
+`docs/release-evidence/2026-07-15-staging-canvas-game-match-f03b428.md` and the remaining
 gates in `docs/production-readiness-plan.md`.
 
 ---
