@@ -83,13 +83,13 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
           "Don't change the Tomodachishare password first — that site is shut down, fixing it there protects nothing. Change your primary email password first (because email controls every password reset), turn on two-factor authentication on that email, then work through other accounts in priority order: banks, cloud storage, identity (Apple/Google/Microsoft), social, everything else.",
         links: [
           { label: "Free 24-hour action plan", href: "/help" },
-          { label: "Paid 12-step recovery checklist ($9)", href: "/unlock" },
+          { label: "Try the free AI Action Plan", href: "/ai-plan" },
         ],
       },
       {
-        question: "Is the breach recovery checklist worth $9?",
+        question: "Does Tomodachi accept payments or consultation bookings?",
         answer:
-          "Only if you'd rather follow a structured on-page plan than improvise from the free 24-hour actions on /help. The free guidance already covers the four highest-value moves. The paid checklist spells out a longer 12-step flow and 30-day monitoring rhythm in the browser; it does not include a PDF or Markdown download.",
+          "No. Checkout, tips, donations, paid recovery content, and consultation bookings have been retired. The existing recovery guidance and AI action-plan beta are free.",
       },
     ],
   },
@@ -99,7 +99,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Is the Studio free to use?",
         answer:
-          "Yes. Importing a photo, generating a paint-by-numbers reference, exporting the reference pack — all free. No account needed. The optional paid extras live on /unlock and /support and have nothing to do with the editor itself.",
+          "Yes. Importing a photo, generating a paint-by-numbers reference, and exporting the reference pack are free. No account is needed for anonymous editing and export. Tomodachi currently has no checkout or paid Studio tier.",
       },
       {
         question: "Do you store my photos or my password?",
@@ -115,10 +115,10 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "How can I support the project?",
         answer:
-          "Three ways: drop a tip on /support ($5, $15, or $25 via Stripe), pick up the paid recovery checklist on /unlock, or watch the GitHub repo for the Sponsor button once the application is approved. Consult bookings are temporarily paused while fulfillment is verified.",
+          "Test a real drawing workflow, publish original work when community sharing opens, report reproducible bugs, or send product feedback. Tomodachi currently accepts no payments or tips.",
         links: [
-          { label: "Tip jar", href: "/support" },
-          { label: "Paid recovery content", href: "/unlock" },
+          { label: "Support the workshop", href: "/support" },
+          { label: "AI Action Plan", href: "/ai-plan" },
         ],
       },
     ],

@@ -486,14 +486,14 @@ export default function RecoveryHub() {
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-[var(--island-mint-dark)]" />
             <p className="text-sm font-semibold text-[var(--island-ink)]/68">
-              Need a written checklist or more structured support?
+              Want a clearer explanation of the AI plan and its limits?
             </p>
           </div>
           <Link
-            href="/unlock"
+            href="/ai-plan"
             className="inline-flex items-center gap-2 text-sm font-extrabold text-[var(--island-ink)]"
           >
-            See recovery guides <ArrowRight className="h-4 w-4" />
+            See the AI Action Plan <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>

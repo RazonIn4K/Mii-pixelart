@@ -107,9 +107,9 @@ export default function About() {
             <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Free first</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              The editor, the password check, the AI assistant, and every guide
-              stay free. Optional paid extras live on /unlock; tips live on
-              /support.
+              The editor, password check, AI assistant, and guides are free.
+              Tomodachi currently accepts no payments, tips, or consultation
+              bookings.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
@@ -125,11 +125,11 @@ export default function About() {
           <div className="rounded-sm border border-border bg-card p-4">
             <Heart className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">
-              Solo-built, sponsor-supported
+              Solo-built, community-tested
             </h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              One developer, open source, supported by Stripe tips and a small
-              paid recovery pack. GitHub Sponsors application in flight.
+              One developer, open source, improved through real Studio testing,
+              original community creations, and useful issue reports.
             </p>
           </div>
         </section>
@@ -152,9 +152,9 @@ export default function About() {
             The production architecture uses one Cloudflare Worker for the API
             and the React app's Static Assets, with D1 for community data,
             private R2 for project and generated media objects, and KV for edge
-            caching. Stripe Checkout handles optional paid items, and the Have I
-            Been Pwned API powers the password check. The full stack is
-            documented in the repo README.
+            caching. OpenRouter powers optional AI tools, and the Have I Been
+            Pwned API powers the password check. The full stack is documented in
+            the repo README.
           </p>
         </section>
 
@@ -196,18 +196,18 @@ export default function About() {
               schema.
             </li>
             <li>
-              <Link href="/unlock" className="underline">
-                Unlock
+              <Link href="/ai-plan" className="underline">
+                AI Action Plan
               </Link>
-              : a $9 browser-based 12-step recovery checklist. Consult bookings
-              are temporarily paused while fulfillment is verified.
+              : a free beta for practical, reviewable recovery and creator next
+              steps, plus an honest preview of a possible expanded plan.
             </li>
             <li>
               <Link href="/support" className="underline">
-                Support / tip jar
+                Support
               </Link>
-              : fixed $5 / $15 / $25 Stripe tips, plus Brave Rewards for the
-              .brave-verified audience.
+              : ways to test the Studio, share original work, and report useful
+              feedback without a payment.
             </li>
           </ul>
         </section>
@@ -238,17 +238,12 @@ export default function About() {
               short bio, hero image, or numbers you need for the story.
             </li>
             <li>
-              <strong>Sponsorship:</strong> Stripe-backed tips and paid
-              checklist via the{" "}
+              <strong>Project support:</strong> test the product or send useful
+              feedback through the{" "}
               <Link href="/support" className="underline">
                 support page
               </Link>
-              ; GitHub Sponsors via the repo's Sponsor button once approved.
-            </li>
-            <li>
-              <strong>Brave Rewards:</strong> the domain is a verified Brave
-              Creator. The Rewards icon in the Brave address bar will recognize
-              it.
+              .
             </li>
           </ul>
         </section>

@@ -4,6 +4,25 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-07-16
+
+- **Payments retired:** removed the Stripe product catalog, Checkout Session
+  creation and verification, tip and consultation UI, webhook processing,
+  payment secrets, payment rate-limit binding, CSP allowances, and release
+  approval fields. Historic payment API paths now return provider-free
+  `410 Gone` tombstones with `Cache-Control: no-store`; `/unlock` redirects to
+  the free `/ai-plan` beta and `/support` contains only non-payment ways to
+  help. The possible one-time $5 Creator Action Plan is product direction, not
+  an offer for sale, until entitlements, fulfillment, refunds, limits, privacy,
+  tax, and end-to-end acceptance exist.
+- **Provider containment:** confirmed the only live Tomodachi Payment Link had
+  no completed or open Checkout Sessions, deactivated that link, disabled the
+  production and staging Tomodachi webhook endpoints, and removed obsolete
+  payment variable names from Tomodachi Doppler, Pages, and staging Worker
+  configuration. The shared Stripe account and unrelated payment objects were
+  not changed. The sanitized completion record is
+  [`docs/release-evidence/2026-07-16-payment-retirement.md`](./docs/release-evidence/2026-07-16-payment-retirement.md).
+
 ### 2026-07-14
 
 - **AI sketch reliability follow-up:** replaced the abbreviated five-row

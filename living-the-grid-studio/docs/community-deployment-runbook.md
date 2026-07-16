@@ -26,25 +26,26 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 - Operator David Ortiz and Illinois, United States governing law are recorded
   in the public legal pages. On 2026-07-13, the operator confirmed the complete
   public legal and service address; Terms, Privacy, and Copyright publish it
-  verbatim. Confirm the address against the intended merchant records and each
-  published email address is deliverable before launch.
+  verbatim. Confirm the address against the intended public legal/service
+  records and that each published email address is deliverable before launch.
 - David Ortiz is the accountable admin and final human moderation reviewer; a
   separate moderator is optional. Assign his internal user ID after the first
   approved sign-in. On 2026-07-13, he confirmed that he actively monitors
-  `legal@`, `privacy@`, `security@`, `help@`, the abuse/report queue, and the
-  consult intake channel. Verify delivery and escalation for each channel
-  before launch. Follow
+  `legal@`, `privacy@`, `security@`, `help@`, and the abuse/report queue.
+  Verify delivery and escalation for each channel before launch. Follow
   `docs/adr/0003-human-in-loop-moderation.md`; AI assistance is advisory and
   has no enforcement authority.
-- Consult channel ownership does not by itself complete paid fulfillment.
-  Keep `CONSULT_SALES_ENABLED=false` until the purchase notification,
-  scheduling/intake, and promised written follow-up workflow for the 30-minute
-  consult passes an end-to-end staging test.
 - Confirm 13+ policy, seven-day deletion grace, 90-day report-text cleanup, and
   two-year minimal moderation retention with the legal operator.
-- Confirm that Stripe is configured for the intended merchant account and tax
-  jurisdictions. Stripe Tax calculation does not replace the operator's
-  registration, filing, collection, or remittance duties.
+- Payments and consultations are retired. Confirm public pages contain no
+  checkout, tip, purchase, donation, or consultation control; retired payment
+  API paths return provider-free `410 Gone`; and any old provider links,
+  endpoints, and Tomodachi-exclusive credentials are deactivated under the
+  audited retirement checklist in `stripe-paywall-setup.md`.
+- `/ai-plan` is a free beta. A possible one-time $5 Creator Action Plan is
+  product direction only and is not for sale. It requires a separate future
+  architecture, entitlement, payment, refund, privacy, tax, fulfillment, and
+  acceptance gate before any payment provider is reintroduced.
 - Recheck current Workers, D1, R2, and Images pricing and approve any paid Images
   transformation usage.
 - Workers Paid was activated with owner approval on 2026-07-13. The tracked
@@ -98,7 +99,8 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
    fixtures for automated tests; use a dedicated localhost Google client only
    for an explicitly approved manual sign-in test.
 6. Verify anonymous Studio import/edit/export without cookies or API calls.
-7. Verify all legacy AI/Stripe/webhook/crawler parity tests.
+7. Verify legacy AI/crawler parity and the retired-payment `410` tombstone
+   tests.
 8. Load a fresh development tab through the Worker fallback and confirm both
    parts of the Vite/React contract: `react()` precedes `cloudflare()` so
    `transformIndexHtml` injects the React Refresh preamble, and the Worker CSP
@@ -119,21 +121,16 @@ See [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/).
 | Production            | `https://tomodachi.pw`         | Production database       | Production private bucket | Production namespace | Production client     | Allowed only on canonical host         |
 | Random branch preview | Variable                       | Isolated preview/emulator | Isolated preview/emulator | Isolated preview     | None                  | Disabled                               |
 
-Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`,
-`AUTH_RATE_LIMITER`, `SAVE_RATE_LIMITER`, `COMMENT_RATE_LIMITER`,
-`SOCIAL_RATE_LIMITER`, `DISCOVERY_RATE_LIMITER`, `AI_RATE_LIMITER`, and
-`STRIPE_RATE_LIMITER`. The dedicated comment binding is 10 requests per minute
-per user; do not merge it into the 60-per-minute social lane. The AI and Stripe
-bindings independently limit AI chat and Stripe checkout/session to 10 requests
-per minute per privacy-preserving client key.
+Required bindings are `DB`, `PROJECTS`, `EDGE_CACHE`, `IMAGES`, plus exactly
+six rate-limit bindings: `AUTH_RATE_LIMITER`, `SAVE_RATE_LIMITER`,
+`COMMENT_RATE_LIMITER`, `SOCIAL_RATE_LIMITER`, `DISCOVERY_RATE_LIMITER`, and
+`AI_RATE_LIMITER`. The dedicated comment binding is 10 requests per minute per
+user; do not merge it into the 60-per-minute social lane. AI chat uses its own
+privacy-preserving client-key limit. Retired payment paths require no provider,
+KV receipt, or dedicated limiter.
 
-`CONSULT_SALES_ENABLED` is a non-secret string variable and must be explicitly
-`"false"` or `"true"` in every environment. Only the exact value `"true"`
-enables the consult catalog entry and checkout; all other runtime values fail
-closed. Recovery and support products are unaffected.
-
-`pnpm test:preflight` and every target-specific Worker dry run validate all
-seven rate-limit binding names, limits, periods, and environment-isolated
+`pnpm test:preflight` and every target-specific Worker dry run validate all six
+rate-limit binding names, limits, periods, and environment-isolated
 namespace IDs in both the source and generated Wrangler configurations. Use
 the generated Wrangler `Env` type; do not hand-maintain a parallel binding
 type.
@@ -147,8 +144,7 @@ Required secrets are:
 - `PSEUDONYM_KEY` (at least 32 independent random bytes used as the HMAC key
   for privacy-preserving rate-limit keys and persisted report/moderation
   pseudonyms; never emitted to logs)
-- Existing `OPENROUTER_API_KEY`, `STRIPE_SECRET_KEY`, and
-  `STRIPE_WEBHOOK_SECRET`
+- `OPENROUTER_API_KEY`
 
 Outside local development the Worker rejects short values and known
 placeholder prefixes for Google credentials, session pepper, and pseudonym
@@ -169,11 +165,11 @@ allows profile, project, publishing, social, report, or moderation writes.
 Missing, malformed, and `false` values return the standard `503
 SERVICE_UNAVAILABLE` envelope before a route handler can mutate D1 or R2. Reads,
 anonymous Studio operation, OAuth/session controls, account deletion and
-cancellation, the existing AI/Stripe routes, and Stripe webhooks remain
-available. Local development is enabled. The tracked staging configuration is
-writable only for the approved authenticated acceptance gate; production stays
-read-only until its own reviewed deployment artifact and approval set the flag
-to `true`.
+cancellation, existing AI routes, and provider-free retired-payment `410`
+tombstones remain available. Local development is enabled. The tracked staging
+configuration is writable only for the approved authenticated acceptance gate;
+production stays read-only until its own reviewed deployment artifact and
+approval set the flag to `true`.
 
 Because a Wrangler environment variable changes only through deployment, keep
 a validated read-only Worker version ready for rollback. Do not describe this
@@ -242,16 +238,16 @@ For an approved deployment, copy
 to the exact clean Git commit. The approval expires after 30 minutes and records
 the intended read-only/writable mutation mode. It must also confirm the exact
 Cloudflare/Google/domain, pricing/Images, legal/contact/retention,
-admin/moderator/inbox, consult-fulfillment, Stripe/tax, rollback, and migration
+admin/moderator/inbox, payment-retirement, rollback, and migration
 owners or decisions. Create it under `umask 077`, retain mode `0600`, and never
 commit it because it can contain a public-service address and internal account
 IDs. The wrapper requires a private regular file and validates its fields
 without logging their values. Inspect the flattened output config before every
 deploy.
 
-Readiness schema version 3 requires an explicit `deploymentPhase`, a
-`stripe.consultSalesEnabled` value matching the selected Wrangler environment,
-and an explicit `confirmations.consultFulfillmentTestPassed` boolean. Use
+Readiness schema version 4 requires an explicit `deploymentPhase` and current
+target-specific ownership/confirmation fields. It contains no payment or
+consultation-enable field. Use
 `standard` for every writable deploy and every deploy after the first
 privileged account has been assigned. Two target-specific bootstrap phases,
 `staging-read-only-bootstrap` and `production-read-only-bootstrap`, break the
@@ -259,9 +255,7 @@ first-account dependency. Both require
 `COMMUNITY_MUTATIONS_ENABLED=false`, null admin/moderator IDs,
 `adminModeratorAssigned=false`, an explicit
 `bootstrapReadOnlyApproved=true`, and no existing privileged users in the
-selected remote D1 database. Bootstrap requires both consult values to be
-false. Any later approval with consult sales enabled requires the fulfillment
-test confirmation to be true. Production bootstrap additionally requires passed
+selected remote D1 database. Production bootstrap additionally requires passed
 staging acceptance and explicit production cutover approval. The wrapper
 verifies the empty role state before it builds. Missing, legacy, cross-target,
 or contradictory phase fields fail closed. Every `standard` deploy
@@ -281,7 +275,7 @@ After explicit approval for resources and staging deployment:
    production identity, project, report, or session data.
 3. Add staging binding IDs to the staging Wrangler environment. For the first
    deployment, prepare an ignored JSON object at
-   `.deployment-readiness/staging.secrets.json` containing exactly the eight
+   `.deployment-readiness/staging.secrets.json` containing exactly the six
    allowlisted secret names. Never print, commit, or place the values in shell
    arguments. Create the directory and file with a restrictive umask, and
    retain owner-only permissions after the approved secret-manager workflow
@@ -302,7 +296,7 @@ After explicit approval for resources and staging deployment:
    before the Worker exists: that command creates and deploys a Worker version.
    After bootstrap, use a separately approved Wrangler versions workflow for
    rotations.
-   `secrets.required` in Wrangler must list the same eight names in every
+   `secrets.required` in Wrangler must list the same six names in every
    environment.
 
 4. List unapplied migrations against the **database name**, review the output,
@@ -317,13 +311,12 @@ After explicit approval for resources and staging deployment:
    enable community mutations only in a later reviewed artifact used for
    authenticated write acceptance. Stop if the generated artifact contains the
    production hostname or if the staging hostname is already claimed.
-   - For the first deployment only, use readiness schema 3 with
+   - For the first deployment only, use readiness schema 4 with
      `deploymentPhase=staging-read-only-bootstrap`. Keep both privileged IDs
      null, `adminModeratorAssigned=false`,
      `writableCommunityDeployApproved=false`, and
-     `bootstrapReadOnlyApproved=true`. Keep `stripe.consultSalesEnabled=false`
-     and `confirmations.consultFulfillmentTestPassed=false`. Do not use this
-     phase if any admin or moderator already exists.
+     `bootstrapReadOnlyApproved=true`. Do not use this phase if any admin or
+     moderator already exists.
    - After the read-only Worker and staging hostname are available, the named
      admin signs in with the approved Google account. A separately staffed
      moderator signs in too when one will be assigned. OAuth provisioning
@@ -370,11 +363,12 @@ After explicit approval for resources and staging deployment:
 
    The command refuses production and arbitrary remote hosts, omits
    credentials, never follows redirects, and never calls OAuth, account, AI,
-   Stripe, webhook, moderation, scheduled, or destructive routes. See
+   retired-payment compatibility, moderation, scheduled, or destructive
+   routes. See
    [`hosted-read-only-acceptance.md`](hosted-read-only-acceptance.md) for its
-   exact allowlist and local fixture tests. Continue to verify
-   `CONSULT_SALES_ENABLED=false` in the generated/deployed configuration; the
-   hosted network gate deliberately never calls a Stripe route.
+   exact allowlist and local fixture tests. Separately require Worker and Pages
+   integration tests to prove the retired payment paths return `410`, do not
+   use credentials, and make no upstream request.
 
 7. Run contract/integration/browser/security/accessibility/performance tests,
    including two-user authorization, OAuth, R2 failure injection, cleanup, and
@@ -400,13 +394,12 @@ domain cutover:
 3. List and apply only reviewed unapplied D1 migrations by production database
    name. Never re-run SQL manually or edit the migration ledger.
 4. Prepare `.deployment-readiness/production.secrets.json` with exactly the
-   eight production secret names using the same non-logging process as staging.
+   six production secret names using the same non-logging process as staging.
    Run `pnpm worker:dry-run:production` and inspect the generated output.
 5. The first production deployment uses
    `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
    production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
-   staging acceptance and rollback readiness, keep consult sales and its
-   fulfillment-test confirmation false, and verify the generated config
+   staging acceptance and rollback readiness, and verify the generated config
    contains exactly `{ "pattern": "tomodachi.pw", "custom_domain": true }`.
    Immediately before the approved deploy, detach `tomodachi.pw` from the Pages
    project through the audited Cloudflare control plane; a Worker Custom Domain
@@ -414,9 +407,10 @@ domain cutover:
    Deploy the reviewed artifact to atomically install the production secrets and
    attach the Worker Custom Domain, which creates its DNS record and certificate.
    Keep the recorded Pages deployment available at its immutable `pages.dev`
-   URL. Verify TLS, assets, SPA fallback, dynamic documents, API headers, Stripe
-   webhook, AI routes, robots/sitemap, and no Pages/Worker route overlap before
-   continuing. If this read-only cutover fails, remove the partial Worker Custom
+   URL. Verify TLS, assets, SPA fallback, dynamic documents, API headers, AI
+   routes, retired-payment `410` responses, robots/sitemap, and no
+   Pages/Worker route overlap before continuing. If this read-only cutover
+   fails, remove the partial Worker Custom
    Domain and immediately restore `tomodachi.pw` to the recorded Pages deployment.
 6. The named production admin signs in through the production Google client,
    reads only the internal UUID from `/api/auth/session`, and is promoted with
@@ -433,16 +427,14 @@ domain cutover:
 
 ## Rollback
 
-Use rollback for a material auth, authorization, data-integrity, payment,
-availability, or privacy regression.
+Use rollback for a material auth, authorization, data-integrity, availability,
+privacy, or unexpected payment-surface regression.
 
 1. Deploy the validated read-only Worker version (or set
    `COMMUNITY_MUTATIONS_ENABLED=false` in a reviewed build and deploy it) to
    disable community mutations while preserving anonymous Studio and the
-   documented operational routes.
-   Keep `CONSULT_SALES_ENABLED=false` unless that exact rollback artifact still
-   has a proven, staffed fulfillment path; a Pages rollback must not silently
-   re-enable consult checkout.
+   documented operational routes. A Pages rollback must not silently re-enable
+   checkout, consultation, tip, donation, or purchase UI/API behavior.
 2. For a Worker-code rollback, deploy the last known-good Worker version without
    changing the Custom Domain. For a Pages rollback, remove the Worker Custom
    Domain through the audited Cloudflare control plane, reattach
@@ -455,7 +447,7 @@ availability, or privacy regression.
 4. Preserve R2 objects and manifests unless they are proven orphaned. Run the
    idempotent reconciliation/cleanup job after the incident scope is known.
 5. Revoke affected sessions/secrets, pause OAuth, or pause publishing as the
-   incident demands. Keep Stripe webhook idempotency intact.
+   incident demands. Keep retired payment endpoints fail-closed at `410`.
 6. Record request IDs, Worker versions, migration versions, affected object IDs,
    and actions without copying sensitive content into the incident record.
 

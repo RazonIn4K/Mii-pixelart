@@ -1,128 +1,25 @@
 /**
- * Cloudflare Pages Function: catch-all for `/api/stripe/*`.
- *
- *   GET  /api/stripe/products             — list paid products + price labels.
- *   POST /api/stripe/checkout             — create a Stripe Checkout Session.
- *   GET  /api/stripe/session?session_id=… — verify a session after redirect.
- *
- * Required env bindings (Pages → Settings → Environment variables):
- *   - STRIPE_SECRET_KEY (secret)        — your Stripe restricted/secret key.
- *   - PUBLIC_SITE_URL  (plaintext)      — production origin, e.g. https://tomodachi.pw.
+ * Retained only as a fail-closed tombstone for old checkout clients and links.
+ * Tomodachi no longer offers payments or calls Stripe from this route.
  */
 
-import {
-  createCheckoutSession,
-  listPublicProducts,
-  verifyCheckoutSession,
-  type ApiResult,
-  type StripeEnv,
-} from "../../../server/stripe";
-import {
-  RequestInputError,
-  publicRequestError,
-  readBoundedText,
-} from "../../../server/request-body";
-import { formatPrice } from "../../../shared/products";
-
-interface PagesContext<EnvT = StripeEnv> {
-  env: EnvT;
-  params: { path?: string | string[] };
+interface PagesContext {
   request: Request;
 }
 
-function jsonResponse(result: ApiResult): Response {
-  return new Response(JSON.stringify(result.body), {
-    status: result.status,
+const RETIRED_BODY = JSON.stringify({
+  error: {
+    code: "payments_retired",
+    message: "Payments and checkout are no longer offered by Tomodachi.",
+  },
+});
+
+export async function onRequest(_context: PagesContext): Promise<Response> {
+  return new Response(RETIRED_BODY, {
     headers: {
-      "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
+      "Content-Type": "application/json; charset=utf-8",
     },
+    status: 410,
   });
 }
-
-function resolveSubpath(params: PagesContext["params"]): string {
-  const raw = params?.path;
-  if (!raw) return "";
-  if (Array.isArray(raw)) return raw.join("/");
-  return String(raw);
-}
-
-async function readJsonBody(request: Request): Promise<unknown> {
-  if (request.method !== "POST") return {};
-  const text = await readBoundedText(request, 100_000);
-  if (!text) return {};
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new RequestInputError(400, "Invalid JSON request body.");
-  }
-}
-
-export const onRequest = async (
-  context: PagesContext,
-): Promise<Response> => {
-  const subpath = resolveSubpath(context.params).replace(/^\/+|\/+$/g, "");
-  // RFC 7231 §4.3.2: HEAD must return the same headers as GET. Normalize so
-  // HEAD/`curl -I` against products/session match GET behavior.
-  const rawMethod = context.request.method.toUpperCase();
-  const method = rawMethod === "HEAD" ? "GET" : rawMethod;
-  const env = context.env;
-
-  try {
-    if (method === "GET" && subpath === "products") {
-      const url = new URL(context.request.url);
-      const categoryFilter = url.searchParams.get("category");
-      const products = listPublicProducts(env)
-        .filter(
-          (product) => !categoryFilter || product.category === categoryFilter,
-        )
-        .map((product) => ({
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          priceLabel: formatPrice(product.amount, product.currency),
-          perks: product.perks ?? [],
-          caveat: product.caveat ?? null,
-          category: product.category,
-        }));
-      return jsonResponse({ status: 200, body: { products } });
-    }
-
-    if (method === "POST" && subpath === "checkout") {
-      const body = await readJsonBody(context.request);
-      return jsonResponse(await createCheckoutSession(body, env));
-    }
-
-    if (method === "GET" && subpath === "session") {
-      const url = new URL(context.request.url);
-      const sessionId = url.searchParams.get("session_id") ?? "";
-      return jsonResponse(await verifyCheckoutSession(sessionId, env));
-    }
-
-    return new Response(
-      JSON.stringify({
-        configured: true,
-        error: `Unknown Stripe route: ${method} /api/stripe/${subpath}`,
-      }),
-      {
-        status: 404,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-      },
-    );
-  } catch (error) {
-    const requestError = publicRequestError(
-      error,
-      "Stripe request failed at the edge.",
-    );
-    return new Response(
-      JSON.stringify({
-        configured: true,
-        error: requestError.message,
-      }),
-      {
-        status: requestError.status,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-      },
-    );
-  }
-};

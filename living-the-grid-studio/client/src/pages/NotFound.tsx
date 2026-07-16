@@ -18,22 +18,25 @@ const SUGGESTIONS: Array<{
   {
     href: "/studio",
     title: "Open the Studio",
-    description: "Browser-first pixel-art editor — import a face photo, get a paint-by-numbers Mii.",
+    description:
+      "Browser-first pixel-art editor — import a face photo, get a paint-by-numbers Mii.",
   },
   {
     href: "/guides",
     title: "Read the free guides",
-    description: "Mii creation, gameplay basics, Tomodachishare breach recovery, QR codes + save backup.",
+    description:
+      "Mii creation, gameplay basics, Tomodachishare breach recovery, QR codes + save backup.",
   },
   {
     href: "/help",
     title: "Breach recovery first steps",
-    description: "Free 24-hour action plan if you got a Tomodachishare breach notice.",
+    description:
+      "Free 24-hour action plan if you got a Tomodachishare breach notice.",
   },
   {
-    href: "/unlock",
-    title: "Paid recovery checklist",
-    description: "$9 browser-based 12-step recovery checklist.",
+    href: "/ai-plan",
+    title: "AI Action Plan",
+    description: "Free beta for practical, reviewable next steps.",
   },
 ];
 
@@ -41,7 +44,7 @@ export default function NotFound() {
   const [path] = useLocation();
   useDocumentTitle(
     "Page not found",
-    "The page you're looking for doesn't exist. Try the studio, the free guides, or the recovery checklist.",
+    "The page you're looking for doesn't exist. Try the Studio, free guides, or AI Action Plan.",
     { noindex: true },
   );
 
@@ -56,7 +59,10 @@ export default function NotFound() {
         </div>
       </header>
 
-      <main id="main-content" className="container max-w-3xl py-12 sm:py-16 space-y-8">
+      <main
+        id="main-content"
+        className="container max-w-3xl py-12 sm:py-16 space-y-8"
+      >
         <section className="space-y-3">
           <p className="section-header">404</p>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">

@@ -17,15 +17,16 @@ export default function Terms() {
   return (
     <LegalLayout
       title="Terms of Service"
-      lastUpdated="July 14, 2026"
+      lastUpdated="July 16, 2026"
       intro="These Terms govern your use of Tomodachi, a service operated by David Ortiz. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
       <p>
         Tomodachi is a browser-based Mii pixel-art studio paired with
-        breach-recovery tools and guides. We provide free tools (the studio, the
-        AI assistant, the password breach-check) and may also sell paid digital
-        products and consult bookings through the Site.
+        breach-recovery tools and guides. The Studio, AI assistant, password
+        breach check, community features, and guides are currently offered
+        without a checkout. We do not accept payments, tips, donations, or
+        consultation bookings through the Site.
       </p>
 
       <h2>2. Acceptable use</h2>
@@ -40,8 +41,8 @@ export default function Terms() {
           violent threats, or other content that violates applicable law.
         </li>
         <li>
-          Attempt to bypass rate limits, scrape paid content, or interfere with
-          the Site&apos;s normal operation.
+          Attempt to bypass rate limits, access another user&apos;s private
+          content, or interfere with the Site&apos;s normal operation.
         </li>
         <li>
           Submit information about people other than yourself to the
@@ -99,17 +100,14 @@ export default function Terms() {
         generate.
       </p>
 
-      <h2>7. Paid services</h2>
+      <h2>7. Payments</h2>
       <p>
-        Where the Site offers paid downloads, paid guides, or consult bookings,
-        the price, scope, and refund policy will be displayed at checkout. David
-        Ortiz, operating Tomodachi, is the merchant of record for these
-        purchases, and Stripe acts as the payment processor. Stripe Tax may
-        calculate tax at checkout, but that automation does not transfer the
-        operator&apos;s responsibility for required tax registrations, filings,
-        collection, or remittance. Unless stated otherwise, digital downloads
-        are non-refundable once the download link has been delivered, and
-        consult bookings can be rescheduled with at least 24 hours&apos; notice.
+        Tomodachi currently offers no paid service and contains no active
+        checkout. A possible one-time expanded AI creator plan is only a product
+        direction, not an offer for sale. Any future paid feature will require
+        updated Terms that clearly identify its price, scope, fulfillment,
+        cancellation and refund rules, data handling, and payment provider
+        before anyone can purchase it.
       </p>
 
       <h2>8. Intellectual property</h2>
@@ -136,8 +134,7 @@ export default function Terms() {
         Tomodachi, is not liable for indirect, incidental, special,
         consequential, or punitive damages, or any loss of data or profits,
         arising from your use of the Site. Our total liability for any claim
-        related to the Site will not exceed the amount you paid us in the twelve
-        months preceding the claim, or USD 50 if you paid us nothing.
+        related to the Site will not exceed USD 50.
       </p>
 
       <h2>11. Termination and deletion</h2>

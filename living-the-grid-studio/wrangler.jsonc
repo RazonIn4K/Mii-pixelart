@@ -22,6 +22,7 @@
       "/faq",
       "/about",
       "/help",
+      "/ai-plan",
       "/unlock",
       "/support",
       "/donate",
@@ -39,16 +40,15 @@
       "/search",
       "/moderation",
       "/me",
-      "/me/*"
-    ]
+      "/me/*",
+    ],
   },
   "vars": {
     "ENVIRONMENT": "local",
     "PUBLIC_SITE_URL": "http://localhost:3000",
     "GOOGLE_OIDC_REDIRECT_URI": "http://localhost:3000/api/auth/google/callback",
-    "TERMS_VERSION": "2026-07-14",
+    "TERMS_VERSION": "2026-07-16",
     "COMMUNITY_MUTATIONS_ENABLED": "true",
-    "CONSULT_SALES_ENABLED": "false"
   },
   "secrets": {
     "required": [
@@ -58,50 +58,71 @@
       "SESSION_PEPPER",
       "PSEUDONYM_KEY",
       "OPENROUTER_API_KEY",
-      "STRIPE_SECRET_KEY",
-      "STRIPE_WEBHOOK_SECRET"
-    ]
+    ],
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "tomodachi-studio-local",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "./migrations"
-    }
+      "migrations_dir": "./migrations",
+    },
   ],
   "r2_buckets": [
     {
       "binding": "PROJECTS",
-      "bucket_name": "tomodachi-studio-projects-local"
-    }
+      "bucket_name": "tomodachi-studio-projects-local",
+    },
   ],
   "kv_namespaces": [
     {
       "binding": "EDGE_CACHE",
-      "id": "5129b5ce8d2d435cb704b398a437f355"
-    }
+      "id": "5129b5ce8d2d435cb704b398a437f355",
+    },
   ],
   "images": {
     "binding": "IMAGES",
-    "remote": false
+    "remote": false,
   },
   "ratelimits": [
-    { "name": "AUTH_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
-    { "name": "SAVE_RATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } },
-    { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } },
-    { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1004", "simple": { "limit": 120, "period": 60 } },
-    { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1005", "simple": { "limit": 10, "period": 60 } },
-    { "name": "AI_RATE_LIMITER", "namespace_id": "1006", "simple": { "limit": 10, "period": 60 } },
-    { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1007", "simple": { "limit": 10, "period": 60 } }
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "SAVE_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    {
+      "name": "SOCIAL_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "DISCOVERY_RATE_LIMITER",
+      "namespace_id": "1004",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "COMMENT_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "AI_RATE_LIMITER",
+      "namespace_id": "1006",
+      "simple": { "limit": 10, "period": 60 },
+    },
   ],
   "triggers": {
-    "crons": ["0 * * * *"]
+    "crons": ["0 * * * *"],
   },
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "head_sampling_rate": 1 },
-    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 },
   },
   "env": {
     "staging": {
@@ -109,23 +130,20 @@
       "workers_dev": false,
       "preview_urls": false,
       "limits": {
-        "cpu_ms": 2000
+        "cpu_ms": 2000,
       },
       "assets": {
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": true
+        "run_worker_first": true,
       },
-      "routes": [
-        { "pattern": "staging.tomodachi.pw", "custom_domain": true }
-      ],
+      "routes": [{ "pattern": "staging.tomodachi.pw", "custom_domain": true }],
       "vars": {
         "ENVIRONMENT": "staging",
         "PUBLIC_SITE_URL": "https://staging.tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://staging.tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-14",
+        "TERMS_VERSION": "2026-07-16",
         "COMMUNITY_MUTATIONS_ENABLED": "true",
-        "CONSULT_SALES_ENABLED": "false"
       },
       "secrets": {
         "required": [
@@ -135,44 +153,70 @@
           "SESSION_PEPPER",
           "PSEUDONYM_KEY",
           "OPENROUTER_API_KEY",
-          "STRIPE_SECRET_KEY",
-          "STRIPE_WEBHOOK_SECRET"
-        ]
+        ],
       },
       "d1_databases": [
-        { "binding": "DB", "database_name": "tomodachi-studio-staging", "database_id": "57c021c9-fa3b-4f93-b8fc-025822e757c2", "migrations_dir": "./migrations" }
+        {
+          "binding": "DB",
+          "database_name": "tomodachi-studio-staging",
+          "database_id": "57c021c9-fa3b-4f93-b8fc-025822e757c2",
+          "migrations_dir": "./migrations",
+        },
       ],
       "r2_buckets": [
-        { "binding": "PROJECTS", "bucket_name": "tomodachi-studio-projects-staging" }
+        {
+          "binding": "PROJECTS",
+          "bucket_name": "tomodachi-studio-projects-staging",
+        },
       ],
       "kv_namespaces": [
-        { "binding": "EDGE_CACHE", "id": "c79d996b11084e84b5953834104b8152" }
+        { "binding": "EDGE_CACHE", "id": "c79d996b11084e84b5953834104b8152" },
       ],
       "images": { "binding": "IMAGES", "remote": false },
       "ratelimits": [
-        { "name": "AUTH_RATE_LIMITER", "namespace_id": "1101", "simple": { "limit": 10, "period": 60 } },
-        { "name": "SAVE_RATE_LIMITER", "namespace_id": "1102", "simple": { "limit": 30, "period": 60 } },
-        { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1103", "simple": { "limit": 60, "period": 60 } },
-        { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1104", "simple": { "limit": 120, "period": 60 } },
-        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1105", "simple": { "limit": 10, "period": 60 } },
-        { "name": "AI_RATE_LIMITER", "namespace_id": "1106", "simple": { "limit": 10, "period": 60 } },
-        { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1107", "simple": { "limit": 10, "period": 60 } }
-      ]
+        {
+          "name": "AUTH_RATE_LIMITER",
+          "namespace_id": "1101",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "SAVE_RATE_LIMITER",
+          "namespace_id": "1102",
+          "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "SOCIAL_RATE_LIMITER",
+          "namespace_id": "1103",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "DISCOVERY_RATE_LIMITER",
+          "namespace_id": "1104",
+          "simple": { "limit": 120, "period": 60 },
+        },
+        {
+          "name": "COMMENT_RATE_LIMITER",
+          "namespace_id": "1105",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "AI_RATE_LIMITER",
+          "namespace_id": "1106",
+          "simple": { "limit": 10, "period": 60 },
+        },
+      ],
     },
     "production": {
       "name": "tomodachi-studio-production",
       "workers_dev": false,
       "preview_urls": false,
-      "routes": [
-        { "pattern": "tomodachi.pw", "custom_domain": true }
-      ],
+      "routes": [{ "pattern": "tomodachi.pw", "custom_domain": true }],
       "vars": {
         "ENVIRONMENT": "production",
         "PUBLIC_SITE_URL": "https://tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://tomodachi.pw/api/auth/google/callback",
-        "TERMS_VERSION": "2026-07-14",
+        "TERMS_VERSION": "2026-07-16",
         "COMMUNITY_MUTATIONS_ENABLED": "false",
-        "CONSULT_SALES_ENABLED": "false"
       },
       "secrets": {
         "required": [
@@ -182,29 +226,58 @@
           "SESSION_PEPPER",
           "PSEUDONYM_KEY",
           "OPENROUTER_API_KEY",
-          "STRIPE_SECRET_KEY",
-          "STRIPE_WEBHOOK_SECRET"
-        ]
+        ],
       },
       "d1_databases": [
-        { "binding": "DB", "database_name": "tomodachi-studio-production", "database_id": "22222222-2222-2222-2222-222222222222", "migrations_dir": "./migrations" }
+        {
+          "binding": "DB",
+          "database_name": "tomodachi-studio-production",
+          "database_id": "22222222-2222-2222-2222-222222222222",
+          "migrations_dir": "./migrations",
+        },
       ],
       "r2_buckets": [
-        { "binding": "PROJECTS", "bucket_name": "tomodachi-studio-projects-production" }
+        {
+          "binding": "PROJECTS",
+          "bucket_name": "tomodachi-studio-projects-production",
+        },
       ],
       "kv_namespaces": [
-        { "binding": "EDGE_CACHE", "id": "22222222222222222222222222222222" }
+        { "binding": "EDGE_CACHE", "id": "22222222222222222222222222222222" },
       ],
       "images": { "binding": "IMAGES", "remote": false },
       "ratelimits": [
-        { "name": "AUTH_RATE_LIMITER", "namespace_id": "1201", "simple": { "limit": 10, "period": 60 } },
-        { "name": "SAVE_RATE_LIMITER", "namespace_id": "1202", "simple": { "limit": 30, "period": 60 } },
-        { "name": "SOCIAL_RATE_LIMITER", "namespace_id": "1203", "simple": { "limit": 60, "period": 60 } },
-        { "name": "DISCOVERY_RATE_LIMITER", "namespace_id": "1204", "simple": { "limit": 120, "period": 60 } },
-        { "name": "COMMENT_RATE_LIMITER", "namespace_id": "1205", "simple": { "limit": 10, "period": 60 } },
-        { "name": "AI_RATE_LIMITER", "namespace_id": "1206", "simple": { "limit": 10, "period": 60 } },
-        { "name": "STRIPE_RATE_LIMITER", "namespace_id": "1207", "simple": { "limit": 10, "period": 60 } }
-      ]
-    }
-  }
+        {
+          "name": "AUTH_RATE_LIMITER",
+          "namespace_id": "1201",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "SAVE_RATE_LIMITER",
+          "namespace_id": "1202",
+          "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "SOCIAL_RATE_LIMITER",
+          "namespace_id": "1203",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "DISCOVERY_RATE_LIMITER",
+          "namespace_id": "1204",
+          "simple": { "limit": 120, "period": 60 },
+        },
+        {
+          "name": "COMMENT_RATE_LIMITER",
+          "namespace_id": "1205",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "AI_RATE_LIMITER",
+          "namespace_id": "1206",
+          "simple": { "limit": 10, "period": 60 },
+        },
+      ],
+    },
+  },
 }

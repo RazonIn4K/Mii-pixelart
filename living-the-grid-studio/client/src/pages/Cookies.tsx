@@ -25,7 +25,7 @@ export default function Cookies() {
   return (
     <LegalLayout
       title="Cookie Notice"
-      lastUpdated="July 13, 2026"
+      lastUpdated="July 16, 2026"
       intro="This page explains what we store in your browser and why. You can change your mind any time."
     >
       <h2>What we use</h2>
@@ -44,10 +44,6 @@ export default function Cookies() {
         <li>
           <code>ltg.consent.v1</code> — your cookie preferences. Without this
           entry the banner would appear every visit.
-        </li>
-        <li>
-          Server session cookies during a Stripe checkout flow, set by Stripe
-          directly. These cookies are required to complete a purchase.
         </li>
       </ul>
 
@@ -120,8 +116,8 @@ export default function Cookies() {
       <h2>Browser-level controls</h2>
       <p>
         Most browsers let you block cookies entirely or per-site. Blocking
-        essential cookies may break checkout. We recommend using the banner
-        controls above instead.
+        essential cookies may break sign-in, account sessions, and authenticated
+        AI features. We recommend using the banner controls above instead.
       </p>
     </LegalLayout>
   );

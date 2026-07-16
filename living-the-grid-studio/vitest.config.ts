@@ -11,12 +11,12 @@ const ephemeralCredential = () => randomBytes(32).toString("base64url");
 const testSecretEnvironment = {
   GOOGLE_CLIENT_ID: "test-google-client-id",
   GOOGLE_CLIENT_SECRET: ephemeralCredential(),
-  OIDC_COOKIE_KEY: Buffer.from("test-only-oidc-cookie-key-000001").toString("base64url"),
+  OIDC_COOKIE_KEY: Buffer.from("test-only-oidc-cookie-key-000001").toString(
+    "base64url",
+  ),
   SESSION_PEPPER: "test-only-session-pepper",
   PSEUDONYM_KEY: "test-only-pseudonym-hmac-key",
   OPENROUTER_API_KEY: ephemeralCredential(),
-  STRIPE_SECRET_KEY: ephemeralCredential(),
-  STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
 } as const;
 
 // Wrangler validates required secret names before Miniflare applies its test
@@ -43,8 +43,6 @@ export default defineConfig({
           TEST_MIGRATIONS: await readD1Migrations("./migrations"),
           ...testSecretEnvironment,
           OPENROUTER_API_KEY: "",
-          STRIPE_SECRET_KEY: "",
-          STRIPE_WEBHOOK_SECRET: "",
         },
       },
     })),

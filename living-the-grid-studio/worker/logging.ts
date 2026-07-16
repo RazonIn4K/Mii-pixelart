@@ -9,10 +9,8 @@ const ROUTE_GROUPS = new Set([
   "public",
   "reports",
   "search",
-  "stripe",
   "tags",
   "users",
-  "webhooks",
 ]);
 
 interface RequestLogOptions {

@@ -3,7 +3,7 @@
  *
  * Top of the page: short teaser cards for the four recovery + studio guides.
  *   The CTA points at the matching free tool (studio, password check, help)
- *   and optionally upsells to /unlock or /support.
+ *   and may point to the free AI plan or non-payment support page.
  *
  * Below: four full-length Tomodachi Life player guides, rendered inline so
  * Google indexes the actual content. Each guide has an anchor ID so it can
@@ -59,7 +59,7 @@ const GUIDES: GuideCard[] = [
       "Free: a printable rotation order so you do the highest-value accounts first.",
     ],
     cta: { href: "/help", label: "Read the free 24-hour actions" },
-    upsell: { href: "/unlock", label: "Get the full paid checklist ($9)" },
+    upsell: { href: "/ai-plan", label: "Try the free AI Action Plan" },
   },
   {
     id: "mii-face-mask-from-image",
@@ -104,8 +104,8 @@ const GUIDES: GuideCard[] = [
     ],
     cta: { href: "/", label: "Run the browser-only password check" },
     upsell: {
-      href: "/unlock",
-      label: "Pair it with the paid recovery checklist",
+      href: "/ai-plan",
+      label: "Pair it with a free AI Action Plan",
     },
   },
 ];
@@ -387,14 +387,13 @@ const LONG_GUIDES: LongGuide[] = [
           next priority to lock down.
         </p>
         <p>
-          For a structured written plan you can hand to a less-technical friend
-          or family member, the paid{" "}
-          <Link className="underline" href="/unlock">
-            recovery checklist
+          For a structured set of next steps you can review with a
+          less-technical friend or family member, try the free{" "}
+          <Link className="underline" href="/ai-plan">
+            AI Action Plan
           </Link>{" "}
-          covers the same flow as a structured, browser-based 12-step plan.
-          Consult bookings are temporarily paused while the notification,
-          scheduling, and follow-up workflow is verified.
+          beta. Never include passwords, recovery codes, payment details, or
+          other secrets in an AI prompt.
         </p>
       </>
     ),
@@ -669,8 +668,9 @@ export default function Guides() {
             Practical walkthroughs for the people we actually serve: Tomodachi
             Life players turning faces and characters into Mii repaint plans,
             and visitors arriving from the Tomodachishare breach notice. Every
-            guide gives you the working actions for free first, then points at
-            an optional paid upgrade only if you want more depth.
+            guide gives you the useful actions for free. When you want a
+            personalized checklist, the free AI Action Plan beta can help you
+            decide what to do next.
           </p>
           <nav
             aria-label="Jump to guide"
@@ -793,30 +793,27 @@ export default function Guides() {
               <footer className="pt-2 text-xs text-muted-foreground">
                 Found this helpful?{" "}
                 <Link href="/support" className="underline">
-                  Drop a tip
+                  Test another workflow
                 </Link>{" "}
                 or{" "}
-                <Link href="/unlock" className="underline">
-                  pick up a paid checklist
+                <Link href="/ai-plan" className="underline">
+                  try the free AI Action Plan
                 </Link>{" "}
-                to fund the next one.
+                and send useful feedback.
               </footer>
             </article>
           );
         })}
 
         <section className="border-t border-border pt-6">
-          <h2 className="text-lg font-semibold">Help keep guides free</h2>
+          <h2 className="text-lg font-semibold">Help improve the next guide</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every guide here stays free. The paid checklist on{" "}
-            <Link href="/unlock" className="underline">
-              /unlock
-            </Link>{" "}
-            and tips on{" "}
+            Every guide here is free. Use the workflows, then share specific
+            feedback through{" "}
             <Link href="/support" className="underline">
               /support
             </Link>{" "}
-            help fund the next one.
+            so the next revision solves a real problem.
           </p>
         </section>
       </main>

@@ -1,6 +1,6 @@
 # Tomodachi Domain Launch Checklist
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 Repo: RazonIn4K/Mii-pixelart
 Release evidence: record the exact reviewed commit and immutable deployment URL
 at each approved gate; do not reuse this checklist as proof for a later commit.
@@ -21,7 +21,7 @@ Recommended routes:
 - `/studio` - Living The Grid Studio.
 - `/help` - trust and account-safety guidance.
 - `/guides` - SEO articles and creator tutorials.
-- `/packs` - paid or email-gated template packs.
+- `/ai-plan` - free AI next-step plan beta.
 - `/privacy` - privacy policy.
 - `/affiliate-disclosure` - affiliate and sponsored content disclosure.
 
@@ -55,19 +55,19 @@ Recommended uses:
    remains canonical, GitLab remains a private security mirror, and Cloudflare
    remains the only runtime platform.
 
-## Monetization ladder
+## Product and sustainability boundary
 
-Start low-friction and trust-first:
+Keep the launch trust-first:
 
-1. Free studio usage and free guides.
-2. Display ads on guide pages and secondary creator pages.
-3. Affiliate links for creator tools and account-safety tools.
-4. Email capture for new template drops and status updates.
-5. Paid downloadable packs at $5 to $9.
-6. Premium creator workflow bundles at $19 to $49.
-7. Optional consult calls at $49 to $149 once the site has traffic.
-
-Do not overload the trust pages with ads. Put heavier monetization on guides, packs, and creative workflow pages.
+1. Studio use, recovery guidance, and the AI Action Plan beta stay free.
+2. The project accepts no payments, tips, recovery-product purchases, or
+   consultation bookings.
+3. Legacy checkout and webhook paths return provider-free `410 Gone` responses.
+4. A possible one-time $5 creator plan is product direction only and is not for
+   sale. It requires a separate decision plus account entitlements,
+   fulfillment, refund/revocation, usage-limit, privacy, and acceptance work.
+5. Advertising or affiliate experiments, if any, require accurate disclosures
+   and must not compromise trust or the Studio workflow.
 
 ## Disclosure copy
 
@@ -93,11 +93,11 @@ Do not overload the trust pages with ads. Put heavier monetization on guides, pa
    new exact-SHA staging approval and rerun Worker-hosted cold and interaction
    traces.
 2. The complete public service address is approved and published, and David
-   Ortiz confirmed ownership of the legal, privacy, security, help, abuse, and
-   consult channels. Verify live delivery and escalation for each channel.
-3. Google staging consent branding and the isolated Stripe test key/webhook are
-   complete. Run the real staging Google sign-in and signed Stripe acceptance
-   probes without altering production.
+   Ortiz confirmed ownership of the legal, privacy, security, help, and abuse
+   channels. Verify live delivery and escalation for each channel.
+3. Google staging consent branding is complete. Run the real staging Google
+   sign-in without altering production. Verify legacy payment and webhook paths
+   return provider-free `410 Gone` and make no upstream payment request.
 4. Preserve the existing real Chrome evidence and capture new Worker-hosted
    traces after every exact-source change. Lighthouse remains supporting
    accessibility/best-practices evidence, not a substitute for cold LCP, CLS,

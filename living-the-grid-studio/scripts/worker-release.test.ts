@@ -74,6 +74,7 @@ const assetRoutes = [
   "/faq",
   "/about",
   "/help",
+  "/ai-plan",
   "/unlock",
   "/support",
   "/donate",
@@ -101,8 +102,6 @@ const requiredSecrets = [
   "SESSION_PEPPER",
   "PSEUDONYM_KEY",
   "OPENROUTER_API_KEY",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
 ];
 
 const targetValues = {
@@ -176,11 +175,6 @@ function rateLimits(prefix: string) {
       namespace_id: `${prefix}06`,
       simple: { limit: 10, period: 60 },
     },
-    {
-      name: "STRIPE_RATE_LIMITER",
-      namespace_id: `${prefix}07`,
-      simple: { limit: 10, period: 60 },
-    },
   ];
 }
 
@@ -213,10 +207,9 @@ function environmentConfig(
       ENVIRONMENT: target,
       PUBLIC_SITE_URL: values.site,
       GOOGLE_OIDC_REDIRECT_URI: values.redirect,
-      TERMS_VERSION: "2026-07-13",
+      TERMS_VERSION: "2026-07-16",
       COMMUNITY_MUTATIONS_ENABLED:
         target === "local" || remoteWritable ? "true" : "false",
-      CONSULT_SALES_ENABLED: "false",
     },
     secrets: { required: requiredSecrets },
     d1_databases: [
@@ -321,7 +314,7 @@ function approval(
 ) {
   const bootstrap = deploymentPhase !== "standard";
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     target,
     intent: "deploy",
     deploymentPhase,
@@ -352,14 +345,6 @@ function approval(
       securityOwner: "Security Operations Owner",
       helpOwner: "Customer Help Owner",
       abuseOwner: "Trust and Safety Owner",
-      consult30FulfillmentOwner: "Consultation Fulfillment Owner",
-      consult30FulfillmentProcess:
-        "Paid consultation scheduling and refund runbook",
-    },
-    stripe: {
-      mode: target === "staging" ? "staging-test" : "production-live",
-      taxConfirmation: "Stripe tax configuration reviewed and approved",
-      consultSalesEnabled: false,
     },
     confirmations: {
       targetIsolationConfirmed: true,
@@ -375,7 +360,6 @@ function approval(
       stagingAcceptancePassed: target === "production" || !bootstrap,
       productionCutoverApproved: target === "production" || !bootstrap,
       communityMutationsEnabled,
-      consultFulfillmentTestPassed: false,
       writableCommunityDeployApproved: communityMutationsEnabled,
       bootstrapReadOnlyApproved: bootstrap,
     },
@@ -468,11 +452,6 @@ function makeHarness(
         SESSION_PEPPER: "session-pepper-a1b2c3d4e5f6g7h8i9j0k1l2",
         PSEUDONYM_KEY: "pseudonym-key-a1b2c3d4e5f6g7h8i9j0k1l2",
         OPENROUTER_API_KEY: `sk-${"or-v1"}-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`,
-        STRIPE_SECRET_KEY:
-          target === "staging"
-            ? `rk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`
-            : `sk_${"live"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
-        STRIPE_WEBHOOK_SECRET: `wh${"sec"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
       }),
     );
   }
@@ -616,25 +595,29 @@ describe("parseJsonc", () => {
 });
 
 describe("runRelease dry-run", () => {
-  it.each(["AI_RATE_LIMITER", "STRIPE_RATE_LIMITER"])(
-    "rejects a missing %s binding before build",
-    async (bindingName) => {
-      const harness = makeHarness("local");
-      const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
-      source.ratelimits = source.ratelimits.filter(
-        (binding: { name: string }) => binding.name !== bindingName,
-      );
-      harness.files.set(SOURCE_PATH, JSON.stringify(source));
+  it.each([
+    "AUTH_RATE_LIMITER",
+    "SAVE_RATE_LIMITER",
+    "SOCIAL_RATE_LIMITER",
+    "DISCOVERY_RATE_LIMITER",
+    "COMMENT_RATE_LIMITER",
+    "AI_RATE_LIMITER",
+  ])("rejects a missing %s binding before build", async (bindingName) => {
+    const harness = makeHarness("local");
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    source.ratelimits = source.ratelimits.filter(
+      (binding: { name: string }) => binding.name !== bindingName,
+    );
+    harness.files.set(SOURCE_PATH, JSON.stringify(source));
 
-      await expect(
-        runRelease(
-          { cwd: CWD, target: "local", intent: "dry-run" },
-          harness.dependencies,
-        ),
-      ).rejects.toThrow("Rate-limit bindings");
-      expect(harness.calls).toHaveLength(0);
-    },
-  );
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "local", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Rate-limit bindings");
+    expect(harness.calls).toHaveLength(0);
+  });
 
   it("builds the explicit local selection and always invokes Wrangler with --dry-run", async () => {
     const harness = makeHarness("local");
@@ -997,7 +980,7 @@ describe("runRelease deploy gates", () => {
     }
   });
 
-  it("rejects missing audited owner inputs and a mismatched Stripe mode before commands", async () => {
+  it("rejects missing audited owner inputs before commands", async () => {
     const auditedInputHarness = makeHarness("staging");
     const approvalPath = path.join(
       CWD,
@@ -1016,172 +999,6 @@ describe("runRelease deploy gates", () => {
       ),
     ).rejects.toThrow("Operational owner input");
     expect(auditedInputHarness.calls).toHaveLength(0);
-
-    const stripeHarness = makeHarness("production");
-    const productionApprovalPath = path.join(
-      CWD,
-      ".deployment-readiness",
-      "production.json",
-    );
-    const wrongStripeMode = JSON.parse(
-      stripeHarness.files.get(productionApprovalPath)!,
-    );
-    wrongStripeMode.stripe.mode = "staging-test";
-    stripeHarness.files.set(
-      productionApprovalPath,
-      JSON.stringify(wrongStripeMode),
-    );
-    await expect(
-      runRelease(
-        { cwd: CWD, target: "production", intent: "deploy" },
-        stripeHarness.dependencies,
-      ),
-    ).rejects.toThrow("Stripe release mode");
-    expect(stripeHarness.calls).toHaveLength(0);
-  });
-
-  it("requires an explicit consult sales variable before running commands", async () => {
-    const harness = makeHarness("staging");
-    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
-    delete source.env.staging.vars.CONSULT_SALES_ENABLED;
-    harness.files.set(SOURCE_PATH, JSON.stringify(source));
-
-    await expect(
-      runRelease(
-        { cwd: CWD, target: "staging", intent: "deploy" },
-        harness.dependencies,
-      ),
-    ).rejects.toThrow(
-      "Consult sales mode must be an explicit true or false string",
-    );
-    expect(harness.calls).toHaveLength(0);
-  });
-
-  it("rejects a generated consult sales mode that disagrees with the selected source", async () => {
-    const harness = makeHarness("staging");
-    const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
-    generated.vars.CONSULT_SALES_ENABLED = "true";
-    harness.files.set(GENERATED_PATH, JSON.stringify(generated));
-
-    await expect(
-      runRelease(
-        { cwd: CWD, target: "staging", intent: "deploy" },
-        harness.dependencies,
-      ),
-    ).rejects.toThrow("Generated consult sales mode");
-    expect(harness.calls).toHaveLength(3);
-    expect(harness.calls.at(-1)?.args).toEqual(["build"]);
-    expect(harness.calls.some((call) => call.args.includes("deploy"))).toBe(
-      false,
-    );
-  });
-
-  it("requires consult sales and fulfillment evidence to remain false during bootstrap", async () => {
-    const salesHarness = makeHarness("staging", { bootstrap: true });
-    const approvalPath = path.join(
-      CWD,
-      ".deployment-readiness",
-      "staging.json",
-    );
-    const salesSource = JSON.parse(salesHarness.files.get(SOURCE_PATH)!);
-    salesSource.env.staging.vars.CONSULT_SALES_ENABLED = "true";
-    salesHarness.files.set(SOURCE_PATH, JSON.stringify(salesSource));
-    salesHarness.files.set(
-      GENERATED_PATH,
-      JSON.stringify(generatedConfig("staging", salesSource)),
-    );
-    const salesApproval = JSON.parse(salesHarness.files.get(approvalPath)!);
-    salesApproval.stripe.consultSalesEnabled = true;
-    salesHarness.files.set(approvalPath, JSON.stringify(salesApproval));
-    await expect(
-      runRelease(
-        { cwd: CWD, target: "staging", intent: "deploy" },
-        salesHarness.dependencies,
-      ),
-    ).rejects.toThrow("Bootstrap consult sales mode");
-    expect(salesHarness.calls).toHaveLength(0);
-
-    const testHarness = makeHarness("staging", { bootstrap: true });
-    const testApproval = JSON.parse(testHarness.files.get(approvalPath)!);
-    testApproval.confirmations.consultFulfillmentTestPassed = true;
-    testHarness.files.set(approvalPath, JSON.stringify(testApproval));
-    await expect(
-      runRelease(
-        { cwd: CWD, target: "staging", intent: "deploy" },
-        testHarness.dependencies,
-      ),
-    ).rejects.toThrow("Bootstrap consult fulfillment test state");
-    expect(testHarness.calls).toHaveLength(0);
-  });
-
-  it.each([
-    ["missing", undefined],
-    ["not a boolean", "true"],
-  ])(
-    "rejects %s consult fulfillment evidence before running commands",
-    async (_label, value) => {
-      const harness = makeHarness("staging");
-      const approvalPath = path.join(
-        CWD,
-        ".deployment-readiness",
-        "staging.json",
-      );
-      const deploymentApproval = JSON.parse(harness.files.get(approvalPath)!);
-      if (value === undefined) {
-        delete deploymentApproval.confirmations.consultFulfillmentTestPassed;
-      } else {
-        deploymentApproval.confirmations.consultFulfillmentTestPassed = value;
-      }
-      harness.files.set(approvalPath, JSON.stringify(deploymentApproval));
-
-      await expect(
-        runRelease(
-          { cwd: CWD, target: "staging", intent: "deploy" },
-          harness.dependencies,
-        ),
-      ).rejects.toThrow(
-        "Consult fulfillment test confirmation must be an explicit boolean",
-      );
-      expect(harness.calls).toHaveLength(0);
-    },
-  );
-
-  it("permits consult sales only with matching passed fulfillment evidence", async () => {
-    const approvalPath = path.join(
-      CWD,
-      ".deployment-readiness",
-      "staging.json",
-    );
-
-    for (const fulfillmentTestPassed of [false, true]) {
-      const harness = makeHarness("staging");
-      const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
-      source.env.staging.vars.CONSULT_SALES_ENABLED = "true";
-      harness.files.set(SOURCE_PATH, JSON.stringify(source));
-      harness.files.set(
-        GENERATED_PATH,
-        JSON.stringify(generatedConfig("staging", source)),
-      );
-      const deploymentApproval = JSON.parse(harness.files.get(approvalPath)!);
-      deploymentApproval.stripe.consultSalesEnabled = true;
-      deploymentApproval.confirmations.consultFulfillmentTestPassed =
-        fulfillmentTestPassed;
-      harness.files.set(approvalPath, JSON.stringify(deploymentApproval));
-
-      const result = runRelease(
-        { cwd: CWD, target: "staging", intent: "deploy" },
-        harness.dependencies,
-      );
-      if (fulfillmentTestPassed) {
-        await expect(result).resolves.toBeDefined();
-        expect(harness.calls).toHaveLength(4);
-      } else {
-        await expect(result).rejects.toThrow(
-          "Enabled consult sales require a passed fulfillment test",
-        );
-        expect(harness.calls).toHaveLength(0);
-      }
-    }
   });
 
   it("binds writable remote mode to explicit approval and permits it when both values are true", async () => {
@@ -1237,17 +1054,6 @@ describe("runRelease deploy gates", () => {
     ]);
   });
 
-  it("accepts a restricted Stripe test key for staging bootstrap", async () => {
-    const harness = makeHarness("staging", { bootstrap: true });
-
-    await runRelease(
-      { cwd: CWD, target: "staging", intent: "deploy" },
-      harness.dependencies,
-    );
-
-    expect(harness.calls).toHaveLength(4);
-  });
-
   it("permits an explicit read-only production bootstrap only after staging acceptance and cutover approval", async () => {
     const harness = makeHarness("production", { productionBootstrap: true });
 
@@ -1277,13 +1083,13 @@ describe("runRelease deploy gates", () => {
     );
     const cases = [
       (secrets: Record<string, string>) => {
-        delete secrets.STRIPE_WEBHOOK_SECRET;
+        delete secrets.OPENROUTER_API_KEY;
       },
       (secrets: Record<string, string>) => {
         secrets.EXTRA_SECRET = "not-allowed";
       },
       (secrets: Record<string, string>) => {
-        secrets.STRIPE_SECRET_KEY = "sk_test_REPLACE_ME";
+        secrets.OPENROUTER_API_KEY = "sk-or-v1-REPLACE_ME";
       },
       (secrets: Record<string, string>) => {
         secrets.OIDC_COOKIE_KEY = "too-short";
@@ -1304,42 +1110,6 @@ describe("runRelease deploy gates", () => {
       expect(harness.calls).toHaveLength(0);
     }
   });
-
-  it.each([
-    {
-      target: "staging" as const,
-      options: { bootstrap: true },
-      stripeSecretKey: `rk_${"live"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
-    },
-    {
-      target: "production" as const,
-      options: { productionBootstrap: true },
-      stripeSecretKey: `sk_${"test"}_a1b2c3d4e5f6g7h8i9j0k1l2`,
-    },
-  ])(
-    "rejects a Stripe key from the wrong mode for $target bootstrap",
-    async ({ target, options, stripeSecretKey }) => {
-      const harness = makeHarness(target, options);
-      const secretPath = path.join(
-        CWD,
-        ".deployment-readiness",
-        `${target}.secrets.json`,
-      );
-      const secrets = JSON.parse(harness.files.get(secretPath)!);
-      secrets.STRIPE_SECRET_KEY = stripeSecretKey;
-      harness.files.set(secretPath, JSON.stringify(secrets));
-
-      await expect(
-        runRelease(
-          { cwd: CWD, target, intent: "deploy" },
-          harness.dependencies,
-        ),
-      ).rejects.toThrow(
-        "One or more bootstrap secrets are missing, placeholder, or malformed.",
-      );
-      expect(harness.calls).toHaveLength(0);
-    },
-  );
 
   it.each([
     { label: "a directory", isRegularFile: false, permissions: 0o600 },

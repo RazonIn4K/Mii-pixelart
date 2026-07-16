@@ -70,18 +70,19 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/support": {
     description:
-      "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.",
+      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback. No payments or tips are accepted.",
     title: "Support · Tomodachi",
   },
-  "/unlock": {
+  "/ai-plan": {
     description:
-      "Paid browser-based recovery checklist for the Tomodachishare breach. Consult bookings are temporarily paused.",
-    title: "Unlock · Tomodachi",
+      "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+    title: "AI Action Plan · Tomodachi",
   },
 };
 
 const LEGACY_ROUTE_ALIASES: Readonly<Record<string, string>> = {
   "/donate": "/support",
+  "/unlock": "/ai-plan",
 };
 
 const STATIC_ROUTE_ALIASES: Readonly<Record<string, string>> = {

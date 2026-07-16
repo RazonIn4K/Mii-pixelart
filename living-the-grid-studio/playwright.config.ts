@@ -12,8 +12,6 @@ Object.assign(process.env, {
   SESSION_PEPPER: ephemeralCredential(),
   PSEUDONYM_KEY: ephemeralCredential(),
   OPENROUTER_API_KEY: ephemeralCredential(),
-  STRIPE_SECRET_KEY: ephemeralCredential(),
-  STRIPE_WEBHOOK_SECRET: ephemeralCredential(),
   // Give consent tests a same-origin analytics target that Playwright
   // intercepts locally. No external analytics service is contacted.
   VITE_ANALYTICS_ENDPOINT: "/__test/analytics",

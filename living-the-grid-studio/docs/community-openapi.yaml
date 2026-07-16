@@ -11,16 +11,15 @@ info:
     saves. All JSON successes use `{data, meta?, requestId}` and all JSON errors
     use `{error:{code,message,fields?}, requestId}`. Account export and binary
     project/media downloads are the documented streaming exceptions. Legacy
-    `/api/ai/*`, `/api/stripe/*`, and `/api/webhooks/stripe` parity routes are
-    intentionally outside this community contract and retain their preexisting
-    response shapes rather than the community JSON envelope. Consult sales on
-    those parity routes fail closed unless `CONSULT_SALES_ENABLED` is exactly
-    `true`: the catalog omits `consult-30`, and direct checkout returns HTTP 503
-    with `{code:"consult_sales_disabled",configured:true,error:"Consult bookings are temporarily unavailable."}`.
-    Recovery and support products remain available. Unsafe community
-    mutations can return the shared `503 ServiceUnavailable` response while the
-    fail-closed incident switch is disabled; documented authentication,
-    deletion, AI, Stripe, and webhook controls are exempt.
+    `/api/ai/*` routes remain outside this community contract and retain their
+    preexisting response shapes rather than the community JSON envelope. The
+    historic `/api/stripe/*` and `/api/webhooks/stripe` paths are provider-free
+    retirement tombstones that always return HTTP 410; they contain no catalog,
+    checkout, session verification, webhook processing, secrets, or external
+    provider call. Unsafe community mutations can return the shared `503
+    ServiceUnavailable` response while the fail-closed incident switch is
+    disabled; documented authentication, deletion, AI, and retired-route
+    controls are exempt.
 servers:
   - url: https://tomodachi.pw
     description: Production (not authorized for deployment by this contract)
@@ -1427,9 +1426,7 @@ paths:
           content:
             application/json:
               schema:
-                {
-                  $ref: "#/components/schemas/ProfileImageModerationEnvelope",
-                }
+                { $ref: "#/components/schemas/ProfileImageModerationEnvelope" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }

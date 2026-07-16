@@ -13,5 +13,3 @@ OPENROUTER_API_KEY=""
 # Set to "allow" only if the free-model roster becomes unavailable under
 # "deny" and the privacy tradeoff is accepted.
 # OPENROUTER_DATA_COLLECTION="deny"
-STRIPE_SECRET_KEY=""
-STRIPE_WEBHOOK_SECRET=""

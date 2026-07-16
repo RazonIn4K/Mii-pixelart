@@ -1,8 +1,8 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.3
+**Version:** 2.4
 
-**Last Updated:** 2026-07-14
+**Last Updated:** 2026-07-16
 
 > **Deployment status (2026-07-14):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
@@ -52,9 +52,8 @@ Mii-pixelart/
     │       ├── lib/
     │       │   └── engine/        ← Pure TS engine (no React deps)
     │       └── pages/             ← Route-level page components
-    ├── server/                    ← Shared AI/Stripe helpers retained for parity
-    │   ├── openrouter.ts
-    │   └── stripe.ts
+    ├── server/                    ← Shared OpenRouter helper retained for parity
+    │   └── openrouter.ts
     ├── functions/                 ← Legacy Pages rollback Functions
     │   └── api/
     ├── worker/                    ← Unified Worker routes, policy, jobs, and documents
@@ -118,12 +117,10 @@ graph TB
 
     subgraph External["External Services"]
         OR["OpenRouter API<br/>(AI models)"]
-        Stripe["Stripe API<br/>(payments)"]
     end
 
     Browser -->|"assets, APIs, public documents"| Worker
     Worker -->|"OPENROUTER_API_KEY"| OR
-    Worker -->|"STRIPE_SECRET_KEY"| Stripe
 
     style Browser fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -240,7 +237,8 @@ graph TD
     Studio["/studio  →  Studio.tsx"]
     Help["/help  →  Help.tsx"]
     Guides["/guides  →  Guides.tsx"]
-    Unlock["/unlock  →  Unlock.tsx"]
+    AiPlan["/ai-plan  →  AiPlan.tsx"]
+    Unlock["/unlock  →  redirect to /ai-plan"]
     Support["/support  →  Support.tsx"]
     Legal["Legal pages<br/>Privacy / Terms / Cookies<br/>Disclosure"]
     NotFound["* → NotFound.tsx"]
@@ -250,6 +248,7 @@ graph TD
     Router --> Studio
     Router --> Help
     Router --> Guides
+    Router --> AiPlan
     Router --> Unlock
     Router --> Support
     Router --> Legal
@@ -477,14 +476,16 @@ flowchart LR
 ## API Routes
 
 The branch runs local development and deployed requests through the same Worker
-entry point. Existing AI, Stripe, webhook, and crawler behavior is ported into
-that Worker; the old Express/Pages paths remain only as compatibility and
-rollback references.
+entry point. Existing AI and crawler behavior is ported into that Worker. Paid
+recovery, tips, checkout, and consultations are retired; the old payment and
+webhook paths remain only as provider-free `410 Gone` tombstones so stale
+clients cannot fall through to the SPA. The Pages paths remain for rollback
+compatibility.
 
 ```mermaid
 graph LR
     subgraph Runtime["worker/index.ts + router.ts"]
-        Legacy["Legacy parity<br/>/api/ai/* + /api/stripe/* + webhook"]
+        Legacy["Legacy compatibility<br/>/api/ai/* + retired-payment 410 tombstones"]
         Auth["Auth + account<br/>/api/auth/* + /api/me/*"]
         Creations["Projects + publishing<br/>/api/creations/*"]
         Discovery["Public discovery<br/>search + tags + profiles"]

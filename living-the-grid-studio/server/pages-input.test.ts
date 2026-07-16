@@ -1,83 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
-import { onRequest as handleStripe } from "../functions/api/stripe/[[path]]";
-import { onRequestPost as handleStripeWebhook } from "../functions/api/webhooks/stripe";
-import { CONSULT_SALES_DISABLED_BODY } from "./stripe";
+import { onRequest as handleRetiredPayment } from "../functions/api/stripe/[[path]]";
+import { onRequestPost as handleRetiredWebhook } from "../functions/api/webhooks/stripe";
 
-const jsonRequest = (url: string, body: string, contentLength?: number) =>
+const jsonRequest = (url: string, body: string) =>
   new Request(url, {
     body,
-    headers: {
-      "Content-Type": "application/json",
-      ...(contentLength === undefined
-        ? {}
-        : { "Content-Length": String(contentLength) }),
-    },
+    headers: { "Content-Type": "application/json" },
     method: "POST",
   });
 
 describe("legacy Pages input handling", () => {
-  it("filters consult products in Pages unless sales are explicitly enabled", async () => {
-    const disabledResponse = await handleStripe({
-      env: {
-        CONSULT_SALES_ENABLED: "false",
-        STRIPE_SECRET_KEY: "test-key",
-      },
-      params: { path: "products" },
-      request: new Request("https://example.test/api/stripe/products"),
-    });
-    const enabledResponse = await handleStripe({
-      env: {
-        CONSULT_SALES_ENABLED: "true",
-        STRIPE_SECRET_KEY: "test-key",
-      },
-      params: { path: "products" },
-      request: new Request("https://example.test/api/stripe/products"),
-    });
-    const disabledPayload = (await disabledResponse.json()) as {
-      products: Array<{ category: string; id: string }>;
-    };
-    const enabledPayload = (await enabledResponse.json()) as {
-      products: Array<{ category: string; id: string }>;
-    };
-
-    expect(disabledResponse.status).toBe(200);
-    expect(
-      disabledPayload.products.some((product) => product.id === "consult-30"),
-    ).toBe(false);
-    expect(
-      disabledPayload.products.some(
-        (product) => product.category === "recovery",
-      ),
-    ).toBe(true);
-    expect(
-      disabledPayload.products.some(
-        (product) => product.category === "support",
-      ),
-    ).toBe(true);
-    expect(
-      enabledPayload.products.some((product) => product.id === "consult-30"),
-    ).toBe(true);
-  });
-
-  it("rejects direct consult checkout through Pages while sales are disabled", async () => {
-    const response = await handleStripe({
-      env: {
-        CONSULT_SALES_ENABLED: "false",
-        STRIPE_SECRET_KEY: "test-key",
-      },
-      params: { path: "checkout" },
-      request: jsonRequest(
-        "https://example.test/api/stripe/checkout",
-        JSON.stringify({ productId: "consult-30" }),
-      ),
-    });
-
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual(CONSULT_SALES_DISABLED_BODY);
-  });
-
   it("advertises AI as unavailable when authenticated Worker bindings are absent", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
@@ -107,133 +41,49 @@ describe("legacy Pages input handling", () => {
     });
   });
 
-  it("returns a controlled Stripe error for a JSON null body", async () => {
-    const response = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest("https://example.test/api/stripe/checkout", "null"),
-    });
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      configured: true,
-      error: "Unknown product id: (missing).",
-    });
-  });
-
-  it("returns controlled 400 responses for malformed JSON", async () => {
-    const aiResponse = await handleAi({
+  it("returns controlled AI responses for malformed input without parsing payment data", async () => {
+    const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "{"),
     });
-    const stripeResponse = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest("https://example.test/api/stripe/checkout", "{"),
-    });
-    expect(aiResponse.status).toBe(503);
-    expect(stripeResponse.status).toBe(400);
-    await expect(aiResponse.json()).resolves.toMatchObject({
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
       reply: expect.stringContaining("authenticated community Worker"),
     });
-    await expect(stripeResponse.json()).resolves.toMatchObject({
-      error: "Invalid JSON request body.",
-    });
   });
 
-  it("rejects declared oversized AI and Stripe bodies with 413", async () => {
-    const aiResponse = await handleAi({
-      env: { OPENROUTER_API_KEY: "test-key" },
-      params: { path: "chat" },
-      request: jsonRequest("https://example.test/api/ai/chat", "{}", 1_000_001),
-    });
-    const stripeResponse = await handleStripe({
-      env: { STRIPE_SECRET_KEY: "test-key" },
-      params: { path: "checkout" },
-      request: jsonRequest(
-        "https://example.test/api/stripe/checkout",
-        "{}",
-        100_001,
-      ),
-    });
-    expect(aiResponse.status).toBe(503);
-    expect(stripeResponse.status).toBe(413);
-  });
-
-  it("bounds Stripe webhook bodies before signature verification", async () => {
-    const response = await handleStripeWebhook({
-      env: { STRIPE_WEBHOOK_SECRET: "test-secret" },
-      request: new Request("https://example.test/api/webhooks/stripe", {
-        body: "{}",
-        headers: {
-          "Content-Length": "1000001",
-          "Stripe-Signature": "t=0,v1=invalid",
-        },
-        method: "POST",
-      }),
-    });
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({
-      error: "Request body is too large.",
-    });
-  });
-
-  it("keeps the retained Pages webhook free of provider-specific logs", async () => {
-    const secret = "test-only-pages-webhook-secret";
-    const eventId = "evt_pages_sensitive_123";
-    const eventType = "checkout.session.completed";
-    const body = JSON.stringify({ id: eventId, type: eventType });
-    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const errorLog = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-
-    try {
-      const response = await handleStripeWebhook({
-        env: { STRIPE_WEBHOOK_SECRET: secret },
-        request: new Request("https://example.test/api/webhooks/stripe", {
-          body,
-          headers: {
-            "Stripe-Signature": await stripeSignature(body, secret),
-          },
+  it.each([
+    [
+      "catalog",
+      handleRetiredPayment,
+      "https://example.test/api/stripe/products",
+    ],
+    [
+      "checkout",
+      handleRetiredPayment,
+      "https://example.test/api/stripe/checkout",
+    ],
+    [
+      "webhook",
+      handleRetiredWebhook,
+      "https://example.test/api/webhooks/stripe",
+    ],
+  ])(
+    "retires the legacy Pages %s endpoint with no provider call",
+    async (_label, handler, url) => {
+      const response = await handler({
+        request: new Request(url, {
+          body: JSON.stringify({ card: "must-not-be-read" }),
           method: "POST",
         }),
       });
 
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ received: true });
-      expect(log).not.toHaveBeenCalled();
-      expect(errorLog).not.toHaveBeenCalled();
-      const serializedLogs = JSON.stringify([
-        ...log.mock.calls,
-        ...errorLog.mock.calls,
-      ]);
-      expect(serializedLogs).not.toContain(eventId);
-      expect(serializedLogs).not.toContain(eventType);
-    } finally {
-      log.mockRestore();
-      errorLog.mockRestore();
-    }
-  });
+      expect(response.status).toBe(410);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "payments_retired" },
+      });
+    },
+  );
 });
-
-async function stripeSignature(body: string, secret: string): Promise<string> {
-  const timestamp = Math.floor(Date.now() / 1_000);
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"],
-  );
-  const digest = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(`${timestamp}.${body}`),
-  );
-  const signature = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  return `t=${timestamp},v1=${signature}`;
-}

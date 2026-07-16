@@ -142,7 +142,7 @@ function shellFor(route: string, shell: RouteShell): string {
       <a href="/faq">FAQ</a> ·
       <a href="/about">About</a> ·
       <a href="/help">Help</a> ·
-      <a href="/unlock">Unlock</a> ·
+      <a href="/ai-plan">AI Action Plan</a> ·
       <a href="/support">Support</a>
     </nav>
   </footer>
@@ -165,8 +165,8 @@ const ROUTES: Record<string, RouteShell> = {
         <li><a href="/">Home recovery hub</a> — browser-only k-anonymity password breach check + AI recovery assistant.</li>
         <li><a href="/guides">Long-form guides</a> — Mii creation, Tomodachi Life gameplay basics, post-breach recovery, QR codes + save backup.</li>
         <li><a href="/faq">FAQ</a> — common questions answered.</li>
-        <li><a href="/unlock">Unlock</a> — paid $9 browser-based recovery checklist; consult bookings are temporarily paused.</li>
-        <li><a href="/support">Support</a> — $5 / $15 / $25 Stripe tips.</li>
+        <li><a href="/ai-plan">AI Action Plan</a> — a free beta for practical, reviewable next steps.</li>
+        <li><a href="/support">Support</a> — test the Studio, share original work, and report useful feedback.</li>
       </ul>`,
     jsonLd: [
       {
@@ -300,7 +300,7 @@ const ROUTES: Record<string, RouteShell> = {
       <p>Change your email password before anything else (because email controls every other password reset). Then turn on 2FA on that email, then rotate other accounts. <a href="/help">Free 24-hour action plan here</a>.</p>
       <h2>The site</h2>
       <h3>Is the Studio free?</h3>
-      <p>Yes. Import, reduce, export, password breach check, AI assistant — all free. Optional paid extras on <a href="/unlock">/unlock</a> and tips on <a href="/support">/support</a>.</p>
+      <p>Yes. Import, reduce, export, password breach check, and AI assistant are free. Tomodachi currently accepts no payments, tips, or consultation bookings.</p>
       <h3>Do you store my photos or my password?</h3>
       <p>Local reference imports stay in your browser unless you deliberately choose a separate showcase upload for a cloud creation. Showcase files are normalized, metadata-stripped, and the raw upload is discarded. The password check uses k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
     jsonLd: [
@@ -364,7 +364,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: "Is the Studio free?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. Import, reduce, export, password breach check, AI assistant are all free. Optional paid extras live on /unlock; tips on /support.",
+              text: "Yes. Import, reduce, export, password breach check, and AI assistant are free. Tomodachi currently accepts no payments, tips, or consultation bookings.",
             },
           },
           {
@@ -386,14 +386,14 @@ const ROUTES: Record<string, RouteShell> = {
     h1: "About Tomodachi",
     body: `
       <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual Face Paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
-      <h2>Free first, sponsor-supported</h2>
-      <p>The editor, the password check, the AI assistant, and every guide stay free. Optional paid extras live on <a href="/unlock">/unlock</a>; tips on <a href="/support">/support</a>.</p>
+      <h2>Free, useful, and honest about what exists</h2>
+      <p>The editor, the password check, the AI assistant, and every guide are free. Tomodachi does not currently accept payments or consultation bookings. See the <a href="/ai-plan">AI Action Plan</a> for the free beta and future product direction.</p>
       <h2>Privacy on principle</h2>
       <p>Local reference imports stay in the browser unless you deliberately choose a separate, normalized showcase upload. Google accounts and private cloud projects are optional; anonymous editing and export remain available. The password check uses k-anonymity against Have I Been Pwned, and optional tracking waits for cookie consent.</p>
       <h2>How to reach the project</h2>
       <ul>
         <li>Source code &amp; issues: <a href="https://github.com/RazonIn4K/Mii-pixelart">github.com/RazonIn4K/Mii-pixelart</a></li>
-        <li>Sponsorship: Stripe-backed tips and a paid recovery checklist via <a href="/support">/support</a> and <a href="/unlock">/unlock</a>.</li>
+        <li>Project support: test the Studio, share original work, or report useful feedback through <a href="/support">/support</a>.</li>
         <li>Brave Creators: tomodachi.pw is a verified Brave Creator.</li>
       </ul>`,
     jsonLd: [
@@ -440,7 +440,7 @@ const ROUTES: Record<string, RouteShell> = {
       </ol>
       <h2>Next 24 hours</h2>
       <p>Rotate passwords on accounts in priority order: financial (banks, brokerage, PayPal, crypto), cloud (Google Drive, iCloud, Dropbox), identity (Apple ID, Microsoft, Google), social (X, Instagram, Discord, Reddit), everything else. A password manager makes this an evening of work rather than a month-long fight.</p>
-      <p>For a longer checklist + 30-day monitoring plan, the paid <a href="/unlock">recovery checklist ($9)</a> spells out the same flow step by step on the return page. It does not include a PDF or Markdown download.</p>`,
+      <p>For personalized next steps, try the free <a href="/ai-plan">AI Action Plan beta</a>. Review every suggestion before acting and never include passwords, recovery codes, payment details, or other secrets.</p>`,
     jsonLd: [
       breadcrumbFor("Help", "/help"),
       {
@@ -457,58 +457,41 @@ const ROUTES: Record<string, RouteShell> = {
       },
     ],
   },
-  "/unlock": {
-    title: "Unlock · Tomodachi",
+  "/ai-plan": {
+    title: "AI Action Plan · Tomodachi",
     description:
-      "Paid browser-based recovery checklist for the Tomodachishare breach. Consult bookings are temporarily paused.",
-    h1: "Unlock",
+      "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+    h1: "AI Action Plan",
     body: `
-      <p>Free guidance stays free. The optional paid checklist provides a structured, browser-based recovery plan.</p>
-      <h2>Breach Recovery Checklist — $9</h2>
-      <p>A browser-based 12-step recovery flow for the Tomodachishare breach, with password, 2FA, session, and 30-day monitoring priorities. The checklist is unlocked on the return page; no PDF or Markdown download is included.</p>
-      <h2>Consult bookings are temporarily paused</h2>
-      <p>The 30-minute consult is not accepting new bookings while its purchase notification, scheduling, and written follow-up workflow completes staging verification. No consult checkout is available.</p>
-      <p>Not legal or law-enforcement advice. For active criminal incidents contact the appropriate authorities. Payments are processed by Stripe. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
+      <p>Tell Tomodachi what you are trying to make or fix and get a short, reviewable checklist covering what to do first, what can wait, and the quickest useful next action.</p>
+      <h2>Free beta available now</h2>
+      <p>Recovery planning is available from the home page, and creative advice is available inside the Studio. AI suggestions never change a project automatically.</p>
+      <h2>Expanded $5 creator plan is only a direction</h2>
+      <p>A one-time expanded plan is being explored, but it is not for sale. Tomodachi currently accepts no payments and has no checkout. A paid version will launch only after account entitlements, refunds, usage limits, privacy controls, and fulfillment are tested end to end.</p>
+      <p>Do not include passwords, payment details, recovery codes, government IDs, or other secrets in an AI prompt. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
     jsonLd: [
-      breadcrumbFor("Unlock", "/unlock"),
+      breadcrumbFor("AI Action Plan", "/ai-plan"),
       {
         "@context": "https://schema.org",
-        "@type": "ItemList",
-        url: "https://tomodachi.pw/unlock",
-        name: "Tomodachi paid recovery products",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            item: {
-              "@type": "Product",
-              name: "Breach Recovery Checklist",
-              description:
-                "A browser-based 12-step recovery flow for the Tomodachishare breach, unlocked on the return page without a PDF or Markdown download.",
-              offers: {
-                "@type": "Offer",
-                price: "9.00",
-                priceCurrency: "USD",
-                url: "https://tomodachi.pw/unlock",
-                availability: "https://schema.org/InStock",
-                seller: PUBLISHER_ORG,
-              },
-            },
-          },
-        ],
+        "@type": "WebPage",
+        url: "https://tomodachi.pw/ai-plan",
+        name: "Tomodachi AI Action Plan",
+        description:
+          "A free AI action-plan beta for practical, reviewable next steps.",
+        inLanguage: "en",
+        isPartOf: { "@id": "https://tomodachi.pw/#website" },
       },
     ],
   },
   "/support": {
     title: "Support · Tomodachi",
     description:
-      "Tip jar for the Tomodachi project. Drop $5, $15, or $25 to fund the next free guide.",
-    h1: "Help keep the tools free",
+      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback. No payments or tips are accepted.",
+    h1: "Support the workshop by using it",
     body: `
-      <p>The studio, the AI assistant, the breach recovery guides, and the password check are all free to use. Tips help cover hosting, API credits, and time to write the next free guide.</p>
-      <p>Three fixed tip amounts via Stripe Checkout: $5, $15, $25.</p>
-      <p>Not a registered nonprofit. Tips are not tax-deductible. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>
-      <p>Brave Rewards: tomodachi.pw is a verified Brave Creator. Brave browser users see the Rewards icon in the address bar.</p>`,
+      <p>Tomodachi does not currently accept payments, tips, donations, or consultation bookings.</p>
+      <p>Help by testing the Studio with a real workflow, sharing original work when community publishing opens, reporting reproducible bugs, or sending product feedback to help@tomodachi.pw.</p>
+      <p>Security reports belong at security@tomodachi.pw and should never contain passwords, session cookies, or private project files.</p>`,
     jsonLd: [
       breadcrumbFor("Support", "/support"),
       {
@@ -517,7 +500,7 @@ const ROUTES: Record<string, RouteShell> = {
         url: "https://tomodachi.pw/support",
         name: "Support the Tomodachi project",
         description:
-          "Tip jar for the Tomodachi project. Fixed Stripe tips at $5 / $15 / $25 plus Brave Rewards for the verified domain.",
+          "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback.",
         inLanguage: "en",
         about: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
@@ -529,6 +512,7 @@ const ROUTES: Record<string, RouteShell> = {
 // Routes that should resolve to identical SEO shells via aliasing.
 const ROUTE_ALIASES: Record<string, string> = {
   "/donate": "/support",
+  "/unlock": "/ai-plan",
   "/disclosure": "/about", // /affiliate-disclosure is a separate static legal page
   "": "/",
 };

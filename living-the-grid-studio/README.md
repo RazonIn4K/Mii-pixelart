@@ -18,7 +18,8 @@
 > mobile-performance scope. It is functionally accepted, but its cold-Studio
 > LCP misses the launch threshold and a live mixed-history Create request
 > produced a safely rejected empty grid. Community mutations are enabled only
-> on staging; consult sales remains disabled. The current branch contains an
+> on staging. Payments, tips, recovery-product sales, and consultations have
+> been retired. The current branch contains an
 > early Studio shell and server-side sketch-history isolation that are tested
 > but not deployed and require a new exact-SHA staging approval.
 > Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
@@ -67,10 +68,11 @@ community is not enabled on production
 - Discovery, search, profiles, likes, comments, follows, reports, and role-gated moderation
 - Anonymous editing plus JSON, PNG, CSV, HTML, and ZIP exports remain available without an account
 
-**Paid extras** (optional)
+**AI Action Plan** — [`/ai-plan`](https://tomodachi.pw/ai-plan)
 
-- [`/unlock`](https://tomodachi.pw/unlock) — $9 detailed recovery checklist; 30-minute consult bookings remain paused until fulfillment passes staging verification
-- [`/support`](https://tomodachi.pw/support) — $5 / $15 / $25 tip jar
+- The free beta turns a visitor's situation into a practical next-step plan.
+- A possible one-time $5 creator plan is product direction only. It is not for sale and will not launch until account entitlements, fulfillment, refunds, usage limits, privacy disclosures, and acceptance tests exist.
+- [`/support`](https://tomodachi.pw/support) lists no-payment ways to test the Studio, share creations, report bugs, and give feedback.
 
 ## Tech stack
 
@@ -80,7 +82,7 @@ community is not enabled on production
 - **Community data:** D1 for relational state and FTS5; private R2 for immutable project revisions and generated media
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
 - **Authentication:** Google authorization-code OIDC, encrypted transaction cookies, and hashed opaque sessions
-- **Payments:** Stripe Checkout with HMAC-SHA256 webhook verification at the edge
+- **Payments:** Retired. Legacy checkout and webhook paths return provider-free `410 Gone` tombstones so stale clients cannot fall through to the SPA.
 - **AI:** OpenRouter with capability-checked free-tier rotation (Gemma 4 vision, GPT-OSS 120B, Nemotron 3 Super 120B)
 - **Secrets:** Environment-scoped Wrangler secrets, optionally sourced from Doppler after deployment approval
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
@@ -167,32 +169,29 @@ pnpm worker:dry-run
 Worker secrets use an untracked `.dev.vars` locally and Cloudflare secrets after
 an explicit deployment approval. Vite-only `VITE_*` values may use `.env.local`:
 
-| Variable                        | Required for                   | Notes                                                       |
-| ------------------------------- | ------------------------------ | ----------------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients         |
-| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                                |
-| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                             |
-| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                                   |
-| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                                     |
-| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                         |
-| `STRIPE_SECRET_KEY`             | Paywall + tip jar              | Live or test key                                            |
-| `STRIPE_WEBHOOK_SECRET`         | Webhook signature verification | Per-endpoint secret from Stripe dashboard                   |
-| `CONSULT_SALES_ENABLED`         | Consult catalog and checkout   | Exact `true` only after fulfillment test; otherwise `false` |
-| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                          |
-| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                            |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                            |
+| Variable                        | Required for                   | Notes                                               |
+| ------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients |
+| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                        |
+| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                     |
+| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                           |
+| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                             |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                 |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                  |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                    |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                    |
 
 ## Project structure
 
 ```
 client/                  Vite + React SPA
   src/
-    pages/               Route components (Home, Studio, Unlock, Guides, FAQ, About, Help, Support, legal)
+    pages/               Route components (Home, Studio, AI Plan, Guides, FAQ, About, Help, Support, legal)
     components/
       studio/            AI panel, palette grid, import panel, etc.
       ui/                shadcn/ui primitives
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
-    lib/                 engine (JSON import/export, palette ops), breadcrumb, consent, stripeUrl
+    lib/                 engine (JSON import/export, palette ops), breadcrumb, consent
   public/                Static assets (original WebP artwork, community social card, PWA icons, sitemap, robots, headers)
 worker/                  Unified staging/target Worker (API, auth, documents, jobs)
 migrations/              Forward-only D1 migrations
@@ -200,9 +199,9 @@ shared/                  Shared validation and legacy contracts
 functions/               Current production Pages and retained rollback compatibility
   api/
     ai/[[path]].ts       KV-cached model list; chat fails closed without Worker auth/rate limits
-    stripe/[[path]].ts   Checkout + session verification + products
-    webhooks/stripe.ts   Stripe webhook with HMAC verification
-server/                  Portable OpenRouter/Stripe helpers shared by legacy parity code and the Worker
+    stripe/[[path]].ts   Provider-free 410 tombstone for retired payment clients
+    webhooks/stripe.ts   Provider-free 410 tombstone for retired webhook deliveries
+server/                  Portable OpenRouter helper shared by legacy parity code and the Worker
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```
@@ -224,12 +223,15 @@ pnpm verify       # Full verification suite
 
 ## Support and sponsorship
 
-If the studio or the guides have helped, a few ways to support the project:
+If the studio or the guides have helped, a few no-payment ways to support the project:
 
-- **Tip jar:** [tomodachi.pw/support](https://tomodachi.pw/support) — $5 / $15 / $25 via Stripe
-- **Paid products:** [tomodachi.pw/unlock](https://tomodachi.pw/unlock) — $9 recovery checklist; consult bookings are temporarily paused
-- **GitHub Sponsors:** the [`Sponsor`](https://github.com/sponsors/RazonIn4K) button at the top of this repo (once GitHub Sponsors approval clears)
-- **Brave Creator:** [tomodachi.brave](https://tomodachi.brave) is verified for Brave Rewards if you tip with BAT
+- Test a Studio workflow and report anything confusing through [GitHub issues](https://github.com/RazonIn4K/Mii-pixelart/issues).
+- Share a creation or compare a Copy Guide with the in-game drawing tools.
+- Send product and accessibility feedback through [tomodachi.pw/support](https://tomodachi.pw/support).
+
+Payments are not accepted. The free AI Action Plan beta lives at
+[tomodachi.pw/ai-plan](https://tomodachi.pw/ai-plan); a possible one-time $5
+creator plan remains gated product direction and is not for sale.
 
 ## License
 

@@ -184,8 +184,8 @@ human-authorized moderation.
 **Implemented and locally/CI tested:**
 
 - [x] Unified Hono Worker with Static Assets, D1, private R2, KV, Images, rate
-      limits, scheduled maintenance, dynamic documents, and legacy AI/Stripe
-      parity
+      limits, scheduled maintenance, dynamic documents, AI compatibility, and
+      provider-free `410 Gone` tombstones for retired payment routes
 - [x] Google authorization-code OIDC, onboarding, hashed opaque sessions,
       generated avatars, avatar regeneration, optional normalized profile
       images, profile/settings, export, and deletion lifecycle
@@ -202,12 +202,15 @@ human-authorized moderation.
       tests, and responsive/accessibility coverage
 - [x] Direct local Chromium 200 percent page-scale regression with keyboard
       focus and no document-level overflow
+- [x] Retire checkout, tips, paid recovery, and consultations; keep the AI
+      Action Plan beta free and mark the possible one-time $5 creator plan as
+      gated product direction, not an offer for sale
 
 **Accepted on isolated staging:**
 
 - [x] Exact source `406660bcfbef590d8da0e79a52b7ad7bc96e6590`
-      deployed with community mutations enabled only on isolated staging and
-      consult sales disabled; authenticated Studio, account navigation, share
+      deployed with community mutations enabled only on isolated staging;
+      authenticated Studio, account navigation, share
       review, security, crawler, accessibility, CSP, and isolation checks pass
 - [x] Authenticated single-account profile setup and Terms reacceptance,
       generated/custom avatar lifecycle, private cloud restore, showcase-image
@@ -240,8 +243,8 @@ human-authorized moderation.
 
 Production `tomodachi.pw` remains on the existing Cloudflare Pages deployment.
 The accepted staging deployment enables community mutations only in isolated
-staging for its approved single-account scope. Consult sales stays disabled
-everywhere, and no roadmap status grants approval for production. See the
+staging for its approved single-account scope. Payments and consultations are
+retired everywhere, and no roadmap status grants approval for production. See the
 sanitized exact-source record in
 `docs/release-evidence/2026-07-16-staging-true-256-406660b.md` and the remaining
 gates in `docs/production-readiness-plan.md`.

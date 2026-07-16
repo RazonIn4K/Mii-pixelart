@@ -6,7 +6,9 @@ const publicRoutes = [
   "/about",
   "/faq",
   "/studio",
+  "/ai-plan",
   "/unlock",
+  "/support",
   "/discover",
   "/search",
   "/community-guidelines",
@@ -47,56 +49,51 @@ for (const route of publicRoutes) {
   });
 }
 
-test("Unlock keeps consult sales visibly paused and has no consult checkout action", async ({
+test("AI plan and support surfaces expose no payment or checkout action", async ({
   page,
 }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop",
-    "One desktop check covers the shared fail-closed product catalog.",
+    "One desktop check covers the shared payment-free product surfaces.",
   );
 
-  const consultCheckoutRequests: string[] = [];
+  const paymentRequests: string[] = [];
   page.on("request", (request) => {
-    if (
-      request.method() === "POST" &&
-      new URL(request.url()).pathname === "/api/stripe/checkout"
-    ) {
-      consultCheckoutRequests.push(request.postData() ?? "");
+    if (/stripe|checkout|payment/iu.test(request.url())) {
+      paymentRequests.push(request.url());
     }
   });
 
-  await page.goto("/unlock", { waitUntil: "networkidle" });
+  await page.goto("/ai-plan", { waitUntil: "networkidle" });
   await expect(
-    page.getByText("Consult bookings are temporarily paused.", {
-      exact: true,
-    }),
+    page.getByRole("heading", { name: "Free AI plan beta", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", {
-      name: "Breach Recovery Checklist",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "30-min Recovery Consult" }),
-  ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /consult|\$49/i })).toHaveCount(
-    0,
-  );
-
-  await page.goto("/unlock?product=consult-30", {
-    waitUntil: "networkidle",
-  });
   await expect(
     page.getByText(
-      "The 30-minute consult is not accepting new bookings right now. No checkout is available for this product.",
+      "A one-time expanded plan is being explored, but it is not for sale yet. Tomodachi currently accepts no payments and has no checkout.",
       { exact: true },
     ),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /consult|\$49/i })).toHaveCount(
-    0,
-  );
-  expect(consultCheckoutRequests).toEqual([]);
+  await expect(
+    page.locator("a, button").filter({ hasText: /buy|checkout|pay/i }),
+  ).toHaveCount(0);
+
+  await page.goto("/unlock", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { name: "Free AI plan beta", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/support", { waitUntil: "networkidle" });
+  await expect(
+    page.getByText(
+      "Tomodachi does not currently accept payments, tips, donations, or consultation bookings. Testing the real workflow and sharing clear feedback helps more than a checkout ever could.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.locator("a, button").filter({ hasText: /buy|checkout|pay/i }),
+  ).toHaveCount(0);
+  expect(paymentRequests).toEqual([]);
 });
 
 test("phone header exposes Google sign-in before opening navigation", async ({

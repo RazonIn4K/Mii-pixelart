@@ -45,7 +45,7 @@ describe("Worker route documents", () => {
     expect(html).not.toContain("og-image.png");
   });
 
-  it("canonicalizes retained disclosure and support aliases", async () => {
+  it("canonicalizes retained disclosure, support, and retired unlock aliases", async () => {
     const disclosure = await dynamicDocument(
       context("/disclosure", "Mozilla/5.0"),
     );
@@ -60,6 +60,13 @@ describe("Worker route documents", () => {
     expect(donateHtml).toContain(
       '<link rel="canonical" href="http://localhost:3000/support">',
     );
+
+    const unlock = await dynamicDocument(context("/unlock", "Mozilla/5.0"));
+    const unlockHtml = await unlock!.text();
+    expect(unlockHtml).toContain(
+      '<link rel="canonical" href="http://localhost:3000/ai-plan">',
+    );
+    expect(unlockHtml).toContain("AI Action Plan · Tomodachi");
   });
 
   it("escapes creation text in both HTML metadata and JSON-LD", async () => {

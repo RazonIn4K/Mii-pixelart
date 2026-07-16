@@ -17,7 +17,7 @@ export default function Privacy() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      lastUpdated="July 14, 2026"
+      lastUpdated="July 16, 2026"
       intro="Tomodachi is a local-first pixel-art workshop with an optional account and community layer. Local editing and export do not require an account; cloud saving and publishing are deliberate choices."
     >
       <h2>1. Who we are</h2>
@@ -48,12 +48,6 @@ export default function Privacy() {
           transit our Worker to OpenRouter and the selected model provider. They
           are not treated as community projects unless you separately choose to
           save the resulting project.
-        </li>
-        <li>Newsletter email address, if you choose to subscribe.</li>
-        <li>
-          Payment details processed by Stripe. We do not receive your full card
-          number, but we receive transaction records needed to fulfill a
-          purchase, handle support, and meet tax and accounting obligations.
         </li>
       </ul>
 
@@ -101,15 +95,16 @@ export default function Privacy() {
       <ul>
         <li>
           <strong>Operate the Site.</strong> Serving pages, routing AI requests,
-          returning password-breach results, processing payments.
+          returning password-breach results, and providing account and community
+          features.
         </li>
         <li>
           <strong>Improve the Site.</strong> Diagnosing errors and measuring
           which features get used (only with analytics consent).
         </li>
         <li>
-          <strong>Communicate.</strong> Sending newsletter updates only to
-          people who subscribed and a way to unsubscribe in every email.
+          <strong>Communicate.</strong> Responding when you contact a published
+          support, privacy, security, legal, abuse, or copyright address.
         </li>
         <li>
           <strong>Comply with the law.</strong> Responding to lawful requests
@@ -134,13 +129,6 @@ export default function Privacy() {
           <strong>OpenRouter</strong> for routing AI chat requests to language
           models. Prompts you send to the assistant transit OpenRouter and the
           underlying model provider.
-        </li>
-        <li>
-          <strong>Stripe</strong> for processing paid recovery guides and
-          consult bookings. David Ortiz, operating Tomodachi, remains the
-          merchant of record; Stripe acts as the payment processor. Stripe Tax
-          may calculate tax, while required registrations, filings, collection,
-          and remittance remain the operator&apos;s responsibility.
         </li>
         <li>
           <strong>Google AdSense</strong> for advertising, if you have accepted

@@ -25,7 +25,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Support = lazy(() => import("./pages/Support"));
 const Terms = lazy(() => import("./pages/Terms"));
-const Unlock = lazy(() => import("./pages/Unlock"));
+const AiPlan = lazy(() => import("./pages/AiPlan"));
 const Discover = lazy(() => import("./pages/community/Discover"));
 const Search = lazy(() => import("./pages/community/Search"));
 const UserProfile = lazy(() => import("./pages/community/UserProfile"));
@@ -103,7 +103,10 @@ function Router() {
       <Route path={"/guides"} component={Guides} />
       <Route path={"/faq"} component={Faq} />
       <Route path={"/about"} component={About} />
-      <Route path={"/unlock"} component={Unlock} />
+      <Route path={"/ai-plan"} component={AiPlan} />
+      <Route path={"/unlock"}>
+        <Redirect to="/ai-plan" replace />
+      </Route>
       <Route path={"/support"} component={Support} />
       <Route path={"/donate"} component={Support} />
       <Route path={"/404"} component={NotFound} />

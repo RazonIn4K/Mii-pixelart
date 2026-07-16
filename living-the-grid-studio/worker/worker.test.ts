@@ -50,13 +50,19 @@ describe("Worker security primitives", () => {
       .replace(/=+$/u, "");
     expect(isValidOidcCookieKey(encodedKey)).toBe(true);
     expect(secretKey(encodedKey)).toEqual(keyBytes);
-    expect(isValidOidcCookieKey("replace-with-32-byte-base64url-key")).toBe(false);
+    expect(isValidOidcCookieKey("replace-with-32-byte-base64url-key")).toBe(
+      false,
+    );
     expect(() => secretKey("short")).toThrow(/32 base64url/iu);
 
     expect(isStrongRuntimeSecret("short-local-secret", "local")).toBe(true);
     expect(isStrongRuntimeSecret("short", "staging")).toBe(false);
-    expect(isStrongRuntimeSecret("test-only-".padEnd(48, "x"), "production")).toBe(false);
-    expect(isStrongRuntimeSecret("7FqQW-1sz9y8wSRjK5odL4hB2cPN6Vmu", "production")).toBe(true);
+    expect(
+      isStrongRuntimeSecret("test-only-".padEnd(48, "x"), "production"),
+    ).toBe(false);
+    expect(
+      isStrongRuntimeSecret("7FqQW-1sz9y8wSRjK5odL4hB2cPN6Vmu", "production"),
+    ).toBe(true);
   });
 
   it("rejects bodies that exceed a bounded reader limit", async () => {
@@ -69,17 +75,35 @@ describe("Worker security primitives", () => {
   });
 
   it("normalizes internal errors and applies HTTPS security headers", async () => {
-    const raw = failure("request-1", 401, "authentication_required", "Sign in.");
-    const withScheme = new Response(raw.body, { headers: { ...Object.fromEntries(raw.headers), "X-Worker-Scheme": "https" }, status: raw.status });
+    const raw = failure(
+      "request-1",
+      401,
+      "authentication_required",
+      "Sign in.",
+    );
+    const withScheme = new Response(raw.body, {
+      headers: {
+        ...Object.fromEntries(raw.headers),
+        "X-Worker-Scheme": "https",
+      },
+      status: raw.status,
+    });
     const response = applySecurityHeaders(withScheme, "request-1");
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "UNAUTHENTICATED" },
       requestId: "request-1",
     });
-    expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
-    expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
+    expect(response.headers.get("cross-origin-opener-policy")).toBe(
+      "same-origin",
+    );
+    expect(response.headers.get("strict-transport-security")).toContain(
+      "max-age=31536000",
+    );
     expect(response.headers.get("content-security-policy")).toContain(
-      "form-action 'self' https://accounts.google.com https://checkout.stripe.com",
+      "form-action 'self' https://accounts.google.com",
+    );
+    expect(response.headers.get("content-security-policy")).not.toMatch(
+      /stripe|checkout/iu,
     );
     expect(response.headers.get("content-security-policy")).toContain(
       "font-src 'self' data:",
@@ -114,12 +138,18 @@ describe("Worker security primitives", () => {
 
   it("fails closed for community mutations while preserving operational controls", () => {
     for (const value of [undefined, "", "false", "TRUE", "1"]) {
-      expect(isCommunityMutationBlocked("POST", "/api/creations", value)).toBe(true);
+      expect(isCommunityMutationBlocked("POST", "/api/creations", value)).toBe(
+        true,
+      );
     }
-    expect(isCommunityMutationBlocked("POST", "/api/creations", "true")).toBe(false);
+    expect(isCommunityMutationBlocked("POST", "/api/creations", "true")).toBe(
+      false,
+    );
 
     for (const method of ["GET", "HEAD", "OPTIONS"]) {
-      expect(isCommunityMutationBlocked(method, "/api/creations", undefined)).toBe(false);
+      expect(
+        isCommunityMutationBlocked(method, "/api/creations", undefined),
+      ).toBe(false);
     }
 
     for (const [method, path] of [
@@ -135,10 +165,22 @@ describe("Worker security primitives", () => {
       expect(isCommunityMutationBlocked(method, path, undefined)).toBe(false);
     }
 
-    expect(isCommunityMutationBlocked("POST", "/api/reports", undefined)).toBe(true);
-    expect(isCommunityMutationBlocked("PATCH", "/api/me", undefined)).toBe(true);
-    expect(isCommunityMutationBlocked("POST", "/api/moderation/reports/id/actions", undefined)).toBe(true);
-    expect(isCommunityMutationBlocked("POST", "/api/future-write", undefined)).toBe(true);
+    expect(isCommunityMutationBlocked("POST", "/api/reports", undefined)).toBe(
+      true,
+    );
+    expect(isCommunityMutationBlocked("PATCH", "/api/me", undefined)).toBe(
+      true,
+    );
+    expect(
+      isCommunityMutationBlocked(
+        "POST",
+        "/api/moderation/reports/id/actions",
+        undefined,
+      ),
+    ).toBe(true);
+    expect(
+      isCommunityMutationBlocked("POST", "/api/future-write", undefined),
+    ).toBe(true);
   });
 });
 describe("deterministic preview rendering", () => {
@@ -146,7 +188,11 @@ describe("deterministic preview rendering", () => {
     const timestamp = "2026-07-10T12:00:00.000Z";
     const project = canonicalizeGridDocument({
       version: 1,
-      meta: { name: "<script>alert(1)</script>", createdAt: timestamp, modifiedAt: timestamp },
+      meta: {
+        name: "<script>alert(1)</script>",
+        createdAt: timestamp,
+        modifiedAt: timestamp,
+      },
       width: 8,
       height: 8,
       cells: ["R1C1", "R10C7", ...Array.from({ length: 62 }, () => null)],
@@ -162,6 +208,33 @@ describe("deterministic preview rendering", () => {
 });
 
 describe("Worker HTTP integration", () => {
+  it.each([
+    ["GET", "/api/stripe/products"],
+    ["POST", "/api/stripe/checkout"],
+    ["GET", "/api/stripe/session?session_id=legacy"],
+    ["POST", "/api/webhooks/stripe"],
+  ])(
+    "retires %s %s without contacting a payment provider",
+    async (method, path) => {
+      const response = await SELF.fetch(`http://localhost:3000${path}`, {
+        body: method === "POST" ? "{}" : undefined,
+        headers:
+          method === "POST"
+            ? {
+                "Content-Type": "application/json",
+                Origin: "http://localhost:3000",
+              }
+            : undefined,
+        method,
+      });
+      expect(response.status).toBe(410);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "payments_retired" },
+      });
+    },
+  );
+
   it("returns the anonymous session envelope with hardened headers", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/auth/session");
     expect(response.status).toBe(200);
@@ -176,7 +249,9 @@ describe("Worker HTTP integration", () => {
   });
 
   it("serves an empty public discovery feed from migrated D1", async () => {
-    const response = await SELF.fetch("http://localhost:3000/api/discover/recent");
+    const response = await SELF.fetch(
+      "http://localhost:3000/api/discover/recent",
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: [],
@@ -185,7 +260,9 @@ describe("Worker HTTP integration", () => {
   });
 
   it("returns a successful null envelope when random discovery is empty", async () => {
-    const response = await SELF.fetch("http://localhost:3000/api/discover/random");
+    const response = await SELF.fetch(
+      "http://localhost:3000/api/discover/random",
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: null,
@@ -193,7 +270,9 @@ describe("Worker HTTP integration", () => {
   });
 
   it("returns the documented not-found envelope for unknown tag feeds", async () => {
-    const response = await SELF.fetch("http://localhost:3000/api/tags/not-a-launch-tag");
+    const response = await SELF.fetch(
+      "http://localhost:3000/api/tags/not-a-launch-tag",
+    );
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "NOT_FOUND" },
@@ -203,7 +282,10 @@ describe("Worker HTTP integration", () => {
   it("rejects unsafe cross-origin mutations before route handling", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/auth/logout", {
       body: "{}",
-      headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://evil.example",
+      },
       method: "POST",
     });
     expect(response.status).toBe(403);
@@ -215,7 +297,10 @@ describe("Worker HTTP integration", () => {
   it("rejects same-origin unsafe mutations that are not JSON", async () => {
     const response = await SELF.fetch("http://localhost:3000/api/auth/logout", {
       body: "not-json",
-      headers: { "Content-Type": "text/plain", Origin: "http://localhost:3000" },
+      headers: {
+        "Content-Type": "text/plain",
+        Origin: "http://localhost:3000",
+      },
       method: "POST",
     });
     expect(response.status).toBe(415);

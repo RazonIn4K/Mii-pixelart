@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "target": "staging",
   "intent": "deploy",
   "deploymentPhase": "staging-read-only-bootstrap",
@@ -29,14 +29,7 @@
     "privacyOwner": "replace-with-the-named-privacy-owner",
     "securityOwner": "replace-with-the-named-security-owner",
     "helpOwner": "replace-with-the-named-help-owner",
-    "abuseOwner": "replace-with-the-named-abuse-owner",
-    "consult30FulfillmentOwner": "replace-with-the-named-consult-30-owner",
-    "consult30FulfillmentProcess": "replace-with-the-approved-consult-30-process"
-  },
-  "stripe": {
-    "mode": "staging-test-or-production-live",
-    "taxConfirmation": "replace-with-the-approved-tax-check",
-    "consultSalesEnabled": false
+    "abuseOwner": "replace-with-the-named-abuse-owner"
   },
   "confirmations": {
     "targetIsolationConfirmed": false,
@@ -52,7 +45,6 @@
     "stagingAcceptancePassed": false,
     "productionCutoverApproved": false,
     "communityMutationsEnabled": false,
-    "consultFulfillmentTestPassed": false,
     "writableCommunityDeployApproved": false,
     "bootstrapReadOnlyApproved": false
   }

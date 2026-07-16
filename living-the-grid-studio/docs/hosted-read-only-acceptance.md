@@ -43,16 +43,19 @@ The safety policy is enforced in code rather than relying on operator care:
   `/api/creations`, with body exactly `{}` and no session. The route requires an
   onboarded session before any data operation if mutation mode is accidentally
   enabled, so an unexpected response fails the harness without creating data;
-- OAuth, account/session, AI, Stripe, webhook, moderation, private-object,
-  scheduled, and destructive routes are never requested; and
+- OAuth, account/session, AI, retired-payment compatibility, moderation,
+  private-object, scheduled, and destructive routes are never requested; and
 - redirects are not followed; cross-origin response URLs are rejected; and the
   per-request deadline remains active through bounded 2 MiB body consumption,
   including a server that sends headers and then stalls its body.
 
-The harness does not query `/api/stripe/products`. Consequently,
-`CONSULT_SALES_ENABLED=false` remains an exact generated-config and deployed
-binding check in the guarded release wrapper. This separation avoids touching
-any Stripe route during the anonymous read-only network gate.
+The harness does not query the retired `/api/stripe/*` or
+`/api/webhooks/stripe` paths. Worker and Pages integration tests verify those
+provider-free compatibility tombstones separately: every method must return
+`410 Gone`, JSON, and `Cache-Control: no-store` without a provider credential
+or upstream request. This separation keeps the anonymous discovery/crawler gate
+strictly allowlisted while still preventing a stale payment client from falling
+through to the SPA.
 
 ## Local tests
 

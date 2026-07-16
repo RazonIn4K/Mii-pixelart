@@ -14,11 +14,11 @@ function user(overrides: Record<string, unknown> = {}) {
     createdAt: 1_700_000_000_000,
     displayName: "Test Islander",
     id: "00000000-0000-4000-8000-000000000001",
-    requiredTermsVersion: "2026-07-14",
+    requiredTermsVersion: "2026-07-16",
     role: "user",
     status: "active",
     termsAccepted: true,
-    termsVersion: "2026-07-14",
+    termsVersion: "2026-07-16",
     username: "test-islander",
     ...overrides,
   };
@@ -384,7 +384,7 @@ test("onboarding stores profile, bio, age attestation, and terms in one request"
     bio: "Tiny portraits and paint guides.",
     confirmsAge13OrOlder: true,
     displayName: "Tiny Islander",
-    termsVersion: "2026-07-14",
+    termsVersion: "2026-07-16",
     username: "tiny-islander",
   });
 });
@@ -759,7 +759,7 @@ test("an existing username reviews newer terms without changing identity", async
     user({
       displayName: "Returning Islander",
       termsAccepted: accepted,
-      termsVersion: accepted ? "2026-07-14" : "2026-07-10",
+      termsVersion: accepted ? "2026-07-16" : "2026-07-10",
       username: "returning-islander",
     });
   await page.route("**/api/auth/session", (route) =>
@@ -781,7 +781,7 @@ test("an existing username reviews newer terms without changing identity", async
   await page.route("**/api/me/setup", async (route) => {
     const submitted = route.request().postDataJSON() as Record<string, unknown>;
     expect(submitted.username).toBe("returning-islander");
-    expect(submitted.termsVersion).toBe("2026-07-14");
+    expect(submitted.termsVersion).toBe("2026-07-16");
     accepted = true;
     await fulfillJson(route, { data: returningUser(), requestId });
   });

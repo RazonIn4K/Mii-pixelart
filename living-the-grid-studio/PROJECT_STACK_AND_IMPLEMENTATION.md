@@ -2,16 +2,17 @@
 
 Generated: 2026-05-20
 
-Last reconciled with the Worker branch: 2026-07-14
+Last reconciled with the Worker branch: 2026-07-16
 
-This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and payments.
+This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and the retired-payment compatibility boundary.
 
 > **Runtime status:** `codex/island-workshop-community` targets one Cloudflare
 > Worker (Hono) with Worker Static Assets, D1, private R2, KV, Images, rate-limit
 > bindings, and scheduled cleanup. Exact source
 > `1bded7eda46f9be9f9a184656e535256467919d4` is accepted on the isolated
 > staging Worker for the approved authenticated single-account scope with
-> community mutations enabled only on staging and consult sales disabled.
+> community mutations enabled only on staging. Payments, tips, recovery-product
+> sales, and consultations are retired.
 > Post-gate Studio refinements on the current branch are not deployed.
 > Production `tomodachi.pw` still
 > serves the rollback-safe Cloudflare Pages deployment; record its exact
@@ -59,8 +60,9 @@ Tomodachi Studio currently combines five product lanes:
    - Palette-ID validation before an AI sketch is converted into a `GridDocument`.
 
 4. **Public website support**
-   - Home, studio, guides, FAQ, help, legal, unlock, and support pages.
-   - Stripe checkout for support/recovery products.
+   - Home, studio, guides, FAQ, help, legal, AI Action Plan, and no-payment support pages.
+   - A free AI Action Plan beta; a possible one-time $5 creator plan is product direction only and is not for sale.
+   - Provider-free `410 Gone` tombstones for retired checkout and webhook routes.
    - Current production Pages rollback plus the branch's Worker parity routes.
    - Security headers, robots policy, crawler controls, and Cloudflare security helper scripts.
 
@@ -78,7 +80,7 @@ Tomodachi Studio currently combines five product lanes:
 flowchart TD
   User["User in browser"] --> Routes["React app routes (wouter)"]
   Routes --> Studio["/studio workspace"]
-  Routes --> SitePages["Home, Guides, FAQ, Help, Legal, Unlock, Support"]
+  Routes --> SitePages["Home, Guides, FAQ, Help, Legal, AI Plan, Support"]
 
   Studio --> Import["ImportPanel"]
   Studio --> Create["CreationPanel"]
@@ -104,12 +106,12 @@ flowchart TD
   AI --> ApiAI["/api/ai/*"]
   ApiAI --> OpenRouter["OpenRouter"]
 
-  SitePages --> ApiStripe["/api/stripe/*"]
-  ApiStripe --> Stripe["Stripe Checkout"]
+  SitePages --> AiPlan["Free /ai-plan beta"]
+  LegacyPayment["Retired payment paths"] --> Gone["Provider-free 410 Gone"]
 
   BrowserBuild["Cloudflare Vite build"] --> Worker["Unified Worker + Static Assets"]
   Worker --> ApiAI
-  Worker --> ApiStripe
+  Worker --> LegacyPayment
   Worker --> Community["Auth + projects + discovery + social + moderation"]
   Community --> D1["D1 relational authority"]
   Community --> R2["Private R2 projects/media"]
@@ -132,7 +134,7 @@ This is how the user's abstraction-layer thinking maps onto the actual codebase.
 | L4 UI state and interactions | How the user edits the document                                                                               | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools                                                                        |
 | L5 Persistence               | Local state plus explicit opt-in cloud state                                                                  | IndexedDB/local storage for drafts and AI sessions; cloud project bytes only after an explicit account save                                            |
 | L6 API/runtime services      | Server or edge endpoints                                                                                      | Unified Hono Worker for local/deployed APIs, dynamic documents, and scheduled jobs; legacy Pages/Express helpers retained for rollback parity          |
-| L7 External integrations     | Services outside the app                                                                                      | OpenRouter, Stripe, Cloudflare KV, Have I Been Pwned password range API                                                                                |
+| L7 External integrations     | Services outside the app                                                                                      | OpenRouter, Cloudflare KV, Have I Been Pwned password range API                                                                                        |
 | L8 Deployment/security/ops   | How it runs publicly and stays controlled                                                                     | Worker Static Assets, `wrangler.jsonc`, isolated D1/R2/KV bindings, `_headers`, Worker security middleware, Doppler-managed secrets, and gated cutover |
 
 ## 4. Repository Layout
@@ -175,16 +177,14 @@ living-the-grid-studio/
     _middleware.ts
     api/
       ai/[[path]].ts
-      stripe/[[path]].ts
-      webhooks/stripe.ts
-  server/                     # Shared AI/Stripe helpers retained for parity
+      stripe/[[path]].ts      # Provider-free 410 tombstone
+      webhooks/stripe.ts      # Provider-free 410 tombstone
+  server/                     # Shared AI helper retained for parity
     index.ts
     openrouter.ts
-    stripe.ts
   shared/
     ai.ts
     community.ts
-    products.ts
     residents.ts
   worker/                     # Unified branch runtime
     index.ts
@@ -231,30 +231,30 @@ living-the-grid-studio/
 
 ## 5. Main Technologies Being Used
 
-| Area                | Tooling                             | How It Is Used                                                                              |
-| ------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| Language            | TypeScript                          | Shared across client, engine, Worker, compatibility helpers, and scripts                    |
-| Frontend            | React 19                            | Studio UI, pages, panels, editor state display                                              |
-| Routing             | `wouter`                            | Lightweight route map in `client/src/App.tsx`                                               |
-| Build/dev server    | Vite 7 + Cloudflare Vite plugin     | React development through the Worker runtime; emits Static Assets and a Worker bundle       |
-| Styling             | Tailwind CSS v4                     | Global styles in `client/src/index.css`; utility styling throughout components              |
-| UI primitives       | Radix UI family                     | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes               |
-| Icons               | `lucide-react`                      | Studio toolbar icons, panel actions, import/export affordances                              |
-| Canvas              | HTML Canvas 2D                      | Grid renderer, image sampling, PNG export, palette sheet generation                         |
-| Image import        | Browser canvas APIs                 | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels       |
-| Color matching      | CIELAB + CIE76 Delta E              | Match source pixels to the closest Studio working-palette color                             |
-| State               | React state + `useGridDocument`     | Holds `GridDocument`, image preview, undo/redo history, stroke transactions                 |
-| AI                  | OpenRouter Chat Completions         | Model picker, chat, optional image snapshot, applyable sketch JSON                          |
-| Payments            | Stripe REST API                     | Checkout sessions and checkout verification without Stripe Node SDK                         |
-| ZIP export          | JSZip                               | Bundles reference-pack assets into one downloadable archive                                 |
-| Target hosting      | Cloudflare Workers + Static Assets  | SPA, dynamic documents, APIs, and scheduled jobs in one deployment unit                     |
-| Production rollback | Current Cloudflare Pages deployment | Record its exact immutable identity at cutover and retain it through the Worker soak        |
-| Edge runtime        | Hono Worker                         | Legacy AI/Stripe parity plus auth, account, project, discovery, social, and moderation APIs |
-| Data/storage        | D1 + private R2                     | Relational authorization state plus immutable validated projects and generated media        |
-| Edge cache/media    | Cloudflare KV + Images              | Bounded OpenRouter cache and deterministic generated preview transformation                 |
-| Security            | Cloudflare + response headers       | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                         |
-| Secrets             | Doppler / env vars                  | OpenRouter, Stripe, Cloudflare tokens are expected from environment, not committed          |
-| Verification        | `pnpm verify` scripts               | Type-checking and fixture-based verification                                                |
+| Area                | Tooling                             | How It Is Used                                                                                               |
+| ------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Language            | TypeScript                          | Shared across client, engine, Worker, compatibility helpers, and scripts                                     |
+| Frontend            | React 19                            | Studio UI, pages, panels, editor state display                                                               |
+| Routing             | `wouter`                            | Lightweight route map in `client/src/App.tsx`                                                                |
+| Build/dev server    | Vite 7 + Cloudflare Vite plugin     | React development through the Worker runtime; emits Static Assets and a Worker bundle                        |
+| Styling             | Tailwind CSS v4                     | Global styles in `client/src/index.css`; utility styling throughout components                               |
+| UI primitives       | Radix UI family                     | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes                                |
+| Icons               | `lucide-react`                      | Studio toolbar icons, panel actions, import/export affordances                                               |
+| Canvas              | HTML Canvas 2D                      | Grid renderer, image sampling, PNG export, palette sheet generation                                          |
+| Image import        | Browser canvas APIs                 | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels                        |
+| Color matching      | CIELAB + CIE76 Delta E              | Match source pixels to the closest Studio working-palette color                                              |
+| State               | React state + `useGridDocument`     | Holds `GridDocument`, image preview, undo/redo history, stroke transactions                                  |
+| AI                  | OpenRouter Chat Completions         | Model picker, chat, optional image snapshot, applyable sketch JSON                                           |
+| Payments            | Retired compatibility routes        | Legacy product, checkout, session, and webhook paths return provider-free `410 Gone`                         |
+| ZIP export          | JSZip                               | Bundles reference-pack assets into one downloadable archive                                                  |
+| Target hosting      | Cloudflare Workers + Static Assets  | SPA, dynamic documents, APIs, and scheduled jobs in one deployment unit                                      |
+| Production rollback | Current Cloudflare Pages deployment | Record its exact immutable identity at cutover and retain it through the Worker soak                         |
+| Edge runtime        | Hono Worker                         | AI compatibility, retired-payment tombstones, auth, account, project, discovery, social, and moderation APIs |
+| Data/storage        | D1 + private R2                     | Relational authorization state plus immutable validated projects and generated media                         |
+| Edge cache/media    | Cloudflare KV + Images              | Bounded OpenRouter cache and deterministic generated preview transformation                                  |
+| Security            | Cloudflare + response headers       | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                                          |
+| Secrets             | Doppler / env vars                  | OpenRouter and Cloudflare tokens are expected from environment, not committed                                |
+| Verification        | `pnpm verify` scripts               | Type-checking and fixture-based verification                                                                 |
 
 ## 6. App Entry And Routing
 
@@ -284,9 +284,10 @@ Routes are declared with `wouter`:
 | `/guides`               | `Guides`     | Guide content                      |
 | `/faq`                  | `Faq`        | FAQ                                |
 | `/about`                | `About`      | About                              |
-| `/unlock`               | `Unlock`     | Paid recovery; consult gated       |
-| `/support`              | `Support`    | Tip/support products               |
-| `/donate`               | `Support`    | Alias route                        |
+| `/ai-plan`              | `AiPlan`     | Free AI next-step plan beta        |
+| `/unlock`               | redirect     | Legacy alias to `/ai-plan`         |
+| `/support`              | `Support`    | No-payment project support         |
+| `/donate`               | `Support`    | Legacy alias to no-payment support |
 | `/404`                  | `NotFound`   | Explicit 404                       |
 | fallback                | `NotFound`   | Unknown route                      |
 
@@ -765,7 +766,7 @@ AI code is split between client, shared types, and API helpers.
 | `shared/ai.ts`                             | Shared request/response/model/sketch TypeScript types and model presets             |
 | `client/src/lib/engine/ai-sketch.ts`       | Converts validated AI sketch rows into a `GridDocument`                             |
 | `server/openrouter.ts`                     | Shared OpenRouter request, prompt, model list, parsing, salvage logic               |
-| `worker/legacy.ts`                         | Unified Worker parity routes for `/api/ai/*`, Stripe, and the Stripe webhook        |
+| `worker/legacy.ts`                         | Unified Worker AI routes plus provider-free `410 Gone` retired-payment tombstones   |
 | `functions/api/ai/[[path]].ts`             | Legacy Pages Function retained for the production rollback deployment               |
 | `vite.config.ts`                           | Cloudflare Vite plugin entry for the local Worker runtime                           |
 
@@ -1022,22 +1023,23 @@ OpenRouter fetch instead of consuming provider time until the Worker deadline.
 
 `worker/index.ts` registers one policy boundary for:
 
-| Route group                                  | Primary module                               | Purpose                                                 |
-| -------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
-| `/api/ai/*`, `/api/stripe/*`, Stripe webhook | `worker/legacy.ts`                           | Preserve the existing public API behavior in the Worker |
-| `/api/auth/*`, `/api/me/*`                   | `worker/auth.ts`, `worker/accounts.ts`       | OIDC, sessions, onboarding, export, deletion            |
-| `/api/creations/*`                           | `worker/creations.ts`, `worker/media.ts`     | Private revisions, generated media, publishing          |
-| discovery/search/profile routes              | `worker/discovery.ts`, `worker/documents.ts` | Public data and safe dynamic metadata                   |
-| social/report routes                         | `worker/social.ts`                           | Likes, comments, follows, and reports                   |
-| moderation routes                            | `worker/moderation.ts`                       | Role-gated moderation transitions                       |
-| scheduled handler                            | `worker/scheduled.ts`                        | Cleanup, deletion, retention, and popularity work       |
+| Route group                             | Primary module                               | Purpose                                              |
+| --------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
+| `/api/ai/*`                             | `worker/legacy.ts`                           | Preserve the AI compatibility API in the Worker      |
+| `/api/stripe/*`, `/api/webhooks/stripe` | `worker/legacy.ts`                           | Return provider-free `410 Gone` for retired payments |
+| `/api/auth/*`, `/api/me/*`              | `worker/auth.ts`, `worker/accounts.ts`       | OIDC, sessions, onboarding, export, deletion         |
+| `/api/creations/*`                      | `worker/creations.ts`, `worker/media.ts`     | Private revisions, generated media, publishing       |
+| discovery/search/profile routes         | `worker/discovery.ts`, `worker/documents.ts` | Public data and safe dynamic metadata                |
+| social/report routes                    | `worker/social.ts`                           | Likes, comments, follows, and reports                |
+| moderation routes                       | `worker/moderation.ts`                       | Role-gated moderation transitions                    |
+| scheduled handler                       | `worker/scheduled.ts`                        | Cleanup, deletion, retention, and popularity work    |
 
 ### Legacy Pages Rollback Compatibility
 
 Production still serves the current Cloudflare Pages deployment. Its
 `functions/api/*` handlers and `functions/_middleware.ts` remain in the tree so
-that production and the rollback deployment continue to provide AI, Stripe,
-webhook, and crawler behavior while the Worker is staged and soaked. They are
+that production and the rollback deployment continue to provide AI, crawler,
+and retired-payment `410 Gone` behavior while the Worker is staged and soaked. They are
 not a second target implementation for new community features. The cutover
 procedure records the then-current immutable Pages deployment and source rather
 than relying on this architecture map for release identity.
@@ -1120,43 +1122,28 @@ CLOUDFLARE_ZONE_NAME
 
 The user has indicated these are managed through Doppler.
 
-## 21. Stripe Product And Checkout Implementation
+## 21. Retired Payments And AI Action Plan Scope
 
-Stripe code is split across:
+Tomodachi does not currently sell recovery products, accept tips, or book
+consultations. The Stripe product catalog and provider client were removed.
+Legacy product, checkout, session, and webhook paths remain temporarily in both
+the Worker and Pages rollback surface as provider-free `410 Gone` tombstones.
+They use no payment binding, never call a payment provider, and prevent an old
+bookmark or client bundle from receiving a misleading SPA `200` response.
 
-- `shared/products.ts`
-- `server/stripe.ts`
-- Worker parity routes in `worker/legacy.ts`
-- legacy Pages rollback Function under `functions/api/stripe/[[path]].ts`
+`/ai-plan` now offers a free beta that turns a visitor's situation into a
+practical next-step plan. A possible one-time $5 creator plan is explicitly
+product direction, not an available offer. It must remain unsellable until a
+separate decision and implementation add account-bound entitlements,
+authoritative fulfillment and usage state, refund/revocation handling, privacy
+and legal updates, and end-to-end acceptance. The legacy `/unlock` route
+redirects to `/ai-plan`; `/support` contains no-payment ways to help.
 
-### Product Catalog
-
-`shared/products.ts` is the source of truth for sellable products.
-
-Current categories:
-
-- `recovery`
-- `consult`
-- `support`
-
-Current products include:
-
-- `breach-recovery-checklist`
-- `consult-30`
-- `support-jar-5`
-- `support-jar-15`
-- `support-jar-25`
-
-`consult-30` remains in the source catalog so historical paid sessions can be
-verified, but it is omitted from both Worker and retained Pages public catalogs
-and rejected at checkout unless `CONSULT_SALES_ENABLED` is exactly `true`.
-Local, staging, and production configurations currently set it to `false`.
-Release readiness schema 3 prevents enablement until an end-to-end consult
-fulfillment test is recorded as passed.
-
-### Why The Stripe SDK Is Not Used
-
-`server/stripe.ts` uses direct REST calls instead of the official Stripe Node SDK because Cloudflare Workers do not support every Node crypto API the SDK expects. The project manually flattens nested objects into Stripe form encoding.
+The operational retirement sequence also includes deactivating provider-side
+payment links and webhook endpoints, expiring practical open sessions, removing
+environment secrets, and revoking only credentials confirmed to be exclusive
+to this project. Historical release records remain unchanged evidence of the
+former implementation.
 
 ## 22. Local Development Runtime
 
@@ -1198,9 +1185,7 @@ apply only to the current rollback deployment.
 | Variable                                               | Used By                   | Purpose                                                              |
 | ------------------------------------------------------ | ------------------------- | -------------------------------------------------------------------- |
 | `OPENROUTER_API_KEY`                                   | AI API                    | Authenticate OpenRouter requests                                     |
-| `PUBLIC_SITE_URL`                                      | AI/Stripe/Cloudflare      | Referer, success URLs, canonical site URL                            |
-| `STRIPE_SECRET_KEY`                                    | Stripe API                | Create and verify checkout sessions                                  |
-| `STRIPE_WEBHOOK_SECRET`                                | Stripe webhook            | Verify Stripe webhook signatures                                     |
+| `PUBLIC_SITE_URL`                                      | AI/Cloudflare             | Referer and canonical site URL                                       |
 | `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN`                | Cloudflare script         | Bot/security config audit/apply                                      |
 | `CLOUDFLARE_ZONE_ID`                                   | Cloudflare script         | Optional direct zone lookup                                          |
 | `CLOUDFLARE_ZONE_NAME`                                 | Cloudflare script         | Defaults to `tomodachi.pw`                                           |
@@ -1208,7 +1193,7 @@ apply only to the current rollback deployment.
 | `OIDC_COOKIE_KEY` / `SESSION_PEPPER` / `PSEUDONYM_KEY` | Worker security           | Encrypted OIDC transaction, session hashing, privacy-preserving keys |
 | `DB`                                                   | Worker D1 binding         | Identity, authorization, creation, and community state               |
 | `PROJECTS`                                             | Worker private R2 binding | Immutable project and generated-media objects                        |
-| `EDGE_CACHE`                                           | Worker KV binding         | Bounded OpenRouter and webhook cache                                 |
+| `EDGE_CACHE`                                           | Worker KV binding         | Bounded OpenRouter cache                                             |
 | `IMAGES`                                               | Worker Images binding     | Deterministic generated preview transcoding                          |
 
 ## 24. Verification Coverage

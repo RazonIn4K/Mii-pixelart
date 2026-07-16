@@ -1,36 +1,22 @@
 import { AI_CHAT_BODY_MAX_BYTES, type AiChatRequest } from "../shared/ai";
-import { formatPrice } from "../shared/products";
 import {
   getOpenRouterModels,
   getOpenRouterStatus,
   sendOpenRouterChat,
   type ApiResult as AiApiResult,
 } from "../server/openrouter";
-import {
-  createCheckoutSession,
-  listPublicProducts,
-  verifyCheckoutSession,
-  type ApiResult as StripeApiResult,
-} from "../server/stripe";
 import { clientKey, enforceRateLimit, requireOnboardedSession } from "./auth";
-import {
-  HttpError,
-  readJson,
-  readText,
-  type WorkerRequestContext,
-} from "./http";
+import { HttpError, readJson, type WorkerRequestContext } from "./http";
 import type { Router } from "./router";
 
 const MODELS_CACHE_KEY = "openrouter:models:v2";
 const MODELS_CACHE_SECONDS = 3_600;
-const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
-const STRIPE_EVENT_TTL_SECONDS = 24 * 60 * 60;
 
 export function registerLegacyRoutes(router: Router): void {
   router
     .add("*", "/api/ai/*path", handleAi)
-    .add("*", "/api/stripe/*path", handleStripe)
-    .add("POST", "/api/webhooks/stripe", handleStripeWebhook);
+    .add("*", "/api/stripe/*path", retiredPaymentRoute)
+    .add("*", "/api/webhooks/stripe", retiredPaymentRoute);
 }
 
 async function handleAi(context: WorkerRequestContext): Promise<Response> {
@@ -78,111 +64,22 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
   throw new HttpError(404, "ai_route_not_found", "AI route was not found.");
 }
 
-async function handleStripe(context: WorkerRequestContext): Promise<Response> {
-  const method =
-    context.request.method === "HEAD" ? "GET" : context.request.method;
-  const path = context.params.path.replace(/^\/+|\/+$/gu, "");
-  if (method === "GET" && path === "products") {
-    const category = context.url.searchParams.get("category");
-    const products = listPublicProducts(context.env)
-      .filter((product) => !category || product.category === category)
-      .map((product) => ({
-        category: product.category,
-        caveat: product.caveat ?? null,
-        description: product.description,
-        id: product.id,
-        name: product.name,
-        perks: product.perks ?? [],
-        priceLabel: formatPrice(product.amount, product.currency),
-      }));
-    return legacyJson({ body: { products }, status: 200 });
-  }
-  if (method === "POST" && path === "checkout") {
-    await enforceStripeRateLimit(context);
-    const body = await readJson(context.request, 100_000);
-    return legacyJson(await createCheckoutSession(toRecord(body), context.env));
-  }
-  if (method === "GET" && path === "session") {
-    await enforceStripeRateLimit(context);
-    return legacyJson(
-      await verifyCheckoutSession(
-        context.url.searchParams.get("session_id") ?? "",
-        context.env,
-      ),
-    );
-  }
-  throw new HttpError(
-    404,
-    "stripe_route_not_found",
-    "Stripe route was not found.",
+async function retiredPaymentRoute(): Promise<Response> {
+  return Response.json(
+    {
+      error: {
+        code: "payments_retired",
+        message: "Payments and checkout are no longer offered by Tomodachi.",
+      },
+    },
+    {
+      headers: { "Cache-Control": "no-store" },
+      status: 410,
+    },
   );
 }
 
-async function enforceStripeRateLimit(
-  context: WorkerRequestContext,
-): Promise<void> {
-  await enforceRateLimit(
-    context.env.STRIPE_RATE_LIMITER,
-    await clientKey(context.env, context.request),
-  );
-}
-
-async function handleStripeWebhook(
-  context: WorkerRequestContext,
-): Promise<Response> {
-  if (!context.env.STRIPE_WEBHOOK_SECRET) {
-    throw new HttpError(
-      503,
-      "stripe_not_configured",
-      "Stripe webhook is not configured.",
-    );
-  }
-  const signature = context.request.headers.get("stripe-signature");
-  if (!signature)
-    throw new HttpError(
-      400,
-      "missing_signature",
-      "Stripe signature is missing.",
-    );
-  const declaredLength = Number(context.request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > 1_000_000) {
-    throw new HttpError(413, "payload_too_large", "Webhook body is too large.");
-  }
-  const rawBody = await readText(context.request, 1_000_000);
-  if (
-    !(await verifyStripeSignature(
-      rawBody,
-      signature,
-      context.env.STRIPE_WEBHOOK_SECRET,
-    ))
-  ) {
-    throw new HttpError(
-      400,
-      "invalid_signature",
-      "Stripe signature is invalid.",
-    );
-  }
-  const event = parseStripeEvent(rawBody);
-  const eventId = event.id ?? "";
-  if (
-    eventId &&
-    (await context.env.EDGE_CACHE.get(`stripe:event:${eventId}`))
-  ) {
-    return Response.json({ deduped: true, received: true });
-  }
-
-  // The Worker entry point emits the approved six-field request log. Do not
-  // create a second provider-specific log here: Stripe event identifiers and
-  // types are payment metadata and must not enter application logs.
-  if (eventId) {
-    await context.env.EDGE_CACHE.put(`stripe:event:${eventId}`, "1", {
-      expirationTtl: STRIPE_EVENT_TTL_SECONDS,
-    });
-  }
-  return Response.json({ received: true });
-}
-
-function legacyJson(result: AiApiResult | StripeApiResult): Response {
+function legacyJson(result: AiApiResult): Response {
   return new Response(JSON.stringify(result.body), {
     status: result.status,
     headers: legacyHeaders(),
@@ -195,13 +92,6 @@ function legacyHeaders(cache?: string): Headers {
     "Content-Type": "application/json; charset=utf-8",
     ...(cache ? { "X-Cache": cache } : {}),
   });
-}
-
-function toRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new HttpError(400, "invalid_json", "Expected a JSON object.");
-  }
-  return value as Record<string, unknown>;
 }
 
 function isAiChatRequest(value: unknown): value is AiChatRequest {
@@ -218,65 +108,4 @@ function isAiChatRequest(value: unknown): value is AiChatRequest {
       typeof entry.content === "string"
     );
   });
-}
-
-function parseStripeEvent(rawBody: string): { id?: string } {
-  try {
-    const value: unknown = JSON.parse(rawBody);
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("not object");
-    }
-    const record = value as Record<string, unknown>;
-    return {
-      id: typeof record.id === "string" ? record.id : undefined,
-    };
-  } catch {
-    throw new HttpError(400, "invalid_json", "Webhook body is not valid JSON.");
-  }
-}
-
-async function verifyStripeSignature(
-  rawBody: string,
-  header: string,
-  secret: string,
-): Promise<boolean> {
-  const parts = header.split(",").map((part) => part.trim().split("=", 2));
-  const timestamp = Number(parts.find(([key]) => key === "t")?.[1]);
-  const signatures = parts
-    .filter(([key]) => key === "v1")
-    .map(([, value]) => value);
-  if (!Number.isFinite(timestamp) || signatures.length === 0) return false;
-  if (
-    Math.abs(Math.floor(Date.now() / 1_000) - timestamp) >
-    STRIPE_SIGNATURE_TOLERANCE_SECONDS
-  ) {
-    return false;
-  }
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"],
-  );
-  const digest = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(`${timestamp}.${rawBody}`),
-  );
-  const expected = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  return signatures.some((signature) => constantTimeEqual(signature, expected));
-}
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const size = Math.max(left.length, right.length);
-  let difference = left.length ^ right.length;
-  for (let index = 0; index < size; index += 1) {
-    difference |=
-      (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
-  }
-  return difference === 0;
 }

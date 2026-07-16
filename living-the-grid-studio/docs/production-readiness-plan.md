@@ -22,9 +22,9 @@ staging check does not authorize the next gate.
   `4cb804a9-684c-4490-8fa1-1a40b0b15e57`, active Worker version
   `e9bbf6f6-b14a-468a-94e3-0c4dcdde796b`. The immediately preceding rollback
   version is `d025b531-055f-46bf-be25-2089bedeef58`.
-- The deployed staging flags are `COMMUNITY_MUTATIONS_ENABLED=true` and
-  `CONSULT_SALES_ENABLED=false`. The staging D1 migration ledger contains
-  `0001` through `0008`; that deployment did not apply a migration, rotate a
+- The deployed staging flag is `COMMUNITY_MUTATIONS_ENABLED=true`. Payments and
+  consultations are retired; the staging D1 migration ledger contains `0001`
+  through `0008`. That deployment did not apply a migration, rotate a
   secret, change OAuth, DNS, a role, production, or application data.
 - Anonymous routes, crawler controls, CSP/security headers, the authenticated
   account menu, one authoritative true-256 Studio canvas, isolated drawing,
@@ -57,7 +57,7 @@ staging check does not authorize the next gate.
 | Secret or OAuth change | Target- and credential-specific approval | Account owner | Secret **names** and provider/config audit record; never values |
 | Role change | Exact internal UUID and target approval | D1 operator | Exactly-one-row result and `id, role` read-back |
 | Production deploy or DNS cutover | Separate production cutover approval | Cloudflare account owner and release engineer | Old/new runtime IDs, TLS/routing checks, rollback record |
-| Legal, policy, merchant, licensing go/no-go | David Ortiz, with professional review where he chooses it | Operator | Dated decision record; automated scans are supporting evidence only |
+| Legal, policy, licensing, and provider-cost go/no-go | David Ortiz, with professional review where he chooses it | Operator | Dated decision record; automated scans are supporting evidence only |
 
 Store public, secret-free evidence under `docs/release-evidence/`. Do not
 duplicate the approved public-service address outside the legal pages merely
@@ -75,8 +75,8 @@ project contents, or report free-text in release logs.
 | P3 | Secret-free live-auth runner | P2 safety primitives | Not implemented as a repeatable runner |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete on live staging |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete on live staging |
-| P6 | Legal, operator, contact-channel, merchant, and licensing sign-off | Can run beside P1-P5 | Partially recorded; live checks remain |
-| P7 | Consult-sales disabled proof | Every release candidate | Disabled; must remain continuously verified |
+| P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Partially recorded; live checks remain |
+| P7 | Payments-retired proof | Every release candidate | Retired; compatibility tombstones must remain fail-closed |
 | P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | Must be rerun on the final SHA |
 | P9 | Final staging exit review | P1-P8 | Blocked by preceding gates |
 | P10 | Isolated production resources, schema, OAuth, secrets, and bootstrap readiness | P9 | Not authorized by this plan |
@@ -93,8 +93,8 @@ and disposable data is what proves irreversible cleanup safely.
 
 **Owner/authority:** The maintainer may implement and test locally. David Ortiz
 must approve the final 40-character SHA before another staging deploy. That
-approval must explicitly preserve `COMMUNITY_MUTATIONS_ENABLED=true` and
-`CONSULT_SALES_ENABLED=false` or name a different reviewed mode.
+approval must explicitly preserve the reviewed `COMMUNITY_MUTATIONS_ENABLED`
+mode.
 
 **Prerequisites**
 
@@ -159,9 +159,9 @@ object prefixes, maximum writes, and cleanup plan.
   `verify:hosted-staging-writable`; until that tracked script and its fixture
   tests exist, no ad hoc shell collection counts as writable acceptance.
 - Require exact `https://staging.tomodachi.pw`, expected source SHA/Worker
-  version, `COMMUNITY_MUTATIONS_ENABLED=true`, and
-  `CONSULT_SALES_ENABLED=false`. Refuse production, redirects, arbitrary hosts,
-  unexpected cookies/headers, unlisted routes, and non-fixture object IDs.
+  version, and `COMMUNITY_MUTATIONS_ENABLED=true`. Refuse production,
+  redirects, arbitrary hosts, unexpected cookies/headers, unlisted routes, and
+  non-fixture object IDs.
 
 **Commands and evidence**
 
@@ -306,7 +306,7 @@ from disposable identities and pre-run manifests, not restoration. Stop the
 cron fixture lane, preserve failure evidence, and roll back code only after the
 current schema and object state are understood.
 
-## P6 - Close legal, operator, channel, merchant, and licensing checks
+## P6 - Close legal, operator, channel, provider-cost, and licensing checks
 
 **Owner/authority:** David Ortiz is the operator and final business go/no-go.
 Automated checks do not substitute for legal, copyright, privacy, or tax
@@ -317,19 +317,19 @@ advice.
 - Verify the public operator name is David Ortiz and the operator-approved
   service address beginning `122 W Taylor St, DeKalb, Illinois` is published in
   complete mail-ready form, including any required postal data, consistently
-  in Terms, Privacy, Copyright, Stripe merchant records, and the private launch
-  record. Do not infer missing address fields.
+  in Terms, Privacy, Copyright, and the private launch record. Do not infer
+  missing address fields.
 - Send controlled delivery tests and document ownership, review cadence,
   escalation, and backup coverage for `legal@`, `privacy@`, `security@`,
-  `help@`, abuse/report intake, and consult intake. David Ortiz's statement that
+  `help@`, and abuse/report intake. David Ortiz's statement that
   he monitors them is the owner declaration; delivery and escalation still
   need live proof.
 - Confirm 13+ attestation, current Terms version, seven-day deletion grace,
   90-day report-text purge, two-year minimal moderation retention, data export,
   Google identity disclosure, public-content licensing, appeal/report process,
   copyright notice/counter-notice routing, and cookie behavior.
-- Confirm the intended Stripe legal entity/merchant and tax responsibilities.
-  Recheck current Workers, D1, R2, and Images pricing and approve the expected
+- Confirm payments, tips, donations, and consultations are not offered. Recheck
+  current Workers, D1, R2, and Images pricing and approve the expected
   generated-image transformation/storage cost.
 - Run `pnpm verify:licenses`, review every changed production dependency and
   required notice, and record an explicit human disposition. The checked-in
@@ -341,33 +341,40 @@ advice.
   independent fan-made, manual Copy Guide, and no-game-file-export language.
 
 **Go/no-go:** No placeholder, bounced public channel, unowned escalation,
-unreviewed dependency/license drift, unsupported merchant/tax claim, or
+unreviewed dependency/license drift, unexpected payment claim/control, or
 third-party asset of uncertain rights may remain.
 
 **Rollback:** Keep launch blocked. Revert or replace the affected copy/asset,
 preserve the prior legal version for records, and require renewed operator
 acceptance when policy terms change.
 
-## P7 - Keep consult sales disabled
+## P7 - Keep payments retired
 
-**Owner/authority:** Disabling remains the fail-closed default and requires no
-sales launch. Enabling requires a future, separate Stripe/fulfillment approval
-and is not part of community production launch.
+**Owner/authority:** Retirement is the production-launch default. Reintroducing
+any payment provider or paid offer requires a separate product, architecture,
+security, legal, tax, fulfillment, and release approval.
 
-**Evidence:** For every staging and production candidate, inspect source and
-flattened Wrangler output for `CONSULT_SALES_ENABLED=false`; require the product
-catalog to omit `consult-30`, direct checkout to fail with the stable disabled
-response, and retained Pages behavior to remain disabled. Do not send a test or
-live Stripe event merely to prove the flag.
+**Evidence:** For every staging and production candidate, inspect source,
+client output, and flattened Wrangler output. Require no payment secret,
+payment build variable, payment rate limiter, product catalog, checkout UI, or
+consultation offer. `/api/stripe/*` and `/api/webhooks/stripe` are temporary,
+provider-free compatibility tombstones: every method returns `410 Gone`, JSON,
+and `Cache-Control: no-store` without a credential or upstream call. The public
+`/ai-plan` is a free beta; the possible one-time $5 Creator Action Plan is
+clearly marked as future direction and not for sale.
 
-**Go/no-go:** Any environment that exposes or sells the consult is no-go. A
-future enablement must first prove test-mode payment, notification, scheduling,
-staffed 30-minute delivery, refund/cancellation, and promised written follow-up
-end to end, then receive a new explicit approval.
+Provider-side retirement is separately audited: verify historical obligations,
+deactivate old links/endpoints, remove Tomodachi payment values from Doppler and
+Cloudflare, and revoke only credentials proven exclusive to this project. Do
+not send a test or live payment event merely to prove retirement.
 
-**Rollback:** Deploy the reviewed false-flag artifact and disable the offer at
-its catalog source. Preserve webhook idempotency and do not rotate credentials
-as an improvised feature switch.
+**Go/no-go:** Any environment that presents a buy/checkout/tip/donation/
+consultation control, accepts payment, makes a payment-provider request, or lets
+a legacy API path fall through to SPA HTML is no-go.
+
+**Rollback:** Deploy the last reviewed artifact that keeps public payment UI
+absent and tombstones at `410`. Do not use credential rotation as a feature
+switch. Preserve historical fulfillment/refund/audit records as required.
 
 ## P8 - Produce exact-head GitHub and GitLab security/CI evidence
 
@@ -449,8 +456,8 @@ production approval. P9 does not authorize any of them.
 **Prerequisites and procedure**
 
 1. Confirm the exact Cloudflare account/zone, Google project, domain control,
-   merchant account, owners, cost/budget alerts, and incident contacts.
-2. Provision production-only D1, private R2, KV, Images, and seven rate-limit
+   owners, cost/budget alerts, and incident contacts.
+2. Provision production-only D1, private R2, KV, Images, and six rate-limit
    namespaces. Do not reuse staging IDs, buckets, OAuth clients, limiter IDs, or
    secrets and do not clone staging identities/content.
 3. Configure the production Google client with only the canonical homepage,
@@ -461,18 +468,18 @@ production approval. P9 does not authorize any of them.
    migration in the final SHA), apply only the explicitly approved files, then
    verify the ledger, integrity, foreign keys, uniqueness, triggers, and empty
    bootstrap counts. Never edit or manually re-run an applied migration.
-5. Write exactly the eight production secret names through the protected,
+5. Write exactly the six production secret names through the protected,
    non-logging flow with unique values for each purpose/environment. Keep the
    ignored readiness and secrets files regular, mode `0600`, current, and bound
    to the exact SHA. Do not print or diff values.
 6. Run `pnpm worker:dry-run:production`, inspect the flattened artifact, and
-   require `COMMUNITY_MUTATIONS_ENABLED=false`,
-   `CONSULT_SALES_ENABLED=false`, the production-only bindings, exactly
+   require `COMMUNITY_MUTATIONS_ENABLED=false`, no payment bindings or secrets,
+   the production-only bindings, exactly
    `tomodachi.pw` as a Custom Domain, and no preview/workers.dev exposure.
 
 **Go/no-go:** Zero shared staging identifier/secret, exact migration ledger,
 clean empty production application state, valid rollback artifact, and a
-schema-3 `production-read-only-bootstrap` readiness record are mandatory.
+schema-4 `production-read-only-bootstrap` readiness record are mandatory.
 The admin UUID remains null before first production sign-in.
 
 **Rollback:** Stop before domain cutover. Remove unused newly provisioned
@@ -489,16 +496,18 @@ UUID. Neither authority is granted here.
 
 1. Freeze schema-changing work. Record the live Pages deployment and immutable
    `pages.dev` URL, Worker rollback version, bindings, DNS/product attachments,
-   production ledger, OAuth redirect, Stripe endpoint, and rollback owner.
+   production ledger, OAuth redirect, retired-payment tombstone behavior, and
+   rollback owner.
 2. Detach `tomodachi.pw` from Pages through the audited Cloudflare control
    plane and deploy the reviewed `production-read-only-bootstrap` artifact.
    Attach exactly one Worker Custom Domain; never let Pages and Workers claim
    the hostname simultaneously.
-3. With mutations and consult sales false, verify TLS, static assets, SPA/API
+3. With community mutations false, verify TLS, static assets, SPA/API
    routing, envelopes, security headers/CSP, canonical/robots/sitemaps, public
    404s, anonymous Studio/edit/export, AI status and an approved minimal AI
-   probe, Stripe product/webhook signature behavior, performance, logs, and
-   the fail-closed write response. No checkout event is required.
+   probe, provider-free `410` responses for every retired payment path,
+   performance, logs, and the fail-closed write response. No payment-provider
+   event or credential is permitted.
 4. David Ortiz signs in through the production Google client and reads only his
    internal UUID from the authenticated session response. Under the distinct
    role-data approval, change exactly that current `user` row to `admin`,
@@ -509,21 +518,20 @@ UUID. Neither authority is granted here.
    has moderator authority.
 
 **Go/no-go:** Any Pages/Worker route overlap, TLS/canonical error, unexpected
-write, OAuth mismatch, non-exact role change, Stripe signature failure, AI auth
+write, OAuth mismatch, non-exact role change, payment-provider request, AI auth
 failure, secret/log leak, or regression triggers immediate no-go.
 
 **Rollback:** Remove the partial Worker Custom Domain, reattach the canonical
 hostname to the recorded Pages deployment, verify DNS/TLS and the immutable
-Pages URL, and keep community mutations/consult disabled. Do not reverse D1 or
-delete R2. Revoke new sessions or credentials only when incident scope requires
-it.
+Pages URL, and keep community mutations disabled and payment surfaces retired.
+Do not reverse D1 or delete R2. Revoke new sessions or credentials only when
+incident scope requires it.
 
 ## P12 - Enable production community mutations
 
 **Owner/authority:** Requires a fresh exact-SHA production writable-deploy
 approval after P11 read-only acceptance. It must explicitly set
-`COMMUNITY_MUTATIONS_ENABLED=true` and keep
-`CONSULT_SALES_ENABLED=false`.
+`COMMUNITY_MUTATIONS_ENABLED=true` and keep payment surfaces retired.
 
 **Prerequisites and evidence:** Use a clean standard-phase artifact, verified
 production admin, P9 staging evidence, production binding/ledger recheck, fresh
@@ -536,13 +544,14 @@ only declared production smoke fixtures and remove them.
 
 **Go/no-go:** Zero unauthorized data access, orphan object, console/network
 error, moderation gap, rate-limit failure, or material latency regression. A
-single integrity, privacy, auth, payment, or deletion defect is an immediate
-rollback; lack of organic users does not relax this gate.
+single integrity, privacy, auth, unexpected payment exposure, or deletion
+defect is an immediate rollback; lack of organic users does not relax this
+gate.
 
 **Rollback:** Deploy the validated read-only Worker version first so anonymous
 Studio and legacy routes remain available. For a runtime-wide incident, use
-the P11 Pages rollback. Reconcile objects from D1 manifests and preserve audit
-and Stripe idempotency.
+the P11 Pages rollback. Reconcile objects from D1 manifests, preserve audit
+records, and keep retired payment routes fail-closed.
 
 ## P13 - Soak, drill rollback, and retain Pages
 
@@ -553,7 +562,8 @@ consequence of launch.
 **Evidence and thresholds:** Observe at least one complete scheduled cycle in
 read-only mode and a minimum 72-hour writable soak unless the owner records a
 longer window. Monitor request/error rates, D1/R2/Images failures and cost,
-OAuth/session errors, rate limits, AI/Stripe failures, queue age, cleanup,
+OAuth/session errors, rate limits, AI failures, unexpected payment-path
+traffic, queue age, cleanup,
 orphan counts, CSP reports, and Core Web Vitals without logging sensitive
 content. Drill Worker-to-read-only rollback and, in an approved maintenance
 window, prove the documented Pages restoration path and return to the Worker.
@@ -565,8 +575,9 @@ Pages deployment for at least seven days after writable enablement and longer
 if the agreed soak or incident history requires it.
 
 **Rollback:** At the first material auth, authorization, data-integrity,
-payment, privacy, or availability regression, disable community writes through
-a reviewed deployment; restore Pages if Worker rollback is insufficient. Keep
+unexpected payment exposure, privacy, or availability regression, disable
+community writes through a reviewed deployment; restore Pages if Worker
+rollback is insufficient. Keep
 the incident record secret-free and prefer forward-compatible data repair.
 
 ## P14 - Operate after launch and keep deferred scope explicit
@@ -584,8 +595,8 @@ launch.
   moderator session, mutation token, signing key, or autonomous enforcement
   route.
 - Run deletion/export/recovery exercises and a rollback drill periodically.
-  Track SLOs for OAuth, saves, media transformation, discovery, AI, Stripe,
-  scheduled cleanup, and report response.
+  Track SLOs for OAuth, saves, media transformation, discovery, AI, scheduled
+  cleanup, report response, and unexpected traffic to retired payment paths.
 - Rotate credentials on provider schedule or exposure, one target at a time,
   with overlap where supported and a signed/authorized probe before revocation.
 
@@ -600,7 +611,11 @@ launch.
   rules, verified-email policy, recovery/deletion/export behavior, migration,
   OpenAPI/UI work, and two-provider takeover tests. Google `sub` identities
   must never be silently merged by email.
-- Consult sales remain disabled until P7's separate fulfillment gate passes.
+- `/ai-plan` remains a free beta. A possible one-time $5 Creator Action Plan is
+  not for sale. It requires a new ADR, threat-model/API changes, account-bound
+  entitlement and ledger design, fulfillment and bounded usage, refund and
+  revocation behavior, privacy/retention/tax/legal review, provider-isolated
+  credentials, and complete test-mode and rollback acceptance before launch.
 - Local Sketch mode, multi-panel projects, and further Copy Guide/AI command
   work follow the Studio roadmap. They must preserve the canonical validated
   command layer, original asset boundaries, and no-game-file-export claim.
