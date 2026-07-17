@@ -13,6 +13,10 @@ import {
 } from "./crypto";
 import { applySecurityHeaders, errorResponse, failure, readJson } from "./http";
 import { renderGridSvg } from "./media";
+import {
+  applyReleaseIdentityHeaders,
+  runtimeSourceCommit,
+} from "./release-identity";
 
 describe("Worker security primitives", () => {
   it("hashes session material as lowercase SHA-256 hex", async () => {
@@ -117,6 +121,34 @@ describe("Worker security primitives", () => {
     expect(
       response.headers.get("content-security-policy-report-only"),
     ).toBeNull();
+  });
+
+  it("exposes only non-secret release identity and fail-closed test provenance", () => {
+    const headers = new Headers();
+    applyReleaseIdentityHeaders(headers, {
+      CF_VERSION_METADATA: {
+        id: "11111111-1111-4111-8111-111111111111",
+        tag: "test",
+        timestamp: "2026-07-16T00:00:00.000Z",
+      },
+      COMMUNITY_MUTATIONS_ENABLED: "true",
+      ENVIRONMENT: "staging",
+    } as Env);
+    expect(headers.get("x-tomodachi-source-commit")).toBe(
+      runtimeSourceCommit(),
+    );
+    expect(headers.get("x-tomodachi-source-commit")).toMatch(/^[0-9a-f]{40}$/u);
+    expect(headers.get("x-tomodachi-environment")).toBe("staging");
+    expect(headers.get("x-tomodachi-worker-version")).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(headers.get("x-tomodachi-community-mutations")).toBe("enabled");
+    expect([...headers.keys()]).toEqual([
+      "x-tomodachi-community-mutations",
+      "x-tomodachi-environment",
+      "x-tomodachi-source-commit",
+      "x-tomodachi-worker-version",
+    ]);
   });
 
   it("returns a Retry-After hint when a binding rejects a request", async () => {
@@ -246,6 +278,16 @@ describe("Worker HTTP integration", () => {
       },
     });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("x-tomodachi-source-commit")).toMatch(
+      /^[0-9a-f]{40}$/u,
+    );
+    expect(response.headers.get("x-tomodachi-environment")).toBe("local");
+    expect(response.headers.get("x-tomodachi-worker-version")).toMatch(
+      /^(?:00000000-0000-0000-0000-000000000000|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u,
+    );
+    expect(response.headers.get("x-tomodachi-community-mutations")).toBe(
+      "enabled",
+    );
   });
 
   it("serves an empty public discovery feed from migrated D1", async () => {

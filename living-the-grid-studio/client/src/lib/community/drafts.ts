@@ -5,6 +5,10 @@ const DATABASE_NAME = "tomodachi-studio";
 const STORE_NAME = "drafts";
 const DATABASE_VERSION = 1;
 const RESUME_KEY = "auth-resume";
+const PENDING_CLOUD_CREATION_PREFIX = "pending-cloud-creation:";
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const CLOUD_CREATION_FINGERPRINT_PATTERN = /^sha256-v1:[0-9a-f]{64}$/;
 
 export interface LocalDraft {
   id: string;
@@ -12,6 +16,19 @@ export interface LocalDraft {
   updatedAt: number;
   cloud?: CloudProjectState;
   resumeAfterAuth?: boolean;
+}
+
+interface PendingCloudCreation {
+  clientCreationId: string;
+  draftFingerprint: string;
+  id: string;
+  updatedAt: number;
+  userId: string;
+}
+
+export interface PendingCloudCreationLease {
+  clientCreationId: string;
+  draftFingerprint: string;
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -119,6 +136,212 @@ export async function readLocalDraft(
 
 export async function deleteLocalDraft(id = "current"): Promise<void> {
   await withStore("readwrite", (store) => store.delete(id));
+}
+
+export async function fingerprintCloudCreationPayload(
+  payload: unknown,
+): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256-v1:${Array.from(new Uint8Array(digest), (value) =>
+    value.toString(16).padStart(2, "0"),
+  ).join("")}`;
+}
+
+export async function getOrCreatePendingCloudCreationLease(
+  userId: string,
+  draftFingerprint: string,
+): Promise<PendingCloudCreationLease> {
+  if (!CLOUD_CREATION_FINGERPRINT_PATTERN.test(draftFingerprint)) {
+    throw new Error("Cloud retry fingerprint is invalid.");
+  }
+  const database = await openDatabase();
+  const recordId = `${PENDING_CLOUD_CREATION_PREFIX}${userId}`;
+
+  return await new Promise<PendingCloudCreationLease>((resolve, reject) => {
+    let lease: PendingCloudCreationLease | undefined;
+    let settled = false;
+    let transaction: IDBTransaction | undefined;
+
+    const close = () => {
+      try {
+        database.close();
+      } catch {
+        // Closing is best-effort after the operation reaches a terminal state.
+      }
+    };
+    const rejectOnce = (error: unknown, fallback: string) => {
+      if (settled) return;
+      settled = true;
+      close();
+      reject(error ?? new Error(fallback));
+    };
+
+    try {
+      transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const read = store.get(recordId);
+
+      transaction.oncomplete = () => {
+        if (settled) return;
+        if (!lease) {
+          rejectOnce(
+            undefined,
+            "IndexedDB completed without a cloud retry identifier.",
+          );
+          return;
+        }
+        settled = true;
+        close();
+        resolve(lease);
+      };
+      transaction.onerror = () => {
+        rejectOnce(
+          transaction?.error ?? read.error,
+          "IndexedDB cloud retry transaction failed.",
+        );
+      };
+      transaction.onabort = () => {
+        rejectOnce(
+          transaction?.error ?? read.error,
+          "IndexedDB cloud retry transaction was aborted.",
+        );
+      };
+      read.onerror = () => {
+        rejectOnce(
+          read.error ?? transaction?.error,
+          "Could not read the cloud retry identifier.",
+        );
+      };
+      read.onsuccess = () => {
+        const existing = read.result as PendingCloudCreation | undefined;
+        if (
+          existing?.id === recordId &&
+          existing.userId === userId &&
+          UUID_V4_PATTERN.test(existing.clientCreationId.toLowerCase()) &&
+          existing.draftFingerprint === draftFingerprint
+        ) {
+          lease = {
+            clientCreationId: existing.clientCreationId,
+            draftFingerprint,
+          };
+          return;
+        }
+
+        lease = {
+          clientCreationId: crypto.randomUUID(),
+          draftFingerprint,
+        };
+        const write = store.put({
+          ...lease,
+          id: recordId,
+          updatedAt: Date.now(),
+          userId,
+        } satisfies PendingCloudCreation);
+        write.onerror = () => {
+          rejectOnce(
+            write.error ?? transaction?.error,
+            "Could not persist the cloud retry identifier.",
+          );
+        };
+      };
+    } catch (error) {
+      rejectOnce(error, "Could not start the cloud retry transaction.");
+      try {
+        transaction?.abort();
+      } catch {
+        // The transaction may not have started or may already be inactive.
+      }
+    }
+  });
+}
+
+export async function clearPendingCloudCreationLease(
+  userId: string,
+  expected: PendingCloudCreationLease,
+): Promise<boolean> {
+  const database = await openDatabase();
+  const recordId = `${PENDING_CLOUD_CREATION_PREFIX}${userId}`;
+
+  return await new Promise<boolean>((resolve, reject) => {
+    let cleared = false;
+    let settled = false;
+    let transaction: IDBTransaction | undefined;
+
+    const close = () => {
+      try {
+        database.close();
+      } catch {
+        // Closing is best-effort after the operation reaches a terminal state.
+      }
+    };
+    const rejectOnce = (error: unknown, fallback: string) => {
+      if (settled) return;
+      settled = true;
+      close();
+      reject(error ?? new Error(fallback));
+    };
+
+    try {
+      transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const read = store.get(recordId);
+
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        close();
+        resolve(cleared);
+      };
+      transaction.onerror = () => {
+        rejectOnce(
+          transaction?.error ?? read.error,
+          "IndexedDB cloud retry cleanup failed.",
+        );
+      };
+      transaction.onabort = () => {
+        rejectOnce(
+          transaction?.error ?? read.error,
+          "IndexedDB cloud retry cleanup was aborted.",
+        );
+      };
+      read.onerror = () => {
+        rejectOnce(
+          read.error ?? transaction?.error,
+          "Could not read the cloud retry identifier for cleanup.",
+        );
+      };
+      read.onsuccess = () => {
+        const existing = read.result as PendingCloudCreation | undefined;
+        if (
+          existing?.id !== recordId ||
+          existing.userId !== userId ||
+          existing.clientCreationId !== expected.clientCreationId ||
+          existing.draftFingerprint !== expected.draftFingerprint
+        ) {
+          return;
+        }
+
+        const removal = store.delete(recordId);
+        removal.onsuccess = () => {
+          cleared = true;
+        };
+        removal.onerror = () => {
+          rejectOnce(
+            removal.error ?? transaction?.error,
+            "Could not clear the cloud retry identifier.",
+          );
+        };
+      };
+    } catch (error) {
+      rejectOnce(error, "Could not start the cloud retry cleanup transaction.");
+      try {
+        transaction?.abort();
+      } catch {
+        // The transaction may not have started or may already be inactive.
+      }
+    }
+  });
 }
 
 export async function markDraftForAuthResume(

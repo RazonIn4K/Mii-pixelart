@@ -520,6 +520,7 @@ export const ProfileUpdateSchema = z
 
 export const CreateCreationSchema = z
   .object({
+    id: z.uuidv4().optional(),
     project: CanonicalGridDocumentSchema,
     title: CreationTitleSchema.optional(),
   })
@@ -737,6 +738,8 @@ export const ApiErrorCodeSchema = z.enum([
   "FORBIDDEN",
   "NOT_FOUND",
   "CONFLICT",
+  "CREATION_ID_CONFLICT",
+  "FIRST_SAVE_PENDING",
   "VALIDATION_FAILED",
   "RATE_LIMITED",
   "QUOTA_EXCEEDED",

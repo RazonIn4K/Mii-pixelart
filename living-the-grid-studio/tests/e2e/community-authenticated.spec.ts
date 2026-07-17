@@ -67,6 +67,30 @@ async function mockSession(
   );
 }
 
+async function readDraftRecord(
+  page: Page,
+  id: string,
+): Promise<Record<string, unknown> | null> {
+  return page.evaluate(
+    ({ recordId }) =>
+      new Promise<Record<string, unknown> | null>((resolve, reject) => {
+        const open = indexedDB.open("tomodachi-studio", 1);
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const transaction = open.result.transaction("drafts", "readonly");
+          const request = transaction.objectStore("drafts").get(recordId);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () =>
+            resolve(
+              (request.result as Record<string, unknown> | undefined) ?? null,
+            );
+          transaction.oncomplete = () => open.result.close();
+        };
+      }),
+    { recordId: id },
+  );
+}
+
 test("read-only mode explains and disables unavailable profile writes", async ({
   page,
 }, testInfo) => {
@@ -1200,6 +1224,8 @@ test("the deliberate first cloud save still resumes its local draft after onboar
           id: "00000000-0000-4000-8000-000000000042",
           revision: 1,
           slug: "resumed-local-draft-01",
+          state: "draft",
+          visibility: "private",
         },
         requestId,
       },
@@ -1942,6 +1968,7 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
   const currentUser = user();
   let copyAttempts = 0;
   let copiedProjectName: string | null = null;
+  const copyRequestIds: string[] = [];
   await mockSession(page, currentUser);
   await page.route("**/api/creations", async (route) => {
     if (route.request().method() !== "POST") {
@@ -1949,12 +1976,12 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
       return;
     }
     copyAttempts += 1;
-    copiedProjectName =
-      (
-        route.request().postDataJSON() as {
-          project?: { meta?: { name?: string } };
-        }
-      ).project?.meta?.name ?? null;
+    const payload = route.request().postDataJSON() as {
+      id?: string;
+      project?: { meta?: { name?: string } };
+    };
+    copyRequestIds.push(payload.id ?? "");
+    copiedProjectName = payload.project?.meta?.name ?? null;
     if (copyAttempts === 1) {
       await fulfillJson(
         route,
@@ -1976,6 +2003,8 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
           id: "00000000-0000-4000-8000-000000000099",
           revision: 1,
           slug: "conflicted-draft-copy-01",
+          state: "draft",
+          visibility: "private",
         },
         requestId,
       },
@@ -2112,6 +2141,16 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
     .getByRole("button", { name: "Save local work as a copy" })
     .click();
   await expect.poll(() => copyAttempts).toBe(1);
+  expect(copyRequestIds[0]).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
+  await expect(
+    readDraftRecord(page, `pending-cloud-creation:${String(currentUser.id)}`),
+  ).resolves.toMatchObject({
+    clientCreationId: copyRequestIds[0],
+    draftFingerprint: expect.stringMatching(/^sha256-v1:[0-9a-f]{64}$/),
+    userId: currentUser.id,
+  });
   await expect(
     page.getByRole("dialog", {
       name: "Choose how to resolve this save conflict",
@@ -2126,15 +2165,136 @@ test("a loaded conflict state fits the minimum supported Studio width", async ({
     .getByRole("button", { name: "Save local work as a copy" })
     .click();
   await expect.poll(() => copyAttempts).toBe(2);
+  expect(copyRequestIds[1]).toBe(copyRequestIds[0]);
   expect(copiedProjectName).toBe(
     "A very long restored conflict project title for mobile (copy)",
   );
   await expect(page.getByText("Saved · v1", { exact: true })).toBeVisible();
+  await expect(
+    readDraftRecord(page, `pending-cloud-creation:${String(currentUser.id)}`),
+  ).resolves.toBeNull();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("first-save leases survive temporary conflicts and reset only after a definitive identifier collision", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the IndexedDB first-save lease contract.",
+  );
+  const currentUser = user();
+  const requestIds: string[] = [];
+  let createAttempts = 0;
+  await mockSession(page, currentUser);
+  await page.route("**/api/creations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    createAttempts += 1;
+    const payload = route.request().postDataJSON() as { id: string };
+    requestIds.push(payload.id);
+    if (createAttempts === 1) {
+      await fulfillJson(
+        route,
+        {
+          error: {
+            code: "FIRST_SAVE_PENDING",
+            message: "That private cloud save is still being prepared.",
+          },
+          requestId,
+        },
+        409,
+        { "Retry-After": "2" },
+      );
+      return;
+    }
+    if (createAttempts === 2) {
+      await fulfillJson(
+        route,
+        {
+          error: {
+            code: "CONFLICT",
+            message: "A separate creation conflict must remain visible.",
+          },
+          requestId,
+        },
+        409,
+      );
+      return;
+    }
+    if (createAttempts === 3) {
+      await fulfillJson(
+        route,
+        {
+          error: {
+            code: "CREATION_ID_CONFLICT",
+            message: "The retry identifier cannot be reused.",
+          },
+          requestId,
+        },
+        409,
+      );
+      return;
+    }
+    await fulfillJson(
+      route,
+      {
+        data: {
+          id: "00000000-0000-4000-8000-000000000088",
+          revision: 1,
+          slug: "fresh-first-save-after-conflict",
+          state: "draft",
+          visibility: "private",
+        },
+        requestId,
+      },
+      201,
+      { ETag: '"rev-1"' },
+    );
+  });
+
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Start blank" }).click();
+  const save = page.getByRole("button", { name: "Save to account" });
+  const recordId = `pending-cloud-creation:${String(currentUser.id)}`;
+
+  await save.click();
+  await expect.poll(() => createAttempts).toBe(1);
+  const pendingLease = await readDraftRecord(page, recordId);
+  expect(pendingLease).toMatchObject({
+    clientCreationId: requestIds[0],
+    draftFingerprint: expect.stringMatching(/^sha256-v1:[0-9a-f]{64}$/),
+  });
+
+  await save.click();
+  await expect.poll(() => createAttempts).toBe(2);
+  expect(requestIds[1]).toBe(requestIds[0]);
+  await expect(readDraftRecord(page, recordId)).resolves.toMatchObject({
+    clientCreationId: requestIds[0],
+  });
+
+  await save.click();
+  await expect.poll(() => createAttempts).toBe(3);
+  await expect(
+    page.getByText(
+      "That retry identifier is no longer usable. Nothing was overwritten. Choose Save to account again to create a fresh private copy.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page.waitForTimeout(100);
+  expect(createAttempts).toBe(3);
+  await expect(readDraftRecord(page, recordId)).resolves.toBeNull();
+
+  await save.click();
+  await expect.poll(() => createAttempts).toBe(4);
+  expect(requestIds[3]).not.toBe(requestIds[0]);
+  await expect(page.getByText("Saved · v1", { exact: true })).toBeVisible();
 });
 
 test("saving a conflicted cloud project as a copy replaces the cloud URL before reload", async ({
@@ -2248,6 +2408,8 @@ test("saving a conflicted cloud project as a copy replaces the cloud URL before 
           id: newCreationId,
           revision: 1,
           slug: "query-bound-conflict-project-copy",
+          state: "draft",
+          visibility: "private",
         },
         requestId,
       },

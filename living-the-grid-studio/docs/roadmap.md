@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
-| 7     | Island Workshop Community  | Writable single-account staging; performance and AI follow-up required | Exact `406660b` is active and functionally accepted; its cold-Studio LCP fails the gate, and the tested Studio-shell plus AI-history corrective candidate still needs a new exact-SHA staging approval |
+| 7     | Island Workshop Community  | Writable single-account staging; final release gates open | Staging runs exact runtime `80fdcd5`; branch checkpoint `b34f821` is runtime-equivalent, but exact-head P1 evidence and P2-P5 hosted acceptance remain incomplete |
 
 ---
 
@@ -208,9 +208,11 @@ human-authorized moderation.
 
 **Accepted on isolated staging:**
 
-- [x] Exact source `406660bcfbef590d8da0e79a52b7ad7bc96e6590`
-      deployed with community mutations enabled only on isolated staging;
-      authenticated Studio, account navigation, share
+- [x] Exact runtime source
+      `80fdcd5da432b88d06d84bfd084e9f0993edc363` deployed as Cloudflare
+      deployment `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
+      `c56f580f-2238-4775-846d-3d2c08f17c78`, with community mutations enabled
+      only on isolated staging; authenticated Studio, account navigation, share
       review, security, crawler, accessibility, CSP, and isolation checks pass
 - [x] Authenticated single-account profile setup and Terms reacceptance,
       generated/custom avatar lifecycle, private cloud restore, showcase-image
@@ -222,32 +224,44 @@ human-authorized moderation.
       checks
 - [x] Last unchanged-homepage acceptance: 2,185 ms median LCP, 0.00 CLS, and
       100 Accessibility/Best Practices Lighthouse scores
-- [ ] Current exact-source Studio performance closeout: `406660b` records
-      4,084 ms cold-Studio p75 LCP and 0.00 CLS under the agreed Slow-4G/4×-CPU
-      profile. The true-256 canvas is functionally accepted; the tested early
-      Studio shell and AI-history isolation require a new exact staging
-      approval and Worker-hosted cold, restored-draft, and cloud-load checks.
+- [ ] Final exact-head Studio performance closeout: branch checkpoint
+      `b34f821373657ccf8e5d38401af6c4ff255fc65c` differs from deployed
+      `80fdcd5` only by documentation and test configuration, but the release
+      rule still requires fresh immutable exact-head cold, restored-draft,
+      cloud-load, interaction, and mobile evidence. Earlier hosted records are
+      supporting evidence only.
 
 **Remaining approval gates:**
 
-- [ ] New exact-source staging deployment for the tested Studio-shell and
-      AI-history corrective candidate, followed by Worker-hosted cold,
-      restored-draft, authenticated cloud-load, live Create, accessibility,
-      CSP/console, crawler, and mobile-performance acceptance
+- [ ] Complete P1 on one final exact-head staging deployment with Worker-hosted
+      cold, restored-draft, authenticated cloud-load, live Create,
+      accessibility, CSP/console, crawler, and mobile-performance acceptance
+- [x] Implement and locally prove the fail-closed writable hosted harness and
+      secret-free live-auth runner with production-host refusal, fixed
+      route/write/byte ceilings, private `0600` approval binding, exact D1/R2
+      key/size/SHA-256 reconciliation, HMAC-attested loopback enumeration, two
+      ephemeral browser contexts, and D1-confirmed session revocation
+- [ ] Run those tools on the next exact staging SHA with a fresh private
+      approval and a distinct approved second Google identity; no remote
+      writable/two-session run is approved or complete yet
 - [ ] Distinct second-user cross-account, social, report, moderation, and
       destructive account-lifecycle acceptance
-- [x] Immutable preview and Worker asset-byte parity for the preceding accepted
-      read-only `520d0f28` source
+- [x] Exact branch preview
+      `https://02e85e33.mii-pixelart.pages.dev` and green owned PR checks for
+      checkpoint `b34f821`; this does not substitute for exact-head Worker
+      acceptance
 - [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
-Production `tomodachi.pw` remains on the existing Cloudflare Pages deployment.
+Production `tomodachi.pw` remains on Cloudflare Pages at exact source
+`c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
+`b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. No production Worker or isolated
+production resources exist; checked-in production IDs remain placeholders.
 The accepted staging deployment enables community mutations only in isolated
 staging for its approved single-account scope. Payments and consultations are
-retired everywhere, and no roadmap status grants approval for production. See the
-sanitized exact-source record in
-`docs/release-evidence/2026-07-16-staging-true-256-406660b.md` and the remaining
-gates in `docs/production-readiness-plan.md`.
+retired everywhere, and no roadmap status grants approval for production. See
+`docs/release-evidence/2026-07-16-payment-retirement.md` and the remaining gates
+in `docs/production-readiness-plan.md`.
 
 ---
 

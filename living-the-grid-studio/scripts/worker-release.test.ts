@@ -30,6 +30,8 @@ const migrationNames = [
   "0004_preserve_moderation_state.sql",
   "0005_creation_showcase_images.sql",
   "0006_align_game_taxonomy.sql",
+  "0007_profile_images.sql",
+  "0008_retain_deleting_showcase_quota.sql",
 ] as const;
 const PRIVILEGED_ROLE_COUNT_QUERY =
   "SELECT COUNT(*) AS count FROM users WHERE role IN ('admin', 'moderator')";
@@ -238,6 +240,7 @@ function environmentConfig(
       },
     ],
     images: { binding: "IMAGES", remote: false },
+    version_metadata: { binding: "CF_VERSION_METADATA" },
     ratelimits: rateLimits(values.ratePrefix),
   };
 }
@@ -297,6 +300,7 @@ function generatedConfig(target: ReleaseTarget, source = sourceConfig()) {
     r2_buckets: selected.r2_buckets,
     kv_namespaces: selected.kv_namespaces,
     images: selected.images,
+    version_metadata: selected.version_metadata,
     ratelimits: selected.ratelimits,
     ...(target === "local" ? {} : { routes: selected.routes }),
   };

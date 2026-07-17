@@ -425,6 +425,15 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CreateCreationInput" }
       responses:
+        "200":
+          description: Idempotent replay of an already-completed first save
+          headers:
+            ETag: { $ref: "#/components/headers/RevisionEtag" }
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreationEnvelope" }
         "201":
           description: Private creation and first ready revision
           headers:
@@ -436,6 +445,7 @@ paths:
               schema: { $ref: "#/components/schemas/CreationEnvelope" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
@@ -1609,6 +1619,8 @@ components:
           FORBIDDEN,
           NOT_FOUND,
           CONFLICT,
+          CREATION_ID_CONFLICT,
+          FIRST_SAVE_PENDING,
           VALIDATION_FAILED,
           RATE_LIMITED,
           QUOTA_EXCEEDED,
@@ -2398,6 +2410,11 @@ components:
       additionalProperties: false
       required: [project]
       properties:
+        id:
+          type: string
+          format: uuid
+          pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          description: Client-generated UUIDv4 reused only for retries of this exact first save.
         project: { $ref: "#/components/schemas/GridDocumentV1" }
         title: { type: string, minLength: 1, maxLength: 80 }
     SaveProjectInput:

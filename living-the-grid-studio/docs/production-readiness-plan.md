@@ -17,11 +17,25 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- Staging is serving exact source commit
-  `406660bcfbef590d8da0e79a52b7ad7bc96e6590` as Cloudflare deployment
-  `4cb804a9-684c-4490-8fa1-1a40b0b15e57`, active Worker version
-  `e9bbf6f6-b14a-468a-94e3-0c4dcdde796b`. The immediately preceding rollback
-  version is `d025b531-055f-46bf-be25-2089bedeef58`.
+- The community branch checkpoint is
+  `b34f821373657ccf8e5d38401af6c4ff255fc65c`. GitHub and GitLab carry that
+  exact branch ref, its owned PR checks are green, and its exact Pages preview
+  is `https://02e85e33.mii-pixelart.pages.dev`. This is repository and preview
+  evidence, not a staging-exit or production approval.
+- The next candidate now adds retry-safe first-cloud-save idempotency, exact
+  Worker source-identity headers, the fail-closed P2 writable harness, and the
+  secret-free P3 two-session runner. Those local changes alter runtime code;
+  they must be committed, pushed, scanned, and deployed as one new exact SHA
+  before any earlier hosted evidence can be reused. No P2/P3 remote run,
+  staging mutation, or production change was performed while building them.
+- Staging is serving exact runtime source
+  `80fdcd5da432b88d06d84bfd084e9f0993edc363` as Cloudflare deployment
+  `9803bbba-4ee5-45fc-9027-7afd4e902089`, active Worker version
+  `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19) at 100 percent traffic.
+  The changes from `80fdcd5` through `b34f821` are documentation and test
+  configuration only, so the deployed application runtime is equivalent, but
+  that equivalence does **not** replace the required exact-head hosted P1
+  evidence.
 - The deployed staging flag is `COMMUNITY_MUTATIONS_ENABLED=true`. Payments and
   consultations are retired; the staging D1 migration ledger contains `0001`
   through `0008`. That deployment did not apply a migration, rotate a
@@ -31,19 +45,27 @@ staging check does not authorize the next gate.
   import/reference/Copy Guide, export-failure recovery, real AI advice, and the
   publish-review dialog passed the completed functional checks. No project was
   published and no existing cloud draft was changed during that gate.
-- The exact deployed commit does **not** pass the complete performance gate.
-  In the agreed 390 by 844, DPR 3, Slow 4G, 4-times CPU profile, five cold
-  Studio runs measured 4.084 seconds p75 LCP and 0.00 CLS; the first canvas
-  interaction measured 76 ms INP. The required limits remain LCP below 2.5
-  seconds, CLS below 0.1, and INP below 200 ms.
-- A live Create request after Advice returned a safely rejected empty grid.
-  The current corrective candidate isolates sketch history at the server
-  boundary and paints an early Studio shell. It passes local functional,
-  bundle, and compressed-trace diagnostics, but is not a release until remote
-  CI is green, the exact SHA is approved, and that SHA passes hosted staging.
-- Production is unchanged and continues to run the retained Pages deployment.
-  Nothing in this document authorizes a merge, production deployment, DNS
-  change, migration, secret write, OAuth change, or new staging data.
+- The performance and AI corrections are present in the deployed runtime, but
+  P1 remains open because the final branch head has not completed the required
+  immutable exact-head cold, restored-draft, cloud-load, interaction, and
+  mobile performance record. Earlier hosted results remain supporting evidence
+  only and may not be promoted to final exact-head acceptance.
+- The assembled local release candidate passes both TypeScript projects,
+  8 preflight files/135 tests, 38 Worker files/345 tests, and the complete
+  Playwright matrix with 410 executed passes plus 396 intentional
+  viewport/project skips. The isolated reruns for the two earlier
+  concurrency-timeout cases also pass. The production bundle remains within
+  budget at 92.3 KiB initial/largest gzip, all three target-explicit Worker
+  dry-runs pass without deployment, and `pnpm audit --audit-level high` reports
+  no known vulnerabilities. These are local candidate checks, not hosted P1-P5
+  evidence.
+- Production remains Cloudflare Pages at exact source
+  `c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
+  `b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. A production Worker and isolated
+  production resources do not exist yet; the checked-in production IDs are
+  placeholders. Nothing in this document authorizes a merge, production
+  deployment, DNS change, migration, resource creation, secret write, OAuth
+  change, or new staging data.
 
 ## Authority and evidence rules
 
@@ -70,9 +92,9 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Studio performance fix and new exact staging candidate | Current staging checkpoint | **In review:** local candidate passes diagnostics; hosted exact-SHA approval remains |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Not implemented as a dedicated live harness |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Not implemented as a repeatable runner |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Runtime correction is deployed through `80fdcd5`; the new runtime candidate still needs exact-head hosted evidence |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Local implementation and injected tests complete; no remote writable run is approved or complete |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Local implementation and injected tests complete; no two-session live-auth run is approved or complete |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete on live staging |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete on live staging |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Partially recorded; live checks remain |
@@ -89,7 +111,7 @@ P1 is the active engineering gate. P2-P5 are required even without organic
 users: a second synthetic identity is what proves object-level authorization,
 and disposable data is what proves irreversible cleanup safely.
 
-## P1 - Fix Studio performance and approve a new exact staging candidate
+## P1 - Close exact-head Studio performance and functional evidence
 
 **Owner/authority:** The maintainer may implement and test locally. David Ortiz
 must approve the final 40-character SHA before another staging deploy. That
@@ -140,11 +162,12 @@ diagnostic. Also test 320, 360, 390, 430, 768, 1024, and 1440 pixel layouts,
 Any threshold miss, stale trace, console error, failed expected request,
 duplicate interactive grid, or changed provider data-collection mode is no-go.
 
-**Rollback:** Before deployment, record the active and rollback versions. If
-the new version regresses behavior, return staging to known functional version
-`d025b531-055f-46bf-be25-2089bedeef58`; if the issue affects authorization,
-privacy, or data integrity, deploy the validated read-only artifact instead.
-Do not reverse D1 migrations or delete R2 data as a code rollback.
+**Rollback:** Before deployment, query and record the then-active version and
+its immediate reviewed rollback version; do not reuse an obsolete version ID
+from an earlier gate. If the new version regresses behavior, return staging to
+that recorded functional version; if the issue affects authorization, privacy,
+or data integrity, deploy the validated read-only artifact instead. Do not
+reverse D1 migrations or delete R2 data as a code rollback.
 
 ## P2 - Build a fail-closed writable hosted harness
 
@@ -155,9 +178,8 @@ object prefixes, maximum writes, and cleanup plan.
 **Prerequisites**
 
 - Keep `verify:hosted-read-only` unchanged as the credentialless read gate.
-- Add a separately named script such as
-  `verify:hosted-staging-writable`; until that tracked script and its fixture
-  tests exist, no ad hoc shell collection counts as writable acceptance.
+- Use the tracked `verify:hosted-staging-writable` script. Ad hoc shell
+  collections do not count as writable acceptance.
 - Require exact `https://staging.tomodachi.pw`, expected source SHA/Worker
   version, and `COMMUNITY_MUTATIONS_ENABLED=true`. Refuse production,
   redirects, arbitrary hosts, unexpected cookies/headers, unlisted routes, and
@@ -165,12 +187,32 @@ object prefixes, maximum writes, and cleanup plan.
 
 **Commands and evidence**
 
+The integrated command reads only the gitignored
+`.deployment-readiness/staging-writable.json` file. It refuses any other path,
+requires mode `0600`, and accepts no CLI-supplied identity or approval values.
+The private file must bind a fresh 30-minute-or-shorter window to the exact
+source SHA, active Worker version, owner internal UUID, distinct second-user
+internal UUID, unique UUIDv4 `runId`, fixed ceilings, and the four required
+safety confirmations. Immediately before the first mutation the runner
+atomically creates a `0600` consumption marker and removes the approval file;
+the same `runId` cannot authorize another run. Never commit either file.
+
+```bash
+pnpm verify:hosted-staging-writable
+```
+
 - Unit-test the complete request allowlist, byte/object ceilings, first-failure
   stop, redaction, idempotent cleanup, and production-host refusal with injected
   fetch; those tests must not contact a remote service.
 - Capture sanitized pre/post D1 row counts and R2 manifest counts. Use generated
   fixture IDs and an explicit test prefix; never infer ownership from a title or
-  username.
+  username. The tracked runner starts a loopback-only, non-deployable audit
+  Worker with the staging R2 binding in remote-development mode, independently
+  lists the one generated creation prefix, HMAC-attests the response, and
+  compares every key, byte size, streamed byte count, and SHA-256 digest against
+  D1. Listings, responses, objects, process output, and process lifetime are all
+  bounded; any orphan, missing object, digest mismatch, or cleanup failure stops
+  the run.
 - Require every write response to have the standard envelope and request ID.
   Record created IDs only in the private run record and delete fixtures through
   normal APIs. A narrowly scoped cleanup script is a separately approved
@@ -205,6 +247,12 @@ only browser-memory session state.
 - Reuse the current owner account only for owner/admin checks. Add a distinct
   approved Google staging test user for cross-account checks; do not create a
   fake D1 identity that bypasses OIDC.
+- The tracked `verify:staging-live-auth` command performs the standalone
+  two-context lifecycle check. The integrated P2 command invokes the same
+  runner and binds both in-memory sessions to the private approval record. It
+  keeps session IDs private in memory, signs out both contexts, then requires a
+  sanitized read-only staging D1 query to prove both exact session rows are
+  present and revoked; cookie clearing alone does not count as revocation.
 
 **Evidence:** Show verified-email onboarding, Terms attestation, session
 creation/revocation, ten-session eviction, fresh-auth enforcement, sign-out,
@@ -361,12 +409,16 @@ consultation offer. `/api/stripe/*` and `/api/webhooks/stripe` are temporary,
 provider-free compatibility tombstones: every method returns `410 Gone`, JSON,
 and `Cache-Control: no-store` without a credential or upstream call. The public
 `/ai-plan` is a free beta; the possible one-time $5 Creator Action Plan is
-clearly marked as future direction and not for sale.
+clearly marked as future direction and not for sale. The current Pages
+production release `c044134`/`b73cc5ba` and staging Worker release
+`80fdcd5`/`9803bbba` passed this proof; retain it on every later candidate.
 
-Provider-side retirement is separately audited: verify historical obligations,
-deactivate old links/endpoints, remove Tomodachi payment values from Doppler and
-Cloudflare, and revoke only credentials proven exclusive to this project. Do
-not send a test or live payment event merely to prove retirement.
+Provider-side retirement is recorded in
+`docs/release-evidence/2026-07-16-payment-retirement.md`: identified Tomodachi
+links/endpoints are inactive, Tomodachi payment values are absent from Doppler
+and Cloudflare, and no shared-account credential was revoked without exclusive
+ownership proof. Recheck that state before release; do not send a test or live
+payment event merely to prove retirement.
 
 **Go/no-go:** Any environment that presents a buy/checkout/tip/donation/
 consultation control, accepts payment, makes a payment-provider request, or lets

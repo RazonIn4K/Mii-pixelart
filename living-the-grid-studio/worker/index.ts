@@ -18,6 +18,7 @@ import { registerLegacyRoutes } from "./legacy";
 import { formatRequestLog } from "./logging";
 import { registerModerationRoutes } from "./moderation";
 import { registerProfileImageRoutes } from "./profile-images";
+import { applyReleaseIdentityHeaders } from "./release-identity";
 import { Router } from "./router";
 import { runScheduledMaintenance } from "./scheduled";
 import { registerSocialRoutes } from "./social";
@@ -103,6 +104,7 @@ async function handleRequest(
 
   const headers = new Headers(response.headers);
   headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
+  applyReleaseIdentityHeaders(headers, env);
   applyEnvironmentCrawlerPolicy(headers, env);
   response = new Response(request.method === "HEAD" ? null : response.body, {
     headers,
@@ -204,6 +206,7 @@ function malformedApiPath(request: Request, env: Env): Promise<Response> {
     "Request path encoding is invalid.",
   );
   response.headers.set("X-Worker-Scheme", url.protocol.slice(0, -1));
+  applyReleaseIdentityHeaders(response.headers, env);
   applyEnvironmentCrawlerPolicy(response.headers, env);
   console.log(
     formatRequestLog(request, {

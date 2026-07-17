@@ -264,10 +264,14 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 
 ### Checkpoint A — game-matched easy drawing
 
-Status: the true-256 slice is live on staging at exact source `406660b` and is
-functionally accepted. Its cold-Studio performance and live mixed-history AI
-findings have a tested corrective candidate that requires a new exact-SHA
-staging gate.
+Status: the true-256 slice and its Studio-shell/AI-history corrections are live
+on staging at exact runtime source
+`80fdcd5da432b88d06d84bfd084e9f0993edc363`. The current branch checkpoint is
+`b34f821373657ccf8e5d38401af6c4ff255fc65c`; changes between those commits are
+documentation and test configuration, so the application runtime is
+equivalent. Final P1 acceptance nevertheless remains open until one immutable
+exact head passes the full hosted cold, restored-draft, cloud-load,
+interaction, and mobile performance matrix.
 
 - Keep one 256×256 coordinate surface so one Studio cell can represent one
   reported game-surface pixel without conflating document resolution and brush
@@ -360,7 +364,7 @@ Exit evidence:
 This record applies to the game-matched drawing slice based on
 `d3ec2f9f889677a5859972c2e21935619e032f90`. It is local evidence, not a hosted
 staging approval or production result, and is superseded for release decisions
-by the hosted `406660b` record.
+by the current hosted `80fdcd5` runtime and the exact-head requirements below.
 
 - TypeScript client and Worker checks passed.
 - Worker tests passed: 37 files and 318 tests.
@@ -381,17 +385,22 @@ by the hosted `406660b` record.
   measured 74ms INP and 0.00 CLS. No console errors or failed network requests
   appeared in the traced workflow.
 
-### Current release gates after hosted `406660b` acceptance
+### Current release gates after published checkpoint `b34f821`
 
-1. Require the remote CI and security checks to pass on the mirrored corrective
-   commit containing the early Studio shell and AI-history isolation.
-2. Request a new exact-SHA staging approval; the approval for `406660b` does
-   not authorize a newer corrective commit.
-3. After approval only, deploy that exact commit to staging with the already
-   approved feature flags and no unrelated DNS, secret, migration, OAuth, role,
-   or production changes.
-4. Repeat authenticated Studio, profile, live Create, accessibility,
-   CSP/console, crawler, and mobile performance acceptance on the immutable
-   hosted deployment URL.
-5. Keep production unchanged until staging evidence is reviewed and a separate
-   production cutover gate is explicitly approved.
+1. Keep the P1 exact-head rule: the existing staging runtime is equivalent to
+   the branch application code, but fresh immutable exact-head cold,
+   restored-draft, cloud-load, interaction, and mobile evidence is still
+   required before staging exit.
+2. The fail-closed writable hosted harness and secret-free live-auth runner are
+   implemented and locally proven. Do not count those injected tests as an
+   approved remote writable or two-session run; the first live run still needs
+   a fresh private approval and distinct second Google staging identity.
+3. After separately scoped identity and fixture approval, complete the
+   two-user authorization, social, report, moderation, conflict, deletion,
+   cancellation, retention, and cleanup matrices on staging.
+4. Require final GitHub/GitLab CI and security evidence on the same immutable
+   SHA and active staging Worker version used for exit review.
+5. Keep production on Pages source `c044134`/deployment `b73cc5ba`; no
+   production Worker or isolated resource set exists, and every resource,
+   OAuth, secret, migration, deploy, DNS, and write-enable action retains its
+   separate approval gate.

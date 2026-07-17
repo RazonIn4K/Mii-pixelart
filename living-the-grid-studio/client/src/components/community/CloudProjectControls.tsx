@@ -32,6 +32,7 @@ import {
 import { PublishDialog } from "./PublishDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import type { GridDocument } from "@/lib/engine/grid";
+import { CreateCreationSchema } from "@shared/community";
 import {
   communityApi,
   CommunityApiError,
@@ -39,10 +40,14 @@ import {
   messageFromError,
 } from "@/lib/community/api";
 import {
+  clearPendingCloudCreationLease,
   consumeAuthResumeDraft,
+  fingerprintCloudCreationPayload,
+  getOrCreatePendingCloudCreationLease,
   markDraftForAuthResume,
   readLocalDraft,
   saveLocalDraft,
+  type PendingCloudCreationLease,
 } from "@/lib/community/drafts";
 import {
   currentStudioReturnTo,
@@ -59,6 +64,8 @@ interface SaveResponse {
   creationId?: string;
   slug: string;
   revision: number;
+  state: "draft" | "published" | "hidden" | "deleted";
+  visibility: "private" | "unlisted" | "public";
 }
 
 function publicationFromCreation(
@@ -184,7 +191,10 @@ export function CloudProjectControls({
   docRef.current = doc;
 
   const persistLocal = useCallback(
-    async (document: GridDocument, state?: CloudProjectState | null) => {
+    async (
+      document: GridDocument,
+      state?: CloudProjectState | null,
+    ): Promise<boolean> => {
       try {
         await saveLocalDraft({
           id: "current",
@@ -192,8 +202,10 @@ export function CloudProjectControls({
           updatedAt: Date.now(),
           cloud: state ?? undefined,
         });
+        return true;
       } catch {
         // IndexedDB can be unavailable in hardened/private browser modes. The in-memory editor still works.
+        return false;
       }
     },
     [],
@@ -260,16 +272,50 @@ export function CloudProjectControls({
         }
         return null;
       }
+      if (savingRef.current) return null;
       setBusy(true);
       savingRef.current = true;
+      let pendingLease: PendingCloudCreationLease | null = null;
       try {
+        let canonicalInput: ReturnType<typeof CreateCreationSchema.parse>;
+        try {
+          canonicalInput = CreateCreationSchema.parse({
+            project: document,
+            title: document.meta.name,
+          });
+          const draftFingerprint = await fingerprintCloudCreationPayload({
+            project: canonicalInput.project,
+            title: canonicalInput.title,
+          });
+          pendingLease = await getOrCreatePendingCloudCreationLease(
+            user.id,
+            draftFingerprint,
+          );
+        } catch {
+          throw new Error(
+            "This browser could not prepare a retry-safe cloud save. Export JSON before retrying or use a browser that allows local site storage.",
+          );
+        }
+
         const result = await communityApi<SaveResponse>("/api/creations", {
           method: "POST",
-          body: jsonBody({ project: document, title: document.meta.name }),
+          body: jsonBody({
+            ...canonicalInput,
+            id: pendingLease.clientCreationId,
+          }),
         });
         const creationId = result.data.id ?? result.data.creationId;
         if (!creationId)
           throw new Error("The server did not return a project identifier.");
+        if (
+          result.data.revision !== 1 ||
+          result.data.state !== "draft" ||
+          result.data.visibility !== "private"
+        ) {
+          throw new Error(
+            "The server did not return a safe private first-save state.",
+          );
+        }
         const next: CloudProjectState = {
           userId: user.id,
           creationId,
@@ -291,13 +337,40 @@ export function CloudProjectControls({
         };
         lastSavedModifiedRef.current = document.meta.modifiedAt;
         setCloud(next);
-        await persistLocal(document, next);
-        toast.success(
-          "Private cloud save created. Publishing is still separate.",
-        );
+        const localMetadataSaved = await persistLocal(document, next);
+        if (localMetadataSaved) {
+          // Compare-and-delete prevents a completed request in one tab from
+          // clearing a newer draft lease prepared in another tab.
+          await clearPendingCloudCreationLease(user.id, pendingLease).catch(
+            () => false,
+          );
+          toast.success(
+            "Private cloud save created. Publishing is still separate.",
+          );
+        } else {
+          toast.info(
+            "Private cloud save created, but this browser could not retain its local link. You can reopen it from My projects.",
+          );
+        }
         return creationId;
       } catch (error) {
-        toast.error(messageFromError(error));
+        let leaseCleared = false;
+        if (
+          pendingLease &&
+          error instanceof CommunityApiError &&
+          error.status === 409 &&
+          error.code === "CREATION_ID_CONFLICT"
+        ) {
+          leaseCleared = await clearPendingCloudCreationLease(
+            user.id,
+            pendingLease,
+          ).catch(() => false);
+        }
+        toast.error(
+          leaseCleared
+            ? "That retry identifier is no longer usable. Nothing was overwritten. Choose Save to account again to create a fresh private copy."
+            : messageFromError(error),
+        );
         if (!options?.preserveCloudOnError) {
           setCloud((current) =>
             current

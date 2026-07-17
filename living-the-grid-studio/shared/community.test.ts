@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ApiErrorCodeSchema,
   CanonicalGridDocumentSchema,
+  CreateCreationSchema,
   CreateCreationImageUploadSchema,
   CreateProfileImageUploadSchema,
   GridDocumentV1Schema,
@@ -81,6 +83,34 @@ describe("GridDocumentV1Schema", () => {
 });
 
 describe("community helpers", () => {
+  it("exposes distinct first-save pending and identifier-conflict codes", () => {
+    expect(ApiErrorCodeSchema.parse("FIRST_SAVE_PENDING")).toBe(
+      "FIRST_SAVE_PENDING",
+    );
+    expect(ApiErrorCodeSchema.parse("CREATION_ID_CONFLICT")).toBe(
+      "CREATION_ID_CONFLICT",
+    );
+  });
+
+  it("accepts only an optional client-generated UUIDv4 for first-save retries", () => {
+    const input = { project: validDocument() };
+    const uuidv4 = "6a1e8d9d-0d22-45a0-8d7a-6818cc8e879d";
+
+    expect(CreateCreationSchema.parse({ ...input, id: uuidv4 }).id).toBe(
+      uuidv4,
+    );
+    expect(CreateCreationSchema.safeParse(input).success).toBe(true);
+    for (const id of [
+      "6a1e8d9d-0d22-15a0-8d7a-6818cc8e879d",
+      "6a1e8d9d-0d22-75a0-8d7a-6818cc8e879d",
+      "not-a-uuid",
+    ]) {
+      expect(CreateCreationSchema.safeParse({ ...input, id }).success).toBe(
+        false,
+      );
+    }
+  });
+
   it("allows only a server-controlled avatar regeneration request", () => {
     expect(ProfileUpdateSchema.parse({ regenerateAvatar: true })).toEqual({
       regenerateAvatar: true,

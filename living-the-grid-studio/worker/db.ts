@@ -15,7 +15,9 @@ export interface CreationRow {
   popularity_score: number;
   project_download_enabled: number;
   published_at: number | null;
+  project_sha256: string | null;
   revision_number: number | null;
+  revision_status: "failed" | "obsolete" | "ready" | "uploading" | null;
   showcase_json: string;
   slug: string;
   state: "deleted" | "draft" | "hidden" | "published";
@@ -61,7 +63,7 @@ export const CREATION_SELECT = `
     COALESCE(cs.like_count, 0) AS like_count,
     COALESCE(cs.comment_count, 0) AS comment_count,
     COALESCE(cs.popularity_score, 0) AS popularity_score,
-    cr.revision_number,
+    cr.revision_number, cr.project_sha256, cr.status AS revision_status,
     COALESCE((
       SELECT JSON_GROUP_ARRAY(JSON_OBJECT(
         'id', showcase.id,

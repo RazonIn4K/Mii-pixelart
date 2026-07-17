@@ -7,6 +7,7 @@ import {
 } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { CreateCreationSchema } from "../shared/community";
 import { sha256 } from "./crypto";
 import worker from "./index";
 
@@ -33,6 +34,236 @@ describe("community Worker integration", () => {
     `);
   });
 
+  it("replays an exact completed first save without duplicating database state", async () => {
+    const owner = await seedUser("retry-owner");
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "retry-owner-token"),
+    );
+    const creationId = "7c06a008-f20c-47f4-802a-ff7e78e3ca45";
+    const body = JSON.stringify({
+      id: creationId,
+      project: project("Retry-safe project"),
+      title: "Retry-safe project",
+    });
+
+    const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body,
+      headers,
+      method: "POST",
+    });
+    expect(created.status).toBe(201);
+    expect(created.headers.get("location")).toBe(
+      `/api/creations/${creationId}`,
+    );
+
+    const countsBeforeReplay = await creationStorageCounts(creationId);
+    const replayed = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body,
+      headers,
+      method: "POST",
+    });
+    expect(replayed.status).toBe(200);
+    expect(replayed.headers.get("etag")).toBe('"rev-1"');
+    expect(replayed.headers.get("location")).toBe(
+      `/api/creations/${creationId}`,
+    );
+    await expect(replayed.json()).resolves.toMatchObject({
+      data: { id: creationId, revision: 1, title: "Retry-safe project" },
+    });
+    await expect(creationStorageCounts(creationId)).resolves.toEqual(
+      countsBeforeReplay,
+    );
+  });
+
+  it("fails closed while the same first-save identifier is still uploading", async () => {
+    const owner = await seedUser("racing-owner");
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "racing-owner-token"),
+    );
+    const creationId = "4b0bd634-4f72-4c3b-b473-4b8b2ab6b14a";
+    const revisionId = "46f7ef93-c943-4695-a5e4-01eed59016ee";
+    const now = Date.now();
+    const racingProject = project("Racing project");
+    const canonicalProject = CreateCreationSchema.parse({
+      id: creationId,
+      project: racingProject,
+      title: "Racing project",
+    }).project;
+    const projectSha256 = await sha256(JSON.stringify(canonicalProject));
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO creations
+         (id, owner_user_id, slug, title, description, state, visibility,
+          comments_enabled, project_download_enabled, current_revision_id,
+          bytes_total, created_at, updated_at)
+         VALUES (?, ?, 'racing-save-slug01', 'Racing project', '', 'draft',
+          'private', 0, 0, NULL, 0, ?, ?)`,
+      ).bind(creationId, owner.id, now, now),
+      env.DB.prepare(
+        `INSERT INTO creation_revisions
+         (id, creation_id, revision_number, status, project_bytes,
+          project_sha256, created_at)
+         VALUES (?, ?, 1, 'uploading', 0, ?, ?)`,
+      ).bind(revisionId, creationId, projectSha256, now),
+    ]);
+    await expect(
+      env.DB.prepare("SELECT current_revision_id FROM creations WHERE id = ?")
+        .bind(creationId)
+        .first<{ current_revision_id: string | null }>(),
+    ).resolves.toEqual({ current_revision_id: null });
+
+    const response = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        id: creationId,
+        project: racingProject,
+        title: "Racing project",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(response.status).toBe(409);
+    expect(response.headers.get("retry-after")).toBe("2");
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "FIRST_SAVE_PENDING",
+        message:
+          "That private cloud save is still being prepared. Wait a moment and try again.",
+      },
+    });
+
+    const changedPayload = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        id: creationId,
+        project: project("Different upload payload"),
+        title: "Racing project",
+      }),
+      headers,
+      method: "POST",
+    });
+    expect(changedPayload.status).toBe(409);
+    expect(changedPayload.headers.get("retry-after")).toBeNull();
+    await expect(changedPayload.json()).resolves.toMatchObject({
+      error: { code: "CREATION_ID_CONFLICT" },
+    });
+  });
+
+  it("uses the same generic conflict for changed and cross-user identifier collisions", async () => {
+    const owner = await seedUser("collision-owner");
+    const visitor = await seedUser("collision-visitor");
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "collision-owner-token"),
+    );
+    const visitorHeaders = authenticatedHeaders(
+      await seedSession(visitor.id, "collision-visitor-token"),
+    );
+    const creationId = "204e2dd1-ef3b-4143-8e07-d9c0ab7c356e";
+    const initial = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        id: creationId,
+        project: project("Collision project"),
+        title: "Collision project",
+      }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    expect(initial.status).toBe(201);
+
+    const changed = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        id: creationId,
+        project: project("Changed project"),
+        title: "Changed project",
+      }),
+      headers: ownerHeaders,
+      method: "POST",
+    });
+    const crossUser = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: JSON.stringify({
+        id: creationId,
+        project: project("Collision project"),
+        title: "Collision project",
+      }),
+      headers: visitorHeaders,
+      method: "POST",
+    });
+    expect(changed.status).toBe(409);
+    expect(crossUser.status).toBe(409);
+
+    const changedBody = (await changed.json()) as {
+      error: { code: string; message: string };
+    };
+    const crossUserBody = (await crossUser.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(changedBody.error.code).toBe("CREATION_ID_CONFLICT");
+    expect(crossUserBody.error).toEqual(changedBody.error);
+    expect(JSON.stringify(crossUserBody)).not.toContain(owner.id);
+    expect(JSON.stringify(crossUserBody)).not.toContain("collision-owner");
+    await expect(creationStorageCounts(creationId)).resolves.toMatchObject({
+      creations: 1,
+      revisions: 1,
+    });
+  });
+
+  it("never treats a later, published, or deleted creation as a first-save replay", async () => {
+    const owner = await seedUser("stale-retry-owner");
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "stale-retry-owner-token"),
+    );
+    const creationId = "3daf2277-b4de-4b54-99ed-2e6f8e8a33e0";
+    const requestBody = JSON.stringify({
+      id: creationId,
+      project: project("Stale retry project"),
+      title: "Stale retry project",
+    });
+    const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
+      body: requestBody,
+      headers,
+      method: "POST",
+    });
+    expect(created.status).toBe(201);
+
+    const assertGenericConflict = async () => {
+      const response = await SELF.fetch(`${ORIGIN}/api/creations`, {
+        body: requestBody,
+        headers,
+        method: "POST",
+      });
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        error: {
+          code: "CREATION_ID_CONFLICT",
+          message:
+            "The cloud save could not be completed with that retry identifier.",
+        },
+      });
+    };
+
+    await env.DB.prepare(
+      "UPDATE creation_revisions SET revision_number = 2 WHERE creation_id = ?",
+    )
+      .bind(creationId)
+      .run();
+    await assertGenericConflict();
+
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE creation_revisions SET revision_number = 1 WHERE creation_id = ?",
+      ).bind(creationId),
+      env.DB.prepare(
+        "UPDATE creations SET state = 'published', visibility = 'public', published_at = ? WHERE id = ?",
+      ).bind(Date.now(), creationId),
+    ]);
+    await assertGenericConflict();
+
+    await env.DB.prepare(
+      "UPDATE creations SET state = 'deleted', visibility = 'private', published_at = NULL, deleted_at = ? WHERE id = ?",
+    )
+      .bind(Date.now(), creationId)
+      .run();
+    await assertGenericConflict();
+  });
+
   it("authenticates, saves immutable revisions, publishes, and serves discovery", async () => {
     const owner = await seedUser("islander");
     const session = await seedSession(owner.id, "owner-token");
@@ -51,15 +282,23 @@ describe("community Worker integration", () => {
     });
 
     const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
-      body: JSON.stringify({ project: project("First project"), title: "First project" }),
+      body: JSON.stringify({
+        project: project("First project"),
+        title: "First project",
+      }),
       headers,
       method: "POST",
     });
     expect(created.status).toBe(201);
     expect(created.headers.get("etag")).toBe('"rev-1"');
-    const createdBody = await created.json() as { data: { id: string; slug: string } };
+    const createdBody = (await created.json()) as {
+      data: { id: string; slug: string };
+    };
 
-    const owned = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}`, { headers });
+    const owned = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}`,
+      { headers },
+    );
     expect(owned.status).toBe(200);
     await expect(owned.json()).resolves.toMatchObject({
       data: {
@@ -93,11 +332,14 @@ describe("community Worker integration", () => {
       version: 1,
     });
 
-    const conflict = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/project`, {
-      body: JSON.stringify({ project: project("Conflicting project") }),
-      headers: { ...headers, "If-Match": '"rev-0"' },
-      method: "PUT",
-    });
+    const conflict = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/project`,
+      {
+        body: JSON.stringify({ project: project("Conflicting project") }),
+        headers: { ...headers, "If-Match": '"rev-0"' },
+        method: "PUT",
+      },
+    );
     expect(conflict.status).toBe(409);
     await expect(conflict.json()).resolves.toMatchObject({
       error: {
@@ -112,7 +354,9 @@ describe("community Worker integration", () => {
       `INSERT INTO creation_revisions
        (id, creation_id, revision_number, status, project_bytes, created_at)
        VALUES (?, ?, 2, 'uploading', 0, ?)`,
-    ).bind(competingRevisionId, createdBody.data.id, Date.now()).run();
+    )
+      .bind(competingRevisionId, createdBody.data.id, Date.now())
+      .run();
     const raceConflict = await SELF.fetch(
       `${ORIGIN}/api/creations/${createdBody.data.id}/project`,
       {
@@ -131,31 +375,39 @@ describe("community Worker integration", () => {
     });
     await env.DB.prepare(
       "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
-    ).bind(competingRevisionId).run();
+    )
+      .bind(competingRevisionId)
+      .run();
 
-    const saved = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/project`, {
-      body: JSON.stringify({ project: project("Second revision") }),
-      headers: { ...headers, "If-Match": '"rev-1"' },
-      method: "PUT",
-    });
+    const saved = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/project`,
+      {
+        body: JSON.stringify({ project: project("Second revision") }),
+        headers: { ...headers, "If-Match": '"rev-1"' },
+        method: "PUT",
+      },
+    );
     expect(saved.status).toBe(200);
     expect(saved.headers.get("etag")).toBe('"rev-3"');
     await expect(saved.json()).resolves.toMatchObject({
       data: { id: createdBody.data.id, revision: 3, state: "draft" },
     });
 
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/publish`, {
-      body: JSON.stringify({
-        commentsEnabled: true,
-        description: "A public test project.",
-        projectDownloadEnabled: false,
-        tags: ["portraits"],
-        title: "First project",
-        visibility: "public",
-      }),
-      headers,
-      method: "POST",
-    });
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/publish`,
+      {
+        body: JSON.stringify({
+          commentsEnabled: true,
+          description: "A public test project.",
+          projectDownloadEnabled: false,
+          tags: ["portraits"],
+          title: "First project",
+          visibility: "public",
+        }),
+        headers,
+        method: "POST",
+      },
+    );
     expect(published.status).toBe(200);
     await expect(published.json()).resolves.toMatchObject({
       data: {
@@ -183,21 +435,32 @@ describe("community Worker integration", () => {
     });
 
     const visitor = await seedUser("visitor-one");
-    const visitorHeaders = authenticatedHeaders(await seedSession(visitor.id, "visitor-token"));
-    const liked = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/like`, {
-      body: "{}",
-      headers: visitorHeaders,
-      method: "PUT",
-    });
+    const visitorHeaders = authenticatedHeaders(
+      await seedSession(visitor.id, "visitor-token"),
+    );
+    const liked = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/like`,
+      {
+        body: "{}",
+        headers: visitorHeaders,
+        method: "PUT",
+      },
+    );
     expect(liked.status).toBe(200);
-    const commented = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/comments`, {
-      body: JSON.stringify({ body: "A constructive comment." }),
-      headers: visitorHeaders,
-      method: "POST",
-    });
+    const commented = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/comments`,
+      {
+        body: JSON.stringify({ body: "A constructive comment." }),
+        headers: visitorHeaders,
+        method: "POST",
+      },
+    );
     expect(commented.status).toBe(201);
     await expect(commented.json()).resolves.toMatchObject({
-      data: { body: "A constructive comment.", creationId: createdBody.data.id },
+      data: {
+        body: "A constructive comment.",
+        creationId: createdBody.data.id,
+      },
     });
     const comments = await SELF.fetch(
       `${ORIGIN}/api/creations/${createdBody.data.id}/comments?limit=1`,
@@ -208,16 +471,21 @@ describe("community Worker integration", () => {
       meta: { hasMore: false, limit: 1, nextCursor: null },
     });
 
-    const discovered = await SELF.fetch(`${ORIGIN}/api/discover/recent?limit=5`, {
-      headers: visitorHeaders,
-    });
+    const discovered = await SELF.fetch(
+      `${ORIGIN}/api/discover/recent?limit=5`,
+      {
+        headers: visitorHeaders,
+      },
+    );
     expect(discovered.status).toBe(200);
     await expect(discovered.json()).resolves.toMatchObject({
-      data: [{
-        id: createdBody.data.id,
-        likedByViewer: true,
-        stats: { comments: 1, likes: 1 },
-      }],
+      data: [
+        {
+          id: createdBody.data.id,
+          likedByViewer: true,
+          stats: { comments: 1, likes: 1 },
+        },
+      ],
     });
 
     const random = await SELF.fetch(`${ORIGIN}/api/discover/random`, {
@@ -238,58 +506,77 @@ describe("community Worker integration", () => {
     const stranger = await seedUser("stranger-two");
     const moderator = await seedUser("private-moderator", "moderator");
     const admin = await seedUser("private-admin", "admin");
-    const ownerHeaders = authenticatedHeaders(await seedSession(owner.id, "owner-two-token"));
-    const strangerHeaders = authenticatedHeaders(await seedSession(stranger.id, "stranger-token"));
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "owner-two-token"),
+    );
+    const strangerHeaders = authenticatedHeaders(
+      await seedSession(stranger.id, "stranger-token"),
+    );
     const moderatorHeaders = authenticatedHeaders(
       await seedSession(moderator.id, "private-moderator-token"),
     );
-    const adminHeaders = authenticatedHeaders(await seedSession(admin.id, "private-admin-token"));
+    const adminHeaders = authenticatedHeaders(
+      await seedSession(admin.id, "private-admin-token"),
+    );
     const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
       body: JSON.stringify({ project: project("Private") }),
       headers: ownerHeaders,
       method: "POST",
     });
-    const body = await created.json() as { data: { id: string } };
+    const body = (await created.json()) as { data: { id: string } };
 
-    const forbidden = await SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}`, {
-      headers: strangerHeaders,
-    });
+    const forbidden = await SELF.fetch(
+      `${ORIGIN}/api/creations/${body.data.id}`,
+      {
+        headers: strangerHeaders,
+      },
+    );
     expect(forbidden.status).toBe(403);
 
-    const privateComment = await SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/comments`, {
-      body: JSON.stringify({ body: "Should not be accepted" }),
-      headers: strangerHeaders,
-      method: "POST",
-    });
+    const privateComment = await SELF.fetch(
+      `${ORIGIN}/api/creations/${body.data.id}/comments`,
+      {
+        body: JSON.stringify({ body: "Should not be accepted" }),
+        headers: strangerHeaders,
+        method: "POST",
+      },
+    );
     expect(privateComment.status).toBe(404);
 
     for (const elevatedHeaders of [moderatorHeaders, adminHeaders]) {
-      const [privateDetail, privateProject, privatePreview] = await Promise.all([
-        SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}`, { headers: elevatedHeaders }),
-        SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/project`, {
-          headers: elevatedHeaders,
-        }),
-        SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/media/preview`, {
-          headers: elevatedHeaders,
-        }),
-      ]);
+      const [privateDetail, privateProject, privatePreview] = await Promise.all(
+        [
+          SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}`, {
+            headers: elevatedHeaders,
+          }),
+          SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/project`, {
+            headers: elevatedHeaders,
+          }),
+          SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/media/preview`, {
+            headers: elevatedHeaders,
+          }),
+        ],
+      );
       expect(privateDetail.status).toBe(403);
       expect(privateProject.status).toBe(404);
       expect(privatePreview.status).toBe(404);
     }
 
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/publish`, {
-      body: JSON.stringify({
-        commentsEnabled: false,
-        description: "Unlisted link-holder access",
-        projectDownloadEnabled: true,
-        tags: [],
-        title: "Unlisted project",
-        visibility: "unlisted",
-      }),
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${body.data.id}/publish`,
+      {
+        body: JSON.stringify({
+          commentsEnabled: false,
+          description: "Unlisted link-holder access",
+          projectDownloadEnabled: true,
+          tags: [],
+          title: "Unlisted project",
+          visibility: "unlisted",
+        }),
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(published.status).toBe(200);
     const [unlistedProject, unlistedPreview] = await Promise.all([
       SELF.fetch(`${ORIGIN}/api/creations/${body.data.id}/project`),
@@ -306,7 +593,9 @@ describe("community Worker integration", () => {
   it("keeps author deletion separate from audited moderator comment actions", async () => {
     const owner = await seedUser("comment-owner");
     const moderator = await seedUser("comment-moderator", "moderator");
-    const ownerHeaders = authenticatedHeaders(await seedSession(owner.id, "comment-owner-token"));
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "comment-owner-token"),
+    );
     const moderatorHeaders = authenticatedHeaders(
       await seedSession(moderator.id, "comment-moderator-token"),
     );
@@ -315,7 +604,7 @@ describe("community Worker integration", () => {
       headers: ownerHeaders,
       method: "POST",
     });
-    const creation = (await created.json() as { data: { id: string } }).data;
+    const creation = ((await created.json()) as { data: { id: string } }).data;
     await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
       body: JSON.stringify({
         commentsEnabled: true,
@@ -328,24 +617,36 @@ describe("community Worker integration", () => {
       headers: ownerHeaders,
       method: "POST",
     });
-    const createdComment = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/comments`, {
-      body: JSON.stringify({ body: "Keep moderation reversible and audited." }),
-      headers: ownerHeaders,
-      method: "POST",
-    });
-    const comment = (await createdComment.json() as { data: { id: string } }).data;
+    const createdComment = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/comments`,
+      {
+        body: JSON.stringify({
+          body: "Keep moderation reversible and audited.",
+        }),
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
+    const comment = ((await createdComment.json()) as { data: { id: string } })
+      .data;
 
-    const moderatorDelete = await SELF.fetch(`${ORIGIN}/api/comments/${comment.id}`, {
-      body: "{}",
-      headers: moderatorHeaders,
-      method: "DELETE",
-    });
+    const moderatorDelete = await SELF.fetch(
+      `${ORIGIN}/api/comments/${comment.id}`,
+      {
+        body: "{}",
+        headers: moderatorHeaders,
+        method: "DELETE",
+      },
+    );
     expect(moderatorDelete.status).toBe(403);
 
     const moderatorHide = await SELF.fetch(
       `${ORIGIN}/api/moderation/comments/${comment.id}/hide`,
       {
-        body: JSON.stringify({ action: "hide_comment", reason: "Policy review" }),
+        body: JSON.stringify({
+          action: "hide_comment",
+          reason: "Policy review",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -354,7 +655,9 @@ describe("community Worker integration", () => {
     await expect(
       env.DB.prepare(
         "SELECT action FROM moderation_actions WHERE target_type = 'comment' AND target_id = ?",
-      ).bind(comment.id).first<{ action: string }>(),
+      )
+        .bind(comment.id)
+        .first<{ action: string }>(),
     ).resolves.toMatchObject({ action: "hide_comment" });
   });
 
@@ -363,7 +666,9 @@ describe("community Worker integration", () => {
     await seedUser("taken-name-2");
     await seedUser("taken-name-3");
     const newcomer = await seedUnconfiguredUser();
-    const headers = authenticatedHeaders(await seedSession(newcomer.id, "setup-token"));
+    const headers = authenticatedHeaders(
+      await seedSession(newcomer.id, "setup-token"),
+    );
     const response = await SELF.fetch(`${ORIGIN}/api/me/setup`, {
       body: JSON.stringify({
         acceptsTerms: true,
@@ -376,17 +681,23 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(response.status).toBe(409);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       error: { fields: { usernameSuggestions: string } };
     };
     const suggestions = body.error.fields.usernameSuggestions.split(",");
     expect(suggestions).toHaveLength(3);
-    expect(suggestions).toEqual(["taken-name-4", "taken-name-5", "taken-name-6"]);
+    expect(suggestions).toEqual([
+      "taken-name-4",
+      "taken-name-5",
+      "taken-name-6",
+    ]);
   });
 
   it("commits onboarding identity, terms, and bio atomically", async () => {
     const newcomer = await seedUnconfiguredUser();
-    const headers = authenticatedHeaders(await seedSession(newcomer.id, "atomic-setup-token"));
+    const headers = authenticatedHeaders(
+      await seedSession(newcomer.id, "atomic-setup-token"),
+    );
     const response = await SELF.fetch(`${ORIGIN}/api/me/setup`, {
       body: JSON.stringify({
         acceptsTerms: true,
@@ -407,9 +718,13 @@ describe("community Worker integration", () => {
         username: "atomic-islander",
       },
     });
-    await expect(env.DB.prepare(
-      "SELECT username, bio, terms_version FROM users WHERE id = ?",
-    ).bind(newcomer.id).first()).resolves.toMatchObject({
+    await expect(
+      env.DB.prepare(
+        "SELECT username, bio, terms_version FROM users WHERE id = ?",
+      )
+        .bind(newcomer.id)
+        .first(),
+    ).resolves.toMatchObject({
       bio: "Building tiny island portraits.",
       terms_version: "2026-07-16",
       username: "atomic-islander",
@@ -420,13 +735,17 @@ describe("community Worker integration", () => {
     const owner = await seedUser("avatar-owner");
     await env.DB.prepare(
       "UPDATE users SET display_name = 'Avatar Owner', bio = 'Keep this profile text.' WHERE id = ?",
-    ).bind(owner.id).run();
+    )
+      .bind(owner.id)
+      .run();
     const headers = authenticatedHeaders(
       await seedSession(owner.id, "avatar-owner-token"),
     );
     const before = await env.DB.prepare(
       "SELECT avatar_seed FROM users WHERE id = ?",
-    ).bind(owner.id).first<{ avatar_seed: string }>();
+    )
+      .bind(owner.id)
+      .first<{ avatar_seed: string }>();
 
     const regenerated = await SELF.fetch(`${ORIGIN}/api/me`, {
       body: JSON.stringify({ regenerateAvatar: true }),
@@ -434,7 +753,7 @@ describe("community Worker integration", () => {
       method: "PATCH",
     });
     expect(regenerated.status).toBe(200);
-    const regeneratedBody = await regenerated.json() as {
+    const regeneratedBody = (await regenerated.json()) as {
       data: {
         avatarSeed: string;
         bio: string;
@@ -454,14 +773,20 @@ describe("community Worker integration", () => {
     );
     expect(regeneratedBody.data.avatarSeed).not.toBe(before?.avatar_seed);
 
-    await expect(env.DB.prepare(
-      "SELECT avatar_seed, display_name, bio FROM users WHERE id = ?",
-    ).bind(owner.id).first()).resolves.toEqual({
+    await expect(
+      env.DB.prepare(
+        "SELECT avatar_seed, display_name, bio FROM users WHERE id = ?",
+      )
+        .bind(owner.id)
+        .first(),
+    ).resolves.toEqual({
       avatar_seed: regeneratedBody.data.avatarSeed,
       bio: "Keep this profile text.",
       display_name: "Avatar Owner",
     });
-    const refreshedSession = await SELF.fetch(`${ORIGIN}/api/auth/session`, { headers });
+    const refreshedSession = await SELF.fetch(`${ORIGIN}/api/auth/session`, {
+      headers,
+    });
     await expect(refreshedSession.json()).resolves.toMatchObject({
       data: { user: { avatarSeed: regeneratedBody.data.avatarSeed } },
     });
@@ -476,9 +801,11 @@ describe("community Worker integration", () => {
       method: "PATCH",
     });
     expect(rejected.status).toBe(400);
-    await expect(env.DB.prepare(
-      "SELECT avatar_seed FROM users WHERE id = ?",
-    ).bind(owner.id).first()).resolves.toEqual({
+    await expect(
+      env.DB.prepare("SELECT avatar_seed FROM users WHERE id = ?")
+        .bind(owner.id)
+        .first(),
+    ).resolves.toEqual({
       avatar_seed: regeneratedBody.data.avatarSeed,
     });
   });
@@ -487,7 +814,9 @@ describe("community Worker integration", () => {
     const returning = await seedUser("returning-islander");
     await env.DB.prepare(
       "UPDATE users SET terms_version = '2026-07-10' WHERE id = ?",
-    ).bind(returning.id).run();
+    )
+      .bind(returning.id)
+      .run();
     const headers = authenticatedHeaders(
       await seedSession(returning.id, "returning-terms-token"),
     );
@@ -535,32 +864,38 @@ describe("community Worker integration", () => {
 
   it("paginates full-text search with opaque cursors", async () => {
     const owner = await seedUser("search-owner");
-    const headers = authenticatedHeaders(await seedSession(owner.id, "search-owner-token"));
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "search-owner-token"),
+    );
     for (const title of ["Spark portrait", "Spark emblem"]) {
       const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
         body: JSON.stringify({ project: project(title), title }),
         headers,
         method: "POST",
       });
-      const creation = (await created.json() as { data: { id: string } }).data;
-      const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
-        body: JSON.stringify({
-          commentsEnabled: true,
-          description: "A searchable spark design.",
-          projectDownloadEnabled: false,
-          tags: ["portraits"],
-          title,
-          visibility: "public",
-        }),
-        headers,
-        method: "POST",
-      });
+      const creation = ((await created.json()) as { data: { id: string } })
+        .data;
+      const published = await SELF.fetch(
+        `${ORIGIN}/api/creations/${creation.id}/publish`,
+        {
+          body: JSON.stringify({
+            commentsEnabled: true,
+            description: "A searchable spark design.",
+            projectDownloadEnabled: false,
+            tags: ["portraits"],
+            title,
+            visibility: "public",
+          }),
+          headers,
+          method: "POST",
+        },
+      );
       expect(published.status).toBe(200);
     }
 
     const first = await SELF.fetch(`${ORIGIN}/api/search?q=spark&limit=1`);
     expect(first.status).toBe(200);
-    const firstBody = await first.json() as {
+    const firstBody = (await first.json()) as {
       data: { id: string }[];
       meta: { nextCursor: string | null };
     };
@@ -570,7 +905,7 @@ describe("community Worker integration", () => {
       `${ORIGIN}/api/search?q=spark&limit=1&cursor=${encodeURIComponent(firstBody.meta.nextCursor!)}`,
     );
     expect(second.status).toBe(200);
-    const secondBody = await second.json() as {
+    const secondBody = (await second.json()) as {
       data: { id: string }[];
       meta: { nextCursor: string | null };
     };
@@ -582,17 +917,21 @@ describe("community Worker integration", () => {
       `${ORIGIN}/api/search?q=spark&tag=portraits&limit=10`,
     );
     expect(tagged.status).toBe(200);
-    const taggedBody = await tagged.json() as { data: { id: string }[] };
+    const taggedBody = (await tagged.json()) as { data: { id: string }[] };
     expect(taggedBody.data).toHaveLength(2);
 
-    const wrongTag = await SELF.fetch(`${ORIGIN}/api/search?q=spark&tag=icons&limit=10`);
+    const wrongTag = await SELF.fetch(
+      `${ORIGIN}/api/search?q=spark&tag=icons&limit=10`,
+    );
     expect(wrongTag.status).toBe(200);
     await expect(wrongTag.json()).resolves.toMatchObject({ data: [] });
   });
 
   it("removes public search rows during deletion and keeps them absent after cancellation", async () => {
     const owner = await seedUser("deletion-search-owner");
-    const headers = authenticatedHeaders(await seedSession(owner.id, "deletion-search-token"));
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "deletion-search-token"),
+    );
     const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
       body: JSON.stringify({
         project: project("Deletion search project"),
@@ -602,23 +941,30 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(created.status).toBe(201);
-    const creation = (await created.json() as { data: { id: string } }).data;
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
-      body: JSON.stringify({
-        commentsEnabled: true,
-        description: "Public text that must leave the search index.",
-        projectDownloadEnabled: false,
-        tags: ["portraits"],
-        title: "Deletion search project",
-        visibility: "public",
-      }),
-      headers,
-      method: "POST",
-    });
+    const creation = ((await created.json()) as { data: { id: string } }).data;
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/publish`,
+      {
+        body: JSON.stringify({
+          commentsEnabled: true,
+          description: "Public text that must leave the search index.",
+          projectDownloadEnabled: false,
+          tags: ["portraits"],
+          title: "Deletion search project",
+          visibility: "public",
+        }),
+        headers,
+        method: "POST",
+      },
+    );
     expect(published.status).toBe(200);
-    await expect(env.DB.prepare(
-      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
-    ).bind(creation.id).first()).resolves.toEqual({ creation_id: creation.id });
+    await expect(
+      env.DB.prepare(
+        "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+      )
+        .bind(creation.id)
+        .first(),
+    ).resolves.toEqual({ creation_id: creation.id });
 
     const deletion = await SELF.fetch(`${ORIGIN}/api/me`, {
       body: "{}",
@@ -626,12 +972,18 @@ describe("community Worker integration", () => {
       method: "DELETE",
     });
     expect(deletion.status).toBe(202);
-    await expect(env.DB.prepare(
-      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
-    ).bind(creation.id).first()).resolves.toBeNull();
-    await expect(env.DB.prepare(
-      "SELECT state, visibility FROM creations WHERE id = ?",
-    ).bind(creation.id).first()).resolves.toEqual({
+    await expect(
+      env.DB.prepare(
+        "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+      )
+        .bind(creation.id)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      env.DB.prepare("SELECT state, visibility FROM creations WHERE id = ?")
+        .bind(creation.id)
+        .first(),
+    ).resolves.toEqual({
       state: "draft",
       visibility: "private",
     });
@@ -648,9 +1000,13 @@ describe("community Worker integration", () => {
     await expect(cancellation.json()).resolves.toMatchObject({
       data: { id: owner.id, status: "active" },
     });
-    await expect(env.DB.prepare(
-      "SELECT creation_id FROM creation_search WHERE creation_id = ?",
-    ).bind(creation.id).first()).resolves.toBeNull();
+    await expect(
+      env.DB.prepare(
+        "SELECT creation_id FROM creation_search WHERE creation_id = ?",
+      )
+        .bind(creation.id)
+        .first(),
+    ).resolves.toBeNull();
     const search = await SELF.fetch(`${ORIGIN}/api/search?q=deletion&limit=10`);
     expect(search.status).toBe(200);
     await expect(search.json()).resolves.toMatchObject({ data: [] });
@@ -671,7 +1027,7 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(created.status).toBe(201);
-    const creation = (await created.json() as { data: { id: string } }).data;
+    const creation = ((await created.json()) as { data: { id: string } }).data;
     const publishBody = JSON.stringify({
       commentsEnabled: true,
       description: "A creation placed under a moderation hold.",
@@ -680,17 +1036,23 @@ describe("community Worker integration", () => {
       title: "Moderation hold",
       visibility: "public",
     });
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
-      body: publishBody,
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/publish`,
+      {
+        body: publishBody,
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(published.status).toBe(200);
 
     const hidden = await SELF.fetch(
       `${ORIGIN}/api/moderation/creations/${creation.id}/hide`,
       {
-        body: JSON.stringify({ action: "hide_creation", reason: "Focused safety review" }),
+        body: JSON.stringify({
+          action: "hide_creation",
+          reason: "Focused safety review",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -709,7 +1071,8 @@ describe("community Worker integration", () => {
       await expect(bypass.json()).resolves.toMatchObject({
         error: {
           code: "CONFLICT",
-          message: "A moderator must restore this creation before it can be published again.",
+          message:
+            "A moderator must restore this creation before it can be published again.",
         },
       });
     }
@@ -722,17 +1085,23 @@ describe("community Worker integration", () => {
     const restored = await SELF.fetch(
       `${ORIGIN}/api/moderation/creations/${creation.id}/restore`,
       {
-        body: JSON.stringify({ action: "restore_creation", reason: "Review complete" }),
+        body: JSON.stringify({
+          action: "restore_creation",
+          reason: "Review complete",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
     );
     expect(restored.status).toBe(200);
-    const republished = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
-      body: publishBody,
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const republished = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/publish`,
+      {
+        body: publishBody,
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(republished.status).toBe(200);
   });
 
@@ -751,24 +1120,30 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(created.status).toBe(201);
-    const creation = (await created.json() as { data: { id: string } }).data;
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
-      body: JSON.stringify({
-        commentsEnabled: true,
-        description: "Must remain hidden after deletion cancellation.",
-        projectDownloadEnabled: false,
-        tags: [],
-        title: "Suspended deletion",
-        visibility: "public",
-      }),
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const creation = ((await created.json()) as { data: { id: string } }).data;
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/publish`,
+      {
+        body: JSON.stringify({
+          commentsEnabled: true,
+          description: "Must remain hidden after deletion cancellation.",
+          projectDownloadEnabled: false,
+          tags: [],
+          title: "Suspended deletion",
+          visibility: "public",
+        }),
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(published.status).toBe(200);
     const suspended = await SELF.fetch(
       `${ORIGIN}/api/moderation/users/${owner.id}/suspend`,
       {
-        body: JSON.stringify({ action: "suspend_user", reason: "Safety suspension" }),
+        body: JSON.stringify({
+          action: "suspend_user",
+          reason: "Safety suspension",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -787,7 +1162,9 @@ describe("community Worker integration", () => {
     await expect(
       env.DB.prepare(
         "SELECT status, deletion_previous_status FROM users WHERE id = ?",
-      ).bind(owner.id).first(),
+      )
+        .bind(owner.id)
+        .first(),
     ).resolves.toEqual({
       deletion_previous_status: "suspended",
       status: "deletion_pending",
@@ -813,7 +1190,9 @@ describe("community Worker integration", () => {
     await expect(
       env.DB.prepare(
         "SELECT status, deletion_previous_status FROM users WHERE id = ?",
-      ).bind(owner.id).first(),
+      )
+        .bind(owner.id)
+        .first(),
     ).resolves.toEqual({ deletion_previous_status: null, status: "suspended" });
     await expect(
       env.DB.prepare("SELECT state, visibility FROM creations WHERE id = ?")
@@ -878,29 +1257,39 @@ describe("community Worker integration", () => {
     });
 
     const execution = createExecutionContext();
-    const blocked = await worker.fetch(new Request(`${ORIGIN}/api/creations`, {
-      body: JSON.stringify({ project: project("Blocked by read-only mode") }),
-      headers: { "Content-Type": "application/json", Origin: ORIGIN },
-      method: "POST",
-    }), readOnlyEnv, execution);
+    const blocked = await worker.fetch(
+      new Request(`${ORIGIN}/api/creations`, {
+        body: JSON.stringify({ project: project("Blocked by read-only mode") }),
+        headers: { "Content-Type": "application/json", Origin: ORIGIN },
+        method: "POST",
+      }),
+      readOnlyEnv,
+      execution,
+    );
     await waitOnExecutionContext(execution);
 
     expect(blocked.status).toBe(503);
     await expect(blocked.json()).resolves.toMatchObject({
       error: {
         code: "SERVICE_UNAVAILABLE",
-        message: "Community changes are temporarily paused. Please try again later.",
+        message:
+          "Community changes are temporarily paused. Please try again later.",
       },
     });
-    await expect(env.DB.prepare("SELECT COUNT(*) AS count FROM creations").first())
-      .resolves.toMatchObject({ count: 0 });
+    await expect(
+      env.DB.prepare("SELECT COUNT(*) AS count FROM creations").first(),
+    ).resolves.toMatchObject({ count: 0 });
 
     const logoutExecution = createExecutionContext();
-    const logout = await worker.fetch(new Request(`${ORIGIN}/api/auth/logout`, {
-      body: "{}",
-      headers: { "Content-Type": "application/json", Origin: ORIGIN },
-      method: "POST",
-    }), readOnlyEnv, logoutExecution);
+    const logout = await worker.fetch(
+      new Request(`${ORIGIN}/api/auth/logout`, {
+        body: "{}",
+        headers: { "Content-Type": "application/json", Origin: ORIGIN },
+        method: "POST",
+      }),
+      readOnlyEnv,
+      logoutExecution,
+    );
     await waitOnExecutionContext(logoutExecution);
     expect(logout.status).toBe(200);
   });
@@ -910,7 +1299,7 @@ describe("community Worker integration", () => {
       [
         "/",
         {
-          body: "<!doctype html><html><head><title>Static shell</title></head><body><div id=\"root\"></div></body></html>",
+          body: '<!doctype html><html><head><title>Static shell</title></head><body><div id="root"></div></body></html>',
           contentType: "text/html; charset=utf-8",
         },
       ],
@@ -949,24 +1338,27 @@ describe("community Worker integration", () => {
         const pathname = new URL(request.url).pathname;
         assetRequests.push(pathname);
         const asset = staticAssets.get(pathname);
-        return Promise.resolve(asset
-          ? new Response(asset.body, {
-              headers: { "Content-Type": asset.contentType },
-            })
-          : new Response(null, { status: 404 }));
+        return Promise.resolve(
+          asset
+            ? new Response(asset.body, {
+                headers: { "Content-Type": asset.contentType },
+              })
+            : new Response(null, { status: 404 }),
+        );
       },
     };
     const environment = (
       name: Env["ENVIRONMENT"],
       site: Env["PUBLIC_SITE_URL"],
-    ) => new Proxy(env as Env, {
-      get(target, property, receiver) {
-        if (property === "ASSETS") return assets;
-        if (property === "ENVIRONMENT") return name;
-        if (property === "PUBLIC_SITE_URL") return site;
-        return Reflect.get(target, property, receiver);
-      },
-    });
+    ) =>
+      new Proxy(env as Env, {
+        get(target, property, receiver) {
+          if (property === "ASSETS") return assets;
+          if (property === "ENVIRONMENT") return name;
+          if (property === "PUBLIC_SITE_URL") return site;
+          return Reflect.get(target, property, receiver);
+        },
+      });
     const fetchFrom = async (site: string, path: string, target: Env) => {
       const execution = createExecutionContext();
       const response = await worker.fetch(
@@ -978,10 +1370,7 @@ describe("community Worker integration", () => {
       return response;
     };
 
-    const stagingEnv = environment(
-      "staging",
-      "https://staging.tomodachi.pw",
-    );
+    const stagingEnv = environment("staging", "https://staging.tomodachi.pw");
     const stagingRobots = await fetchFrom(
       "https://staging.tomodachi.pw",
       "/robots.txt",
@@ -1117,7 +1506,8 @@ describe("community Worker integration", () => {
         const overrides: Partial<Env> = {
           ENVIRONMENT: "production",
           PUBLIC_SITE_URL: "https://tomodachi.pw",
-          GOOGLE_OIDC_REDIRECT_URI: "https://tomodachi.pw/api/auth/google/callback",
+          GOOGLE_OIDC_REDIRECT_URI:
+            "https://tomodachi.pw/api/auth/google/callback",
           GOOGLE_CLIENT_ID: "test-google-client-id",
           GOOGLE_CLIENT_SECRET: "test-google-client-secret",
           SESSION_PEPPER: "session hashing phrase for tests only",
@@ -1128,14 +1518,18 @@ describe("community Worker integration", () => {
       },
     });
     const execution = createExecutionContext();
-    const response = await worker.fetch(new Request(
-      "https://tomodachi.pw/api/auth/google/start",
-      {
+    const response = await worker.fetch(
+      new Request("https://tomodachi.pw/api/auth/google/start", {
         body: JSON.stringify({ returnTo: "/me" }),
-        headers: { "Content-Type": "application/json", Origin: "https://tomodachi.pw" },
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://tomodachi.pw",
+        },
         method: "POST",
-      },
-    ), productionEnv, execution);
+      }),
+      productionEnv,
+      execution,
+    );
     await waitOnExecutionContext(execution);
 
     expect(response.status).toBe(503);
@@ -1146,7 +1540,9 @@ describe("community Worker integration", () => {
 
   it("rejects malformed projects and preserves user text as plain JSON data", async () => {
     const owner = await seedUser("plain-text-owner");
-    const headers = authenticatedHeaders(await seedSession(owner.id, "plain-text-token"));
+    const headers = authenticatedHeaders(
+      await seedSession(owner.id, "plain-text-token"),
+    );
     const malformed = project("Malformed");
     malformed.cells.pop();
     const rejected = await SELF.fetch(`${ORIGIN}/api/creations`, {
@@ -1167,22 +1563,29 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(created.status).toBe(201);
-    const createdBody = await created.json() as { data: { id: string; slug: string } };
+    const createdBody = (await created.json()) as {
+      data: { id: string; slug: string };
+    };
     expect(createdBody.data.title).toBe(title);
-    const published = await SELF.fetch(`${ORIGIN}/api/creations/${createdBody.data.id}/publish`, {
-      body: JSON.stringify({
-        commentsEnabled: true,
-        description,
-        projectDownloadEnabled: false,
-        tags: [],
-        title,
-        visibility: "public",
-      }),
-      headers,
-      method: "POST",
-    });
+    const published = await SELF.fetch(
+      `${ORIGIN}/api/creations/${createdBody.data.id}/publish`,
+      {
+        body: JSON.stringify({
+          commentsEnabled: true,
+          description,
+          projectDownloadEnabled: false,
+          tags: [],
+          title,
+          visibility: "public",
+        }),
+        headers,
+        method: "POST",
+      },
+    );
     expect(published.headers.get("content-type")).toContain("application/json");
-    await expect(published.json()).resolves.toMatchObject({ data: { description, title } });
+    await expect(published.json()).resolves.toMatchObject({
+      data: { description, title },
+    });
   });
 
   it("enforces comment locks and moderation role hierarchy", async () => {
@@ -1190,19 +1593,25 @@ describe("community Worker integration", () => {
     const moderator = await seedUser("lock-moderator", "moderator");
     const peerModerator = await seedUser("peer-moderator", "moderator");
     const admin = await seedUser("lock-admin", "admin");
-    const ownerHeaders = authenticatedHeaders(await seedSession(owner.id, "lock-owner-token"));
-    const moderatorHeaders = authenticatedHeaders(await seedSession(moderator.id, "lock-mod-token"));
+    const ownerHeaders = authenticatedHeaders(
+      await seedSession(owner.id, "lock-owner-token"),
+    );
+    const moderatorHeaders = authenticatedHeaders(
+      await seedSession(moderator.id, "lock-mod-token"),
+    );
     const peerModeratorHeaders = authenticatedHeaders(
       await seedSession(peerModerator.id, "peer-mod-token"),
     );
-    const adminHeaders = authenticatedHeaders(await seedSession(admin.id, "lock-admin-token"));
+    const adminHeaders = authenticatedHeaders(
+      await seedSession(admin.id, "lock-admin-token"),
+    );
 
     const created = await SELF.fetch(`${ORIGIN}/api/creations`, {
       body: JSON.stringify({ project: project("Lockable") }),
       headers: ownerHeaders,
       method: "POST",
     });
-    const creation = (await created.json() as { data: { id: string } }).data;
+    const creation = ((await created.json()) as { data: { id: string } }).data;
     await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/publish`, {
       body: JSON.stringify({
         commentsEnabled: true,
@@ -1217,7 +1626,8 @@ describe("community Worker integration", () => {
     });
     const reportResponse = await SELF.fetch(`${ORIGIN}/api/reports`, {
       body: JSON.stringify({
-        details: "Please review the current target and its discussion controls.",
+        details:
+          "Please review the current target and its discussion controls.",
         reason: "other",
         targetId: creation.id,
         targetType: "creation",
@@ -1226,12 +1636,16 @@ describe("community Worker integration", () => {
       method: "POST",
     });
     expect(reportResponse.status).toBe(201);
-    const report = (await reportResponse.json() as { data: { id: string } }).data;
+    const report = ((await reportResponse.json()) as { data: { id: string } })
+      .data;
 
     const locked = await SELF.fetch(
       `${ORIGIN}/api/moderation/creations/${creation.id}/lock-comments`,
       {
-        body: JSON.stringify({ action: "lock_comments", reason: "Active moderation review" }),
+        body: JSON.stringify({
+          action: "lock_comments",
+          reason: "Active moderation review",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -1249,31 +1663,45 @@ describe("community Worker integration", () => {
       data: {
         actions: [{ action: "lock_comments" }],
         report: { id: report.id, targetId: creation.id },
-        target: { id: creation.id, label: "Lockable", state: "published", type: "creation" },
+        target: {
+          id: creation.id,
+          label: "Lockable",
+          state: "published",
+          type: "creation",
+        },
       },
     });
 
-    const lockedComment = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/comments`, {
-      body: JSON.stringify({ body: "This should stay locked." }),
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const lockedComment = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/comments`,
+      {
+        body: JSON.stringify({ body: "This should stay locked." }),
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(lockedComment.status).toBe(409);
     await expect(lockedComment.json()).resolves.toMatchObject({
       error: { code: "CONFLICT" },
     });
 
-    const ownerBypass = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}`, {
-      body: JSON.stringify({ commentsEnabled: false }),
-      headers: ownerHeaders,
-      method: "PATCH",
-    });
+    const ownerBypass = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}`,
+      {
+        body: JSON.stringify({ commentsEnabled: false }),
+        headers: ownerHeaders,
+        method: "PATCH",
+      },
+    );
     expect(ownerBypass.status).toBe(409);
 
     const unlocked = await SELF.fetch(
       `${ORIGIN}/api/moderation/creations/${creation.id}/unlock-comments`,
       {
-        body: JSON.stringify({ action: "unlock_comments", reason: "Moderation review complete" }),
+        body: JSON.stringify({
+          action: "unlock_comments",
+          reason: "Moderation review complete",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -1282,17 +1710,25 @@ describe("community Worker integration", () => {
     await expect(unlocked.json()).resolves.toMatchObject({
       data: { commentsEnabled: true, commentsLocked: false },
     });
-    const resumedComment = await SELF.fetch(`${ORIGIN}/api/creations/${creation.id}/comments`, {
-      body: JSON.stringify({ body: "The owner's enabled setting applies again." }),
-      headers: ownerHeaders,
-      method: "POST",
-    });
+    const resumedComment = await SELF.fetch(
+      `${ORIGIN}/api/creations/${creation.id}/comments`,
+      {
+        body: JSON.stringify({
+          body: "The owner's enabled setting applies again.",
+        }),
+        headers: ownerHeaders,
+        method: "POST",
+      },
+    );
     expect(resumedComment.status).toBe(201);
 
     const hierarchyDenied = await SELF.fetch(
       `${ORIGIN}/api/moderation/users/${peerModerator.id}/suspend`,
       {
-        body: JSON.stringify({ action: "suspend_user", reason: "Hierarchy test" }),
+        body: JSON.stringify({
+          action: "suspend_user",
+          reason: "Hierarchy test",
+        }),
         headers: moderatorHeaders,
         method: "POST",
       },
@@ -1302,7 +1738,10 @@ describe("community Worker integration", () => {
     const adminAllowed = await SELF.fetch(
       `${ORIGIN}/api/moderation/users/${peerModerator.id}/suspend`,
       {
-        body: JSON.stringify({ action: "suspend_user", reason: "Admin hierarchy test" }),
+        body: JSON.stringify({
+          action: "suspend_user",
+          reason: "Admin hierarchy test",
+        }),
         headers: adminHeaders,
         method: "POST",
       },
@@ -1315,11 +1754,14 @@ describe("community Worker integration", () => {
       data: { session: null, user: null },
     });
 
-    const selfDenied = await SELF.fetch(`${ORIGIN}/api/moderation/users/${admin.id}/suspend`, {
-      body: JSON.stringify({ action: "suspend_user", reason: "Self test" }),
-      headers: adminHeaders,
-      method: "POST",
-    });
+    const selfDenied = await SELF.fetch(
+      `${ORIGIN}/api/moderation/users/${admin.id}/suspend`,
+      {
+        body: JSON.stringify({ action: "suspend_user", reason: "Self test" }),
+        headers: adminHeaders,
+        method: "POST",
+      },
+    );
     expect(selfDenied.status).toBe(400);
   });
 
@@ -1333,15 +1775,17 @@ describe("community Worker integration", () => {
        (id, token_hash, user_id, ua_label, created_at, last_seen_at,
         last_authenticated_at, expires_at)
        VALUES (?, ?, ?, 'Expired browser', ?, ?, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(),
-      await sha256(`${SESSION_PEPPER}:${expiredToken}`),
-      owner.id,
-      now - 2 * 60 * 60 * 1_000,
-      now - 2 * 60 * 60 * 1_000,
-      now - 2 * 60 * 60 * 1_000,
-      now - 60 * 60 * 1_000,
-    ).run();
+    )
+      .bind(
+        crypto.randomUUID(),
+        await sha256(`${SESSION_PEPPER}:${expiredToken}`),
+        owner.id,
+        now - 2 * 60 * 60 * 1_000,
+        now - 2 * 60 * 60 * 1_000,
+        now - 2 * 60 * 60 * 1_000,
+        now - 60 * 60 * 1_000,
+      )
+      .run();
 
     const creationId = crypto.randomUUID();
     const revisionId = crypto.randomUUID();
@@ -1362,8 +1806,9 @@ describe("community Worker integration", () => {
          (creation_id, like_count, comment_count, popularity_score, updated_at)
          VALUES (?, 0, 0, 0, ?)`,
       ).bind(creationId, now),
-      env.DB.prepare("INSERT INTO likes (user_id, creation_id, created_at) VALUES (?, ?, ?)")
-        .bind(visitor.id, creationId, now),
+      env.DB.prepare(
+        "INSERT INTO likes (user_id, creation_id, created_at) VALUES (?, ?, ?)",
+      ).bind(visitor.id, creationId, now),
       env.DB.prepare(
         `INSERT INTO comments
          (id, creation_id, author_user_id, body, status, created_at, updated_at)
@@ -1383,7 +1828,16 @@ describe("community Worker integration", () => {
           free_text_purge_at, retain_until)
          VALUES (?, ?, 'resolved-pseudo', 'user', ?, 'spam', 'purge details',
           'resolved', 'purge resolution', ?, ?, ?, ?, ?)`,
-      ).bind(resolvedReportId, visitor.id, owner.id, now, now, now, now - 1, now + 10_000),
+      ).bind(
+        resolvedReportId,
+        visitor.id,
+        owner.id,
+        now,
+        now,
+        now,
+        now - 1,
+        now + 10_000,
+      ),
       env.DB.prepare(
         `INSERT INTO reports
          (id, reporter_user_id, reporter_pseudonym, target_type, target_id, reason,
@@ -1401,20 +1855,66 @@ describe("community Worker integration", () => {
     await waitOnExecutionContext(execution);
 
     expect(await env.PROJECTS.get(staleKey)).toBeNull();
-    await expect(env.DB.prepare("SELECT status FROM creation_revisions WHERE id = ?")
-      .bind(revisionId).first()).resolves.toMatchObject({ status: "failed" });
-    expect(await env.DB.prepare("SELECT 1 AS found FROM sessions WHERE token_hash = ?")
-      .bind(await sha256(`${SESSION_PEPPER}:${expiredToken}`)).first()).toBeNull();
-    await expect(env.DB.prepare(
-      "SELECT like_count, comment_count FROM creation_stats WHERE creation_id = ?",
-    ).bind(creationId).first()).resolves.toMatchObject({ comment_count: 1, like_count: 1 });
-    await expect(env.DB.prepare(
-      "SELECT details, resolution_note FROM reports WHERE id = ?",
-    ).bind(resolvedReportId).first()).resolves.toMatchObject({ details: "", resolution_note: null });
-    expect(await env.DB.prepare("SELECT 1 AS found FROM reports WHERE id = ?")
-      .bind(openReportId).first()).not.toBeNull();
+    await expect(
+      env.DB.prepare("SELECT status FROM creation_revisions WHERE id = ?")
+        .bind(revisionId)
+        .first(),
+    ).resolves.toMatchObject({ status: "failed" });
+    expect(
+      await env.DB.prepare(
+        "SELECT 1 AS found FROM sessions WHERE token_hash = ?",
+      )
+        .bind(await sha256(`${SESSION_PEPPER}:${expiredToken}`))
+        .first(),
+    ).toBeNull();
+    await expect(
+      env.DB.prepare(
+        "SELECT like_count, comment_count FROM creation_stats WHERE creation_id = ?",
+      )
+        .bind(creationId)
+        .first(),
+    ).resolves.toMatchObject({ comment_count: 1, like_count: 1 });
+    await expect(
+      env.DB.prepare(
+        "SELECT details, resolution_note FROM reports WHERE id = ?",
+      )
+        .bind(resolvedReportId)
+        .first(),
+    ).resolves.toMatchObject({ details: "", resolution_note: null });
+    expect(
+      await env.DB.prepare("SELECT 1 AS found FROM reports WHERE id = ?")
+        .bind(openReportId)
+        .first(),
+    ).not.toBeNull();
   });
 });
+
+async function creationStorageCounts(creationId: string): Promise<{
+  creations: number;
+  objects: number;
+  revisions: number;
+}> {
+  const [creations, revisions, objects] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS count FROM creations WHERE id = ?")
+      .bind(creationId)
+      .first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM creation_revisions WHERE creation_id = ?",
+    )
+      .bind(creationId)
+      .first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM creation_objects WHERE creation_id = ?",
+    )
+      .bind(creationId)
+      .first<{ count: number }>(),
+  ]);
+  return {
+    creations: creations?.count ?? 0,
+    objects: objects?.count ?? 0,
+    revisions: revisions?.count ?? 0,
+  };
+}
 
 async function seedUser(
   username: string,
@@ -1427,19 +1927,23 @@ async function seedUser(
      (id, username, display_name, bio, role, status, avatar_seed,
       terms_version, terms_accepted_at, created_at, updated_at)
      VALUES (?, ?, ?, '', ?, 'active', ?, '2026-07-16', ?, ?, ?)`,
-  ).bind(id, username, username, role, id, now, now, now).run();
+  )
+    .bind(id, username, username, role, id, now, now, now)
+    .run();
   await env.DB.prepare(
     `INSERT INTO external_identities
      (id, user_id, provider, provider_subject, email, email_verified, created_at, updated_at)
      VALUES (?, ?, 'google', ?, ?, 1, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    id,
-    `subject-${id}`,
-    `${username}@example.test`,
-    now,
-    now,
-  ).run();
+  )
+    .bind(
+      crypto.randomUUID(),
+      id,
+      `subject-${id}`,
+      `${username}@example.test`,
+      now,
+      now,
+    )
+    .run();
   return { id };
 }
 
@@ -1450,15 +1954,17 @@ async function seedSession(userId: string, token: string): Promise<string> {
      (id, token_hash, user_id, ua_label, created_at, last_seen_at,
       last_authenticated_at, expires_at)
      VALUES (?, ?, ?, 'Test browser', ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    await sha256(`${SESSION_PEPPER}:${token}`),
-    userId,
-    now,
-    now,
-    now,
-    now + 60 * 60 * 1_000,
-  ).run();
+  )
+    .bind(
+      crypto.randomUUID(),
+      await sha256(`${SESSION_PEPPER}:${token}`),
+      userId,
+      now,
+      now,
+      now,
+      now + 60 * 60 * 1_000,
+    )
+    .run();
   return token;
 }
 
@@ -1498,7 +2004,9 @@ function authenticatedHeaders(token: string): Record<string, string> {
 function project(name: string) {
   const timestamp = "2026-07-10T12:00:00.000Z";
   return {
-    cells: Array.from({ length: 64 }, (_, index) => index === 0 ? "R1C1" : null),
+    cells: Array.from({ length: 64 }, (_, index) =>
+      index === 0 ? "R1C1" : null,
+    ),
     height: 8,
     lockedColors: [],
     meta: { createdAt: timestamp, modifiedAt: timestamp, name },

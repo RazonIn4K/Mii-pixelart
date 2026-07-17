@@ -107,6 +107,8 @@ export function failure(
 
 function publicErrorCode(status: number, internalCode: string): string {
   if (internalCode === "revision_conflict") return "REVISION_CONFLICT";
+  if (internalCode === "creation_id_conflict") return "CREATION_ID_CONFLICT";
+  if (internalCode === "first_save_pending") return "FIRST_SAVE_PENDING";
   if (internalCode === "comments_disabled") return "COMMENTS_DISABLED";
   if (internalCode.includes("quota")) return "QUOTA_EXCEEDED";
   if (internalCode === "validation_error") return "VALIDATION_FAILED";

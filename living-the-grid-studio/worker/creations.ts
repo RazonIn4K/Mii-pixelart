@@ -62,18 +62,38 @@ export function registerCreationRoutes(router: Router): void {
     .add("GET", "/api/creations/:id/media/:variant", serveCreationMedia);
 }
 
-async function createCreation(context: WorkerRequestContext): Promise<Response> {
+async function createCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   await enforceRateLimit(context.env.SAVE_RATE_LIMITER, session.user.id);
-  const input = await parseJson(context.request, CreateCreationSchema, PROJECT_REQUEST_LIMIT);
+  const input = await parseJson(
+    context.request,
+    CreateCreationSchema,
+    PROJECT_REQUEST_LIMIT,
+  );
 
   const now = Date.now();
-  const creationId = crypto.randomUUID();
+  const creationId = input.id ?? crypto.randomUUID();
   const revisionId = crypto.randomUUID();
   const slug = randomToken(13);
   const canonicalJson = JSON.stringify(input.project);
+  const projectSha256 = await sha256(canonicalJson);
   const projectBytes = new TextEncoder().encode(canonicalJson).byteLength;
-  const title = (input.title ?? input.project.meta.name).slice(0, COMMUNITY_LIMITS.creationTitleCharacters);
+  const title = (input.title ?? input.project.meta.name).slice(
+    0,
+    COMMUNITY_LIMITS.creationTitleCharacters,
+  );
+
+  if (input.id) {
+    const replay = await replayExistingFirstSave(context, {
+      creationId,
+      ownerUserId: session.user.id,
+      projectSha256,
+      title,
+    });
+    if (replay) return replay;
+  }
 
   try {
     await context.env.DB.batch([
@@ -92,9 +112,10 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
       ).bind(creationId, session.user.id, slug, title, now, now),
       context.env.DB.prepare(
         `INSERT INTO creation_revisions
-         (id, creation_id, revision_number, status, project_bytes, created_at)
-         VALUES (?, ?, 1, 'uploading', ?, ?)`,
-      ).bind(revisionId, creationId, projectBytes, now),
+         (id, creation_id, revision_number, status, project_bytes,
+          project_sha256, created_at)
+         VALUES (?, ?, 1, 'uploading', ?, ?, ?)`,
+      ).bind(revisionId, creationId, projectBytes, projectSha256, now),
       context.env.DB.prepare(
         `INSERT INTO creation_stats
          (creation_id, like_count, comment_count, popularity_score, updated_at)
@@ -105,6 +126,15 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
       ).bind(revisionId),
     ]);
   } catch (error) {
+    if (input.id) {
+      const replay = await replayExistingFirstSave(context, {
+        creationId,
+        ownerUserId: session.user.id,
+        projectSha256,
+        title,
+      });
+      if (replay) return replay;
+    }
     throw quotaHttpError(error) ?? error;
   }
 
@@ -125,7 +155,7 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
       creationId,
       objects,
       oldRevisionId: null,
-      projectSha256: await sha256(canonicalJson),
+      projectSha256,
       quotaReservationId: revisionId,
       revisionId,
       revisionNumber: 1,
@@ -133,31 +163,139 @@ async function createCreation(context: WorkerRequestContext): Promise<Response> 
   } catch (error) {
     const requestError = quotaHttpError(error) ?? error;
     if (storedObjects.length) {
-      await context.env.PROJECTS.delete(storedObjects.map((object) => object.key));
+      await context.env.PROJECTS.delete(
+        storedObjects.map((object) => object.key),
+      );
     }
     await context.env.DB.batch([
-      context.env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?").bind(revisionId),
-      context.env.DB.prepare("DELETE FROM creations WHERE id = ?").bind(creationId),
+      context.env.DB.prepare(
+        "DELETE FROM quota_reservations WHERE id = ?",
+      ).bind(revisionId),
+      context.env.DB.prepare("DELETE FROM creations WHERE id = ?").bind(
+        creationId,
+      ),
     ]);
     throw requestError;
   }
 
   const created = await getCreationById(context.env, creationId);
-  const response = success(context.requestId, creationToApi(created!), 201);
-  response.headers.set("ETag", revisionEtag(1));
-  response.headers.set("Location", `/api/creations/${creationId}`);
+  return creationSaveResponse(context, created!, 201);
+}
+
+async function replayExistingFirstSave(
+  context: WorkerRequestContext,
+  expected: {
+    creationId: string;
+    ownerUserId: string;
+    projectSha256: string;
+    title: string;
+  },
+): Promise<Response | null> {
+  const existing = await context.env.DB.prepare(
+    `SELECT c.owner_user_id, c.title, c.state, c.visibility,
+      c.current_revision_id, r.id AS first_revision_id,
+      r.revision_number, r.project_sha256,
+      r.status AS revision_status
+     FROM creations c
+     LEFT JOIN creation_revisions r
+       ON r.creation_id = c.id AND r.revision_number = 1
+     WHERE c.id = ?`,
+  )
+    .bind(expected.creationId)
+    .first<{
+      current_revision_id: string | null;
+      first_revision_id: string | null;
+      owner_user_id: string;
+      project_sha256: string | null;
+      revision_number: number | null;
+      revision_status: "failed" | "obsolete" | "ready" | "uploading" | null;
+      state: "deleted" | "draft" | "hidden" | "published";
+      title: string;
+      visibility: "private" | "public" | "unlisted";
+    }>();
+  if (!existing) return null;
+
+  if (
+    existing.owner_user_id === expected.ownerUserId &&
+    existing.title === expected.title &&
+    existing.state === "draft" &&
+    existing.visibility === "private" &&
+    existing.current_revision_id === null &&
+    existing.first_revision_id !== null &&
+    existing.revision_status === "uploading" &&
+    existing.project_sha256 === expected.projectSha256 &&
+    existing.revision_number === 1
+  ) {
+    throw firstSavePending();
+  }
+
+  if (
+    existing.owner_user_id !== expected.ownerUserId ||
+    existing.title !== expected.title ||
+    existing.state !== "draft" ||
+    existing.visibility !== "private" ||
+    !existing.first_revision_id ||
+    existing.current_revision_id !== existing.first_revision_id ||
+    existing.revision_status !== "ready" ||
+    existing.project_sha256 !== expected.projectSha256 ||
+    existing.revision_number !== 1
+  ) {
+    throw creationIdConflict();
+  }
+
+  const completed = await getCreationById(context.env, expected.creationId);
+  if (!completed) throw creationIdConflict();
+  return creationSaveResponse(context, completed, 200);
+}
+
+function creationSaveResponse(
+  context: WorkerRequestContext,
+  creation: CreationRow,
+  status: 200 | 201,
+): Response {
+  if (creation.revision_number === null) throw creationIdConflict();
+  const response = success(context.requestId, creationToApi(creation), status);
+  response.headers.set("ETag", revisionEtag(creation.revision_number));
+  response.headers.set("Location", `/api/creations/${creation.id}`);
   return response;
+}
+
+function creationIdConflict(): HttpError {
+  return new HttpError(
+    409,
+    "creation_id_conflict",
+    "The cloud save could not be completed with that retry identifier.",
+  );
+}
+
+function firstSavePending(): HttpError {
+  return new HttpError(
+    409,
+    "first_save_pending",
+    "That private cloud save is still being prepared. Wait a moment and try again.",
+    undefined,
+    undefined,
+    { "Retry-After": "2" },
+  );
 }
 
 async function saveProject(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   await enforceRateLimit(context.env.SAVE_RATE_LIMITER, session.user.id);
-  const input = await parseJson(context.request, SaveProjectSchema, PROJECT_REQUEST_LIMIT);
+  const input = await parseJson(
+    context.request,
+    SaveProjectSchema,
+    PROJECT_REQUEST_LIMIT,
+  );
   const creation = await ownerCreation(context, session.user.id);
   const currentRevision = creation.revision_number;
   assertRevisionMatch(context.request, currentRevision);
 
-  const revisionNumber = await nextRevisionNumber(context.env, creation.id, currentRevision);
+  const revisionNumber = await nextRevisionNumber(
+    context.env,
+    creation.id,
+    currentRevision,
+  );
   const revisionId = crypto.randomUUID();
   const now = Date.now();
   const canonicalJson = JSON.stringify(input.project);
@@ -209,10 +347,14 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
   } catch (error) {
     const requestError = quotaHttpError(error) ?? error;
     if (storedObjects.length) {
-      await context.env.PROJECTS.delete(storedObjects.map((object) => object.key));
+      await context.env.PROJECTS.delete(
+        storedObjects.map((object) => object.key),
+      );
     }
     await context.env.DB.batch([
-      context.env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?").bind(revisionId),
+      context.env.DB.prepare(
+        "DELETE FROM quota_reservations WHERE id = ?",
+      ).bind(revisionId),
       context.env.DB.prepare(
         "UPDATE creation_revisions SET status = 'failed' WHERE id = ? AND status = 'uploading'",
       ).bind(revisionId),
@@ -229,27 +371,41 @@ async function saveProject(context: WorkerRequestContext): Promise<Response> {
 async function getCreation(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await getCreationById(context.env, context.params.id);
-  if (!creation) throw new HttpError(404, "creation_not_found", "Creation was not found.");
+  if (!creation)
+    throw new HttpError(404, "creation_not_found", "Creation was not found.");
   if (creation.owner_user_id !== session.user.id) {
-    throw new HttpError(403, "creation_forbidden", "You cannot access this creation.");
+    throw new HttpError(
+      403,
+      "creation_forbidden",
+      "You cannot access this creation.",
+    );
   }
   const project = await loadCurrentProject(context.env, creation);
   const response = success(context.requestId, {
     creation: creationToApi(creation),
     project,
   });
-  if (creation.revision_number) response.headers.set("ETag", revisionEtag(creation.revision_number));
+  if (creation.revision_number)
+    response.headers.set("ETag", revisionEtag(creation.revision_number));
   return response;
 }
 
 async function listCreations(context: WorkerRequestContext): Promise<Response> {
   const session = await requireOnboardedSession(context);
   if (context.url.searchParams.get("owner") !== "me") {
-    throw new HttpError(400, "invalid_owner_filter", "Only owner=me is supported.");
+    throw new HttpError(
+      400,
+      "invalid_owner_filter",
+      "Only owner=me is supported.",
+    );
   }
   const visibility = context.url.searchParams.get("visibility") ?? "all";
   if (!["all", "private", "unlisted", "public"].includes(visibility)) {
-    throw new HttpError(400, "invalid_visibility", "Visibility filter is invalid.");
+    throw new HttpError(
+      400,
+      "invalid_visibility",
+      "Visibility filter is invalid.",
+    );
   }
   const limit = normalizeLimit(context.url.searchParams.get("limit"));
   const cursor = parseCreationCursor(context.url.searchParams.get("cursor"));
@@ -265,37 +421,56 @@ async function listCreations(context: WorkerRequestContext): Promise<Response> {
     `${CREATION_SELECT}
      WHERE c.owner_user_id = ? AND c.state != 'deleted' ${visibilityClause} ${cursorClause}
      ORDER BY c.updated_at DESC, c.id DESC LIMIT ?`,
-  ).bind(...values).all<CreationRow>();
+  )
+    .bind(...values)
+    .all<CreationRow>();
   const hasMore = rows.results.length > limit;
   const page = rows.results.slice(0, limit);
   const last = page.at(-1);
   return success(context.requestId, page.map(creationToApi), 200, {
     hasMore,
     limit,
-    nextCursor: hasMore && last
-      ? encodeCursor({ id: last.id, sortValue: last.updated_at })
-      : null,
+    nextCursor:
+      hasMore && last
+        ? encodeCursor({ id: last.id, sortValue: last.updated_at })
+        : null,
   });
 }
 
-async function updateCreation(context: WorkerRequestContext): Promise<Response> {
+async function updateCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
   const input = await parseJson(context.request, UpdateCreationSchema, 25_000);
   if (
-    input.commentsEnabled !== undefined
-    && creation.comments_locked
-    && input.commentsEnabled !== Boolean(creation.comments_enabled)
+    input.commentsEnabled !== undefined &&
+    creation.comments_locked &&
+    input.commentsEnabled !== Boolean(creation.comments_enabled)
   ) {
-    throw new HttpError(409, "comments_locked", "A moderator locked comments for this creation.");
+    throw new HttpError(
+      409,
+      "comments_locked",
+      "A moderator locked comments for this creation.",
+    );
   }
   const updates: string[] = [];
   const values: unknown[] = [];
   for (const [field, value] of [
     ["title", input.title],
     ["description", input.description],
-    ["comments_enabled", input.commentsEnabled === undefined ? undefined : Number(input.commentsEnabled)],
-    ["project_download_enabled", input.projectDownloadEnabled === undefined ? undefined : Number(input.projectDownloadEnabled)],
+    [
+      "comments_enabled",
+      input.commentsEnabled === undefined
+        ? undefined
+        : Number(input.commentsEnabled),
+    ],
+    [
+      "project_download_enabled",
+      input.projectDownloadEnabled === undefined
+        ? undefined
+        : Number(input.projectDownloadEnabled),
+    ],
   ] as const) {
     if (value !== undefined) {
       updates.push(`${field} = ?`);
@@ -305,16 +480,19 @@ async function updateCreation(context: WorkerRequestContext): Promise<Response> 
   updates.push("updated_at = ?");
   values.push(Date.now(), creation.id);
   const statements: D1PreparedStatement[] = [
-    context.env.DB.prepare(`UPDATE creations SET ${updates.join(", ")} WHERE id = ?`)
-      .bind(...values),
+    context.env.DB.prepare(
+      `UPDATE creations SET ${updates.join(", ")} WHERE id = ?`,
+    ).bind(...values),
   ];
   if (
-    creation.state === "published"
-    && creation.visibility === "public"
-    && (input.title !== undefined || input.description !== undefined)
+    creation.state === "published" &&
+    creation.visibility === "public" &&
+    (input.title !== undefined || input.description !== undefined)
   ) {
     statements.push(
-      context.env.DB.prepare("DELETE FROM creation_search WHERE creation_id = ?").bind(creation.id),
+      context.env.DB.prepare(
+        "DELETE FROM creation_search WHERE creation_id = ?",
+      ).bind(creation.id),
       context.env.DB.prepare(
         `INSERT INTO creation_search (creation_id, title, description, username, tags)
          VALUES (?, ?, ?, ?, ?)`,
@@ -328,26 +506,47 @@ async function updateCreation(context: WorkerRequestContext): Promise<Response> 
     );
   }
   await context.env.DB.batch(statements);
-  return success(context.requestId, creationToApi((await getCreationById(context.env, creation.id))!));
+  return success(
+    context.requestId,
+    creationToApi((await getCreationById(context.env, creation.id))!),
+  );
 }
 
-async function publishCreation(context: WorkerRequestContext): Promise<Response> {
+async function publishCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
   assertNotModerationHidden(creation);
   if (!creation.current_revision_id) {
-    throw new HttpError(409, "project_required", "Save the project before publishing.");
+    throw new HttpError(
+      409,
+      "project_required",
+      "Save the project before publishing.",
+    );
   }
   const input = await parseJson(context.request, PublishCreationSchema, 25_000);
-  if (creation.comments_locked && input.commentsEnabled !== Boolean(creation.comments_enabled)) {
-    throw new HttpError(409, "comments_locked", "A moderator locked comments for this creation.");
+  if (
+    creation.comments_locked &&
+    input.commentsEnabled !== Boolean(creation.comments_enabled)
+  ) {
+    throw new HttpError(
+      409,
+      "comments_locked",
+      "A moderator locked comments for this creation.",
+    );
   }
   const tags = await loadActiveTags(context.env, input.tags);
   if (tags.length !== input.tags.length) {
-    throw new HttpError(400, "invalid_tags", "One or more tags are unavailable.");
+    throw new HttpError(
+      400,
+      "invalid_tags",
+      "One or more tags are unavailable.",
+    );
   }
   const now = Date.now();
-  const commentsEnabled = input.commentsEnabled ?? input.visibility === "public";
+  const commentsEnabled =
+    input.commentsEnabled ?? input.visibility === "public";
   const statements: D1PreparedStatement[] = [
     context.env.DB.prepare(
       `UPDATE creations SET title = ?, description = ?, state = 'published',
@@ -420,7 +619,9 @@ async function publishCreation(context: WorkerRequestContext): Promise<Response>
   );
 }
 
-async function unpublishCreation(context: WorkerRequestContext): Promise<Response> {
+async function unpublishCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
   assertNotModerationHidden(creation);
@@ -449,10 +650,15 @@ async function unpublishCreation(context: WorkerRequestContext): Promise<Respons
   if ((results[0]?.meta.changes ?? 0) !== 1) {
     throw moderationHoldConflict();
   }
-  return success(context.requestId, creationToApi((await getCreationById(context.env, creation.id))!));
+  return success(
+    context.requestId,
+    creationToApi((await getCreationById(context.env, creation.id))!),
+  );
 }
 
-async function deleteCreation(context: WorkerRequestContext): Promise<Response> {
+async function deleteCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const session = await requireOnboardedSession(context);
   const creation = await ownerCreation(context, session.user.id);
   const now = Date.now();
@@ -461,22 +667,34 @@ async function deleteCreation(context: WorkerRequestContext): Promise<Response> 
       `UPDATE creations SET state = 'deleted', visibility = 'private', deleted_at = ?,
        published_at = NULL, updated_at = ? WHERE id = ?`,
     ).bind(now, now, creation.id),
-    context.env.DB.prepare("DELETE FROM creation_search WHERE creation_id = ?").bind(creation.id),
+    context.env.DB.prepare(
+      "DELETE FROM creation_search WHERE creation_id = ?",
+    ).bind(creation.id),
   ]);
   return success(context.requestId, { deletedAt: now, id: creation.id });
 }
 
-async function getPublishedCreation(context: WorkerRequestContext): Promise<Response> {
+async function getPublishedCreation(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const creation = await getCreationBySlug(context.env, context.params.slug);
-  if (!creation || creation.state !== "published" || creation.visibility === "private") {
+  if (
+    !creation ||
+    creation.state !== "published" ||
+    creation.visibility === "private"
+  ) {
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
   const viewer = await optionalSession(context);
   let liked = false;
   if (viewer) {
-    liked = Boolean(await context.env.DB.prepare(
-      "SELECT 1 AS found FROM likes WHERE user_id = ? AND creation_id = ?",
-    ).bind(viewer.user.id, creation.id).first<{ found: number }>());
+    liked = Boolean(
+      await context.env.DB.prepare(
+        "SELECT 1 AS found FROM likes WHERE user_id = ? AND creation_id = ?",
+      )
+        .bind(viewer.user.id, creation.id)
+        .first<{ found: number }>(),
+    );
   }
   return success(context.requestId, {
     ...creationToApi(creation),
@@ -486,14 +704,17 @@ async function getPublishedCreation(context: WorkerRequestContext): Promise<Resp
   });
 }
 
-async function downloadProject(context: WorkerRequestContext): Promise<Response> {
+async function downloadProject(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const creation = await getCreationById(context.env, context.params.id);
   if (!creation || !creation.current_revision_id || !creation.revision_number) {
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
   const viewer = await optionalSession(context);
   const isOwner = Boolean(viewer && viewer.user.id === creation.owner_user_id);
-  const isPublished = creation.state === "published" && creation.visibility !== "private";
+  const isPublished =
+    creation.state === "published" && creation.visibility !== "private";
   if (!isOwner && (!isPublished || !creation.project_download_enabled)) {
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
@@ -501,10 +722,14 @@ async function downloadProject(context: WorkerRequestContext): Promise<Response>
   const row = await context.env.DB.prepare(
     `SELECT object_key, content_type FROM creation_objects
      WHERE revision_id = ? AND kind = 'project_json' AND status = 'ready' LIMIT 1`,
-  ).bind(creation.current_revision_id).first<ObjectRow>();
-  if (!row) throw new HttpError(404, "media_not_found", "Project was not found.");
+  )
+    .bind(creation.current_revision_id)
+    .first<ObjectRow>();
+  if (!row)
+    throw new HttpError(404, "media_not_found", "Project was not found.");
   const object = await context.env.PROJECTS.get(row.object_key);
-  if (!object) throw new HttpError(404, "media_not_found", "Project was not found.");
+  if (!object)
+    throw new HttpError(404, "media_not_found", "Project was not found.");
 
   return new Response(object.body, {
     headers: {
@@ -516,12 +741,16 @@ async function downloadProject(context: WorkerRequestContext): Promise<Response>
   });
 }
 
-async function serveCreationMedia(context: WorkerRequestContext): Promise<Response> {
+async function serveCreationMedia(
+  context: WorkerRequestContext,
+): Promise<Response> {
   const creation = await getCreationById(context.env, context.params.id);
-  if (!creation) throw new HttpError(404, "creation_not_found", "Creation was not found.");
+  if (!creation)
+    throw new HttpError(404, "creation_not_found", "Creation was not found.");
   const viewer = await optionalSession(context);
   const isOwner = Boolean(viewer && viewer.user.id === creation.owner_user_id);
-  const isPublished = creation.state === "published" && creation.visibility !== "private";
+  const isPublished =
+    creation.state === "published" && creation.visibility !== "private";
   if (!isOwner && !isPublished) {
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
@@ -533,30 +762,44 @@ async function serveCreationMedia(context: WorkerRequestContext): Promise<Respon
     thumb: "thumb",
   } as const;
   const kind = variantMap[context.params.variant as keyof typeof variantMap];
-  if (!kind) throw new HttpError(404, "media_not_found", "Media variant was not found.");
-  if (kind === "project_json" && !isOwner && !creation.project_download_enabled) {
-    throw new HttpError(403, "download_disabled", "Project downloads are disabled.");
+  if (!kind)
+    throw new HttpError(404, "media_not_found", "Media variant was not found.");
+  if (
+    kind === "project_json" &&
+    !isOwner &&
+    !creation.project_download_enabled
+  ) {
+    throw new HttpError(
+      403,
+      "download_disabled",
+      "Project downloads are disabled.",
+    );
   }
-  if (!creation.current_revision_id) throw new HttpError(404, "media_not_found", "Media was not found.");
+  if (!creation.current_revision_id)
+    throw new HttpError(404, "media_not_found", "Media was not found.");
 
-  const showcaseKind = kind === "preview"
-    ? "display"
-    : kind === "thumb" || kind === "social"
-      ? kind
-      : null;
+  const showcaseKind =
+    kind === "preview"
+      ? "display"
+      : kind === "thumb" || kind === "social"
+        ? kind
+        : null;
   let row: ObjectRow | null = showcaseKind
     ? await getPreferredShowcaseObject(context.env, creation.id, showcaseKind)
     : null;
   row ??= await context.env.DB.prepare(
     `SELECT object_key, content_type FROM creation_objects
      WHERE revision_id = ? AND kind = ? AND status = 'ready' LIMIT 1`,
-  ).bind(creation.current_revision_id, kind).first<ObjectRow>();
+  )
+    .bind(creation.current_revision_id, kind)
+    .first<ObjectRow>();
   if (!row && kind !== "project_json" && context.env.ENVIRONMENT === "local") {
     return dynamicSvgFallback(context, creation);
   }
   if (!row) throw new HttpError(404, "media_not_found", "Media was not found.");
   const object = await context.env.PROJECTS.get(row.object_key);
-  if (!object) throw new HttpError(404, "media_not_found", "Media was not found.");
+  if (!object)
+    throw new HttpError(404, "media_not_found", "Media was not found.");
 
   const headers = new Headers();
   object.writeHttpMetadata(headers);
@@ -564,7 +807,10 @@ async function serveCreationMedia(context: WorkerRequestContext): Promise<Respon
   headers.set("ETag", object.httpEtag);
   if (kind === "project_json") {
     headers.set("Cache-Control", "no-store");
-    headers.set("Content-Disposition", `attachment; filename="${safeFilename(creation.title)}.json"`);
+    headers.set(
+      "Content-Disposition",
+      `attachment; filename="${safeFilename(creation.title)}.json"`,
+    );
   } else if (isPublished && creation.visibility === "public") {
     headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
   } else {
@@ -580,11 +826,17 @@ async function dynamicSvgFallback(
   const projectRow = await context.env.DB.prepare(
     `SELECT object_key FROM creation_objects
      WHERE revision_id = ? AND kind = 'project_json' AND status = 'ready' LIMIT 1`,
-  ).bind(creation.current_revision_id).first<{ object_key: string }>();
-  if (!projectRow) throw new HttpError(404, "media_not_found", "Media was not found.");
+  )
+    .bind(creation.current_revision_id)
+    .first<{ object_key: string }>();
+  if (!projectRow)
+    throw new HttpError(404, "media_not_found", "Media was not found.");
   const object = await context.env.PROJECTS.get(projectRow.object_key);
-  if (!object) throw new HttpError(404, "media_not_found", "Media was not found.");
-  const project = CanonicalGridDocumentSchema.parse(JSON.parse(await object.text()));
+  if (!object)
+    throw new HttpError(404, "media_not_found", "Media was not found.");
+  const project = CanonicalGridDocumentSchema.parse(
+    JSON.parse(await object.text()),
+  );
   return new Response(renderGridSvg(project), {
     headers: {
       "Cache-Control": "no-store",
@@ -602,12 +854,19 @@ async function ownerCreation(
     throw new HttpError(404, "creation_not_found", "Creation was not found.");
   }
   if (creation.owner_user_id !== userId) {
-    throw new HttpError(403, "creation_forbidden", "You cannot change this creation.");
+    throw new HttpError(
+      403,
+      "creation_forbidden",
+      "You cannot change this creation.",
+    );
   }
   return creation;
 }
 
-function assertRevisionMatch(request: Request, currentRevision: number | null): void {
+function assertRevisionMatch(
+  request: Request,
+  currentRevision: number | null,
+): void {
   if (currentRevision === null) return;
   const provided = request.headers.get("if-match");
   if (provided !== revisionEtag(currentRevision)) {
@@ -624,7 +883,9 @@ async function nextRevisionNumber(
     `SELECT COALESCE(MAX(revision_number), 0) AS max_revision,
       COALESCE(SUM(CASE WHEN status = 'uploading' THEN 1 ELSE 0 END), 0) AS uploading_count
      FROM creation_revisions WHERE creation_id = ?`,
-  ).bind(creationId).first<{ max_revision: number; uploading_count: number }>();
+  )
+    .bind(creationId)
+    .first<{ max_revision: number; uploading_count: number }>();
   if ((row?.uploading_count ?? 0) > 0) {
     throw revisionConflict(currentRevision ?? 1);
   }
@@ -713,8 +974,9 @@ async function commitRevision(
     );
   }
   statements.push(
-    env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?")
-      .bind(input.quotaReservationId),
+    env.DB.prepare("DELETE FROM quota_reservations WHERE id = ?").bind(
+      input.quotaReservationId,
+    ),
   );
   await env.DB.batch(statements);
 }
@@ -753,12 +1015,9 @@ async function reserveStorageQuota(
       `UPDATE quota_reservations
        SET creation_slots = 0, storage_bytes = ?, updated_at = ?, expires_at = ?
        WHERE id = ?`,
-    ).bind(
-      storageBytes,
-      now,
-      now + QUOTA_RESERVATION_TTL_MS,
-      reservationId,
-    ).run();
+    )
+      .bind(storageBytes, now, now + QUOTA_RESERVATION_TTL_MS, reservationId)
+      .run();
     if ((result.meta.changes ?? 0) !== 1) {
       throw new HttpError(
         409,
@@ -774,10 +1033,18 @@ async function reserveStorageQuota(
 function quotaHttpError(error: unknown): HttpError | null {
   if (!(error instanceof Error)) return null;
   if (/creation_quota_exceeded/iu.test(error.message)) {
-    return new HttpError(409, "creation_quota_exceeded", "Cloud creation limit reached.");
+    return new HttpError(
+      409,
+      "creation_quota_exceeded",
+      "Cloud creation limit reached.",
+    );
   }
   if (/storage_quota_exceeded/iu.test(error.message)) {
-    return new HttpError(409, "storage_quota_exceeded", "Cloud storage limit reached.");
+    return new HttpError(
+      409,
+      "storage_quota_exceeded",
+      "Cloud storage limit reached.",
+    );
   }
   return null;
 }
@@ -790,7 +1057,9 @@ async function loadActiveTags(
   const placeholders = slugs.map(() => "?").join(",");
   const rows = await env.DB.prepare(
     `SELECT id, slug FROM tags WHERE is_active = 1 AND slug IN (${placeholders})`,
-  ).bind(...slugs).all<{ id: string; slug: string }>();
+  )
+    .bind(...slugs)
+    .all<{ id: string; slug: string }>();
   return rows.results;
 }
 
@@ -802,7 +1071,9 @@ async function loadCurrentProject(
   const row = await env.DB.prepare(
     `SELECT object_key FROM creation_objects
      WHERE revision_id = ? AND kind = 'project_json' AND status = 'ready' LIMIT 1`,
-  ).bind(creation.current_revision_id).first<{ object_key: string }>();
+  )
+    .bind(creation.current_revision_id)
+    .first<{ object_key: string }>();
   if (!row) return null;
   const object = await env.PROJECTS.get(row.object_key);
   if (!object) return null;
@@ -814,14 +1085,23 @@ function totalObjectBytes(objects: StoredCreationObject[]): number {
 }
 
 function safeFilename(title: string): string {
-  return title.normalize("NFKD").replace(/[^a-zA-Z0-9_-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 64) || "tomodachi-project";
+  return (
+    title
+      .normalize("NFKD")
+      .replace(/[^a-zA-Z0-9_-]+/gu, "-")
+      .replace(/^-+|-+$/gu, "")
+      .slice(0, 64) || "tomodachi-project"
+  );
 }
 
-function parseCreationCursor(value: string | null): { id: string; sortValue: number } | null {
+function parseCreationCursor(
+  value: string | null,
+): { id: string; sortValue: number } | null {
   if (!value) return null;
   try {
     const cursor = decodeCursor(value);
-    if (typeof cursor.sortValue !== "number") throw new Error("Invalid creation cursor");
+    if (typeof cursor.sortValue !== "number")
+      throw new Error("Invalid creation cursor");
     return { id: cursor.id, sortValue: cursor.sortValue };
   } catch {
     throw new HttpError(400, "invalid_cursor", "Pagination cursor is invalid.");

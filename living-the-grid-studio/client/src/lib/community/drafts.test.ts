@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readLocalDraft } from "./drafts";
+import { CreateCreationSchema } from "@shared/community";
+import {
+  clearPendingCloudCreationLease,
+  fingerprintCloudCreationPayload,
+  getOrCreatePendingCloudCreationLease,
+  readLocalDraft,
+} from "./drafts";
 
 type MockHandler = (() => void) | null;
 
@@ -79,6 +85,96 @@ function installDatabase(options: HarnessOptions): Harness {
   return { close, transaction };
 }
 
+function installLeaseDatabase(
+  initial: Record<string, unknown> = {},
+): Map<string, unknown> {
+  const records = new Map(Object.entries(initial));
+  const database = {
+    close: vi.fn(),
+    objectStoreNames: { contains: () => true },
+    transaction: vi.fn(() => {
+      let completed = false;
+      let pending = 0;
+      const transaction = {
+        abort: vi.fn(),
+        error: null,
+        onabort: null as MockHandler,
+        oncomplete: null as MockHandler,
+        onerror: null as MockHandler,
+        objectStore: vi.fn(),
+      };
+      const completeWhenIdle = () => {
+        queueMicrotask(() => {
+          if (!completed && pending === 0) {
+            completed = true;
+            transaction.oncomplete?.();
+          }
+        });
+      };
+      const request = <T>(operation: () => T): IDBRequest<T> => {
+        pending += 1;
+        const next = {
+          error: null,
+          onerror: null as MockHandler,
+          onsuccess: null as MockHandler,
+          result: undefined as T,
+        };
+        queueMicrotask(() => {
+          next.result = operation();
+          next.onsuccess?.();
+          pending -= 1;
+          completeWhenIdle();
+        });
+        return next as unknown as IDBRequest<T>;
+      };
+      const store = {
+        delete: (key: IDBValidKey) =>
+          request(() => {
+            records.delete(String(key));
+            return undefined;
+          }),
+        get: (key: IDBValidKey) => request(() => records.get(String(key))),
+        put: (value: { id: string }) =>
+          request(() => {
+            records.set(value.id, value);
+            return value.id;
+          }),
+      };
+      transaction.objectStore.mockReturnValue(
+        store as unknown as IDBObjectStore,
+      );
+      return transaction as unknown as IDBTransaction;
+    }),
+  };
+  const openRequest = {
+    error: null,
+    onerror: null as MockHandler,
+    onsuccess: null as MockHandler,
+    onupgradeneeded: null as MockHandler,
+    result: database as unknown as IDBDatabase,
+  };
+  vi.stubGlobal("indexedDB", {
+    open: vi.fn(() => {
+      queueMicrotask(() => openRequest.onsuccess?.());
+      return openRequest as unknown as IDBOpenDBRequest;
+    }),
+  });
+  return records;
+}
+
+function cloudDocument(name = "Lease test") {
+  const timestamp = "2026-07-16T12:00:00.000Z";
+  return {
+    cells: ["R1C1", ...Array.from({ length: 63 }, () => null)],
+    height: 8,
+    lockedColors: [],
+    meta: { createdAt: timestamp, modifiedAt: timestamp, name },
+    usedColors: ["R1C1"],
+    version: 1 as const,
+    width: 8,
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -142,4 +238,103 @@ describe("local draft IndexedDB lifecycle", () => {
       );
     },
   );
+});
+
+describe("pending cloud creation leases", () => {
+  it("fingerprints the exact canonical create payload", async () => {
+    const raw = cloudDocument();
+    const withDiscardedFilename = {
+      ...raw,
+      meta: { ...raw.meta, sourceImage: "private-filename.png" },
+    };
+    const canonical = CreateCreationSchema.parse({
+      project: raw,
+      title: raw.meta.name,
+    });
+    const canonicalWithDiscardedFilename = CreateCreationSchema.parse({
+      project: withDiscardedFilename,
+      title: raw.meta.name,
+    });
+    const fingerprint = await fingerprintCloudCreationPayload(canonical);
+
+    expect(fingerprint).toMatch(/^sha256-v1:[0-9a-f]{64}$/);
+    await expect(
+      fingerprintCloudCreationPayload(canonicalWithDiscardedFilename),
+    ).resolves.toBe(fingerprint);
+    await expect(
+      fingerprintCloudCreationPayload(
+        CreateCreationSchema.parse({
+          project: cloudDocument("Changed title"),
+          title: "Changed title",
+        }),
+      ),
+    ).resolves.not.toBe(fingerprint);
+  });
+
+  it("reuses a UUID only for the same user and draft fingerprint", async () => {
+    const records = installLeaseDatabase();
+    const fingerprint = `sha256-v1:${"a".repeat(64)}`;
+    const first = await getOrCreatePendingCloudCreationLease(
+      "lease-user",
+      fingerprint,
+    );
+    const replay = await getOrCreatePendingCloudCreationLease(
+      "lease-user",
+      fingerprint,
+    );
+
+    expect(replay).toEqual(first);
+    expect(records.get("pending-cloud-creation:lease-user")).toMatchObject({
+      ...first,
+      userId: "lease-user",
+    });
+  });
+
+  it("rotates the UUID for a changed fingerprint or legacy record", async () => {
+    const recordId = "pending-cloud-creation:lease-user";
+    const records = installLeaseDatabase({
+      [recordId]: {
+        clientCreationId: "7c06a008-f20c-47f4-802a-ff7e78e3ca45",
+        id: recordId,
+        updatedAt: 1,
+        userId: "lease-user",
+      },
+    });
+    const firstFingerprint = `sha256-v1:${"b".repeat(64)}`;
+    const upgraded = await getOrCreatePendingCloudCreationLease(
+      "lease-user",
+      firstFingerprint,
+    );
+    expect(upgraded.clientCreationId).not.toBe(
+      "7c06a008-f20c-47f4-802a-ff7e78e3ca45",
+    );
+
+    const changed = await getOrCreatePendingCloudCreationLease(
+      "lease-user",
+      `sha256-v1:${"c".repeat(64)}`,
+    );
+    expect(changed.clientCreationId).not.toBe(upgraded.clientCreationId);
+    expect(records.get(recordId)).toMatchObject(changed);
+  });
+
+  it("compare-and-deletes only the exact lease", async () => {
+    const records = installLeaseDatabase();
+    const lease = await getOrCreatePendingCloudCreationLease(
+      "lease-user",
+      `sha256-v1:${"d".repeat(64)}`,
+    );
+
+    await expect(
+      clearPendingCloudCreationLease("lease-user", {
+        ...lease,
+        draftFingerprint: `sha256-v1:${"e".repeat(64)}`,
+      }),
+    ).resolves.toBe(false);
+    expect(records.has("pending-cloud-creation:lease-user")).toBe(true);
+
+    await expect(
+      clearPendingCloudCreationLease("lease-user", lease),
+    ).resolves.toBe(true);
+    expect(records.has("pending-cloud-creation:lease-user")).toBe(false);
+  });
 });

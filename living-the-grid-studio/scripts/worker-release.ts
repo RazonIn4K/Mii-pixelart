@@ -646,6 +646,16 @@ function validateSourceConfig(
   const images = objectAt(selected, "images", "Images binding");
   expectExact(images.binding, "IMAGES", "Images binding");
   expectExact(images.remote, false, "Images local-processing guard");
+  const versionMetadata = objectAt(
+    selected,
+    "version_metadata",
+    "Version metadata binding",
+  );
+  expectExact(
+    versionMetadata.binding,
+    "CF_VERSION_METADATA",
+    "Version metadata binding",
+  );
   validateRateLimits(selected);
 
   const secrets = objectAt(selected, "secrets", "Required secret declaration");
@@ -826,6 +836,21 @@ function validateGeneratedConfig(
     generatedImages.remote,
     sourceImages.remote,
     "Generated Images processing mode",
+  );
+  const generatedVersionMetadata = objectAt(
+    generated,
+    "version_metadata",
+    "Generated version metadata binding",
+  );
+  const sourceVersionMetadata = objectAt(
+    selected,
+    "version_metadata",
+    "Version metadata binding",
+  );
+  expectExact(
+    generatedVersionMetadata.binding,
+    sourceVersionMetadata.binding,
+    "Generated version metadata binding",
   );
 
   validateRateLimits(generated);
@@ -1691,6 +1716,8 @@ export async function runRelease(
       env: {
         ...process.env,
         CLOUDFLARE_ENV: options.target === "local" ? "" : options.target,
+        TOMODACHI_REQUIRE_CLEAN_SOURCE:
+          options.intent === "deploy" ? "true" : "false",
       },
     },
     dependencies,

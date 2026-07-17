@@ -26,9 +26,13 @@ Recommended routes:
 - `/affiliate-disclosure` - affiliate and sponsored content disclosure.
 
 Operational note: `tomodachi.pw` currently resolves to the existing Cloudflare
-Pages production app. The target Worker cutover is governed by
-`community-deployment-runbook.md`; do not change registrar or DNS records merely
-to make an undeployed branch visible.
+Pages production app at exact source
+`c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
+`b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. No production Worker or isolated
+production resource set exists yet; checked-in production IDs remain
+placeholders. The target Worker cutover is governed by
+`community-deployment-runbook.md`; do not change registrar or DNS records
+merely to make an undeployed branch visible.
 
 ### tomodachi.brave
 
@@ -46,8 +50,11 @@ Recommended uses:
    production runtime and rollback surface until the approved Worker soak ends.
 2. Build and validate the unified Worker from `living-the-grid-studio/` with the
    target-explicit commands in `community-deployment-runbook.md`.
-3. Deploy `staging.tomodachi.pw` only after its separate resource, secret,
-   migration, and deployment approvals are complete.
+3. Keep `staging.tomodachi.pw` isolated from production. Its current runtime is
+   exact source `80fdcd5da432b88d06d84bfd084e9f0993edc363`, deployment
+   `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
+   `c56f580f-2238-4775-846d-3d2c08f17c78`; every future redeploy still needs
+   its own exact-SHA approval.
 4. Attach `tomodachi.pw` to the production Worker only after staging acceptance
    and explicit cutover approval. The Worker configuration permits no public
    `workers.dev` or version-preview origin.
@@ -85,19 +92,26 @@ Keep the launch trust-first:
 
 ## Launch follow-up gates
 
-1. Staging resources, the eight-secret bootstrap, migrations `0001` through
-   `0008`, and authenticated single-account writable acceptance are complete.
-   Exact source `18e36da` is the current staging deployment. Its homepage and
-   functional canvas/AI checks pass, but its Start blank and returning-draft
-   Studio performance paths do not. Deploy the follow-up source only through a
-   new exact-SHA staging approval and rerun Worker-hosted cold and interaction
-   traces.
+1. Staging resources, the current six-secret bootstrap, migrations `0001`
+   through `0008`, and authenticated single-account writable acceptance are
+   complete. The last pushed community branch checkpoint before the next
+   release candidate is
+   `b34f821373657ccf8e5d38401af6c4ff255fc65c`; staging serves runtime source
+   `80fdcd5da432b88d06d84bfd084e9f0993edc363`. The intervening branch changes
+   through that published checkpoint are documentation and test configuration.
+   The next candidate adds runtime
+   source identity, retry-safe first saves, and the P2/P3 runners, so it is no
+   longer runtime-equivalent to staging and requires a new exact-head deploy
+   plus cold, restored-draft, cloud-load, interaction, and mobile evidence.
 2. The complete public service address is approved and published, and David
    Ortiz confirmed ownership of the legal, privacy, security, help, and abuse
    channels. Verify live delivery and escalation for each channel.
-3. Google staging consent branding is complete. Run the real staging Google
-   sign-in without altering production. Verify legacy payment and webhook paths
-   return provider-free `410 Gone` and make no upstream payment request.
+3. Google staging consent branding and one-account sign-in are complete.
+   The fail-closed writable harness and secret-free live-auth runner now pass
+   local injected tests. Their first live run still needs a fresh private
+   approval plus a distinct approved second staging identity. Legacy payment
+   and webhook paths are already verified as provider-free `410 Gone`; keep
+   that proof in every release candidate.
 4. Preserve the existing real Chrome evidence and capture new Worker-hosted
    traces after every exact-source change. Lighthouse remains supporting
    accessibility/best-practices evidence, not a substitute for cold LCP, CLS,
