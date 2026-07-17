@@ -1,7 +1,7 @@
 # Product Specification — Tomodachi Studio
 
 **Version:** 1.1
-**Last Updated:** 2026-07-14
+**Last Updated:** 2026-07-16
 
 ---
 
@@ -14,10 +14,12 @@ The strongest product angle: **not just "turn image into pixels," but "make this
 The local Studio workflow below is implemented and remains available without an
 account. The Island Workshop account, cloud-project, publishing, discovery,
 social, and moderation surfaces are also implemented and locally/CI tested.
-Exact source `520d0f287d390ba14b0fef179a6394893a5ab92d` remains the last accepted
-isolated staging Worker deployment in standard read-only mode. The current
-branch prepares the controlled writable-staging acceptance gate; production
-launch remains separately approval-gated. Production
+Exact source `80fdcd5da432b88d06d84bfd084e9f0993edc363` is the active isolated
+staging Worker with community mutations enabled and migrations `0001` through
+`0008`. The current review branch adds exact release identity, retry-safe first
+cloud saves, and bounded P2/P3 acceptance runners. Those changes are not on the
+staging Worker and still require an exact-SHA deployment and hosted acceptance
+gate. Production launch remains separately approval-gated, and
 `tomodachi.pw` remains on Cloudflare Pages.
 
 ## Target User

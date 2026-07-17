@@ -17,25 +17,29 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- The community branch checkpoint is
-  `b34f821373657ccf8e5d38401af6c4ff255fc65c`. GitHub and GitLab carry that
-  exact branch ref, its owned PR checks are green, and its exact Pages preview
-  is `https://02e85e33.mii-pixelart.pages.dev`. This is repository and preview
-  evidence, not a staging-exit or production approval.
-- The next candidate now adds retry-safe first-cloud-save idempotency, exact
+- Runtime hardening checkpoint
+  `7f0b74f47897c1136ac3996d6332389384720d74` is on both GitHub and GitLab.
+  Its exact Pages preview is `https://611df827.mii-pixelart.pages.dev`; all five
+  owned GitHub checks passed, including 410 browser/accessibility cases, while
+  the separate external `code/snyk` context reported `Code test limit reached`
+  without a code finding. The exact final review head is the provider-reported
+  PR/MR head after this documentation closeout, not a self-referential SHA in
+  this tracked file. Preview evidence is not staging-exit or production proof.
+- The review candidate adds retry-safe first-cloud-save idempotency, exact
   Worker source-identity headers, the fail-closed P2 writable harness, and the
-  secret-free P3 two-session runner. Those local changes alter runtime code;
-  they must be committed, pushed, scanned, and deployed as one new exact SHA
-  before any earlier hosted evidence can be reused. No P2/P3 remote run,
-  staging mutation, or production change was performed while building them.
+  secret-free P3 two-session runner. The implementation is committed, pushed,
+  and locally validated. It still must pass checks at the final documentation
+  head and be deployed under a new exact-SHA gate before earlier hosted
+  evidence can be reused. No P2/P3 remote run, staging mutation, or production
+  change was performed while building or documenting it.
 - Staging is serving exact runtime source
   `80fdcd5da432b88d06d84bfd084e9f0993edc363` as Cloudflare deployment
   `9803bbba-4ee5-45fc-9027-7afd4e902089`, active Worker version
   `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19) at 100 percent traffic.
   The changes from `80fdcd5` through `b34f821` are documentation and test
-  configuration only, so the deployed application runtime is equivalent, but
-  that equivalence does **not** replace the required exact-head hosted P1
-  evidence.
+  configuration only. Later commits add runtime behavior and release controls,
+  so staging is no longer equivalent to the review candidate and exact-head
+  hosted P1 evidence is required.
 - The deployed staging flag is `COMMUNITY_MUTATIONS_ENABLED=true`. Payments and
   consultations are retired; the staging D1 migration ledger contains `0001`
   through `0008`. That deployment did not apply a migration, rotate a
