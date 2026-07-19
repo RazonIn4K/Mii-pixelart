@@ -8,6 +8,7 @@ import {
   readBoundedResponseText,
   runHostedReadOnlyAcceptance,
   type AcceptanceFetch,
+  type CommunityMutationsExpectation,
 } from "./verify-hosted-read-only";
 
 const FIXTURE_ORIGIN = "http://127.0.0.1:48123";
@@ -30,7 +31,12 @@ interface SeenRequest {
   url: URL;
 }
 
-function fixtureFetch(options: { omitCsp?: boolean } = {}): {
+function fixtureFetch(
+  options: {
+    communityMutations?: CommunityMutationsExpectation;
+    omitCsp?: boolean;
+  } = {},
+): {
   fetchImpl: AcceptanceFetch;
   seen: SeenRequest[];
 } {
@@ -74,15 +80,20 @@ function fixtureFetch(options: { omitCsp?: boolean } = {}): {
     if (request.method === "POST" && url.pathname === "/api/creations") {
       headers.set("Content-Type", "application/json; charset=utf-8");
       const sameOrigin = request.headers.get("origin") === FIXTURE_ORIGIN;
+      const enabled = options.communityMutations === "enabled";
       return new Response(
         JSON.stringify({
           error: {
-            code: sameOrigin ? "SERVICE_UNAVAILABLE" : "FORBIDDEN",
+            code: sameOrigin
+              ? enabled
+                ? "UNAUTHENTICATED"
+                : "SERVICE_UNAVAILABLE"
+              : "FORBIDDEN",
             message: "Blocked by fixture policy.",
           },
           requestId,
         }),
-        { headers, status: sameOrigin ? 503 : 403 },
+        { headers, status: sameOrigin ? (enabled ? 401 : 503) : 403 },
       );
     }
 
@@ -189,6 +200,40 @@ describe("hosted read-only target policy", () => {
         "https://staging.tomodachi.pw",
       ]),
     ).toEqual({ baseUrl: "https://staging.tomodachi.pw" });
+    expect(
+      parseHostedAcceptanceArgs([
+        "--base-url",
+        "https://staging.tomodachi.pw",
+        "--expect-community-mutations",
+        "enabled",
+      ]),
+    ).toEqual({
+      baseUrl: "https://staging.tomodachi.pw",
+      expectedCommunityMutations: "enabled",
+    });
+    for (const args of [
+      [
+        "--base-url",
+        "https://staging.tomodachi.pw",
+        "--expect-community-mutations",
+        "blocked",
+      ],
+      [
+        "--base-url",
+        "https://staging.tomodachi.pw",
+        "--community-mutations",
+        "enabled",
+      ],
+      [
+        "--base-url",
+        "https://staging.tomodachi.pw",
+        "--expect-community-mutations",
+      ],
+    ]) {
+      expect(() => parseHostedAcceptanceArgs(args), args.join(" ")).toThrow(
+        HostedAcceptanceError,
+      );
+    }
   });
 
   it("rejects production before the fetch implementation is reached", async () => {
@@ -292,6 +337,46 @@ describe("hosted read-only acceptance", () => {
         ),
       ),
     ).toBe(false);
+  });
+
+  it("accepts an explicitly enabled deployment only when anonymous writes reach authentication", async () => {
+    const fixture = fixtureFetch({ communityMutations: "enabled" });
+    const result = await runHostedReadOnlyAcceptance({
+      baseUrl: FIXTURE_ORIGIN,
+      expectedCommunityMutations: "enabled",
+      fetchImpl: fixture.fetchImpl,
+    });
+
+    expect(result).toMatchObject({
+      communityMutations: "enabled",
+      requests: 28,
+      target: FIXTURE_ORIGIN,
+    });
+    expect(result.assertions).toBeGreaterThanOrEqual(280);
+    const probes = fixture.seen.filter((request) => request.method === "POST");
+    expect(probes).toHaveLength(2);
+    expect(
+      probes.every(
+        (request) =>
+          request.url.pathname === "/api/creations" &&
+          request.body === "{}" &&
+          request.credentials === "omit" &&
+          !request.headers.has("authorization") &&
+          !request.headers.has("cookie"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a deployment whose mutation mode does not match the explicit expectation", async () => {
+    const fixture = fixtureFetch();
+    await expect(
+      runHostedReadOnlyAcceptance({
+        baseUrl: FIXTURE_ORIGIN,
+        expectedCommunityMutations: "enabled",
+        fetchImpl: fixture.fetchImpl,
+      }),
+    ).rejects.toThrow("same-origin community probe did not fail closed");
+    expect(fixture.seen).toHaveLength(27);
   });
 
   it("stops at the first failed security invariant", async () => {

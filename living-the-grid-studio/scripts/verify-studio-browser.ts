@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { CREATIVE_TEMPLATES } from "../client/src/lib/engine/templates";
 import { OPENROUTER_MODEL_PRESETS } from "../shared/ai";
 
 const STUDIO_URL = process.env.LTG_STUDIO_URL ?? "http://127.0.0.1:3000/studio";
@@ -39,12 +40,7 @@ const LTG_FIXTURE = new URL(
 const LTG_FIXTURE_PATH = fileURLToPath(LTG_FIXTURE);
 
 type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 interface CdpResponse {
   id?: number;
@@ -132,15 +128,15 @@ async function main(): Promise<void> {
     for (const label of [
       "Create",
       "Face Paint",
-      "Character 64",
-      "Face 96",
-      "Character 128",
-      "Sprite 32",
-      "Logo 64",
-      "Sticker 64",
-      "Icon 16",
-      "Full 64",
-      "Pixel 256",
+      "Character",
+      "Face detail",
+      "Character detail",
+      "Sprite blocks",
+      "Logo",
+      "Sticker",
+      "Icon blocks",
+      "Full image",
+      "Pixel detail",
       "Photo",
       "Pixel / Logo",
       "AI",
@@ -155,19 +151,19 @@ async function main(): Promise<void> {
     await verifyCreationTools(cdp);
     await verifyAiPanel(cdp);
     await verifyPresetImport(cdp, {
-      expectedDimensions: "64×64",
+      expectedDimensions: "256×256",
       expectedMaxColors: 22,
       fileName: CHARACTER_FILENAME,
       filePath: CHARACTER_FIXTURE,
-      presetLabel: "Character 64",
+      presetLabel: "Character",
       projectName: CHARACTER_PROJECT_NAME,
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "128×128",
+      expectedDimensions: "256×256",
       expectedMaxColors: 36,
       fileName: CHARACTER_FILENAME,
       filePath: CHARACTER_FIXTURE,
-      presetLabel: "Character 128",
+      presetLabel: "Character detail",
       projectName: CHARACTER_PROJECT_NAME,
     });
     await verifyPresetImport(cdp, {
@@ -175,55 +171,55 @@ async function main(): Promise<void> {
       expectedMaxColors: 84,
       fileName: CHARACTER_FILENAME,
       filePath: CHARACTER_FIXTURE,
-      presetLabel: "Pixel 256",
+      presetLabel: "Pixel detail",
       projectName: CHARACTER_PROJECT_NAME,
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "32×32",
+      expectedDimensions: "256×256",
       expectedMaxColors: 16,
       fileName: CHARACTER_FILENAME,
       filePath: CHARACTER_FIXTURE,
-      presetLabel: "Sprite 32",
+      presetLabel: "Sprite blocks",
       projectName: CHARACTER_PROJECT_NAME,
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "64×64",
+      expectedDimensions: "256×256",
       expectedMaxColors: 22,
       fileName: "smoke-mascot.bmp",
       filePath: MASCOT_FIXTURE,
-      presetLabel: "Character 64",
+      presetLabel: "Character",
       projectName: "smoke-mascot",
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "32×32",
+      expectedDimensions: "256×256",
       expectedMaxColors: 16,
       fileName: "smoke-sprite.bmp",
       filePath: SPRITE_FIXTURE,
-      presetLabel: "Sprite 32",
+      presetLabel: "Sprite blocks",
       projectName: "smoke-sprite",
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "64×64",
+      expectedDimensions: "256×256",
       expectedMaxColors: 12,
       fileName: "smoke-emblem.bmp",
       filePath: EMBLEM_FIXTURE,
-      presetLabel: "Logo 64",
+      presetLabel: "Logo",
       projectName: "smoke-emblem",
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "64×64",
+      expectedDimensions: "256×256",
       expectedMaxColors: 18,
       fileName: "smoke-mascot.bmp",
       filePath: MASCOT_FIXTURE,
-      presetLabel: "Sticker 64",
+      presetLabel: "Sticker",
       projectName: "smoke-mascot",
     });
     await verifyPresetImport(cdp, {
-      expectedDimensions: "16×16",
+      expectedDimensions: "256×256",
       expectedMaxColors: 8,
       fileName: "smoke-icon.bmp",
       filePath: ICON_FIXTURE,
-      presetLabel: "Icon 16",
+      presetLabel: "Icon blocks",
       projectName: "smoke-icon",
       verifyExport: true,
     });
@@ -629,11 +625,27 @@ async function verifyPresetImport(
       `[...document.querySelectorAll('button')].some((candidate) => {
         const rect = candidate.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0 &&
-          candidate.textContent.trim().includes(${JSON.stringify(presetLabel)});
+          candidate.textContent.trim() === ${JSON.stringify(presetLabel)};
       })`,
     ),
   );
-  await clickByText(cdpClient, presetLabel, "js");
+  const clickedPreset = await cdpClient.evaluate<boolean>(`(() => {
+    const candidate = [...document.querySelectorAll('button')].find((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 &&
+        button.textContent.trim() === ${JSON.stringify(presetLabel)};
+    });
+    if (!(candidate instanceof HTMLButtonElement) || candidate.disabled) {
+      return false;
+    }
+    candidate.click();
+    return true;
+  })()`);
+  assert.equal(
+    clickedPreset,
+    true,
+    `${presetLabel} preset should be clickable`,
+  );
   await uploadFile(cdpClient, "#ltg-image-input", filePath);
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
@@ -700,30 +712,7 @@ async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
     "Characters",
     "Horror & Spooky",
     "Marks & Objects",
-    "Face Guide",
-    "Mascot Head",
-    "Space Crew",
-    "Tiny Dino",
-    "Cute Monster",
-    "Haunted Mascot",
-    "Bald Teacher",
-    "Masked Slasher",
-    "Pumpkin Ghoul",
-    "Ghost Sheet",
-    "Vampire Count",
-    "Zombie Buddy",
-    "Creepy Clown",
-    "Red Cap Hero",
-    "Green Adventurer",
-    "Blue Speed Mascot",
-    "Portrait Bust",
-    "Space Helmet",
-    "Robot Face",
-    "Letter Mark",
-    "Controller Icon",
-    "Racing Kart",
-    "Pizza Slice",
-    "Sword Badge",
+    ...CREATIVE_TEMPLATES.map((template) => template.displayName),
   ]) {
     await waitFor(() =>
       cdpClient.evaluate<boolean>(
@@ -734,31 +723,44 @@ async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
     );
   }
 
-  await clickByText(cdpClient, "Red Cap Hero", "js");
+  await clickByText(cdpClient, "Trail Courier", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('Red Cap Hero Template') && document.body.innerText.includes('64×64')",
+      `[...document.querySelectorAll('header span')].some(
+        (candidate) => candidate.textContent.trim() === 'Trail Courier'
+      ) && Boolean(
+        document.querySelector(
+          'canvas[data-grid-width="256"][data-grid-height="256"]'
+        )
+      )`,
     ),
   );
 
-  await clickByText(cdpClient, "Icon 16", "js");
+  await clickByText(cdpClient, "Face paint", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('Icon Canvas') && document.body.innerText.includes('16×16 · 1 color')",
+      "document.body.innerText.includes('Face Paint Canvas') && document.body.innerText.includes('256×256 · 0 colors')",
+    ),
+  );
+
+  await clickByText(cdpClient, "64 Detail", "js");
+  await waitFor(() =>
+    cdpClient.evaluate<boolean>(
+      "document.body.innerText.includes('64×64 · 0 colors')",
     ),
   );
 
   await clickByText(cdpClient, "Upscale 2x", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('32×32 · 1 color')",
+      "document.body.innerText.includes('128×128 · 0 colors')",
     ),
   );
 
   await clickCanvasCell(cdpClient, 2, 2);
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('32×32 · 2 colors')",
+      "document.body.innerText.includes('128×128 · 1 color')",
     ),
   );
 
@@ -766,14 +768,14 @@ async function verifyCreationTools(cdpClient: CdpClient): Promise<void> {
   await clickCanvasCell(cdpClient, 2, 2);
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('32×32 · 1 color')",
+      "document.body.innerText.includes('128×128 · 0 colors')",
     ),
   );
 
   await clickByText(cdpClient, "256 Detail", "js");
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      "document.body.innerText.includes('256×256 · 1 color')",
+      "document.body.innerText.includes('256×256 · 0 colors')",
     ),
   );
   await assertCanvasFitsViewport(cdpClient);
@@ -1137,26 +1139,31 @@ async function clickCanvasCell(
     x: number;
     y: number;
   } | null>(`(() => {
-    const canvas = document.querySelector('canvas');
-    const text = document.body.innerText;
-    const match = text.match(/(\\d+)×(\\d+) · \\d+ colors?/);
-    if (!canvas || !match) return null;
-    const width = Number(match[1]);
-    const height = Number(match[2]);
+    const canvas = document.querySelector('canvas[data-grid-width]');
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const width = Number(canvas.dataset.gridWidth);
+    const height = Number(canvas.dataset.gridHeight);
+    const originX = Number(canvas.dataset.gridOriginX);
+    const originY = Number(canvas.dataset.gridOriginY);
+    const cellSize = Number(canvas.dataset.cellSize);
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      !Number.isFinite(originX) ||
+      !Number.isFinite(originY) ||
+      !Number.isFinite(cellSize) ||
+      cellSize <= 0 ||
+      ${cellX} < 0 ||
+      ${cellX} >= width ||
+      ${cellY} < 0 ||
+      ${cellY} >= height
+    ) {
+      return null;
+    }
     const rect = canvas.getBoundingClientRect();
-    const cellSize = Math.max(
-      1,
-      Math.floor(
-        Math.min((rect.width - 40) / width, (rect.height - 40) / height, 32)
-      )
-    );
-    const gridWidth = width * cellSize;
-    const gridHeight = height * cellSize;
-    const originX = rect.left + Math.round((rect.width - gridWidth) / 2);
-    const originY = rect.top + Math.round((rect.height - gridHeight) / 2);
     return {
-      x: originX + cellSize * (${cellX} + 0.5),
-      y: originY + cellSize * (${cellY} + 0.5),
+      x: rect.left + originX + cellSize * (${cellX} + 0.5),
+      y: rect.top + originY + cellSize * (${cellY} + 0.5),
     };
   })()`);
 
@@ -1171,7 +1178,7 @@ async function assertCanvasFitsViewport(cdpClient: CdpClient): Promise<void> {
     parentHeight: number;
     parentWidth: number;
   } | null>(`(() => {
-    const canvas = document.querySelector('canvas');
+    const canvas = document.querySelector('canvas[data-grid-width]');
     if (!canvas?.parentElement) return null;
     const canvasRect = canvas.getBoundingClientRect();
     const parentRect = canvas.parentElement.getBoundingClientRect();
@@ -1360,8 +1367,7 @@ class CdpClient {
     });
 
     const exception = response.exceptionDetails as
-      | { exception?: { description?: string }; text?: string }
-      | undefined;
+      { exception?: { description?: string }; text?: string } | undefined;
     if (exception) {
       throw new Error(
         exception.exception?.description ??

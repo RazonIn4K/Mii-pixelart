@@ -234,7 +234,7 @@ test("starter metadata selects the matching copy guide and exact game stamp", as
     page.getByRole("button", { name: "In-game grid view: 8×8" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByRole("button", { name: "4 pixel snapped stamp" }),
+    page.getByRole("button", { name: "4px snapped stamp" }),
   ).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: /Twin-Stick Badge/ }).click();
@@ -245,7 +245,7 @@ test("starter metadata selects the matching copy guide and exact game stamp", as
     page.getByRole("button", { name: "In-game grid view: 4×4" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByRole("button", { name: "8 pixel snapped stamp" }),
+    page.getByRole("button", { name: "8px snapped stamp" }),
   ).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: /^Smile Icon / }).click();
@@ -256,7 +256,7 @@ test("starter metadata selects the matching copy guide and exact game stamp", as
     page.getByRole("button", { name: "In-game grid view: 4×4" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByRole("button", { name: "16 pixel snapped stamp" }),
+    page.getByRole("button", { name: "16px snapped stamp" }),
   ).toHaveAttribute("aria-pressed", "true");
 });
 

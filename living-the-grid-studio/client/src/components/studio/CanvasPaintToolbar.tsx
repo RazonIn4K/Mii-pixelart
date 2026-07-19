@@ -633,7 +633,7 @@ export function CanvasPaintToolbar({
                   ? "border-[#96381e] bg-[#b84426] text-white shadow-sm"
                   : "border-[#26485a]/20 bg-white text-[#526975] hover:border-[#ef6b3b]/50 hover:text-[#17384a]"
               }`}
-              aria-label={`${size} pixel ${brushMode === "pixel-perfect" ? "snapped stamp" : "smooth brush"}`}
+              aria-label={`${size}px ${brushMode === "pixel-perfect" ? "snapped stamp" : "smooth brush"}`}
               aria-pressed={brushSize === size}
               onClick={() => onBrushSizeChange(size)}
             >

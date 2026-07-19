@@ -8,15 +8,18 @@ export type AcceptanceFetch = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export type CommunityMutationsExpectation = "blocked" | "enabled";
+
 export interface HostedReadOnlyAcceptanceOptions {
   baseUrl: string;
+  expectedCommunityMutations?: CommunityMutationsExpectation;
   fetchImpl?: AcceptanceFetch;
   timeoutMs?: number;
 }
 
 export interface HostedReadOnlyAcceptanceResult {
   assertions: number;
-  communityMutations: "blocked";
+  communityMutations: CommunityMutationsExpectation;
   requests: number;
   target: string;
 }
@@ -242,6 +245,16 @@ export async function runHostedReadOnlyAcceptance(
   const target = parseHostedAcceptanceTarget(options.baseUrl, {
     allowLoopback: options.fetchImpl !== undefined,
   });
+  const expectedCommunityMutations =
+    options.expectedCommunityMutations ?? "blocked";
+  if (
+    expectedCommunityMutations !== "blocked" &&
+    expectedCommunityMutations !== "enabled"
+  ) {
+    throw new HostedAcceptanceError(
+      "The expected community-mutations mode must be blocked or enabled.",
+    );
+  }
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60_000) {
@@ -496,13 +509,24 @@ export async function runHostedReadOnlyAcceptance(
     const label = origin === target.origin ? "same-origin" : "wrong-origin";
     const body = parseJsonObject(responseBody, `${label} community probe`);
     const error = isJsonObject(body.error) ? body.error : {};
+    const expectedStatus =
+      origin !== target.origin
+        ? 403
+        : expectedCommunityMutations === "enabled"
+          ? 401
+          : 503;
+    const expectedErrorCode =
+      origin !== target.origin
+        ? "FORBIDDEN"
+        : expectedCommunityMutations === "enabled"
+          ? "UNAUTHENTICATED"
+          : "SERVICE_UNAVAILABLE";
     expect(
-      response.status === (origin === target.origin ? 503 : 403),
+      response.status === expectedStatus,
       `${label} community probe did not fail closed`,
     );
     expect(
-      error.code ===
-        (origin === target.origin ? "SERVICE_UNAVAILABLE" : "FORBIDDEN"),
+      error.code === expectedErrorCode,
       `${label} community probe returned the wrong error code`,
     );
     expect(
@@ -515,7 +539,7 @@ export async function runHostedReadOnlyAcceptance(
   expect(requests === 28, `Expected exactly 28 requests, received ${requests}`);
   return {
     assertions,
-    communityMutations: "blocked",
+    communityMutations: expectedCommunityMutations,
     requests,
     target: target.origin,
   };
@@ -703,19 +727,35 @@ function readWithAbort(
 
 export function parseHostedAcceptanceArgs(args: readonly string[]): {
   baseUrl: string;
+  expectedCommunityMutations?: CommunityMutationsExpectation;
 } {
   const normalizedArgs = args[0] === "--" ? args.slice(1) : args;
-  if (
-    normalizedArgs.length !== 2 ||
-    normalizedArgs[0] !== "--base-url" ||
-    !normalizedArgs[1]
-  ) {
+  const usage =
+    "Usage: pnpm verify:hosted-read-only -- --base-url https://staging.tomodachi.pw [--expect-community-mutations enabled]";
+  if (normalizedArgs[0] !== "--base-url" || !normalizedArgs[1]) {
     throw new HostedAcceptanceError(
-      "An explicit --base-url is required. Usage: pnpm verify:hosted-read-only -- --base-url https://staging.tomodachi.pw",
+      `An explicit --base-url is required. ${usage}`,
     );
   }
+  if (normalizedArgs.length !== 2 && normalizedArgs.length !== 4) {
+    throw new HostedAcceptanceError(usage);
+  }
   parseHostedAcceptanceTarget(normalizedArgs[1]);
-  return { baseUrl: normalizedArgs[1] };
+  if (normalizedArgs.length === 2) {
+    return { baseUrl: normalizedArgs[1] };
+  }
+  if (
+    normalizedArgs[2] !== "--expect-community-mutations" ||
+    normalizedArgs[3] !== "enabled"
+  ) {
+    throw new HostedAcceptanceError(
+      `The only explicit community-mutations mode is enabled. ${usage}`,
+    );
+  }
+  return {
+    baseUrl: normalizedArgs[1],
+    expectedCommunityMutations: "enabled",
+  };
 }
 
 async function main(): Promise<void> {
