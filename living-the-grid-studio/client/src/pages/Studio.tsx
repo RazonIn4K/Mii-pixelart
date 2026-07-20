@@ -169,6 +169,10 @@ export default function Studio() {
   const [brushSize, setBrushSize] = useState<BrushSize>(4);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const [generatedImport, setGeneratedImport] = useState<{
+    file: File;
+    requestId: string;
+  } | null>(null);
   const [isPreparingBlankCanvas, setIsPreparingBlankCanvas] = useState(false);
   const [activeCopyRun, setActiveCopyRun] = useState<CopyGuideRun | null>(null);
   const [referenceSourceUrl, setReferenceSourceUrl] = useState<string | null>(
@@ -740,6 +744,17 @@ export default function Studio() {
     [revealCanvasForEditing, setDoc],
   );
 
+  const handleOpenGeneratedImage = useCallback(
+    (file: File, requestId: string) => {
+      setGeneratedImport({ file, requestId });
+      revealPanel("import");
+      toast.info(
+        "Generated artwork opened in Import. Review the framing and 256×256 conversion before committing.",
+      );
+    },
+    [revealPanel],
+  );
+
   const handleLoadProjectDocument = useCallback(
     (projectDoc: NonNullable<typeof doc>) => {
       setDoc(projectDoc);
@@ -1232,7 +1247,13 @@ export default function Studio() {
               <TabsContent value="import" className="mt-0">
                 <Suspense fallback={<PanelLoading />}>
                   <ImportPanel
+                    externalImage={generatedImport}
                     previewDoc={imagePreview}
+                    onExternalImageConsumed={(requestId) =>
+                      setGeneratedImport((current) =>
+                        current?.requestId === requestId ? null : current,
+                      )
+                    }
                     onPreviewImage={handlePreviewImage}
                     onCommitPreview={handleCommitImagePreview}
                     onCancelPreview={handleCancelImagePreview}
@@ -1305,6 +1326,7 @@ export default function Studio() {
                     <AiPanel
                       currentDoc={doc}
                       onApplySketch={handleApplyAiSketch}
+                      onOpenGeneratedImage={handleOpenGeneratedImage}
                     />
                   )}
                 </Suspense>

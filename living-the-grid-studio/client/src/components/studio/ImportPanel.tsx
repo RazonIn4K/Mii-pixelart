@@ -32,7 +32,12 @@ import type {
 } from "@/lib/engine/image-import";
 
 interface ImportPanelProps {
+  externalImage?: {
+    file: File;
+    requestId: string;
+  } | null;
   previewDoc: GridDocument | null;
+  onExternalImageConsumed?: (requestId: string) => void;
   onPreviewImage: (file: File, options?: Partial<ImageImportOptions>) => void;
   onCommitPreview: () => void;
   onCancelPreview: () => void;
@@ -93,7 +98,9 @@ const IMAGE_INPUT_ACCEPT = [
 ].join(",");
 
 export default function ImportPanel({
+  externalImage,
   previewDoc,
+  onExternalImageConsumed,
   onPreviewImage,
   onCommitPreview,
   onCancelPreview,
@@ -105,6 +112,7 @@ export default function ImportPanel({
   const sourcePreviewRef = useRef<HTMLDivElement>(null);
   const cropDragRef = useRef<CropDragState | null>(null);
   const validationRequestRef = useRef(0);
+  const externalImageRequestRef = useRef<string | null>(null);
   const [gridWidth, setGridWidth] = useState(256);
   const [gridHeight, setGridHeight] = useState(256);
   const [frameMode, setFrameMode] = useState<ImageFrameMode>("cover");
@@ -410,6 +418,18 @@ export default function ImportPanel({
     },
     [imageOptions, onPreviewImage, onImportJson],
   );
+
+  useEffect(() => {
+    if (
+      !externalImage ||
+      externalImageRequestRef.current === externalImage.requestId
+    ) {
+      return;
+    }
+    externalImageRequestRef.current = externalImage.requestId;
+    onExternalImageConsumed?.(externalImage.requestId);
+    void processFile(externalImage.file);
+  }, [externalImage, onExternalImageConsumed, processFile]);
 
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { registerAccountRoutes } from "./accounts";
+import { registerAiImageRoutes } from "./ai-images";
 import { registerAuthRoutes } from "./auth";
 import { registerCreationRoutes } from "./creations";
 import { registerCreationImageRoutes } from "./creation-images";
@@ -25,6 +26,7 @@ import { registerSocialRoutes } from "./social";
 
 const router = new Router();
 registerAuthRoutes(router);
+registerAiImageRoutes(router);
 registerAccountRoutes(router);
 registerCreationRoutes(router);
 registerCreationImageRoutes(router);

@@ -105,11 +105,11 @@ test("Studio stays strict-CSP safe and gives every native form control metadata"
   await page.getByRole("tab", { name: "AI", exact: true }).click();
   await page.getByText("Advanced AI settings", { exact: true }).click();
   const requestSketch = page.getByRole("checkbox", {
-    name: "Generate applyable sketch JSON",
+    name: "Request experimental grid sketch JSON",
   });
   await expect(requestSketch).toBeChecked();
   await page
-    .getByText("Generate applyable sketch JSON", { exact: true })
+    .getByText("Request experimental grid sketch JSON", { exact: true })
     .click();
   await expect(requestSketch).not.toBeChecked();
   await expect(

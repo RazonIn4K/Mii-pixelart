@@ -200,6 +200,9 @@ describe("Worker security primitives", () => {
     expect(isCommunityMutationBlocked("POST", "/api/reports", undefined)).toBe(
       true,
     );
+    expect(
+      isCommunityMutationBlocked("POST", "/api/ai/images", undefined),
+    ).toBe(true);
     expect(isCommunityMutationBlocked("PATCH", "/api/me", undefined)).toBe(
       true,
     );

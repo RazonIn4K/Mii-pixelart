@@ -35,6 +35,7 @@ const HTTP_METHODS = new Set([
 ]);
 const ROUTE_SOURCE_FILES = [
   "worker/auth.ts",
+  "worker/ai-images.ts",
   "worker/accounts.ts",
   "worker/creations.ts",
   "worker/creation-images.ts",

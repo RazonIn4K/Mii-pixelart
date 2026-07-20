@@ -34,7 +34,7 @@ import {
 export interface GridDocumentState {
   doc: GridDocument | null;
   imagePreview: GridDocument | null;
-  history: GridDocument[];
+  history: (GridDocument | null)[];
   historyIndex: number;
   isLoading: boolean;
   error: string | null;
@@ -43,8 +43,15 @@ export interface GridDocumentState {
 function appendHistory(
   prev: GridDocumentState,
   doc: GridDocument,
+  preserveEmptyUndo = false,
 ): GridDocumentState {
   const newHistory = prev.history.slice(0, prev.historyIndex + 1);
+  // Preserve the true empty state as the first undo frame. This keeps an
+  // imported or AI-generated image browser-local during preview and still
+  // makes its first explicit commit one-step undoable.
+  if (preserveEmptyUndo && newHistory.length === 0 && prev.doc === null) {
+    newHistory.push(null);
+  }
   newHistory.push(doc);
   if (newHistory.length > 50) newHistory.shift();
   return {
@@ -90,10 +97,13 @@ export function useGridDocument() {
     return true;
   }, []);
 
-  const pushHistory = useCallback((doc: GridDocument) => {
-    previewRequestRef.current += 1;
-    setState((prev) => appendHistory(prev, doc));
-  }, []);
+  const pushHistory = useCallback(
+    (doc: GridDocument, preserveEmptyUndo = false) => {
+      previewRequestRef.current += 1;
+      setState((prev) => appendHistory(prev, doc, preserveEmptyUndo));
+    },
+    [],
+  );
 
   const setDoc = useCallback(
     (doc: GridDocument) => {
@@ -191,7 +201,7 @@ export function useGridDocument() {
 
   const commitImagePreview = useCallback(() => {
     if (!state.imagePreview) return;
-    pushHistory(state.imagePreview);
+    pushHistory(state.imagePreview, true);
   }, [pushHistory, state.imagePreview]);
 
   const clearImagePreview = useCallback(() => {

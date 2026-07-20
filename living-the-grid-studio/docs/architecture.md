@@ -1,8 +1,8 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.4
+**Version:** 2.5
 
-**Last Updated:** 2026-07-16
+**Last Updated:** 2026-07-19
 
 > **Deployment status (2026-07-14):** The target architecture on this branch is
 > one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
@@ -97,14 +97,16 @@ graph TB
         Engine["Engine Modules<br/>(pure TypeScript)"]
         Canvas["HTML5 Canvas API"]
         FileAPI["File API / Blob / URL"]
-        LS["localStorage<br/>(AI sessions)"]
+        LS["localStorage<br/>(written AI sessions only)"]
         IDB["IndexedDB<br/>(draft resume + sync metadata)"]
+        Generated["Transient generated raster<br/>(review state only)"]
 
         SPA -->|"calls"| Engine
         Engine -->|"renders to"| Canvas
         Engine -->|"reads/writes"| FileAPI
         SPA -->|"persists"| LS
         SPA -->|"persists"| IDB
+        SPA -->|"reviews locally"| Generated
     end
 
     subgraph Edge["Target branch: Cloudflare Worker"]
@@ -116,11 +118,14 @@ graph TB
     end
 
     subgraph External["External Services"]
-        OR["OpenRouter API<br/>(AI models)"]
+        ORChat["OpenRouter Chat API<br/>(written advice + grid experiment)"]
+        ORImages["OpenRouter Images API<br/>(bounded generated raster)"]
     end
 
     Browser -->|"assets, APIs, public documents"| Worker
-    Worker -->|"OPENROUTER_API_KEY"| OR
+    Worker -->|"OPENROUTER_API_KEY"| ORChat
+    Worker -->|"allowlisted model + bounded prompt"| ORImages
+    ORImages -->|"verified PNG/JPEG/WebP bytes"| Generated
 
     style Browser fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -359,6 +364,33 @@ flowchart TD
     M -->|"no"| O
 ```
 
+Generated artwork uses this same local review pipeline. The dedicated Worker
+adapter accepts only the reviewed image-model allowlist and verifies one bounded
+PNG, JPEG, or WebP response before returning bytes to the browser. Those bytes
+become a temporary local import source; they are not applied, saved, uploaded,
+or published until the user explicitly commits the normal import preview. See
+the [AI image-generation prototype gate](ai-image-generation-gate.md).
+
+### AI-generated image review pipeline
+
+```mermaid
+flowchart LR
+    Prompt["Original-art prompt"] --> Guard["Authenticated Worker guard<br/>Origin + JSON + edge limit"]
+    Guard --> Ledger["D1 idempotency + daily reservation<br/>hash and cost metadata only"]
+    Ledger --> ImagesAPI["OpenRouter Images API<br/>exact two-model allowlist"]
+    ImagesAPI --> Verify["Bounded response<br/>base64 + MIME signature + usage cost"]
+    Verify --> Blob["Transient browser Blob/File"]
+    Blob --> Import["Existing 256x256 import review<br/>alpha-aware palette conversion"]
+    Import --> Decision{"User decision"}
+    Decision -->|"Commit"| Grid["One undoable GridDocument revision"]
+    Decision -->|"Cancel or failure"| Unchanged["Active document unchanged"]
+```
+
+The prompt text and generated image are not retained in D1 or R2. The ledger
+stores only the user-scoped idempotency record, model, timestamps, reserved and
+actual cost, failure code, and prompt SHA-256. Automatic model fallback is
+forbidden because every generation can be billable.
+
 ---
 
 ## Optimization Pipeline
@@ -485,7 +517,7 @@ compatibility.
 ```mermaid
 graph LR
     subgraph Runtime["worker/index.ts + router.ts"]
-        Legacy["Legacy compatibility<br/>/api/ai/* + retired-payment 410 tombstones"]
+        Legacy["AI compatibility<br/>written chat + local/unreleased<br/>GET /api/ai/images/status<br/>POST /api/ai/images<br/>+ retired-payment 410 tombstones"]
         Auth["Auth + account<br/>/api/auth/* + /api/me/*"]
         Creations["Projects + publishing<br/>/api/creations/*"]
         Discovery["Public discovery<br/>search + tags + profiles"]
@@ -501,6 +533,7 @@ graph LR
     end
 
     Legacy --> Cache
+    Legacy --> DB
     Auth & Creations & Discovery & Social & Moderation --> DB
     Creations & Discovery --> Objects
     Creations --> Images
@@ -610,4 +643,9 @@ Row themes:
 - **WASM:** If Delta E calculations become a bottleneck at 256×256, a Rust/WASM module could accelerate the inner loop.
 - **Crop refinement:** Add finer pan-and-zoom controls inside the implemented draggable crop rectangle if user testing warrants them.
 - **Optimizer explanation:** Add per-pass previews, change summaries, and a repaintability score without changing deterministic output.
-- **AI history:** Keep chat browser-local unless a later privacy review approves explicit opt-in cloud sync.
+- **AI history:** Keep written chat browser-local unless a later privacy review
+  approves explicit opt-in cloud sync. Generated prompts and raster responses
+  are transient and must not enter chat history.
+- **AI image release:** The dedicated image path remains an undeployed local
+  prototype until the acceptance and exact-head staging gates in
+  [AI image-generation prototype gate](ai-image-generation-gate.md) pass.

@@ -39,6 +39,7 @@
     "verify:studio": "tsx scripts/verify-studio-browser.ts",
     "cloudflare:security-insights": "tsx scripts/cloudflare-security-insights.ts",
     "save:templates": "tsx scripts/save-creative-template-fixtures.ts",
+    "benchmark:ai-images": "tsx scripts/benchmark-openrouter-images.ts",
     "compare:models": "tsx scripts/compare-openrouter-models.ts",
     "format": "prettier --write ."
   },

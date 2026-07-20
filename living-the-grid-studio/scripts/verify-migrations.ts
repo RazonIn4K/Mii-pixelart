@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATION_PATTERN = /^(\d{4})_[a-z0-9_]+[.]sql$/u;
 const REQUIRED_TABLES = [
+  "ai_image_requests",
   "comments",
   "creation_objects",
   "creation_revisions",
@@ -31,6 +32,9 @@ const REQUIRED_TABLES = [
   "users",
 ] as const;
 const REQUIRED_INDEXES = [
+  "ai_image_requests_global_budget_idx",
+  "ai_image_requests_stale_pending_idx",
+  "ai_image_requests_user_daily_idx",
   "profile_image_objects_cleanup_idx",
   "profile_image_objects_user_idx",
   "profile_image_report_evidence_image_idx",
@@ -141,7 +145,7 @@ try {
   }
 
   console.log(
-    `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables and ${REQUIRED_INDEXES.length} required profile-image indexes.`,
+    `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables and ${REQUIRED_INDEXES.length} required indexes.`,
   );
 } finally {
   database.close();

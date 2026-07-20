@@ -1,6 +1,6 @@
 # Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-07-16
+**Last Updated:** 2026-07-19
 
 ---
 
@@ -14,7 +14,7 @@
 | 3     | One-Click Optimizer        | ✅ Complete             | Deterministic color merging, island removal, cleanup passes, and palette limiting                            |
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
-| 6     | AI Suggestions             | Implemented; optional   | Account-gated OpenRouter advice/sketch review; merge and contrast suggestions remain optional refinements     |
+| 6     | AI Suggestions             | Chat implemented; image prototype gated | Account-gated advice/sketch review remains; a dedicated generated-artwork import path is local-only and not deployed |
 | 7     | Island Workshop Community  | Writable single-account staging; final release gates open | Staging runs exact runtime `80fdcd5`; branch checkpoint `b34f821` is runtime-equivalent, but exact-head P1 evidence and P2-P5 hosted acceptance remain incomplete |
 
 ---
@@ -145,7 +145,7 @@
 
 **Goal:** Optional AI-powered suggestions that the user explicitly accepts or rejects.
 
-**Completed:**
+**Existing chat path:**
 
 - [x] Server-side OpenRouter proxy routes (`/api/ai/status`, `/api/ai/models`, `/api/ai/chat`) so API keys stay out of the browser bundle
 - [x] Account-gated AI tab with four curated free presets, per-user bounded local history, sketch/advice modes, explicit current-grid consent, and model-capability/output-budget gates
@@ -156,11 +156,40 @@
 - [x] Per-account session persistence in browser `localStorage`; no database is required for single-device private chat history
 - [x] OpenRouter model-comparison script (`pnpm compare:models`) that saves ranked-model outputs to `reports/` when `OPENROUTER_API_KEY` is configured
 
+**Why the image path is separate:**
+
+- [x] Live staging diagnosis reproduced the failure: a free chat model returned
+      prose plus malformed 16-by-16 sketch JSON, which validation rejected.
+- [x] Confirmed that `openrouter/free` is a text-output router, not an image
+      generator.
+- [x] Complete the local dedicated Images API candidate with exact allowlist
+      default `google/gemini-3.1-flash-lite-image` and explicit fallback
+      `google/gemini-3.1-flash-image`, exposed only through the unreleased
+      `GET /api/ai/images/status` and `POST /api/ai/images` Worker routes.
+- [x] Prove bounded provider bytes feed the existing alpha-aware canonical
+      256-by-256 import review without mutating, saving, uploading, or publishing
+      before explicit commit.
+- [x] Prove authentication, same-Origin JSON, edge throttling, D1 idempotency,
+      per-user daily reservation, environment budget, timeout, MIME/signature,
+      and stale-reservation behavior.
+- [x] Run the original-art two-model benchmark with a hard aggregate spend cap
+      of $2.00 and no committed or uploaded benchmark images.
+- [x] Pass local Worker, browser, accessibility, CSP/console, privacy/log,
+      build, and migration verification.
+- [ ] Request a separate immutable exact-head staging deployment and acceptance
+      gate. Production remains disabled and requires a later independent gate.
+
+See
+[AI image-generation prototype gate](ai-image-generation-gate.md) for the
+complete contract and acceptance matrix.
+
 **Principles:**
 
 - AI is a **suggestion layer only** — never a hidden automatic editor.
 - Every AI suggestion is presented as a preview that the user can accept, modify, or dismiss.
 - The user always has the final say.
+- Generated artwork is also an import source, not a special save or publish
+  path; provider bytes are discarded when review ends.
 
 **Potential features:**
 

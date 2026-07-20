@@ -18,6 +18,10 @@ import { DEFAULT_CONFIG, passLimitPalette } from "./optimizer";
 export type ImageFrameMode = "cover" | "contain" | "stretch";
 export type BackgroundMode = "keep" | "flatten";
 export type ImageSamplingMode = "smooth" | "crisp";
+export interface RGBA extends RGB {
+  a: number;
+}
+export type ImportPixel = RGB | null;
 
 export interface ImagePlacement {
   sourceX: number;
@@ -78,8 +82,15 @@ export interface ImageImportOptions {
   backgroundMode: BackgroundMode;
   /** RGB distance tolerance for background cleanup */
   backgroundTolerance: number;
-  /** Background color for contain mode */
+  /** Replacement color used by edge-connected background cleanup */
   backgroundColor: string;
+  /**
+   * Alpha values at or below this byte threshold become transparent cells.
+   * The default removes nearly invisible edge noise while preserving antialiasing.
+   */
+  alphaThreshold: number;
+  /** Matte used to composite visible, partially transparent pixels */
+  matteColor: string;
   /** Sampling mode used when resizing the source into the grid */
   samplingMode: ImageSamplingMode;
 }
@@ -101,6 +112,8 @@ export const DEFAULT_IMPORT_OPTIONS: ImageImportOptions = {
   backgroundMode: "keep",
   backgroundTolerance: 34,
   backgroundColor: "#FFFFFF",
+  alphaThreshold: 16,
+  matteColor: "#FFFFFF",
   samplingMode: "smooth",
 };
 
@@ -130,14 +143,14 @@ export function loadImage(file: File): Promise<HTMLImageElement> {
 
 /**
  * Sample pixel data from an image at the given grid resolution.
- * Returns a 2D array of RGB values.
+ * Returns the source RGBA values without flattening transparency.
  */
 export function sampleImage(
   img: HTMLImageElement,
   gridWidth: number,
   gridHeight: number,
   options: Partial<ImageImportOptions> = {},
-): RGB[][] {
+): RGBA[][] {
   const opts = { ...DEFAULT_IMPORT_OPTIONS, ...options };
   const canvas = document.createElement("canvas");
   canvas.width = gridWidth;
@@ -158,8 +171,9 @@ export function sampleImage(
     },
   );
 
-  ctx.fillStyle = opts.backgroundColor;
-  ctx.fillRect(0, 0, gridWidth, gridHeight);
+  // A new canvas is transparent. Keep it that way so contain-mode letterboxing
+  // and transparent source pixels become empty grid cells instead of white ink.
+  ctx.clearRect(0, 0, gridWidth, gridHeight);
   ctx.imageSmoothingEnabled = opts.samplingMode === "smooth";
   ctx.imageSmoothingQuality = "high";
   ctx.filter = buildImageFilter(opts);
@@ -177,30 +191,86 @@ export function sampleImage(
   ctx.filter = "none";
 
   const imageData = ctx.getImageData(0, 0, gridWidth, gridHeight);
-  const pixels: RGB[][] = [];
+  const pixels: RGBA[][] = [];
 
   for (let y = 0; y < gridHeight; y++) {
-    const row: RGB[] = [];
+    const row: RGBA[] = [];
     for (let x = 0; x < gridWidth; x++) {
       const i = (y * gridWidth + x) * 4;
       row.push({
         r: imageData.data[i],
         g: imageData.data[i + 1],
         b: imageData.data[i + 2],
+        a: imageData.data[i + 3],
       });
     }
     pixels.push(row);
   }
 
+  return pixels;
+}
+
+/**
+ * Convert one sampled RGBA pixel to an import pixel. Fully/nearly transparent
+ * pixels become empty cells; visible partial alpha is composited against a
+ * deterministic matte before palette matching.
+ */
+export function compositeRgbaPixel(
+  pixel: RGBA,
+  matte: RGB,
+  alphaThreshold = DEFAULT_IMPORT_OPTIONS.alphaThreshold,
+): ImportPixel {
+  const alpha = clampByte(pixel.a);
+  const threshold = clampByte(alphaThreshold);
+  if (alpha <= threshold) return null;
+
+  if (alpha === 255) {
+    return {
+      r: clampByte(pixel.r),
+      g: clampByte(pixel.g),
+      b: clampByte(pixel.b),
+    };
+  }
+
+  const inverseAlpha = 255 - alpha;
+  return {
+    r: Math.round(
+      (clampByte(pixel.r) * alpha + clampByte(matte.r) * inverseAlpha) / 255,
+    ),
+    g: Math.round(
+      (clampByte(pixel.g) * alpha + clampByte(matte.g) * inverseAlpha) / 255,
+    ),
+    b: Math.round(
+      (clampByte(pixel.b) * alpha + clampByte(matte.b) * inverseAlpha) / 255,
+    ),
+  };
+}
+
+/** Prepare sampled RGBA values for deterministic palette matching. */
+export function prepareImportPixels(
+  pixels: RGBA[][],
+  options: Partial<ImageImportOptions> = {},
+): ImportPixel[][] {
+  const opts = { ...DEFAULT_IMPORT_OPTIONS, ...options };
+  const matte = hexToRgb(opts.matteColor);
+  const prepared = pixels.map((row) =>
+    row.map((pixel) => compositeRgbaPixel(pixel, matte, opts.alphaThreshold)),
+  );
+
   if (opts.backgroundMode === "flatten") {
     return flattenBackgroundPixels(
-      pixels,
+      prepared,
       hexToRgb(opts.backgroundColor),
       opts.backgroundTolerance,
     );
   }
 
-  return pixels;
+  return prepared;
+}
+
+function clampByte(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(255, Math.max(0, Math.round(value)));
 }
 
 /** Compute source crop and destination rectangle for fitting an image into a grid. */
@@ -336,12 +406,20 @@ function buildImageFilter(options: ImageImportOptions): string {
   ].join(" ");
 }
 
-/** Estimate the dominant background color from the outer edge of sampled pixels. */
+/** Estimate the dominant visible background color from the outer edge. */
 export function estimateEdgeBackgroundColor(pixels: RGB[][]): RGB {
+  const background = findEdgeBackgroundColor(pixels);
+  if (!background) {
+    throw new Error("Cannot estimate background color from an empty image");
+  }
+  return background;
+}
+
+function findEdgeBackgroundColor(pixels: ImportPixel[][]): RGB | null {
   const height = pixels.length;
   const width = pixels[0]?.length ?? 0;
   if (width === 0 || height === 0) {
-    throw new Error("Cannot estimate background color from an empty image");
+    return null;
   }
 
   const buckets = new Map<
@@ -349,7 +427,8 @@ export function estimateEdgeBackgroundColor(pixels: RGB[][]): RGB {
     { count: number; totalR: number; totalG: number; totalB: number }
   >();
   const bucketSize = 16;
-  const addPixel = (pixel: RGB) => {
+  const addPixel = (pixel: ImportPixel) => {
+    if (pixel === null) return;
     const key = [
       Math.floor(pixel.r / bucketSize),
       Math.floor(pixel.g / bucketSize),
@@ -379,7 +458,7 @@ export function estimateEdgeBackgroundColor(pixels: RGB[][]): RGB {
 
   const bucketValues = Array.from(buckets.values());
   if (bucketValues.length === 0) {
-    throw new Error("Cannot estimate background color from an empty image");
+    return null;
   }
   const best = bucketValues.reduce((winner, bucket) =>
     bucket.count > winner.count ? bucket : winner,
@@ -397,14 +476,27 @@ export function flattenBackgroundPixels(
   pixels: RGB[][],
   replacement: RGB,
   tolerance: number,
-): RGB[][] {
+): RGB[][];
+export function flattenBackgroundPixels(
+  pixels: ImportPixel[][],
+  replacement: RGB,
+  tolerance: number,
+): ImportPixel[][];
+export function flattenBackgroundPixels(
+  pixels: ImportPixel[][],
+  replacement: RGB,
+  tolerance: number,
+): ImportPixel[][] {
   const height = pixels.length;
   const width = pixels[0]?.length ?? 0;
   if (width === 0 || height === 0) return pixels;
 
-  const background = estimateEdgeBackgroundColor(pixels);
+  const background = findEdgeBackgroundColor(pixels);
+  if (!background) return pixels.map((row) => [...row]);
   const limit = Math.max(0, tolerance);
-  const out = pixels.map((row) => row.map((pixel) => ({ ...pixel })));
+  const out = pixels.map((row) =>
+    row.map((pixel) => (pixel === null ? null : { ...pixel })),
+  );
   const visited = new Uint8Array(width * height);
   const queue: number[] = [];
 
@@ -414,7 +506,8 @@ export function flattenBackgroundPixels(
     const index = indexOf(x, y);
     if (visited[index]) return;
     visited[index] = 1;
-    if (rgbDistance(pixels[y][x], background) <= limit) {
+    const pixel = pixels[y][x];
+    if (pixel !== null && rgbDistance(pixel, background) <= limit) {
       queue.push(index);
     }
   };
@@ -446,6 +539,26 @@ function rgbDistance(a: RGB, b: RGB): number {
   return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
 }
 
+/** Map a complete rectangular import surface to palette IDs and empty cells. */
+export function importPixelsToPaletteCells(
+  pixels: ImportPixel[][],
+  width: number,
+  height: number,
+): (string | null)[] {
+  if (pixels.length !== height || pixels.some((row) => row.length !== width)) {
+    throw new Error("Import pixels must exactly match the target dimensions");
+  }
+
+  const cells: (string | null)[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const rgb = pixels[y][x];
+      cells.push(rgb === null ? null : findClosestPaletteColor(rgb).color.id);
+    }
+  }
+  return cells;
+}
+
 /**
  * Convert an image file to a GridDocument.
  */
@@ -457,7 +570,8 @@ export async function imageToGridDocument(
   const img = await loadImage(file);
 
   // Sample the image at grid resolution
-  const pixels = sampleImage(img, opts.gridWidth, opts.gridHeight, opts);
+  const sampledPixels = sampleImage(img, opts.gridWidth, opts.gridHeight, opts);
+  const pixels = prepareImportPixels(sampledPixels, opts);
 
   // Create the grid document
   const doc = createGridDocument(
@@ -485,21 +599,18 @@ export async function imageToGridDocument(
       backgroundMode: opts.backgroundMode,
       backgroundTolerance: opts.backgroundTolerance,
       backgroundColor: opts.backgroundColor,
+      alphaThreshold: opts.alphaThreshold,
+      matteColor: opts.matteColor,
       samplingMode: opts.samplingMode,
     },
   };
 
   // Map each pixel to the closest palette color
-  const cells: (string | null)[] = [];
-  for (let y = 0; y < opts.gridHeight; y++) {
-    for (let x = 0; x < opts.gridWidth; x++) {
-      const rgb = pixels[y][x];
-      const match = findClosestPaletteColor(rgb);
-      cells.push(match.color.id);
-    }
-  }
-
-  doc.cells = cells;
+  doc.cells = importPixelsToPaletteCells(
+    pixels,
+    opts.gridWidth,
+    opts.gridHeight,
+  );
 
   // Clean up
   URL.revokeObjectURL(img.src);
@@ -530,7 +641,8 @@ export async function getImagePreview(
   canvas.width = gridWidth * scale;
   canvas.height = gridHeight * scale;
   const ctx = canvas.getContext("2d")!;
-  const pixels = sampleImage(img, gridWidth, gridHeight, options);
+  const sampledPixels = sampleImage(img, gridWidth, gridHeight, options);
+  const pixels = prepareImportPixels(sampledPixels, options);
   const preview = document.createElement("canvas");
   preview.width = gridWidth;
   preview.height = gridHeight;
@@ -541,6 +653,13 @@ export async function getImagePreview(
     for (let x = 0; x < gridWidth; x++) {
       const i = (y * gridWidth + x) * 4;
       const rgb = pixels[y][x];
+      if (rgb === null) {
+        imageData.data[i] = 0;
+        imageData.data[i + 1] = 0;
+        imageData.data[i + 2] = 0;
+        imageData.data[i + 3] = 0;
+        continue;
+      }
       imageData.data[i] = rgb.r;
       imageData.data[i + 1] = rgb.g;
       imageData.data[i + 2] = rgb.b;

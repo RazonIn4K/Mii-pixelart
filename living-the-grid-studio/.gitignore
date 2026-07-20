@@ -62,6 +62,7 @@ coverage/
 *.lcov
 test-results/
 playwright-report/
+reports/
 
 # Temp / cache
 .cache/
@@ -97,6 +98,7 @@ docs/*
 !docs/community-data-flow.md
 !docs/community-deployment-runbook.md
 !docs/community-threat-model.md
+!docs/ai-image-generation-gate.md
 !docs/hosted-read-only-acceptance.md
 !docs/studio-game-reference-roadmap.md
 !docs/visual-assets.md

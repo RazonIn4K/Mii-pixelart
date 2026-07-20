@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Tomodachi Studio Community API
-  version: 1.1.1
+  version: 1.2.0
   license:
     name: MIT
     identifier: MIT
@@ -10,16 +10,18 @@ info:
     Studio does not call these routes unless the user explicitly signs in and
     saves. All JSON successes use `{data, meta?, requestId}` and all JSON errors
     use `{error:{code,message,fields?}, requestId}`. Account export and binary
-    project/media downloads are the documented streaming exceptions. Legacy
-    `/api/ai/*` routes remain outside this community contract and retain their
-    preexisting response shapes rather than the community JSON envelope. The
-    historic `/api/stripe/*` and `/api/webhooks/stripe` paths are provider-free
-    retirement tombstones that always return HTTP 410; they contain no catalog,
-    checkout, session verification, webhook processing, secrets, or external
-    provider call. Unsafe community mutations can return the shared `503
-    ServiceUnavailable` response while the fail-closed incident switch is
-    disabled; documented authentication, deletion, AI, and retired-route
-    controls are exempt.
+    project/media downloads and successful AI image generation are the
+    documented streaming exceptions. The unreleased `/api/ai/images` prototype
+    is included here; legacy AI chat/catalog routes remain outside this
+    community contract and retain their preexisting response shapes rather than
+    the community JSON envelope. The historic `/api/stripe/*` and
+    `/api/webhooks/stripe` paths are provider-free retirement tombstones that
+    always return HTTP 410; they contain no catalog, checkout, session
+    verification, webhook processing, secrets, or external provider call.
+    Unsafe community mutations can return the shared `503 ServiceUnavailable`
+    response while the fail-closed incident switch is disabled. Authentication,
+    deletion, legacy AI chat, and retired-route controls are exempt; paid AI
+    image generation is not.
 servers:
   - url: https://tomodachi.pw
     description: Production (not authorized for deployment by this contract)
@@ -32,6 +34,8 @@ tags:
     description: Google OIDC and application sessions.
   - name: Account
     description: Onboarding, private settings, export, and deletion.
+  - name: AI Images
+    description: Unreleased, cost-bounded artwork generation for explicit Studio import review.
   - name: Creations
     description: Explicit cloud saves, revisions, publication, and media.
   - name: Discovery
@@ -160,6 +164,88 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SessionRevocationEnvelope" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/ai/images/status:
+    get:
+      operationId: getAiImageGenerationStatus
+      tags: [AI Images]
+      summary: Read the current AI image-generation policy
+      description: Reports configuration and policy state for this deployment without authenticating or contacting an image provider. This route documents an unreleased capability and does not imply that it is enabled on staging or production.
+      security: []
+      responses:
+        "200":
+          description: Current fail-closed feature state, model allowlist, and request limits
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiImageStatusEnvelope" }
+
+  /api/ai/images:
+    post:
+      operationId: generateAiImage
+      tags: [AI Images]
+      summary: Generate one bounded image for explicit Studio import review
+      description: |
+        Requires an active onboarded account, an exact allowed Origin, and JSON.
+        The request is reserved against the per-user and shared UTC-day budgets
+        before the provider is contacted. A UUIDv4 idempotency key can be
+        accepted only once for a user; completed bytes are not retained for
+        replay. The prompt is normalized before use and only its SHA-256 digest
+        is retained in the usage ledger. A successful response streams one
+        provider-verified image of at most 6,000,000 bytes. Generation never
+        applies, saves, uploads, or publishes the result; the client must route
+        it through the existing 256 by 256 import review.
+      security:
+        - cookieAuth: []
+      x-rate-limit: Privacy-preserving client and user edge buckets, plus an authoritative per-user UTC-day limit reported by the status route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiImageGenerationInput" }
+      responses:
+        "200":
+          description: One generated image; model, actual cost, and ledger request ID are carried in headers because this success is not a JSON envelope
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+            Content-Length:
+              schema: { type: integer, minimum: 1, maximum: 6000000 }
+            X-AI-Image-Cost-Micro-USD:
+              description: Actual provider cost rounded up to integer micro-US dollars; never above the per-image reservation.
+              schema: { type: integer, minimum: 0, maximum: 150000 }
+            X-AI-Image-Model:
+              schema: { $ref: "#/components/schemas/AiImageModelId" }
+            X-AI-Image-Request-Id:
+              description: Internal UUIDv4 for the committed usage-ledger row; distinct from the HTTP correlation ID.
+              schema:
+                {
+                  type: string,
+                  format: uuid,
+                  pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+                }
+          content:
+            image/png:
+              schema:
+                { type: string, contentEncoding: binary, maxLength: 6000000 }
+            image/jpeg:
+              schema:
+                { type: string, contentEncoding: binary, maxLength: 6000000 }
+            image/webp:
+              schema:
+                { type: string, contentEncoding: binary, maxLength: 6000000 }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "408":
+          description: The client aborted the request before a usable image was returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "415": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /api/me/setup:
     post:
@@ -1644,6 +1730,67 @@ components:
             fields:
               type: object
               additionalProperties: { type: string, maxLength: 500 }
+        requestId: { $ref: "#/components/schemas/RequestId" }
+    AiImageModelId:
+      type: string
+      enum: [google/gemini-3.1-flash-lite-image, google/gemini-3.1-flash-image]
+    AiImageModelPreset:
+      type: object
+      additionalProperties: false
+      required: [id, label, note]
+      properties:
+        id: { $ref: "#/components/schemas/AiImageModelId" }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        note: { type: string, minLength: 1, maxLength: 200 }
+    AiImageGenerationInput:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, prompt]
+      properties:
+        idempotencyKey:
+          {
+            type: string,
+            format: uuid,
+            pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          }
+        model:
+          allOf:
+            - { $ref: "#/components/schemas/AiImageModelId" }
+          default: google/gemini-3.1-flash-lite-image
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Normalized with NFKC, CRLF converted to LF, and surrounding whitespace removed before provider use; encoded UTF-8 is limited to 8,000 bytes.
+    AiImageStatusEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            [configured, enabled, maxPerImageCostUsd, models, userDailyLimit]
+          properties:
+            configured:
+              type: boolean
+              description: Whether the provider credential is structurally configured; does not override the feature switch or budgets.
+            enabled:
+              type: boolean
+              description: True only when the feature switch, shared budget, and per-user daily limit are all usable.
+            maxPerImageCostUsd:
+              type: number
+              const: 0.15
+            models:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items: { $ref: "#/components/schemas/AiImageModelPreset" }
+            userDailyLimit:
+              type: integer
+              minimum: 0
+              maximum: 100
         requestId: { $ref: "#/components/schemas/RequestId" }
     PageMeta:
       type: object

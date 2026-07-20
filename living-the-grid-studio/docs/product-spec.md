@@ -1,7 +1,7 @@
 # Product Specification — Tomodachi Studio
 
-**Version:** 1.1
-**Last Updated:** 2026-07-16
+**Version:** 1.2
+**Last Updated:** 2026-07-19
 
 ---
 
@@ -38,7 +38,10 @@ The studio follows a linear pipeline that the user controls at every step:
 3. **Adjust framing and source type** with Fill/Fit/Stretch, focus controls, and Photo vs Pixel/Logo sampling so the face, logo, or subject lands where the repaint needs it.
 4. **Preview** the palette-limited grid before replacing the active project.
 5. **Commit or cancel** the image preview.
-6. **Create or touch up** by painting cells, erasing, picking colors, filling connected regions, using an accepted AI sketch, or resampling the canvas to a higher pixel count.
+6. **Create or touch up** by painting cells, erasing, picking colors, filling
+   connected regions, using an accepted structured AI sketch, reviewing a
+   locally converted generated-artwork import, or resampling the canvas to a
+   higher pixel count.
 7. **Edit** the palette: view usage counts, lock colors, manually merge similar colors.
 8. **Optimize** with deterministic passes: color merging, island removal, single-cell cleanup, palette limiting.
 9. **Export** a repaint reference pack: labeled and clean PNG guides, palette
@@ -58,6 +61,7 @@ The studio follows a linear pipeline that the user controls at every step:
 | Import preview     | Review generated image grids before committing them to history                                                                                                                                                                              | P0       |
 | Creation tools     | 28 original starter templates, saved JSON fixtures, blank starters, canvas detail resampling, inspect, pencil, eraser, eyedropper, and fill bucket tools                                                                                    | P0       |
 | AI sketch chat     | Account-gated OpenRouter tab with four curated free presets, per-user bounded sessions, model-comparison script, explicit visual-grid consent, capability/output-budget gates, and validated palette-ID sketch review before one-step apply | P1       |
+| AI artwork import  | Gated paid image generation through an exact two-model allowlist, verified raster bytes, and the normal local 256×256 import review; never auto-applies, saves, uploads, or publishes | P1 prototype |
 | JSON import/export | Load and save GridDocument format                                                                                                                                                                                                           | P0       |
 | Canvas viewer      | Render grid with zoom, pan, grid lines, labels                                                                                                                                                                                              | P0       |
 | Palette panel      | Show used colors, usage counts, lock/unlock                                                                                                                                                                                                 | P0       |
@@ -76,6 +80,7 @@ The studio follows a linear pipeline that the user controls at every step:
 | Crop and region selection          | Draggable crop rectangle, framing shortcuts, and subject-focus controls                                 | Implemented; refinements open  |
 | Brightness/contrast adjustment     | Non-destructive pre-processing before palette mapping                                                   | Implemented                    |
 | OpenRouter AI chat/sketch          | Model presets, optional visual grid context, reviewed validated sketches, and one-step undoable apply   | Implemented                    |
+| OpenRouter generated artwork       | Dedicated Images API, bounded cost ledger, and verified raster-to-import review                         | Local prototype; release gated |
 | AI color suggestions               | Suggest optimal merges and contrast changes without applying them automatically                         | Optional refinement            |
 | Collaborative sharing              | Private cloud projects, reviewed publish flow, public/unlisted links, discovery, and social interactions | Implemented; writable gated    |
 
@@ -87,7 +92,15 @@ The studio intentionally does **not** attempt to:
 - Replace the in-game painting experience (that is the charm).
 - Bundle official game, brand, or character artwork.
 - Apply AI edits automatically without user consent.
+- Retain AI prompts or provider-generated raster images, or silently substitute
+  a generated image for the active project.
 - Require server-side processing for the core image import, editing, optimization, or export workflow.
+
+The generated-artwork prototype is not deployed. Its exact security, privacy,
+cost, rollback, benchmark, and release requirements are recorded in
+[AI image-generation prototype gate](ai-image-generation-gate.md). The local
+Worker candidate exposes `GET /api/ai/images/status` and authenticated
+`POST /api/ai/images`; both remain unreleased.
 
 ## Success Metrics
 

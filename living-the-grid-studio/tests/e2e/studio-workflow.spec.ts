@@ -52,6 +52,33 @@ async function mockAiAccount(
       status: 200,
     }),
   );
+  await page.route("**/api/ai/images/status", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        data: {
+          configured: true,
+          enabled: true,
+          maxPerImageCostUsd: 0.15,
+          models: [
+            {
+              id: "google/gemini-3.1-flash-lite-image",
+              label: "Gemini Flash Lite Image",
+              note: "Fast, cost-conscious square artwork generation.",
+            },
+            {
+              id: "google/gemini-3.1-flash-image",
+              label: "Gemini Flash Image",
+              note: "Explicit higher-detail fallback; never selected automatically.",
+            },
+          ],
+          userDailyLimit: 3,
+        },
+        requestId: `${userId}-image-status`,
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
 }
 
 const UNAVAILABLE_AI_PRESET = {
@@ -512,7 +539,7 @@ test("AI applies one validated document revision that Undo removes in one step",
   await page
     .getByPlaceholder(/Ask for a 32x32 horror icon/)
     .fill("Improve this canvas");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
   // First AI use requires explicit third-party processing consent; the
   // request must not fire until it is granted.
   await expect(
@@ -530,6 +557,187 @@ test("AI applies one validated document revision that Undo removes in one step",
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(
     page.getByText("256×256 · 0 colors", { exact: true }),
+  ).toBeVisible();
+});
+
+test("generated artwork stays local until review and commits as one undoable revision", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers the generated-image review and commit boundary.",
+  );
+
+  const userId = "ai-image-user";
+  const imageRequestId = "11111111-1111-4111-8111-111111111111";
+  let imageRequestCount = 0;
+  let imageRequestBody: Record<string, unknown> | null = null;
+
+  await page.addInitScript((id) => {
+    localStorage.setItem(`ltg.ai.consent.v1.${id}`, "v2:deny");
+  }, userId);
+  await mockAiAccount(page, userId);
+  await page.route("**/api/ai/images", (route) => {
+    imageRequestCount += 1;
+    imageRequestBody = route.request().postDataJSON() as Record<
+      string,
+      unknown
+    >;
+    return route.fulfill({
+      body: TINY_PNG,
+      contentType: "image/png",
+      headers: {
+        "cache-control": "no-store",
+        "x-ai-image-cost-micro-usd": "31000",
+        "x-ai-image-model": "google/gemini-3.1-flash-lite-image",
+        "x-ai-image-request-id": imageRequestId,
+      },
+      status: 200,
+    });
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await expect(
+    page.getByText("256×256 · 0 colors", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "AI" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Generate artwork, then convert it" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Generate one image" }).click();
+
+  await expect
+    .poll(() => imageRequestBody)
+    .toMatchObject({
+      model: "google/gemini-3.1-flash-lite-image",
+      prompt:
+        "Create an original friendly island robot badge with a bold silhouette, flat colors, and a plain high-contrast background.",
+    });
+  expect(imageRequestBody?.idempotencyKey).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+  await expect(
+    page.getByRole("img", {
+      name: "Generated original artwork waiting for 256 by 256 import review",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("This is still only a browser-local source preview.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("256×256 · 0 colors", { exact: true }),
+  ).toBeVisible();
+  expect(imageRequestCount).toBe(1);
+
+  await page.getByRole("button", { name: "Review 256×256 conversion" }).click();
+  await expect(page.getByRole("tab", { name: "Import" })).toHaveAttribute(
+    "data-state",
+    "active",
+  );
+  await expect(
+    page.getByText("generated-artwork-11111111.png", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Preview ready", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("256×256 · 1 color", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Commit Preview" }).click();
+  await expect(page.getByRole("tab", { name: "Create" })).toHaveAttribute(
+    "data-state",
+    "active",
+  );
+  await expect(
+    page.getByText("256×256 · 1 color", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(
+    page.getByText("256×256 · 0 colors", { exact: true }),
+  ).toBeVisible();
+  expect(imageRequestCount).toBe(1);
+});
+
+test("AI drawing starters leave Advice mode and disclose a non-drawable reply", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "One desktop run covers explicit starter mode selection and the no-sketch state.",
+  );
+  const userId = "ai-starter-mode-user";
+  await page.addInitScript((id) => {
+    localStorage.setItem(`ltg.ai.consent.v1.${id}`, "v2:deny");
+  }, userId);
+  await mockAiAccount(page, userId);
+
+  let requestBody: Record<string, unknown> | null = null;
+  await page.route("**/api/ai/chat", (route) => {
+    requestBody = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({
+      body: JSON.stringify({
+        configured: true,
+        model: "test/free",
+        reply:
+          "I can describe the robot, but this response does not contain structured cells.",
+        sketch: null,
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.goto("/studio");
+  const essentialCookies = page.getByRole("button", {
+    name: "Essential only",
+  });
+  if (await essentialCookies.isVisible()) await essentialCookies.click();
+  await page.getByRole("button", { name: "Start blank" }).click();
+  await page.getByRole("tab", { name: "AI" }).click();
+
+  await page.getByRole("button", { name: /Get advice only/ }).click();
+  await expect(
+    page.getByRole("button", { name: "Ask for advice" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: /Use drawing starter and switch to Experimental grid sketch: Draw a 16x16 friendly island robot/,
+    })
+    .click();
+
+  await expect(
+    page
+      .getByRole("group", { name: "What should AI do?" })
+      .getByRole("button", { name: /^Experimental grid sketch / }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Try experimental sketch" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
+
+  await expect
+    .poll(() => requestBody)
+    .toMatchObject({ requestSketch: true, preserveDimensions: false });
+  await expect(
+    page.getByText(
+      "The text model replied but did not return a usable structured grid. Nothing can be previewed or applied. Try a simpler prompt or continue with the manual drawing tools.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apply once" })).toHaveCount(0);
+  await expect(
+    page.getByText(
+      "I can describe the robot, but this response does not contain structured cells.",
+      { exact: true },
+    ),
   ).toBeVisible();
 });
 
@@ -631,7 +839,7 @@ test("AI refine mode explicitly attaches only the rendered grid", async ({
     page.getByRole("option", { name: /Gemma 4 31B/ }),
   ).toHaveAttribute("aria-disabled", "true");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try canvas refinement" }).click();
   await expect(
     page.getByText("I reviewed the rendered palette grid only.", {
       exact: true,
@@ -736,8 +944,11 @@ test("AI provider failure leaves manual painting available", async ({
   if (await essentialCookies.isVisible()) await essentialCookies.click();
   await page.getByRole("button", { name: "Start blank" }).click();
   await page.getByRole("tab", { name: "AI" }).click();
-  await page.getByRole("button", { name: "Create a sketch" }).click();
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page
+    .getByRole("group", { name: "What should AI do?" })
+    .getByRole("button", { name: /^Experimental grid sketch / })
+    .click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
   await expect(
     page.getByText("The AI provider is temporarily unavailable.", {
       exact: true,
@@ -779,7 +990,9 @@ test("AI disables sending when the live catalog has no available free model", as
   await page
     .getByRole("textbox", { name: "Your AI request" })
     .fill("Draw a small island badge.");
-  await expect(page.getByRole("button", { name: "Send to AI" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Try experimental sketch" }),
+  ).toBeDisabled();
 });
 
 test("canceling an AI request restores the prompt and ignores a late reply", async ({
@@ -821,7 +1034,7 @@ test("canceling an AI request restores the prompt and ignores a late reply", asy
   await page.getByRole("tab", { name: "AI" }).click();
   const prompt = page.getByRole("textbox", { name: "Your AI request" });
   await prompt.fill("Make a small lighthouse badge");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   await expect
     .poll(() =>
@@ -882,7 +1095,7 @@ test("AI consent is requested again when provider data policy changes", async ({
   await page
     .getByRole("textbox", { name: "Your AI request" })
     .fill("Suggest three cleaner colors");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
 
   await expect(
     page.getByRole("alertdialog", { name: "AI processing consent" }),
@@ -964,7 +1177,7 @@ test("AI history and consent stay isolated between signed-in users", async ({
   await page
     .getByPlaceholder(/Ask for a 32x32 horror icon/)
     .fill("Private prompt for account A");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
   await expect(
     page.getByText("Private reply for account A", { exact: true }),
   ).toBeVisible();
@@ -987,7 +1200,7 @@ test("AI history and consent stay isolated between signed-in users", async ({
   await page
     .getByPlaceholder(/Ask for a 32x32 horror icon/)
     .fill("Account B prompt");
-  await page.getByRole("button", { name: "Send to AI" }).click();
+  await page.getByRole("button", { name: "Try experimental sketch" }).click();
   await expect(
     page.getByRole("alertdialog", { name: "AI processing consent" }),
   ).toBeVisible();

@@ -26,6 +26,7 @@ import {
   validateAiGridSketch,
 } from "@shared/ai";
 import { Button } from "@/components/ui/button";
+import { AiImageGenerator } from "@/components/studio/AiImageGenerator";
 import { GoogleSignIn } from "@/components/community/RequireAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +54,7 @@ import { readAiChatResponse } from "@/lib/ai-http";
 
 interface AiPanelProps {
   currentDoc: GridDocument | null;
+  onOpenGeneratedImage: (file: File, requestId: string) => void;
   onApplySketch: (doc: GridDocument) => void;
 }
 
@@ -115,7 +117,7 @@ function persistAiConsent(
 // canonical AiModelPreset type in shared/ai.ts so client + server share one
 // wire shape.
 
-const STARTER_PROMPTS = [
+const DRAWING_STARTER_PROMPTS = [
   "Draw a 16x16 spooky mascot head with clear eyes and teeth.",
   "Draw a 16x16 mushroom badge using fewer than 8 colors.",
   "Draw a 16x16 friendly island robot with a simple silhouette.",
@@ -127,7 +129,11 @@ function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset | null {
   return presets.find((preset) => preset.available !== false) ?? null;
 }
 
-export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
+export default function AiPanel({
+  currentDoc,
+  onApplySketch,
+  onOpenGeneratedImage,
+}: AiPanelProps) {
   const { serviceMessage, status: authStatus, user } = useAuth();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
@@ -501,26 +507,29 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
       setMessages((prev) =>
         boundAiMessages([...prev, { role: "assistant", content: data.reply }]),
       );
+      let responseWarning = data.warning ?? null;
       if (data.sketch) {
         const validated = validateAiGridSketch(data.sketch);
         if (!validated.ok) {
-          setError(
-            `The AI returned an unsafe sketch (${validated.error}). Nothing was applied.`,
-          );
+          responseWarning = `The AI returned an unsafe sketch (${validated.error}). Nothing was applied.`;
         } else if (
           preserveDimensions &&
           expectedDimensions &&
           (validated.sketch.width !== expectedDimensions.width ||
             validated.sketch.height !== expectedDimensions.height)
         ) {
-          setError(
-            `The AI changed this refinement to ${validated.sketch.width}x${validated.sketch.height}; it must remain ${expectedDimensions.width}x${expectedDimensions.height}. Nothing was applied.`,
-          );
+          responseWarning = `The AI changed this refinement to ${validated.sketch.width}x${validated.sketch.height}; it must remain ${expectedDimensions.width}x${expectedDimensions.height}. Nothing was applied.`;
         } else {
           setPendingSketch(validated.sketch);
         }
+      } else if (requestSketch) {
+        responseWarning =
+          responseWarning ??
+          (preserveDimensions
+            ? "The model replied with text but did not return a usable canvas refinement. Nothing can be previewed or applied."
+            : "The text model replied but did not return a usable structured grid. Nothing can be previewed or applied. Try a simpler prompt or continue with the manual drawing tools.");
       }
-      if (data.warning) setError(data.warning);
+      setError(responseWarning);
     } catch (err) {
       if (requestGenerationRef.current !== requestGeneration) return;
       // A failed request is not a completed conversation turn. Restore both
@@ -578,10 +587,14 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     );
   };
 
-  const acceptAiConsent = () => {
+  const grantAiConsent = () => {
     if (!user) return;
     persistAiConsent(user.id, dataCollectionPolicy);
     setHasAiConsent(true);
+  };
+
+  const acceptAiConsent = () => {
+    grantAiConsent();
     setShowConsentPrompt(false);
     void performSend();
   };
@@ -627,6 +640,18 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
     }
   };
 
+  const chooseDrawingStarter = (prompt: string) => {
+    // Drawing starters are intentionally mode-setting actions. Without this,
+    // a locally persisted Advice session can send a drawing prompt as prose
+    // and make it look as though AI Draw silently failed.
+    setPendingSketch(null);
+    setError(null);
+    setRequestSketch(true);
+    setIncludeGridSummary(false);
+    setIncludeGridImage(false);
+    setInput(prompt);
+  };
+
   const applySketch = () => {
     if (!pendingSketch) return;
     let finalDoc;
@@ -660,6 +685,13 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
         </p>
       </div>
 
+      <AiImageGenerator
+        consentGranted={hasAiConsent}
+        onConsentGranted={grantAiConsent}
+        onOpenImportReview={onOpenGeneratedImage}
+        userId={user?.id ?? null}
+      />
+
       {!hasAvailableModels ? (
         <p
           role="status"
@@ -691,9 +723,12 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
             onClick={() => chooseWorkflow("create")}
           >
             <WandSparkles className="mb-2 h-4 w-4 text-primary" />
-            <span className="block text-xs font-black">Create a sketch</span>
+            <span className="block text-xs font-black">
+              Experimental grid sketch
+            </span>
             <span className="mt-1 block text-[0.68rem] leading-4 text-muted-foreground">
-              Start from a text prompt. No canvas image is attached.
+              A text model attempts structured grid JSON. Results can fail and
+              are never applied without review.
             </span>
           </button>
           <button
@@ -870,13 +905,12 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
                   }
                 />
                 <Label htmlFor="ai-request-sketch" className="text-xs">
-                  Generate applyable sketch JSON
+                  Request experimental grid sketch JSON
                 </Label>
               </div>
               <p className="pl-6 text-[0.68rem] leading-relaxed text-muted-foreground">
-                Leave on for paintable grid output. Turn off if you want a
-                free-form critique or written planning instead of an applyable
-                sketch.
+                This asks a text model for structured cells, not a generated
+                image. Turn it off for written critique or planning.
               </p>
               <div className="flex items-center gap-2 text-xs">
                 <Checkbox
@@ -945,9 +979,24 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
             {requestSketch ? "Reviewable grid" : "Advice only"}
           </span>
         </div>
-        <p className="text-xs font-semibold">Try a starting request</p>
+        <p className="sr-only" role="status" aria-live="polite">
+          {workflow === "advice"
+            ? "Advice only mode. AI will return written guidance."
+            : workflow === "refine"
+              ? "Canvas refinement mode. AI will attempt a reviewable grid."
+              : "Experimental grid sketch mode. AI will attempt a reviewable structured grid."}
+        </p>
+        <div>
+          <p className="text-xs font-semibold">
+            Try an experimental grid starter
+          </p>
+          <p className="mt-1 text-[0.68rem] leading-4 text-muted-foreground">
+            Choosing one always switches to Experimental grid sketch, including
+            from a saved Advice session.
+          </p>
+        </div>
         <div className="space-y-2">
-          {STARTER_PROMPTS.map((prompt) => (
+          {DRAWING_STARTER_PROMPTS.map((prompt) => (
             <Button
               key={prompt}
               type="button"
@@ -955,7 +1004,8 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               size="sm"
               className="h-auto w-full justify-start whitespace-normal text-left text-xs"
               disabled={isLoading}
-              onClick={() => setInput(prompt)}
+              aria-label={`Use drawing starter and switch to Experimental grid sketch: ${prompt}`}
+              onClick={() => chooseDrawingStarter(prompt)}
             >
               <WandSparkles className="mr-2 h-3.5 w-3.5 shrink-0" />
               {prompt}
@@ -1138,7 +1188,13 @@ export default function AiPanel({ currentDoc, onApplySketch }: AiPanelProps) {
               onClick={sendMessage}
             >
               <Send className="mr-2 h-3.5 w-3.5" />
-              {isLoading ? "Asking model..." : "Send to AI"}
+              {isLoading
+                ? "Asking model..."
+                : workflow === "advice"
+                  ? "Ask for advice"
+                  : workflow === "refine"
+                    ? "Try canvas refinement"
+                    : "Try experimental sketch"}
             </Button>
             {isLoading ? (
               <Button
