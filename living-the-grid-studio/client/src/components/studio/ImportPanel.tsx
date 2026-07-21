@@ -778,12 +778,19 @@ export default function ImportPanel({
               <p className="text-xs font-medium truncate">
                 {lastImageFile.name}
               </p>
-              <p className="text-[0.7rem] text-muted-foreground">
-                {hasPendingImageChanges
-                  ? "Settings changed"
-                  : previewDoc
-                    ? "Preview ready"
-                    : "Source image ready"}
+              <p
+                className="text-[0.7rem] text-muted-foreground"
+                aria-live="polite"
+              >
+                {isInspectingFile
+                  ? "Checking source image…"
+                  : isLoading
+                    ? "Building preview…"
+                    : hasPendingImageChanges
+                      ? "Settings changed"
+                      : previewDoc
+                        ? "Preview ready"
+                        : "Source image ready"}
               </p>
             </div>
           </div>

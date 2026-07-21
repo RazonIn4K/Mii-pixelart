@@ -69,6 +69,7 @@ type RgbTuple = [number, number, number];
 interface PresetSmokeCase {
   expectedDimensions: string;
   expectedMaxColors: number;
+  expectedPaletteColors?: number;
   fileName: string;
   filePath: string;
   presetLabel: string;
@@ -169,6 +170,7 @@ async function main(): Promise<void> {
     await verifyPresetImport(cdp, {
       expectedDimensions: "256×256",
       expectedMaxColors: 84,
+      expectedPaletteColors: 0,
       fileName: CHARACTER_FILENAME,
       filePath: CHARACTER_FIXTURE,
       presetLabel: "Pixel detail",
@@ -612,6 +614,7 @@ async function verifyPresetImport(
   const {
     expectedDimensions,
     expectedMaxColors,
+    expectedPaletteColors = expectedMaxColors,
     fileName,
     filePath,
     presetLabel,
@@ -646,22 +649,63 @@ async function verifyPresetImport(
     true,
     `${presetLabel} preset should be clickable`,
   );
-  await uploadFile(cdpClient, "#ltg-image-input", filePath);
   await waitFor(() =>
     cdpClient.evaluate<boolean>(
-      `document.body.innerText.includes(${JSON.stringify(
-        fileName,
-      )}) && document.body.innerText.includes('Preview ready') && document.body.innerText.includes(${JSON.stringify(
-        expectedDimensions,
-      )})`,
+      `document.querySelector('[aria-label="Maximum palette colors"]')?.getAttribute('aria-valuenow') === ${JSON.stringify(
+        String(expectedPaletteColors),
+      )}`,
     ),
   );
-  const colorCount = await cdpClient.evaluate<number | null>(`(() => {
-    const match = document.body.innerText.match(${JSON.stringify(
-      `${expectedDimensions} · `,
-    )} + '(\\\\d+) colors?');
-    return match ? Number(match[1]) : null;
-  })()`);
+
+  const refreshStartedAt = Date.now();
+  let observedProcessing = false;
+  await uploadFile(cdpClient, "#ltg-image-input", filePath);
+  const previewState = await waitFor(
+    async () => {
+      const state = await cdpClient.evaluate<{
+        colorCount: number | null;
+        isProcessing: boolean;
+        isReady: boolean;
+      }>(`(() => {
+        const text = document.body.innerText;
+        const workspaceText =
+          document.querySelector('[data-testid="canvas-workspace"]')?.innerText ?? '';
+        const match = workspaceText.match(${JSON.stringify(
+          `${expectedDimensions} · `,
+        )} + '(\\\\d+) colors?');
+        const commitButton = [...document.querySelectorAll('button')].find(
+          (button) => button.textContent.trim() === 'Commit Preview',
+        );
+        return {
+          colorCount: match ? Number(match[1]) : null,
+          isProcessing:
+            text.includes('Checking image format') ||
+            text.includes('Checking source image') ||
+            text.includes('Building preview') ||
+            text.includes('Converting...'),
+          isReady:
+            text.includes(${JSON.stringify(fileName)}) &&
+            text.includes('Preview ready') &&
+            workspaceText.includes(${JSON.stringify(expectedDimensions)}) &&
+            commitButton instanceof HTMLButtonElement &&
+            !commitButton.disabled,
+        };
+      })()`);
+      if (state.isProcessing) observedProcessing = true;
+      if (
+        !state.isProcessing &&
+        state.isReady &&
+        state.colorCount !== null &&
+        (observedProcessing || Date.now() - refreshStartedAt >= 250)
+      ) {
+        return state;
+      }
+      return null;
+    },
+    15_000,
+    20,
+  );
+  const colorCount = previewState.colorCount;
   assert.ok(colorCount, `${presetLabel} should show a color count`);
   assert.ok(
     colorCount <= expectedMaxColors,
