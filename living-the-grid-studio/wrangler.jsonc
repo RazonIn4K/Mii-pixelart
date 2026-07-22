@@ -244,7 +244,7 @@
         {
           "binding": "DB",
           "database_name": "tomodachi-studio-production",
-          "database_id": "22222222-2222-2222-2222-222222222222",
+          "database_id": "546e38cb-db52-4823-8e49-1f2ce2c17120",
           "migrations_dir": "./migrations",
         },
       ],
@@ -255,7 +255,7 @@
         },
       ],
       "kv_namespaces": [
-        { "binding": "EDGE_CACHE", "id": "22222222222222222222222222222222" },
+        { "binding": "EDGE_CACHE", "id": "699b9f148d4a450fae9f423cc3ef4c2c" },
       ],
       "images": { "binding": "IMAGES", "remote": false },
       "ratelimits": [
