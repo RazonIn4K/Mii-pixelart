@@ -56,8 +56,18 @@ jobs:
       - name: Test release preflight gates
         run: pnpm test:preflight
 
-      - name: Audit dependencies
-        run: pnpm audit --audit-level high
+      # Production audit stays fully blocking.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+      # Temporary development-only waiver for GHSA-f88m-g3jw-g9cj (sharp <0.35
+      # via Miniflare). Do not force sharp@0.35: Cloudflare workers-sdk PR #14493
+      # also corrects AVIF reporting. Expire on 2026-07-29 or the first stable
+      # Cloudflare release that includes PR #14493, whichever comes first. Then
+      # upgrade wrangler, @cloudflare/vite-plugin, and
+      # @cloudflare/vitest-pool-workers together and remove this ignore.
+      - name: Audit development dependencies
+        run: pnpm audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj
 
       - name: Dry-run local Worker package
         run: pnpm worker:dry-run
