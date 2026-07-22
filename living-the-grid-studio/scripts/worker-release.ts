@@ -1,12 +1,15 @@
 import { spawn } from "node:child_process";
-import { lstat, readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export type ReleaseTarget = "local" | "staging" | "production";
 export type ReleaseIntent = "dry-run" | "deploy";
 type DeploymentPhase =
-  "standard" | "staging-read-only-bootstrap" | "production-read-only-bootstrap";
+  | "standard"
+  | "staging-read-only-bootstrap"
+  | "production-read-only-bootstrap"
+  | "production-triggerless-bootstrap";
 
 export interface ReleaseOptions {
   cwd: string;
@@ -41,6 +44,7 @@ export interface FileSecurity {
 
 export interface ReleaseDependencies {
   readText(filePath: string): Promise<string>;
+  writeText(filePath: string, contents: string): Promise<void>;
   readDirectory(directoryPath: string): Promise<readonly string[]>;
   statFile(filePath: string): Promise<FileStat>;
   inspectFileSecurity(filePath: string): Promise<FileSecurity>;
@@ -424,6 +428,23 @@ function validateVariables(config: JsonRecord, target: ReleaseTarget): boolean {
   ) {
     throw new ReleaseError("Terms version is missing or invalid.");
   }
+  if (target === "production") {
+    expectExact(
+      vars.AI_IMAGE_GENERATION_ENABLED,
+      "false",
+      "Production AI generation mode",
+    );
+    expectExact(
+      vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD,
+      "0",
+      "Production AI daily budget",
+    );
+    expectExact(
+      vars.AI_IMAGE_USER_DAILY_LIMIT,
+      "0",
+      "Production AI user daily limit",
+    );
+  }
   return vars.COMMUNITY_MUTATIONS_ENABLED === "true";
 }
 
@@ -698,6 +719,7 @@ function validateGeneratedConfig(
   source: JsonRecord,
   sourcePath: string,
   target: ReleaseTarget,
+  phase: DeploymentPhase | null = null,
 ): void {
   const expected = TARGETS[target];
   const selected = selectedSourceConfig(source, target);
@@ -734,7 +756,7 @@ function validateGeneratedConfig(
   expectExact(generated.name, expected.workerName, "Generated Worker name");
   validateOriginExposure(generated);
   validateCpuLimits(generated, target);
-  validateCustomDomainRoute(generated, target);
+  validateGeneratedRoutes(generated, target, phase);
   expectExact(
     generated.compatibility_date,
     source.compatibility_date,
@@ -759,17 +781,7 @@ function validateGeneratedConfig(
     generated,
     target === "staging" ? true : REQUIRED_ASSET_ROUTES,
   );
-  const generatedTriggers = objectAt(
-    generated,
-    "triggers",
-    "Generated scheduled triggers",
-  );
-  const sourceTriggers = objectAt(source, "triggers", "Scheduled triggers");
-  expectJsonExact(
-    generatedTriggers.crons,
-    sourceTriggers.crons,
-    "Generated scheduled triggers",
-  );
+  validateGeneratedTriggers(generated, source, phase);
 
   const generatedD1 = singleBinding(
     generated,
@@ -893,8 +905,87 @@ function bootstrapTarget(
   phase: DeploymentPhase,
 ): "staging" | "production" | null {
   if (phase === "staging-read-only-bootstrap") return "staging";
-  if (phase === "production-read-only-bootstrap") return "production";
+  if (
+    phase === "production-read-only-bootstrap" ||
+    phase === "production-triggerless-bootstrap"
+  ) {
+    return "production";
+  }
   return null;
+}
+
+function isTriggerlessProductionBootstrap(phase: DeploymentPhase): boolean {
+  return phase === "production-triggerless-bootstrap";
+}
+
+function isCutoverProductionBootstrap(phase: DeploymentPhase): boolean {
+  return phase === "production-read-only-bootstrap";
+}
+
+function sanitizeGeneratedConfigForPhase(
+  generated: JsonRecord,
+  phase: DeploymentPhase | null,
+): JsonRecord {
+  if (phase === null || !isTriggerlessProductionBootstrap(phase)) {
+    return generated;
+  }
+  const sanitized: JsonRecord = { ...generated };
+  delete sanitized.routes;
+  delete sanitized.route;
+  if (isRecord(sanitized.triggers)) {
+    sanitized.triggers = { ...sanitized.triggers, crons: [] };
+  } else {
+    sanitized.triggers = { crons: [] };
+  }
+  return sanitized;
+}
+
+function validateGeneratedTriggers(
+  generated: JsonRecord,
+  source: JsonRecord,
+  phase: DeploymentPhase | null,
+): void {
+  const generatedTriggers = objectAt(
+    generated,
+    "triggers",
+    "Generated scheduled triggers",
+  );
+  if (phase !== null && isTriggerlessProductionBootstrap(phase)) {
+    expectJsonExact(
+      generatedTriggers.crons,
+      [],
+      "Triggerless bootstrap scheduled triggers",
+    );
+    return;
+  }
+  const sourceTriggers = objectAt(source, "triggers", "Scheduled triggers");
+  expectJsonExact(
+    generatedTriggers.crons,
+    sourceTriggers.crons,
+    "Generated scheduled triggers",
+  );
+}
+
+function validateGeneratedRoutes(
+  generated: JsonRecord,
+  target: ReleaseTarget,
+  phase: DeploymentPhase | null,
+): void {
+  if (phase !== null && isTriggerlessProductionBootstrap(phase)) {
+    if (target !== "production") {
+      throw new ReleaseError(
+        "Triggerless bootstrap is only valid for production.",
+      );
+    }
+    if (generated.routes !== undefined || generated.route !== undefined) {
+      throw new ReleaseError(
+        "Triggerless bootstrap must not declare a public hostname or route.",
+      );
+    }
+    validateOriginExposure(generated);
+    return;
+  }
+  validateCustomDomainRoute(generated, target);
 }
 
 function isValidBootstrapSecret(
@@ -1234,7 +1325,7 @@ function validateAuditedInputs(
     );
     expectExact(
       confirmations.productionCutoverApproved,
-      expectedBootstrapTarget === "production",
+      isCutoverProductionBootstrap(deploymentPhase),
       "Bootstrap production cutover state",
     );
   } else {
@@ -1304,9 +1395,18 @@ async function validateApproval(
   if (
     deploymentPhase !== "standard" &&
     deploymentPhase !== "staging-read-only-bootstrap" &&
-    deploymentPhase !== "production-read-only-bootstrap"
+    deploymentPhase !== "production-read-only-bootstrap" &&
+    deploymentPhase !== "production-triggerless-bootstrap"
   ) {
     throw new ReleaseError("Deployment phase is missing or invalid.");
+  }
+  if (
+    isTriggerlessProductionBootstrap(deploymentPhase) &&
+    (target !== "production" || communityMutationsEnabled)
+  ) {
+    throw new ReleaseError(
+      "Triggerless bootstrap requires a read-only production target.",
+    );
   }
   const expectedBootstrapTarget = bootstrapTarget(deploymentPhase);
   if (
@@ -1350,10 +1450,21 @@ async function validateApproval(
     "confirmations",
     "Deployment confirmations",
   );
-  for (const confirmation of [
+  const requiredConfirmations = [
     ...COMMON_CONFIRMATIONS,
-    ...TARGET_CONFIRMATIONS[target],
-  ]) {
+    ...TARGET_CONFIRMATIONS[target].filter((confirmation) => {
+      // Triggerless production bootstrap deliberately keeps cutover unapproved
+      // until a later domain-attaching release.
+      if (
+        isTriggerlessProductionBootstrap(deploymentPhase) &&
+        confirmation === "productionCutoverApproved"
+      ) {
+        return false;
+      }
+      return true;
+    }),
+  ];
+  for (const confirmation of requiredConfirmations) {
     if (confirmations[confirmation] !== true) {
       throw new ReleaseError(
         "Deployment approval is missing one or more required confirmations.",
@@ -1631,6 +1742,7 @@ export async function runRelease(
   );
   const warnings: string[] = [];
   let bootstrapSecretsPath: string | null = null;
+  let validatedDeployPhase: DeploymentPhase | null = null;
 
   dependencies.log(
     "info",
@@ -1665,6 +1777,7 @@ export async function runRelease(
       bindings.communityMutationsEnabled,
       dependencies,
     );
+    validatedDeployPhase = validatedApproval.deploymentPhase;
     if (isBootstrapPhase(validatedApproval.deploymentPhase)) {
       bootstrapSecretsPath = await validateBootstrapSecretsFile(
         cwd,
@@ -1735,7 +1848,36 @@ export async function runRelease(
       "Generated Wrangler configuration is missing or unreadable.",
     );
   }
-  validateGeneratedConfig(generated, source, sourcePath, options.target);
+  if (
+    validatedDeployPhase !== null &&
+    isTriggerlessProductionBootstrap(validatedDeployPhase)
+  ) {
+    generated = sanitizeGeneratedConfigForPhase(
+      generated,
+      validatedDeployPhase,
+    );
+    try {
+      await dependencies.writeText(
+        generatedPath,
+        `${JSON.stringify(generated, null, 2)}\n`,
+      );
+    } catch {
+      throw new ReleaseError(
+        "Triggerless bootstrap artifact could not be written safely.",
+      );
+    }
+    dependencies.log(
+      "info",
+      "Sanitized generated production artifact for triggerless bootstrap (no domain, route, or cron).",
+    );
+  }
+  validateGeneratedConfig(
+    generated,
+    source,
+    sourcePath,
+    options.target,
+    validatedDeployPhase,
+  );
 
   const deployArgs = ["exec", "wrangler", "deploy", "--config", generatedPath];
   if (options.intent === "dry-run") deployArgs.push("--dry-run");
@@ -1876,6 +2018,9 @@ async function nodePathIgnored(
 
 export function createNodeDependencies(): ReleaseDependencies {
   return {
+    writeText: async (filePath, contents) => {
+      await writeFile(filePath, contents, "utf8");
+    },
     readText: (filePath) => readFile(filePath, "utf8"),
     readDirectory: (directoryPath) => readdir(directoryPath),
     statFile: async (filePath) => {

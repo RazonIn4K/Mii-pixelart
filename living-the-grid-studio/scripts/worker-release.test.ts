@@ -212,6 +212,17 @@ function environmentConfig(
       TERMS_VERSION: "2026-07-16",
       COMMUNITY_MUTATIONS_ENABLED:
         target === "local" || remoteWritable ? "true" : "false",
+      ...(target === "production"
+        ? {
+            AI_IMAGE_GENERATION_ENABLED: "false",
+            AI_IMAGE_DAILY_BUDGET_MICRO_USD: "0",
+            AI_IMAGE_USER_DAILY_LIMIT: "0",
+          }
+        : {
+            AI_IMAGE_GENERATION_ENABLED: "true",
+            AI_IMAGE_DAILY_BUDGET_MICRO_USD: "2000000",
+            AI_IMAGE_USER_DAILY_LIMIT: "3",
+          }),
     },
     secrets: { required: requiredSecrets },
     d1_databases: [
@@ -314,7 +325,8 @@ function approval(
   deploymentPhase:
     | "standard"
     | "staging-read-only-bootstrap"
-    | "production-read-only-bootstrap" = "standard",
+    | "production-read-only-bootstrap"
+    | "production-triggerless-bootstrap" = "standard",
 ) {
   const bootstrap = deploymentPhase !== "standard";
   return {
@@ -362,7 +374,9 @@ function approval(
       deployApproved: true,
       stagingDeployApproved: true,
       stagingAcceptancePassed: target === "production" || !bootstrap,
-      productionCutoverApproved: target === "production" || !bootstrap,
+      productionCutoverApproved:
+        deploymentPhase === "production-read-only-bootstrap" ||
+        deploymentPhase === "standard",
       communityMutationsEnabled,
       writableCommunityDeployApproved: communityMutationsEnabled,
       bootstrapReadOnlyApproved: bootstrap,
@@ -478,6 +492,9 @@ function makeHarness(
       const value = files.get(filePath);
       if (value === undefined) throw new Error("ENOENT");
       return value;
+    },
+    async writeText(filePath, contents) {
+      files.set(filePath, contents);
     },
     async readDirectory(directoryPath) {
       if (directoryPath !== MIGRATIONS_DIRECTORY) throw new Error("ENOENT");
@@ -1454,3 +1471,122 @@ describe("runRelease deploy gates", () => {
     expect(harness.calls).toHaveLength(3);
   });
 });
+
+describe("production triggerless bootstrap", () => {
+  it("sanitizes the generated production artifact and deploys without domain, route, or cron", async () => {
+    const harness = makeHarness("production");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const secretsPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.secrets.json",
+    );
+    harness.files.set(
+      approvalPath,
+      JSON.stringify(
+        approval("production", false, {}, "production-triggerless-bootstrap"),
+      ),
+    );
+    harness.files.set(
+      secretsPath,
+      JSON.stringify({
+        GOOGLE_CLIENT_ID:
+          "1020760650950-eqv69pk6cbq6bh7k91r56ogmjn35506t.apps.googleusercontent.com",
+        GOOGLE_CLIENT_SECRET: `GOCSPX-a1b2c3d4e5f6g7h8i9j0k1l2`,
+        OIDC_COOKIE_KEY: "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+        SESSION_PEPPER: "session-pepper-a1b2c3d4e5f6g7h8i9j0k1l2",
+        PSEUDONYM_KEY: "pseudonym-key-a1b2c3d4e5f6g7h8i9j0k1l2",
+        OPENROUTER_API_KEY: `sk-or-v1-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`,
+      }),
+    );
+    harness.setRoleCommandResult(privilegedRoleResult([{ count: 0 }]));
+
+    await runRelease(
+      { cwd: CWD, target: "production", intent: "deploy" },
+      harness.dependencies,
+    );
+
+    const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
+    expect(generated.routes).toBeUndefined();
+    expect(generated.route).toBeUndefined();
+    expect(generated.workers_dev).toBe(false);
+    expect(generated.preview_urls).toBe(false);
+    expect(generated.triggers).toEqual({ crons: [] });
+    expect(generated.vars.COMMUNITY_MUTATIONS_ENABLED).toBe("false");
+    expect(generated.vars.AI_IMAGE_GENERATION_ENABLED).toBe("false");
+
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    expect(source.env.production.routes).toEqual([
+      { pattern: "tomodachi.pw", custom_domain: true },
+    ]);
+    expect(source.triggers).toEqual({ crons: ["0 * * * *"] });
+
+    expect(harness.calls).toHaveLength(4);
+    expect(harness.calls[1].args).toContain(PRIVILEGED_ROLE_COUNT_QUERY);
+    expect(harness.calls[3].args).toEqual([
+      "exec",
+      "wrangler",
+      "deploy",
+      "--config",
+      GENERATED_PATH,
+      "--secrets-file",
+      secretsPath,
+    ]);
+    expect(harness.logs.join("\n")).toContain(
+      "triggerless bootstrap (no domain, route, or cron)",
+    );
+  });
+
+  it("rejects triggerless bootstrap when community mutations are enabled", async () => {
+    const harness = makeHarness("production", { remoteWritable: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    harness.files.set(
+      approvalPath,
+      JSON.stringify(
+        approval("production", true, {}, "production-triggerless-bootstrap"),
+      ),
+    );
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(/read-only production target|read-only release target/);
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it("rejects triggerless bootstrap when production cutover is approved", async () => {
+    const harness = makeHarness("production");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = approval(
+      "production",
+      false,
+      {},
+      "production-triggerless-bootstrap",
+    );
+    body.confirmations.productionCutoverApproved = true;
+    harness.files.set(approvalPath, JSON.stringify(body));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Bootstrap production cutover state");
+    expect(harness.calls).toHaveLength(0);
+  });
+});
+
