@@ -66,8 +66,14 @@ jobs:
       # Cloudflare release that includes PR #14493, whichever comes first. Then
       # upgrade wrangler, @cloudflare/vite-plugin, and
       # @cloudflare/vitest-pool-workers together and remove this ignore.
+      #
+      # pnpm persists --ignore into pnpm-workspace.yaml; restore the file so
+      # later release-output verification still sees a clean Git tree. Do not
+      # commit auditConfig.ignoreGhsas — that would also weaken --prod audits.
       - name: Audit development dependencies
-        run: pnpm audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj
+        run: |
+          pnpm audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj
+          git checkout -- pnpm-workspace.yaml
 
       - name: Dry-run local Worker package
         run: pnpm worker:dry-run
