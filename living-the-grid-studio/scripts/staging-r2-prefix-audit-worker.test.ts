@@ -2,12 +2,13 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  MAX_AUDIT_OBJECT_BYTES,
-  MAX_AUDIT_OBJECTS,
-  MAX_AUDIT_PREFIX_BYTES,
-  handleR2PrefixAudit,
-} from "./staging-r2-prefix-audit-worker";
+import { handleR2PrefixAudit } from "./staging-r2-prefix-audit-worker";
+
+// Mirror the worker's fixed ceilings without importing them as top-level
+// exports (workerd treats top-level exports as handlers).
+const MAX_AUDIT_OBJECTS = 16;
+const MAX_AUDIT_OBJECT_BYTES = 2 * 1_024 * 1_024;
+const MAX_AUDIT_PREFIX_BYTES = 4 * 1_024 * 1_024;
 
 const AUDIT_NONCE = "n".repeat(32);
 const AUDIT_ATTESTATION_KEY = "k".repeat(64);

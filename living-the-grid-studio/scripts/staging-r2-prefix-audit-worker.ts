@@ -2,9 +2,11 @@ const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const HEX_64 = /^[0-9a-f]{64}$/u;
 const MAX_REQUEST_BYTES = 256;
-export const MAX_AUDIT_OBJECTS = 16;
-export const MAX_AUDIT_OBJECT_BYTES = 2 * 1_024 * 1_024;
-export const MAX_AUDIT_PREFIX_BYTES = 4 * 1_024 * 1_024;
+// Keep these non-exported. workerd treats top-level exports as handlers and
+// rejects numeric constants during `wrangler dev` startup.
+const MAX_AUDIT_OBJECTS = 16;
+const MAX_AUDIT_OBJECT_BYTES = 2 * 1_024 * 1_024;
+const MAX_AUDIT_PREFIX_BYTES = 4 * 1_024 * 1_024;
 
 type AuditEnv = {
   AUDIT_ATTESTATION_KEY: string;
