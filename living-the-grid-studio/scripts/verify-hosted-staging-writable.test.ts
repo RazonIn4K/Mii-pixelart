@@ -24,6 +24,7 @@ interface FixtureOptions {
   leakText?: string;
   releaseSourceCommit?: string;
   throwAfterCreate?: boolean;
+  weakEtags?: boolean;
 }
 
 interface SeenRequest {
@@ -109,7 +110,7 @@ function writableFixture(options: FixtureOptions = {}): {
       if (options.throwAfterCreate) {
         throw new Error("simulated lost response after persistence");
       }
-      headers.set("ETag", '"rev-1"');
+      headers.set("ETag", options.weakEtags ? 'W/"rev-1"' : '"rev-1"');
       return envelope(
         {
           data: {
@@ -150,7 +151,7 @@ function writableFixture(options: FixtureOptions = {}): {
     ) {
       putCount += 1;
       if (putCount === 1) {
-        headers.set("ETag", '"rev-2"');
+        headers.set("ETag", options.weakEtags ? 'W/"rev-2"' : '"rev-2"');
         return envelope({
           data: { id: creationId, revision: 2, state: "draft" },
         });
@@ -159,7 +160,7 @@ function writableFixture(options: FixtureOptions = {}): {
         {
           error: {
             code: "REVISION_CONFLICT",
-            currentEtag: '"rev-2"',
+            currentEtag: options.weakEtags ? 'W/"rev-2"' : '"rev-2"',
             currentRevision: 2,
             message: "Conflict",
           },
@@ -231,6 +232,7 @@ function runFixture(
       expectedUserId: USER_ID,
       expectedWorkerVersion: WORKER_VERSION,
       fetchImpl: fixture.fetchImpl,
+      cleanupRetryDelaysMs: [0, 0, 0, 0],
       unsafeAllowLoopbackFixture: true,
       verifyDeployment: async () => ({
         communityMutationsEnabled: true,
@@ -537,6 +539,68 @@ describe("writable staging acceptance", () => {
           !headers.has("cookie"),
       ),
     ).toBe(true);
+  });
+
+  it("normalizes weak revision ETags without weakening conflict checks", async () => {
+    const { run } = runFixture(writableFixture({ weakEtags: true }));
+    await expect(run).resolves.toMatchObject({
+      cleanup: "verified",
+      mutationAttempts: 5,
+      requests: 7,
+    });
+  });
+
+  it("retries a transient post-run manifest before accepting reconciliation", async () => {
+    let afterCaptures = 0;
+    const { run } = runFixture(writableFixture(), {
+      cleanupRetryDelaysMs: [0],
+      captureManifest: async ({ phase }) => {
+        if (phase === "before") return emptyManifest();
+        afterCaptures += 1;
+        if (afterCaptures === 1) {
+          return emptyManifest({ fixtureActiveCreationRows: 1 });
+        }
+        return emptyManifest({
+          fixtureDeletedCreationRows: 1,
+          fixtureObjectBytes: 3_655,
+          fixtureObjectRows: 8,
+          fixtureR2ObjectBytes: 3_655,
+          fixtureR2ObjectCount: 8,
+          fixtureRevisionRows: 2,
+          totalCreationRows: 4,
+          totalObjectBytes: 16_000,
+          totalObjectRows: 16,
+          totalR2ObjectCount: 16,
+          totalRevisionRows: 6,
+        });
+      },
+    });
+
+    await expect(run).resolves.toMatchObject({ cleanup: "verified" });
+    expect(afterCaptures).toBe(2);
+  });
+
+  it("allows a lower eventually-consistent global R2 object delta", async () => {
+    const { run } = runFixture(writableFixture(), {
+      captureManifest: async ({ phase }) =>
+        phase === "before"
+          ? emptyManifest()
+          : emptyManifest({
+              fixtureDeletedCreationRows: 1,
+              fixtureObjectBytes: 3_655,
+              fixtureObjectRows: 8,
+              fixtureR2ObjectBytes: 3_655,
+              fixtureR2ObjectCount: 8,
+              fixtureRevisionRows: 2,
+              totalCreationRows: 4,
+              totalObjectBytes: 16_000,
+              totalObjectRows: 16,
+              totalR2ObjectCount: 12,
+              totalRevisionRows: 6,
+            }),
+    });
+
+    await expect(run).resolves.toMatchObject({ cleanup: "verified" });
   });
 
   it("stops normal writes at the first failure but still performs cleanup", async () => {
