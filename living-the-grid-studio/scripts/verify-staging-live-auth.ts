@@ -942,9 +942,48 @@ function defaultDependencies(): StagingLiveAuthDependencies {
     },
     launchBrowser: async () => {
       const { chromium } = await import("@playwright/test");
-      return (await chromium.launch({
-        headless: false,
-      })) as unknown as LiveAuthBrowserLike;
+      const { homedir } = await import("node:os");
+      // Google's secure-browser policy rejects credential entry inside the
+      // automation-flagged bundled Chromium ("This browser or app may not be
+      // secure"). Launch the installed real Chrome with one persistent
+      // profile per identity slot instead: sign-in state survives between
+      // acceptance runs, so after the first manual sign-in the flow passes
+      // the account chooser without hitting the blocked credential screen.
+      const profileRoot =
+        process.env.LTG_LIVE_AUTH_PROFILE_DIR ??
+        path.join(homedir(), ".ltg-live-auth-profiles");
+      let slotIndex = 0;
+      const contexts: Array<{ close(): Promise<void> }> = [];
+      const browserLike = {
+        close: async () => {
+          for (const context of contexts.splice(0)) {
+            await context.close();
+          }
+        },
+        newContext: async (options: {
+          acceptDownloads: false;
+          baseURL: string;
+          serviceWorkers: "block";
+          viewport: { height: number; width: number };
+        }) => {
+          const context = await chromium.launchPersistentContext(
+            path.join(profileRoot, `slot-${slotIndex++}`),
+            {
+              acceptDownloads: options.acceptDownloads,
+              args: ["--disable-blink-features=AutomationControlled"],
+              baseURL: options.baseURL,
+              channel: "chrome",
+              headless: false,
+              ignoreDefaultArgs: ["--enable-automation"],
+              serviceWorkers: options.serviceWorkers,
+              viewport: options.viewport,
+            },
+          );
+          contexts.push(context);
+          return context;
+        },
+      };
+      return browserLike as unknown as LiveAuthBrowserLike;
     },
     log: (message) => console.log(message),
     verifySessionsRevoked: verifyStagingSessionsRevoked,
