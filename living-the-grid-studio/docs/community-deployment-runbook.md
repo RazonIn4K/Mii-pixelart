@@ -245,7 +245,7 @@ IDs. The wrapper requires a private regular file and validates its fields
 without logging their values. Inspect the flattened output config before every
 deploy.
 
-Readiness schema version 4 requires an explicit `deploymentPhase` and current
+Readiness schema version 5 requires an explicit `deploymentPhase` and current
 target-specific ownership/confirmation fields. It contains no payment or
 consultation-enable field. Use
 `standard` for every writable deploy and every deploy after the first
@@ -320,11 +320,17 @@ After explicit approval for resources and staging deployment:
      `writableCommunityDeployApproved=false`, and
      `bootstrapReadOnlyApproved=true`. Do not use this phase if any admin or
      moderator already exists.
-   - For production bootstrap and cutover approvals, the audited
-     `infrastructure.googleProject` must reference the isolated production OAuth
-     project (never a staging project), and cutover approvals must not contain
-     contradictory no-cutover wording in `changeTicket` or
-     `domainControlConfirmation`.
+   - Schema v5 approvals are structured: `infrastructure.googleProjectId`
+     must exactly equal the audited project for the target
+     (`tomodachi-studio-production` for production, `tomodachi-studio-staging`
+     for staging), and production approvals must declare
+     `infrastructure.domainCutover` with explicit `apex` (`defer` or `attach`)
+     and `www` (`defer`, `attach`, or `redirect-to-apex`) dispositions.
+     Triggerless bootstrap requires both dispositions deferred; cutover and
+     standard production require an attached apex and a non-deferred `www`
+     decision. Staging approvals must omit `domainCutover`. Free-text fields
+     such as `changeTicket` and `domainControlConfirmation` remain audit prose
+     and are never parsed for gating decisions.
    - After the read-only Worker and staging hostname are available, the named
      admin signs in with the approved Google account. A separately staffed
      moderator signs in too when one will be assigned. OAuth provisioning

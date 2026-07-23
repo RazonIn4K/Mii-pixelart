@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "target": "staging",
   "intent": "deploy",
   "deploymentPhase": "staging-read-only-bootstrap",
@@ -9,7 +9,7 @@
   "changeTicket": "replace-with-the-change-or-approval-reference",
   "infrastructure": {
     "cloudflareAccount": "replace-with-the-audited-account-name-or-reference",
-    "googleProject": "replace-with-the-audited-google-project-id",
+    "googleProjectId": "tomodachi-studio-staging",
     "domainControlConfirmation": "replace-with-the-domain-control-check-reference",
     "cloudflarePricingDecision": "replace-with-the-approved-pricing-decision",
     "imagesUsageDecision": "approved-or-not-required"

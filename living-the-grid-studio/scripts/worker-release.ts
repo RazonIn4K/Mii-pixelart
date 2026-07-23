@@ -83,6 +83,7 @@ const TARGETS: Record<
   {
     workerName: string;
     environment: ReleaseTarget;
+    googleProjectId: string | null;
     siteUrl: string;
     redirectUri: string;
     customDomain: string | null;
@@ -93,6 +94,7 @@ const TARGETS: Record<
   local: {
     workerName: "tomodachi-studio",
     environment: "local",
+    googleProjectId: null,
     siteUrl: "http://localhost:3000",
     redirectUri: "http://localhost:3000/api/auth/google/callback",
     customDomain: null,
@@ -102,6 +104,7 @@ const TARGETS: Record<
   staging: {
     workerName: "tomodachi-studio-staging",
     environment: "staging",
+    googleProjectId: "tomodachi-studio-staging",
     siteUrl: "https://staging.tomodachi.pw",
     redirectUri: "https://staging.tomodachi.pw/api/auth/google/callback",
     customDomain: "staging.tomodachi.pw",
@@ -111,6 +114,7 @@ const TARGETS: Record<
   production: {
     workerName: "tomodachi-studio-production",
     environment: "production",
+    googleProjectId: "tomodachi-studio-production",
     siteUrl: "https://tomodachi.pw",
     redirectUri: "https://tomodachi.pw/api/auth/google/callback",
     customDomain: "tomodachi.pw",
@@ -923,6 +927,7 @@ function isCutoverProductionBootstrap(phase: DeploymentPhase): boolean {
   return phase === "production-read-only-bootstrap";
 }
 
+
 function sanitizeGeneratedConfigForPhase(
   generated: JsonRecord,
   phase: DeploymentPhase | null,
@@ -1171,17 +1176,54 @@ function requireApprovalText(
   }
   return value;
 }
-function hasProductionCutoverContradiction(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return false;
-  return (
-    /\bno\b.{0,40}\b(domain|route|cutover|detach|attach)\b/i.test(normalized) ||
-    /\b(do not|don't)\b.{0,40}\b(domain|route|cutover|detach|attach)\b/i.test(
-      normalized,
-    ) ||
-    /\b(remains?|stays?)\b.{0,40}\battached\b/i.test(normalized) ||
-    /\bpages\b.{0,40}\battached\b/i.test(normalized)
+const APEX_DISPOSITIONS = ["defer", "attach"] as const;
+const WWW_DISPOSITIONS = ["defer", "attach", "redirect-to-apex"] as const;
+
+function validateDomainCutover(
+  infrastructure: JsonRecord,
+  target: "staging" | "production",
+  deploymentPhase: DeploymentPhase,
+): void {
+  if (target !== "production") {
+    if (infrastructure.domainCutover !== undefined) {
+      throw new ReleaseError(
+        "Staging approvals must not declare production domain cutover inputs.",
+      );
+    }
+    return;
+  }
+  const domainCutover = objectAt(
+    infrastructure,
+    "domainCutover",
+    "Production domain cutover inputs",
   );
+  const keys = Object.keys(domainCutover).sort();
+  if (JSON.stringify(keys) !== JSON.stringify(["apex", "www"])) {
+    throw new ReleaseError("Production domain cutover inputs are invalid.");
+  }
+  const apex = domainCutover.apex;
+  const www = domainCutover.www;
+  if (
+    typeof apex !== "string" ||
+    !(APEX_DISPOSITIONS as readonly string[]).includes(apex) ||
+    typeof www !== "string" ||
+    !(WWW_DISPOSITIONS as readonly string[]).includes(www)
+  ) {
+    throw new ReleaseError("Production domain cutover inputs are invalid.");
+  }
+  if (isTriggerlessProductionBootstrap(deploymentPhase)) {
+    if (apex !== "defer" || www !== "defer") {
+      throw new ReleaseError(
+        "Triggerless bootstrap requires deferred apex and www dispositions.",
+      );
+    }
+    return;
+  }
+  if (apex !== "attach" || www === "defer") {
+    throw new ReleaseError(
+      "Production releases require an attached apex and an explicit www disposition.",
+    );
+  }
 }
 
 function validateAuditedInputs(
@@ -1200,12 +1242,17 @@ function validateAuditedInputs(
     "cloudflareAccount",
     "Cloudflare account approval input",
   );
-  const googleProject = requireApprovalText(
+  const googleProjectId = requireApprovalText(
     infrastructure,
-    "googleProject",
+    "googleProjectId",
     "Google project approval input",
   );
-  const domainControlConfirmation = requireApprovalText(
+  if (googleProjectId !== TARGETS[target].googleProjectId) {
+    throw new ReleaseError(
+      "Google project approval input does not match the audited target project.",
+    );
+  }
+  requireApprovalText(
     infrastructure,
     "domainControlConfirmation",
     "Domain-control approval input",
@@ -1223,22 +1270,7 @@ function validateAuditedInputs(
   if (imagesDecision !== "approved" && imagesDecision !== "not-required") {
     throw new ReleaseError("Images usage approval input is invalid.");
   }
-  if (target === "production" && /staging/i.test(googleProject)) {
-    throw new ReleaseError(
-      "Google project approval input must reference an isolated production OAuth project.",
-    );
-  }
-  if (
-    target === "production" &&
-    isCutoverProductionBootstrap(deploymentPhase) &&
-    (hasProductionCutoverContradiction(domainControlConfirmation) ||
-      (typeof approval.changeTicket === "string" &&
-        hasProductionCutoverContradiction(approval.changeTicket)))
-  ) {
-    throw new ReleaseError(
-      "Production cutover approval inputs contain contradictory no-cutover language.",
-    );
-  }
+  validateDomainCutover(infrastructure, target, deploymentPhase);
 
   const legal = objectAt(approval, "legal", "Legal readiness inputs");
   requireApprovalText(legal, "operatorIdentity", "Legal operator input");
@@ -1417,7 +1449,7 @@ async function validateApproval(
   }
 
   const approval = parseJson(raw, "Deployment approval");
-  expectExact(approval.schemaVersion, 4, "Deployment approval schema");
+  expectExact(approval.schemaVersion, 5, "Deployment approval schema");
   expectExact(approval.target, target, "Deployment approval target");
   expectExact(approval.intent, "deploy", "Deployment approval intent");
   const deploymentPhase = approval.deploymentPhase;

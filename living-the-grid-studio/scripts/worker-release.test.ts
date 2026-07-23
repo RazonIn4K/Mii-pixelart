@@ -330,7 +330,7 @@ function approval(
 ) {
   const bootstrap = deploymentPhase !== "standard";
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     target,
     intent: "deploy",
     deploymentPhase,
@@ -340,10 +340,21 @@ function approval(
     changeTicket: "release-2026-07-11",
     infrastructure: {
       cloudflareAccount: "Tomodachi production account",
-      googleProject: "tomodachi-community-2026",
+      googleProjectId:
+        target === "production"
+          ? "tomodachi-studio-production"
+          : "tomodachi-studio-staging",
       domainControlConfirmation: "DNS ownership reviewed 2026-07-11",
       cloudflarePricingDecision: "Workers D1 R2 pricing approved 2026-07-11",
       imagesUsageDecision: "approved",
+      ...(target === "production"
+        ? {
+            domainCutover:
+              deploymentPhase === "production-triggerless-bootstrap"
+                ? { apex: "defer", www: "defer" }
+                : { apex: "attach", www: "redirect-to-apex" },
+          }
+        : {}),
     },
     legal: {
       operatorIdentity: "Tomodachi Studio LLC",
@@ -1040,7 +1051,7 @@ describe("runRelease deploy gates", () => {
     ).rejects.toThrow("missing one or more required confirmations");
     expect(harness.calls).toHaveLength(0);
   });
-  it("rejects a production approval that references a staging OAuth project", async () => {
+  it("rejects a production approval bound to the staging Google project", async () => {
     const harness = makeHarness("production", { productionBootstrap: true });
     const approvalPath = path.join(
       CWD,
@@ -1048,19 +1059,17 @@ describe("runRelease deploy gates", () => {
       "production.json",
     );
     const body = JSON.parse(harness.files.get(approvalPath)!);
-    body.infrastructure.googleProject = "tomodachi-staging-oauth-project";
+    body.infrastructure.googleProjectId = "tomodachi-studio-staging";
     harness.files.set(approvalPath, JSON.stringify(body));
     await expect(
       runRelease(
         { cwd: CWD, target: "production", intent: "deploy" },
         harness.dependencies,
       ),
-    ).rejects.toThrow(
-      "isolated production OAuth project",
-    );
+    ).rejects.toThrow("does not match the audited target project");
     expect(harness.calls).toHaveLength(0);
   });
-  it("rejects contradictory no-cutover wording during production cutover bootstrap", async () => {
+  it("rejects a production cutover approval that defers the www disposition", async () => {
     const harness = makeHarness("production", { productionBootstrap: true });
     const approvalPath = path.join(
       CWD,
@@ -1068,19 +1077,90 @@ describe("runRelease deploy gates", () => {
       "production.json",
     );
     const body = JSON.parse(harness.files.get(approvalPath)!);
-    body.changeTicket =
-      "approved release but do not cutover domain attachment in this step";
-    body.infrastructure.domainControlConfirmation =
-      "Pages remains attached to the domain";
+    body.infrastructure.domainCutover = { apex: "attach", www: "defer" };
     harness.files.set(approvalPath, JSON.stringify(body));
     await expect(
       runRelease(
         { cwd: CWD, target: "production", intent: "deploy" },
         harness.dependencies,
       ),
-    ).rejects.toThrow(
-      "contain contradictory no-cutover language",
+    ).rejects.toThrow("attached apex and an explicit www disposition");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects unknown production domain cutover dispositions", async () => {
+    const harness = makeHarness("production", { productionBootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
     );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.infrastructure.domainCutover = { apex: "attach", www: "park" };
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Production domain cutover inputs are invalid");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects staging approvals that declare production domain cutover inputs", async () => {
+    const harness = makeHarness("staging");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.infrastructure.domainCutover = { apex: "defer", www: "defer" };
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("must not declare production domain cutover inputs");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects triggerless bootstrap approvals that attach the apex domain", async () => {
+    const harness = makeHarness("production");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = JSON.parse(
+      JSON.stringify(
+        approval("production", false, {}, "production-triggerless-bootstrap"),
+      ),
+    );
+    body.infrastructure.domainCutover = { apex: "attach", www: "defer" };
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("deferred apex and www dispositions");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects schema version 4 approvals", async () => {
+    const harness = makeHarness("staging");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.schemaVersion = 4;
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Deployment approval schema");
     expect(harness.calls).toHaveLength(0);
   });
 
