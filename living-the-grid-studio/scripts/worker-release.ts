@@ -190,6 +190,7 @@ const COMMON_CONFIRMATIONS = [
   "secretsConfigured",
   "migrationsApproved",
   "legalPlaceholdersReplaced",
+  "scheduledMaintenanceWritesApproved",
   "pricingApproved",
   "rollbackReady",
   "deployApproved",
@@ -1170,6 +1171,18 @@ function requireApprovalText(
   }
   return value;
 }
+function hasProductionCutoverContradiction(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\bno\b.{0,40}\b(domain|route|cutover|detach|attach)\b/i.test(normalized) ||
+    /\b(do not|don't)\b.{0,40}\b(domain|route|cutover|detach|attach)\b/i.test(
+      normalized,
+    ) ||
+    /\b(remains?|stays?)\b.{0,40}\battached\b/i.test(normalized) ||
+    /\bpages\b.{0,40}\battached\b/i.test(normalized)
+  );
+}
 
 function validateAuditedInputs(
   approval: JsonRecord,
@@ -1187,12 +1200,12 @@ function validateAuditedInputs(
     "cloudflareAccount",
     "Cloudflare account approval input",
   );
-  requireApprovalText(
+  const googleProject = requireApprovalText(
     infrastructure,
     "googleProject",
     "Google project approval input",
   );
-  requireApprovalText(
+  const domainControlConfirmation = requireApprovalText(
     infrastructure,
     "domainControlConfirmation",
     "Domain-control approval input",
@@ -1209,6 +1222,22 @@ function validateAuditedInputs(
   );
   if (imagesDecision !== "approved" && imagesDecision !== "not-required") {
     throw new ReleaseError("Images usage approval input is invalid.");
+  }
+  if (target === "production" && /staging/i.test(googleProject)) {
+    throw new ReleaseError(
+      "Google project approval input must reference an isolated production OAuth project.",
+    );
+  }
+  if (
+    target === "production" &&
+    isCutoverProductionBootstrap(deploymentPhase) &&
+    (hasProductionCutoverContradiction(domainControlConfirmation) ||
+      (typeof approval.changeTicket === "string" &&
+        hasProductionCutoverContradiction(approval.changeTicket)))
+  ) {
+    throw new ReleaseError(
+      "Production cutover approval inputs contain contradictory no-cutover language.",
+    );
   }
 
   const legal = objectAt(approval, "legal", "Legal readiness inputs");

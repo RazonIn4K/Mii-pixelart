@@ -368,6 +368,7 @@ function approval(
       secretsConfigured: true,
       migrationsApproved: true,
       legalPlaceholdersReplaced: true,
+      scheduledMaintenanceWritesApproved: true,
       adminModeratorAssigned: !bootstrap,
       pricingApproved: true,
       rollbackReady: true,
@@ -1020,6 +1021,67 @@ describe("runRelease deploy gates", () => {
       ),
     ).rejects.toThrow("Operational owner input");
     expect(auditedInputHarness.calls).toHaveLength(0);
+  });
+  it("rejects missing scheduled maintenance write approval before commands", async () => {
+    const harness = makeHarness("staging");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "staging.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.confirmations.scheduledMaintenanceWritesApproved = false;
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "staging", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("missing one or more required confirmations");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects a production approval that references a staging OAuth project", async () => {
+    const harness = makeHarness("production", { productionBootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.infrastructure.googleProject = "tomodachi-staging-oauth-project";
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(
+      "isolated production OAuth project",
+    );
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects contradictory no-cutover wording during production cutover bootstrap", async () => {
+    const harness = makeHarness("production", { productionBootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.changeTicket =
+      "approved release but do not cutover domain attachment in this step";
+    body.infrastructure.domainControlConfirmation =
+      "Pages remains attached to the domain";
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow(
+      "contain contradictory no-cutover language",
+    );
+    expect(harness.calls).toHaveLength(0);
   });
 
   it("binds writable remote mode to explicit approval and permits it when both values are true", async () => {

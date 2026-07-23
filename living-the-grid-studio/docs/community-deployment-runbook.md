@@ -263,7 +263,10 @@ requires one real internal UUID already assigned the exact `admin` role. The
 moderator UUID may be null because admins have moderator authority; when a
 separate moderator UUID is supplied, it must be distinct and already assigned
 the exact `moderator` role. The wrapper verifies every supplied assignment in
-remote D1.
+remote D1. Every deploy approval must also explicitly acknowledge scheduled
+maintenance writes with `scheduledMaintenanceWritesApproved=true` because the
+hourly cleanup path can mutate D1/R2 even while community writes remain
+fail-closed.
 
 ## Staging gate and procedure
 
@@ -317,6 +320,11 @@ After explicit approval for resources and staging deployment:
      `writableCommunityDeployApproved=false`, and
      `bootstrapReadOnlyApproved=true`. Do not use this phase if any admin or
      moderator already exists.
+   - For production bootstrap and cutover approvals, the audited
+     `infrastructure.googleProject` must reference the isolated production OAuth
+     project (never a staging project), and cutover approvals must not contain
+     contradictory no-cutover wording in `changeTicket` or
+     `domainControlConfirmation`.
    - After the read-only Worker and staging hostname are available, the named
      admin signs in with the approved Google account. A separately staffed
      moderator signs in too when one will be assigned. OAuth provisioning

@@ -37,6 +37,7 @@
     "secretsConfigured": false,
     "migrationsApproved": false,
     "legalPlaceholdersReplaced": false,
+    "scheduledMaintenanceWritesApproved": false,
     "adminModeratorAssigned": false,
     "pricingApproved": false,
     "rollbackReady": false,
