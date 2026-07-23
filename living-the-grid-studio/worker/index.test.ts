@@ -34,16 +34,28 @@ describe("community Worker integration", () => {
     `);
   });
 
-  it("permanently redirects www hosts to the apex preserving path and query", async () => {
-    const response = await SELF.fetch(
-      "http://www.localhost:3000/gallery/pixel-art?page=2&sort=new",
-      { redirect: "manual" },
-    );
-    expect(response.status).toBe(301);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/gallery/pixel-art?page=2&sort=new",
-    );
-  });
+  it.each(["GET", "POST"] as const)(
+    "permanently redirects www %s requests to the apex preserving method, path, and query",
+    async (method) => {
+      const response = await SELF.fetch(
+        "http://www.localhost:3000/gallery/pixel-art?page=2&sort=new",
+        {
+          ...(method === "POST"
+            ? {
+                body: JSON.stringify({ confirm: true }),
+                headers: { "Content-Type": "application/json" },
+              }
+            : {}),
+          method,
+          redirect: "manual",
+        },
+      );
+      expect(response.status).toBe(308);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/gallery/pixel-art?page=2&sort=new",
+      );
+    },
+  );
 
   it("replays an exact completed first save without duplicating database state", async () => {
     const owner = await seedUser("retry-owner");

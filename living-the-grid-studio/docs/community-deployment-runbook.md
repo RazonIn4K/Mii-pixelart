@@ -408,9 +408,22 @@ After explicit approval for resources and staging deployment:
    identity or pseudonym, cookie, OAuth value, email, IP, request body, report
    text, or project content.
 
-Staging acceptance requires zero high/critical security findings, zero failed
-foreign-key/integrity checks, no console errors, complete legacy API parity, and
-documented rollback evidence.
+Staging acceptance requires zero unapproved high/critical security findings,
+zero failed foreign-key/integrity checks, no console errors, complete legacy API
+parity, and documented rollback evidence.
+
+The only approved temporary exception is `GHSA-f88m-g3jw-g9cj`, owned by
+David Ortiz (`@RazonIn4K`) through **2026-07-29 UTC**. It is valid only while
+`pnpm audit --prod --audit-level high` remains clean and
+`pnpm verify:security-audit` confirms that the sole high/critical
+development finding is `sharp@0.34.5`, every finding is marked development-only,
+and every dependency path terminates in `miniflare>sharp` through the allowlisted
+Cloudflare Vite, Vitest-pool, or Wrangler toolchain. The verifier fails closed
+after the expiry, when the advisory disappears, when its version or dependency
+paths drift, or when any additional high/critical advisory appears. Remove the
+exception and verifier as soon as the first stable Cloudflare toolchain carrying
+`workers-sdk` PR #14493 is available; never extend or broaden it without a new
+explicit security approval.
 
 ## Production gate and cutover
 

@@ -12,6 +12,7 @@ export default defineConfig({
       "scripts/verify-hosted-staging-writable.test.ts",
       "scripts/verify-staging-live-auth.test.ts",
       "scripts/verify-licenses.test.ts",
+      "scripts/verify-security-audit.test.ts",
     ],
     testTimeout: 10_000,
   },

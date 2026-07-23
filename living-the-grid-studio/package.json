@@ -36,6 +36,7 @@
     "verify:hosted-staging-writable": "tsx scripts/verify-hosted-staging-writable-cli.ts",
     "verify:staging-live-auth": "tsx scripts/verify-staging-live-auth.ts",
     "verify:release-output": "tsx scripts/verify-release-output.ts",
+    "verify:security-audit": "tsx scripts/verify-security-audit.ts",
     "verify:studio": "tsx scripts/verify-studio-browser.ts",
     "cloudflare:security-insights": "tsx scripts/cloudflare-security-insights.ts",
     "save:templates": "tsx scripts/save-creative-template-fixtures.ts",

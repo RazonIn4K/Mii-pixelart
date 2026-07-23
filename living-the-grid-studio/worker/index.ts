@@ -76,9 +76,10 @@ async function handleRequest(
     const canonicalOrigin = new URL(env.PUBLIC_SITE_URL);
     if (url.hostname === `www.${canonicalOrigin.hostname}`) {
       // The www hostname is attached as a second production Custom Domain and
-      // permanently redirects to the apex, preserving path and query.
+      // permanently redirects to the apex while preserving method, path, and
+      // query.
       response = new Response(null, {
-        status: 301,
+        status: 308,
         headers: {
           Location: `${canonicalOrigin.origin}${url.pathname}${url.search}`,
         },

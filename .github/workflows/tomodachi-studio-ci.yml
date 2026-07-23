@@ -56,21 +56,8 @@ jobs:
       - name: Test release preflight gates
         run: pnpm test:preflight
 
-      - name: Audit production dependencies
-        run: pnpm audit --prod --audit-level high
-
-      - name: Audit development dependencies (temporary sharp advisory waiver)
-        shell: bash
-        run: |
-          set -euo pipefail
-          WAIVER_EXPIRY="2026-07-29"
-          TODAY_UTC="$(date -u +%F)"
-          if [[ "${TODAY_UTC}" > "${WAIVER_EXPIRY}" ]]; then
-            echo "Temporary GHSA-f88m-g3jw-g9cj waiver expired on ${WAIVER_EXPIRY}. Upgrade Wrangler, @cloudflare/vite-plugin, and @cloudflare/vitest-pool-workers to the first stable release containing workers-sdk PR #14493 and remove this waiver."
-            exit 1
-          fi
-          pnpm audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj
-          git checkout -- pnpm-workspace.yaml
+      - name: Audit production and development dependencies
+        run: pnpm verify:security-audit
 
       - name: Dry-run local Worker package
         run: pnpm worker:dry-run
