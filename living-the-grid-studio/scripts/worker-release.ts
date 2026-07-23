@@ -68,6 +68,7 @@ export interface ReleaseResult {
 interface ValidatedApproval {
   adminInternalId: string | null;
   deploymentPhase: DeploymentPhase;
+  domainCutover: { apex: string; www: string } | null;
   moderatorInternalId: string | null;
 }
 
@@ -84,6 +85,7 @@ const TARGETS: Record<
     workerName: string;
     environment: ReleaseTarget;
     googleProjectId: string | null;
+    wwwDomain: string | null;
     siteUrl: string;
     redirectUri: string;
     customDomain: string | null;
@@ -95,6 +97,7 @@ const TARGETS: Record<
     workerName: "tomodachi-studio",
     environment: "local",
     googleProjectId: null,
+    wwwDomain: null,
     siteUrl: "http://localhost:3000",
     redirectUri: "http://localhost:3000/api/auth/google/callback",
     customDomain: null,
@@ -105,6 +108,7 @@ const TARGETS: Record<
     workerName: "tomodachi-studio-staging",
     environment: "staging",
     googleProjectId: "tomodachi-studio-staging",
+    wwwDomain: null,
     siteUrl: "https://staging.tomodachi.pw",
     redirectUri: "https://staging.tomodachi.pw/api/auth/google/callback",
     customDomain: "staging.tomodachi.pw",
@@ -115,6 +119,7 @@ const TARGETS: Record<
     workerName: "tomodachi-studio-production",
     environment: "production",
     googleProjectId: "tomodachi-studio-production",
+    wwwDomain: "www.tomodachi.pw",
     siteUrl: "https://tomodachi.pw",
     redirectUri: "https://tomodachi.pw/api/auth/google/callback",
     customDomain: "tomodachi.pw",
@@ -535,9 +540,15 @@ function validateCustomDomainRoute(
     );
   }
   const routes = arrayAt(config, "routes", "Custom-domain routes");
+  const wwwDomain = TARGETS[target].wwwDomain;
   expectJsonExact(
     routes,
-    [{ pattern: expected, custom_domain: true }],
+    [
+      { pattern: expected, custom_domain: true },
+      ...(wwwDomain === null
+        ? []
+        : [{ pattern: wwwDomain, custom_domain: true }]),
+    ],
     "Custom-domain routes",
   );
   return expected;
@@ -725,6 +736,7 @@ function validateGeneratedConfig(
   sourcePath: string,
   target: ReleaseTarget,
   phase: DeploymentPhase | null = null,
+  domainCutover: { apex: string; www: string } | null = null,
 ): void {
   const expected = TARGETS[target];
   const selected = selectedSourceConfig(source, target);
@@ -761,7 +773,7 @@ function validateGeneratedConfig(
   expectExact(generated.name, expected.workerName, "Generated Worker name");
   validateOriginExposure(generated);
   validateCpuLimits(generated, target);
-  validateGeneratedRoutes(generated, target, phase);
+  validateGeneratedRoutes(generated, target, phase, domainCutover);
   expectExact(
     generated.compatibility_date,
     source.compatibility_date,
@@ -976,6 +988,7 @@ function validateGeneratedRoutes(
   generated: JsonRecord,
   target: ReleaseTarget,
   phase: DeploymentPhase | null,
+  domainCutover: { apex: string; www: string } | null = null,
 ): void {
   if (phase !== null && isTriggerlessProductionBootstrap(phase)) {
     if (target !== "production") {
@@ -992,6 +1005,16 @@ function validateGeneratedRoutes(
     return;
   }
   validateCustomDomainRoute(generated, target);
+  if (
+    target === "production" &&
+    domainCutover !== null &&
+    (domainCutover.apex !== "attach" ||
+      domainCutover.www !== "redirect-to-apex")
+  ) {
+    throw new ReleaseError(
+      "Production cutover approval does not authorize the generated routes.",
+    );
+  }
 }
 
 function isValidBootstrapSecret(
@@ -1177,20 +1200,20 @@ function requireApprovalText(
   return value;
 }
 const APEX_DISPOSITIONS = ["defer", "attach"] as const;
-const WWW_DISPOSITIONS = ["defer", "attach", "redirect-to-apex"] as const;
+const WWW_DISPOSITIONS = ["defer", "redirect-to-apex"] as const;
 
 function validateDomainCutover(
   infrastructure: JsonRecord,
   target: "staging" | "production",
   deploymentPhase: DeploymentPhase,
-): void {
+): { apex: string; www: string } | null {
   if (target !== "production") {
     if (infrastructure.domainCutover !== undefined) {
       throw new ReleaseError(
         "Staging approvals must not declare production domain cutover inputs.",
       );
     }
-    return;
+    return null;
   }
   const domainCutover = objectAt(
     infrastructure,
@@ -1217,13 +1240,14 @@ function validateDomainCutover(
         "Triggerless bootstrap requires deferred apex and www dispositions.",
       );
     }
-    return;
+    return { apex, www };
   }
-  if (apex !== "attach" || www === "defer") {
+  if (apex !== "attach" || www !== "redirect-to-apex") {
     throw new ReleaseError(
-      "Production releases require an attached apex and an explicit www disposition.",
+      "Production releases require an attached apex and a www redirect to the apex.",
     );
   }
+  return { apex, www };
 }
 
 function validateAuditedInputs(
@@ -1270,7 +1294,11 @@ function validateAuditedInputs(
   if (imagesDecision !== "approved" && imagesDecision !== "not-required") {
     throw new ReleaseError("Images usage approval input is invalid.");
   }
-  validateDomainCutover(infrastructure, target, deploymentPhase);
+  const domainCutover = validateDomainCutover(
+    infrastructure,
+    target,
+    deploymentPhase,
+  );
 
   const legal = objectAt(approval, "legal", "Legal readiness inputs");
   requireApprovalText(legal, "operatorIdentity", "Legal operator input");
@@ -1389,6 +1417,13 @@ function validateAuditedInputs(
       isCutoverProductionBootstrap(deploymentPhase),
       "Bootstrap production cutover state",
     );
+    if (isTriggerlessProductionBootstrap(deploymentPhase)) {
+      expectExact(
+        confirmations.scheduledMaintenanceWritesApproved,
+        false,
+        "Triggerless bootstrap scheduled-maintenance approval",
+      );
+    }
   } else {
     expectExact(
       confirmations.adminModeratorAssigned,
@@ -1418,7 +1453,7 @@ function validateAuditedInputs(
     );
   }
 
-  return { adminInternalId, deploymentPhase, moderatorInternalId };
+  return { adminInternalId, deploymentPhase, domainCutover, moderatorInternalId };
 }
 
 async function validateApproval(
@@ -1512,7 +1547,18 @@ async function validateApproval(
     "Deployment confirmations",
   );
   const requiredConfirmations = [
-    ...COMMON_CONFIRMATIONS,
+    ...COMMON_CONFIRMATIONS.filter((confirmation) => {
+      // Triggerless packaging removes every cron schedule, so scheduled
+      // maintenance writes cannot occur and must not carry a standing
+      // approval in this phase.
+      if (
+        isTriggerlessProductionBootstrap(deploymentPhase) &&
+        confirmation === "scheduledMaintenanceWritesApproved"
+      ) {
+        return false;
+      }
+      return true;
+    }),
     ...TARGET_CONFIRMATIONS[target].filter((confirmation) => {
       // Triggerless production bootstrap deliberately keeps cutover unapproved
       // until a later domain-attaching release.
@@ -1804,6 +1850,7 @@ export async function runRelease(
   const warnings: string[] = [];
   let bootstrapSecretsPath: string | null = null;
   let validatedDeployPhase: DeploymentPhase | null = null;
+  let deployDomainCutover: { apex: string; www: string } | null = null;
 
   dependencies.log(
     "info",
@@ -1839,6 +1886,7 @@ export async function runRelease(
       dependencies,
     );
     validatedDeployPhase = validatedApproval.deploymentPhase;
+    deployDomainCutover = validatedApproval.domainCutover;
     if (isBootstrapPhase(validatedApproval.deploymentPhase)) {
       bootstrapSecretsPath = await validateBootstrapSecretsFile(
         cwd,
@@ -1938,6 +1986,7 @@ export async function runRelease(
     sourcePath,
     options.target,
     validatedDeployPhase,
+    deployDomainCutover,
   );
 
   const deployArgs = ["exec", "wrangler", "deploy", "--config", generatedPath];

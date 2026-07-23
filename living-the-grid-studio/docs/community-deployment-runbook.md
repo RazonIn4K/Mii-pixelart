@@ -249,14 +249,17 @@ Readiness schema version 5 requires an explicit `deploymentPhase` and current
 target-specific ownership/confirmation fields. It contains no payment or
 consultation-enable field. Use
 `standard` for every writable deploy and every deploy after the first
-privileged account has been assigned. Two target-specific bootstrap phases,
-`staging-read-only-bootstrap` and `production-read-only-bootstrap`, break the
-first-account dependency. Both require
+privileged account has been assigned. Three target-specific bootstrap phases,
+`staging-read-only-bootstrap`, `production-read-only-bootstrap`, and
+`production-triggerless-bootstrap`, break the first-account dependency. All
+require
 `COMMUNITY_MUTATIONS_ENABLED=false`, null admin/moderator IDs,
 `adminModeratorAssigned=false`, an explicit
 `bootstrapReadOnlyApproved=true`, and no existing privileged users in the
 selected remote D1 database. Production bootstrap additionally requires passed
-staging acceptance and explicit production cutover approval. The wrapper
+staging acceptance; explicit production cutover approval is required exactly
+for `production-read-only-bootstrap` and must remain false for the
+triggerless phase, which also packages without hostname, route, or cron. The wrapper
 verifies the empty role state before it builds. Missing, legacy, cross-target,
 or contradictory phase fields fail closed. Every `standard` deploy
 requires one real internal UUID already assigned the exact `admin` role. The
@@ -266,7 +269,9 @@ the exact `moderator` role. The wrapper verifies every supplied assignment in
 remote D1. Every deploy approval must also explicitly acknowledge scheduled
 maintenance writes with `scheduledMaintenanceWritesApproved=true` because the
 hourly cleanup path can mutate D1/R2 even while community writes remain
-fail-closed.
+fail-closed. The triggerless production bootstrap is the exception: its
+packaging removes every cron schedule, so its approval must set
+`scheduledMaintenanceWritesApproved=false`.
 
 ## Staging gate and procedure
 
@@ -314,7 +319,7 @@ After explicit approval for resources and staging deployment:
    enable community mutations only in a later reviewed artifact used for
    authenticated write acceptance. Stop if the generated artifact contains the
    production hostname or if the staging hostname is already claimed.
-   - For the first deployment only, use readiness schema 4 with
+   - For the first deployment only, use readiness schema 5 with
      `deploymentPhase=staging-read-only-bootstrap`. Keep both privileged IDs
      null, `adminModeratorAssigned=false`,
      `writableCommunityDeployApproved=false`, and
@@ -325,12 +330,22 @@ After explicit approval for resources and staging deployment:
      (`tomodachi-studio-production` for production, `tomodachi-studio-staging`
      for staging), and production approvals must declare
      `infrastructure.domainCutover` with explicit `apex` (`defer` or `attach`)
-     and `www` (`defer`, `attach`, or `redirect-to-apex`) dispositions.
-     Triggerless bootstrap requires both dispositions deferred; cutover and
-     standard production require an attached apex and a non-deferred `www`
-     decision. Staging approvals must omit `domainCutover`. Free-text fields
-     such as `changeTicket` and `domainControlConfirmation` remain audit prose
-     and are never parsed for gating decisions.
+     and `www` (`defer` or `redirect-to-apex`) dispositions. Triggerless
+     bootstrap requires both dispositions deferred and
+     `scheduledMaintenanceWritesApproved=false`. Cutover and standard
+     production require an attached apex plus `www=redirect-to-apex`, which
+     the release gate binds to the generated routes: the packaged artifact
+     must attach both `tomodachi.pw` and `www.tomodachi.pw` Custom Domains,
+     and the Worker permanently redirects www requests to the apex preserving
+     path and query. Staging approvals must omit `domainCutover`. Free-text
+     fields such as `changeTicket` and `domainControlConfirmation` remain
+     audit prose and are never parsed for gating decisions.
+   - Deployment evidence must hash immutable, timestamped snapshots: before
+     each deploy, copy the approval file to
+     `.deployment-readiness/evidence/<target>.json.<UTC-timestamp>` (0600)
+     and record hashes against that snapshot. Never re-hash a mutated
+     approval file; later schema migrations must add a dated attestation
+     beside the original evidence instead of rewriting recorded hashes.
    - After the read-only Worker and staging hostname are available, the named
      admin signs in with the approved Google account. A separately staffed
      moderator signs in too when one will be assigned. OAuth provisioning

@@ -73,7 +73,20 @@ async function handleRequest(
   let response: Response;
 
   try {
-    if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+    const canonicalOrigin = new URL(env.PUBLIC_SITE_URL);
+    if (url.hostname === `www.${canonicalOrigin.hostname}`) {
+      // The www hostname is attached as a second production Custom Domain and
+      // permanently redirects to the apex, preserving path and query.
+      response = new Response(null, {
+        status: 301,
+        headers: {
+          Location: `${canonicalOrigin.origin}${url.pathname}${url.search}`,
+        },
+      });
+    } else if (
+      request.method === "OPTIONS" &&
+      url.pathname.startsWith("/api/")
+    ) {
       response = new Response(null, {
         status: 204,
         headers: { Allow: "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS" },

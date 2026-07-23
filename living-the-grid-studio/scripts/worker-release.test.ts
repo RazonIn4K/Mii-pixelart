@@ -203,7 +203,17 @@ function environmentConfig(
     ...(values.customDomain === null
       ? {}
       : {
-          routes: [{ pattern: values.customDomain, custom_domain: true }],
+          routes: [
+            { pattern: values.customDomain, custom_domain: true },
+            ...(target === "production"
+              ? [
+                  {
+                    pattern: `www.${values.customDomain}`,
+                    custom_domain: true,
+                  },
+                ]
+              : []),
+          ],
         }),
     vars: {
       ENVIRONMENT: target,
@@ -379,7 +389,8 @@ function approval(
       secretsConfigured: true,
       migrationsApproved: true,
       legalPlaceholdersReplaced: true,
-      scheduledMaintenanceWritesApproved: true,
+      scheduledMaintenanceWritesApproved:
+        deploymentPhase !== "production-triggerless-bootstrap",
       adminModeratorAssigned: !bootstrap,
       pricingApproved: true,
       rollbackReady: true,
@@ -1084,7 +1095,7 @@ describe("runRelease deploy gates", () => {
         { cwd: CWD, target: "production", intent: "deploy" },
         harness.dependencies,
       ),
-    ).rejects.toThrow("attached apex and an explicit www disposition");
+    ).rejects.toThrow("attached apex and a www redirect to the apex");
     expect(harness.calls).toHaveLength(0);
   });
   it("rejects unknown production domain cutover dispositions", async () => {
@@ -1103,6 +1114,46 @@ describe("runRelease deploy gates", () => {
         harness.dependencies,
       ),
     ).rejects.toThrow("Production domain cutover inputs are invalid");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects the removed www attach disposition", async () => {
+    const harness = makeHarness("production", { productionBootstrap: true });
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = JSON.parse(harness.files.get(approvalPath)!);
+    body.infrastructure.domainCutover = { apex: "attach", www: "attach" };
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Production domain cutover inputs are invalid");
+    expect(harness.calls).toHaveLength(0);
+  });
+  it("rejects triggerless bootstrap when scheduled maintenance writes are pre-approved", async () => {
+    const harness = makeHarness("production");
+    const approvalPath = path.join(
+      CWD,
+      ".deployment-readiness",
+      "production.json",
+    );
+    const body = JSON.parse(
+      JSON.stringify(
+        approval("production", false, {}, "production-triggerless-bootstrap"),
+      ),
+    );
+    body.confirmations.scheduledMaintenanceWritesApproved = true;
+    harness.files.set(approvalPath, JSON.stringify(body));
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "deploy" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Triggerless bootstrap scheduled-maintenance approval");
     expect(harness.calls).toHaveLength(0);
   });
   it("rejects staging approvals that declare production domain cutover inputs", async () => {
@@ -1664,6 +1715,7 @@ describe("production triggerless bootstrap", () => {
     const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
     expect(source.env.production.routes).toEqual([
       { pattern: "tomodachi.pw", custom_domain: true },
+      { pattern: "www.tomodachi.pw", custom_domain: true },
     ]);
     expect(source.triggers).toEqual({ crons: ["0 * * * *"] });
 
