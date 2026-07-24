@@ -5,6 +5,12 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
+import {
+  cliExitCode,
+  runWithTerminationSignals,
+  throwIfTerminationRequested,
+} from "./cli-termination";
+
 type JsonObject = Record<string, unknown>;
 
 const APP_ROOT = path.resolve(
@@ -22,10 +28,13 @@ const WRANGLER_CONFIG = "wrangler.jsonc";
 const MAX_COMMAND_OUTPUT_BYTES = 256 * 1_024;
 const MAX_PREFLIGHT_RESPONSE_BYTES = 64 * 1_024;
 const DEFAULT_TIMEOUT_MS = 20_000;
+const COMMAND_TIMEOUT_MS = 60_000;
+const COMMAND_KILL_GRACE_MS = 2_000;
 
 export type IdentitySlot = "owner" | "second-user";
 
 export interface StagingLiveAuthOptions {
+  abortSignal?: AbortSignal;
   baseUrl: string;
   expectedCommunityMutations: boolean;
   expectedConsultSales: boolean;
@@ -140,7 +149,10 @@ export interface StagingLiveAuthDependencies {
   launchBrowser: () => Promise<LiveAuthBrowserLike>;
   log: (message: string) => void;
   verifySessionsRevoked: (sessionIds: readonly string[]) => Promise<void>;
-  waitForHuman: (step: IdentitySlot | "sessions-ready") => Promise<void>;
+  waitForHuman: (
+    step: IdentitySlot | "sessions-ready",
+    signal?: AbortSignal,
+  ) => Promise<void>;
 }
 
 export class StagingLiveAuthError extends Error {
@@ -250,6 +262,13 @@ interface AcquiredIdentity extends BrowserMemoryIdentity {
   context: LiveAuthBrowserContextLike;
   /** Retained only for D1 cleanup verification; never expose or log this value. */
   sessionId: string;
+}
+
+interface LiveAuthContextLease {
+  context: LiveAuthBrowserContextLike;
+  request: BrowserMemoryFetch;
+  sessionSnapshot?: SessionSnapshot | null;
+  slot: IdentitySlot;
 }
 
 interface CommandResult {
@@ -582,78 +601,84 @@ export async function withStagingLiveAuthSessions<T>(
     ...defaultDependencies(),
     ...dependencyOverrides,
   } satisfies StagingLiveAuthDependencies;
+  throwIfTerminationRequested(options.abortSignal);
   const validated = await runStagingLiveAuthPreflight(options, dependencies);
+  throwIfTerminationRequested(options.abortSignal);
   dependencies.log(
     "[live-auth] Source, Worker version, mutation mode, and retired consultation state verified.",
   );
 
-  const browser = await dependencies.launchBrowser();
+  let browser: LiveAuthBrowserLike | undefined;
+  const leases: LiveAuthContextLease[] = [];
   const acquired: AcquiredIdentity[] = [];
   let callbackResult!: T;
   let primaryError: unknown;
   const cleanupErrors: unknown[] = [];
 
   try {
+    throwIfTerminationRequested(options.abortSignal);
+    browser = await dependencies.launchBrowser();
+    throwIfTerminationRequested(options.abortSignal);
     for (const slot of ["owner", "second-user"] as const) {
+      throwIfTerminationRequested(options.abortSignal);
       const context = await browser.newContext({
         acceptDownloads: false,
         baseURL: validated.target.origin,
         serviceWorkers: "block",
         viewport: { height: 900, width: 1280 },
       });
-      try {
-        const page = await context.newPage();
-        await page.goto(`${validated.target.origin}/me`, {
-          timeout: validated.timeoutMs,
-          waitUntil: "domcontentloaded",
-        });
-        dependencies.log(
-          `[live-auth] Complete Google sign-in and profile setup for the ${safeSlotLabel(slot)} in the new Chrome window, then return here.`,
-        );
-        await dependencies.waitForHuman(slot);
+      const request = createBrowserMemoryFetch(
+        validated.target,
+        context.request,
+        validated.timeoutMs,
+      );
+      const lease: LiveAuthContextLease = { context, request, slot };
+      leases.push(lease);
+      const page = await context.newPage();
+      await page.goto(`${validated.target.origin}/me`, {
+        timeout: validated.timeoutMs,
+        waitUntil: "domcontentloaded",
+      });
+      dependencies.log(
+        `[live-auth] Complete Google sign-in and profile setup for the ${safeSlotLabel(slot)} in the new Chrome window, then return here.`,
+      );
+      throwIfTerminationRequested(options.abortSignal);
+      await dependencies.waitForHuman(slot, options.abortSignal);
+      throwIfTerminationRequested(options.abortSignal);
 
-        const request = createBrowserMemoryFetch(
-          validated.target,
-          context.request,
-          validated.timeoutMs,
+      const snapshot = await readSessionSnapshot(request);
+      lease.sessionSnapshot = snapshot;
+      throwIfTerminationRequested(options.abortSignal);
+      if (!snapshot) {
+        throw new StagingLiveAuthError(
+          `The ${safeSlotLabel(slot)} browser did not contain an authenticated staging session.`,
         );
-        const snapshot = await readSessionSnapshot(request);
-        if (!snapshot) {
-          throw new StagingLiveAuthError(
-            `The ${safeSlotLabel(slot)} browser did not contain an authenticated staging session.`,
-          );
-        }
-        if (!snapshot.onboarded) {
-          throw new StagingLiveAuthError(
-            `The ${safeSlotLabel(slot)} must finish username and Terms setup before this gate can continue.`,
-          );
-        }
-        if (
-          acquired.some(
-            (identity) => identity.internalUserId === snapshot.internalUserId,
-          )
-        ) {
-          throw new StagingLiveAuthError(
-            "The two browser sessions must belong to distinct approved Google identities.",
-          );
-        }
-        acquired.push({
-          context,
-          internalUserId: snapshot.internalUserId,
-          request,
-          role: snapshot.role,
-          sessionId: snapshot.sessionId,
-          slot,
-        });
-        dependencies.log(
-          `[live-auth] The ${safeSlotLabel(slot)} session is authenticated and onboarded inside its ephemeral browser profile.`,
-        );
-      } catch (error) {
-        if (!acquired.some((identity) => identity.context === context)) {
-          await context.close().catch(() => undefined);
-        }
-        throw error;
       }
+      if (!snapshot.onboarded) {
+        throw new StagingLiveAuthError(
+          `The ${safeSlotLabel(slot)} must finish username and Terms setup before this gate can continue.`,
+        );
+      }
+      if (
+        acquired.some(
+          (identity) => identity.internalUserId === snapshot.internalUserId,
+        )
+      ) {
+        throw new StagingLiveAuthError(
+          "The two browser sessions must belong to distinct approved Google identities.",
+        );
+      }
+      acquired.push({
+        context,
+        internalUserId: snapshot.internalUserId,
+        request,
+        role: snapshot.role,
+        sessionId: snapshot.sessionId,
+        slot,
+      });
+      dependencies.log(
+        `[live-auth] The ${safeSlotLabel(slot)} session is authenticated and onboarded inside its ephemeral browser profile.`,
+      );
     }
 
     const publicIdentities = acquired.map(
@@ -670,10 +695,12 @@ export async function withStagingLiveAuthSessions<T>(
     // Interactive sign-in can take several minutes. Recheck Git, the active
     // Worker version, public release identity, and flags immediately before
     // handing either authenticated adapter to a writable callback.
+    throwIfTerminationRequested(options.abortSignal);
     const freshDeployment = await runStagingLiveAuthPreflight(
       options,
       dependencies,
     );
+    throwIfTerminationRequested(options.abortSignal);
     callbackResult = await useSessions(publicIdentities, {
       communityMutationsEnabled: true,
       consultSalesEnabled: false,
@@ -682,31 +709,43 @@ export async function withStagingLiveAuthSessions<T>(
       sourceCommit: freshDeployment.expectedSourceSha,
       workerVersion: freshDeployment.expectedWorkerVersion,
     });
+    throwIfTerminationRequested(options.abortSignal);
   } catch (error) {
     primaryError = error;
   } finally {
-    for (const identity of acquired) {
+    const discoveredSessionIds = new Set<string>();
+    for (const lease of leases) {
+      if (lease.sessionSnapshot === undefined) {
+        try {
+          lease.sessionSnapshot = await readSessionSnapshot(lease.request);
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      if (lease.sessionSnapshot) {
+        discoveredSessionIds.add(lease.sessionSnapshot.sessionId);
+      }
       try {
-        await revokeAndVerify(identity.request);
+        await revokeAndVerify(lease.request);
       } catch (error) {
         cleanupErrors.push(error);
       }
-      await identity.context.close().catch((error: unknown) => {
+      await lease.context.close().catch((error: unknown) => {
         cleanupErrors.push(error);
       });
     }
-    if (acquired.length > 0) {
+    if (discoveredSessionIds.size > 0) {
       try {
-        await dependencies.verifySessionsRevoked(
-          acquired.map((identity) => identity.sessionId),
-        );
+        await dependencies.verifySessionsRevoked([...discoveredSessionIds]);
       } catch (error) {
         cleanupErrors.push(error);
       }
     }
-    await browser.close().catch((error: unknown) => {
-      cleanupErrors.push(error);
-    });
+    if (browser) {
+      await browser.close().catch((error: unknown) => {
+        cleanupErrors.push(error);
+      });
+    }
   }
 
   if (primaryError !== undefined) {
@@ -954,6 +993,7 @@ async function runCommand(
   return new Promise((resolve, reject) => {
     const child = spawn(command, [...args], {
       cwd,
+      detached: process.platform !== "win32",
       env: {
         ...process.env,
         WRANGLER_LOG_SANITIZE: "true",
@@ -964,32 +1004,95 @@ async function runCommand(
     });
     let stdout = "";
     let outputBytes = 0;
+    let exceeded = false;
+    let settled = false;
+    let timedOut = false;
+    let timeout: NodeJS.Timeout | undefined;
+    let killTimer: NodeJS.Timeout | undefined;
+    let settleTimer: NodeJS.Timeout | undefined;
+    const finish = (callback: () => void): void => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      if (killTimer) clearTimeout(killTimer);
+      if (settleTimer) clearTimeout(settleTimer);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      child.unref();
+      callback();
+    };
+    const terminationError = (): StagingLiveAuthError =>
+      new StagingLiveAuthError(
+        timedOut
+          ? "A required local preflight command timed out."
+          : "A required local preflight command exceeded its output limit.",
+      );
+    const signalChild = (signal: NodeJS.Signals): void => {
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      if (process.platform !== "win32" && child.pid) {
+        try {
+          process.kill(-child.pid, signal);
+          return;
+        } catch {
+          // Fall back to the direct child below.
+        }
+      }
+      try {
+        child.kill(signal);
+      } catch {
+        // The final bounded settle timer below owns the sanitized failure.
+      }
+    };
+    const beginTermination = (): void => {
+      if (killTimer || settleTimer || settled) return;
+      signalChild("SIGTERM");
+      killTimer = setTimeout(() => {
+        signalChild("SIGKILL");
+        settleTimer = setTimeout(
+          () => finish(() => reject(terminationError())),
+          COMMAND_KILL_GRACE_MS,
+        );
+      }, COMMAND_KILL_GRACE_MS);
+    };
+    timeout = setTimeout(() => {
+      timedOut = true;
+      beginTermination();
+    }, COMMAND_TIMEOUT_MS);
     const capture = (chunk: Buffer): void => {
       outputBytes += chunk.byteLength;
-      if (outputBytes <= MAX_COMMAND_OUTPUT_BYTES) stdout += chunk.toString();
+      if (outputBytes <= MAX_COMMAND_OUTPUT_BYTES) {
+        stdout += chunk.toString();
+      } else if (!exceeded) {
+        exceeded = true;
+        beginTermination();
+      }
     };
     child.stdout.on("data", capture);
     // Drain stderr without retaining or repeating CLI/auth diagnostics.
     child.stderr.on("data", (chunk: Buffer) => {
       outputBytes += chunk.byteLength;
+      if (outputBytes > MAX_COMMAND_OUTPUT_BYTES && !exceeded) {
+        exceeded = true;
+        beginTermination();
+      }
     });
-    child.once("error", () =>
-      reject(
-        new StagingLiveAuthError(
-          "A required local preflight command could not start.",
-        ),
-      ),
-    );
-    child.once("close", (code) => {
-      if (outputBytes > MAX_COMMAND_OUTPUT_BYTES) {
+    child.once("error", () => {
+      finish(() =>
         reject(
           new StagingLiveAuthError(
-            "A required local preflight command exceeded its output limit.",
+            "A required local preflight command could not start.",
           ),
-        );
-        return;
-      }
-      resolve({ exitCode: code ?? 1, stdout });
+        ),
+      );
+    });
+    child.once("close", (code) => {
+      finish(() => {
+        if (timedOut || exceeded) {
+          reject(terminationError());
+        } else {
+          resolve({ exitCode: code ?? 1, stdout });
+        }
+      });
     });
   });
 }
@@ -1056,7 +1159,7 @@ function defaultDependencies(): StagingLiveAuthDependencies {
     },
     log: (message) => console.log(message),
     verifySessionsRevoked: verifyStagingSessionsRevoked,
-    waitForHuman: async (step) => {
+    waitForHuman: async (step, signal) => {
       const reader = createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -1066,7 +1169,12 @@ function defaultDependencies(): StagingLiveAuthDependencies {
           ? "Press Enter to revoke both sessions and close the ephemeral browser. "
           : `Press Enter after the ${safeSlotLabel(step)} has finished Google sign-in and profile setup. `;
       try {
-        await reader.question(prompt);
+        await reader.question(prompt, { signal });
+      } catch (error) {
+        if (signal?.aborted) {
+          throwIfTerminationRequested(signal);
+        }
+        throw error;
       } finally {
         reader.close();
       }
@@ -1125,16 +1233,19 @@ export function parseStagingLiveAuthArgs(
   return options;
 }
 
-async function main(): Promise<void> {
+async function main(abortSignal: AbortSignal): Promise<void> {
   const options = parseStagingLiveAuthArgs(process.argv.slice(2));
-  const result = await withStagingLiveAuthSessions(options, async () => {
-    const dependencies = defaultDependencies();
-    dependencies.log(
-      "[live-auth] Both in-memory adapters are available to an integrated writable harness.",
-    );
-    await dependencies.waitForHuman("sessions-ready");
-    return "standalone-session-check" as const;
-  });
+  const result = await withStagingLiveAuthSessions(
+    { ...options, abortSignal },
+    async () => {
+      const dependencies = defaultDependencies();
+      dependencies.log(
+        "[live-auth] Both in-memory adapters are available to an integrated writable harness.",
+      );
+      await dependencies.waitForHuman("sessions-ready", abortSignal);
+      return "standalone-session-check" as const;
+    },
+  );
   console.log(
     JSON.stringify(
       {
@@ -1155,12 +1266,14 @@ const isCli =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCli) {
-  main().catch((error: unknown) => {
-    console.error(
-      error instanceof Error
-        ? `${error.name}: ${error.message}`
-        : "StagingLiveAuthError: The live-auth runner failed.",
-    );
-    process.exitCode = 1;
-  });
+  runWithTerminationSignals((signal) => main(signal)).catch(
+    (error: unknown) => {
+      console.error(
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : "StagingLiveAuthError: The live-auth runner failed.",
+      );
+      process.exitCode = cliExitCode(error);
+    },
+  );
 }

@@ -97,6 +97,7 @@ export interface P4PhaseAManifestRequest {
 }
 
 export interface HostedStagingP4PhaseAOptions {
+  abortSignal?: AbortSignal;
   captureCreationManifest(
     request: StagingManifestRequest,
   ): Promise<StagingFixtureManifest>;
@@ -180,6 +181,7 @@ class P4PhaseARequestError extends HostedStagingP4PhaseAError {
 export async function runHostedStagingP4PhaseA(
   options: HostedStagingP4PhaseAOptions,
 ): Promise<HostedStagingP4PhaseAResult> {
+  options.abortSignal?.throwIfAborted();
   const target = parseHostedStagingWritableTarget(STAGING_ORIGIN, {
     allowLoopback: options.unsafeAllowLoopbackFixture === true,
   });
@@ -189,6 +191,7 @@ export async function runHostedStagingP4PhaseA(
     options.verifyDeployment,
     "Deployment evidence could not be verified safely.",
   );
+  options.abortSignal?.throwIfAborted();
   validateStagingDeploymentEvidence(evidence, {
     origin: target.origin,
     sourceCommit: options.expectedSourceCommit,
@@ -250,6 +253,7 @@ export async function runHostedStagingP4PhaseA(
       "The pre-run social manifest could not be captured safely.",
     ),
   );
+  options.abortSignal?.throwIfAborted();
   expect(
     creationBefore.fixtureActiveCreationRows === 0 &&
       creationBefore.fixtureDeletedCreationRows === 0 &&
@@ -826,6 +830,9 @@ export async function runHostedStagingP4PhaseA(
     }
   }
 
+  if (options.abortSignal?.aborted && runFailure === undefined) {
+    runFailure = options.abortSignal.reason;
+  }
   if (runFailure && unresolvedCleanupFailures.length > 0) {
     throw new AggregateError(
       [runFailure, ...unresolvedCleanupFailures],
@@ -833,6 +840,7 @@ export async function runHostedStagingP4PhaseA(
     );
   }
   if (runFailure) {
+    options.abortSignal?.throwIfAborted();
     throw sanitizeFailure(
       runFailure,
       "P4 phase A stopped at its first failed assertion.",
@@ -1494,6 +1502,9 @@ async function performRequest(
   const method = (requestInit.method ?? "GET").toUpperCase();
   const mutation = !["GET", "HEAD", "OPTIONS"].includes(method);
   const phase = expected.phase ?? "scenario";
+  if (phase === "scenario") {
+    options.abortSignal?.throwIfAborted();
+  }
   if (
     counters.requests >= FIXED_P4_PHASE_A_LIMITS.maxRequests ||
     (phase === "scenario" &&
@@ -1583,6 +1594,9 @@ async function performRequest(
   } catch (error) {
     if (response?.body && !response.bodyUsed) {
       void response.body.cancel("P4 phase A stopped.").catch(() => {});
+    }
+    if (phase === "scenario") {
+      options.abortSignal?.throwIfAborted();
     }
     if (controller.signal.aborted) {
       throw new P4PhaseARequestError(`${expected.label} timed out.`, true);

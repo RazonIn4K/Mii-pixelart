@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { cliExitCode, runWithTerminationSignals } from "./cli-termination";
 import {
   consumeP4PhaseAApproval,
   loadP4PhaseAApproval,
@@ -140,6 +141,7 @@ export function createP4PhaseASocialManifestCapture(
 
 export async function runIntegratedHostedStagingP4PhaseA(
   overrides: Partial<IntegratedP4PhaseACliDependencies> = {},
+  abortSignal?: AbortSignal,
 ): Promise<IntegratedP4PhaseACliResult> {
   const dependencies = {
     consumeApproval: (approval: P4PhaseAApproval) =>
@@ -155,12 +157,14 @@ export async function runIntegratedHostedStagingP4PhaseA(
   } satisfies IntegratedP4PhaseACliDependencies;
 
   const approval = await dependencies.loadApproval();
+  abortSignal?.throwIfAborted();
   const captureCreationManifest =
     dependencies.createCreationManifestCapture(approval);
   const captureSocialManifest =
     dependencies.createSocialManifestCapture(approval);
   const liveAuth = await dependencies.withSessions(
     {
+      abortSignal,
       baseUrl: approval.target,
       expectedCommunityMutations: true,
       expectedConsultSales: false,
@@ -168,6 +172,7 @@ export async function runIntegratedHostedStagingP4PhaseA(
       expectedWorkerVersion: approval.workerVersion,
     },
     async (identities, deployment) => {
+      abortSignal?.throwIfAborted();
       const freshApproval = parseP4PhaseAApproval(approval, dependencies.now());
       const owner = identityForSlot(identities, "owner");
       const secondUser = identityForSlot(identities, "second-user");
@@ -192,8 +197,11 @@ export async function runIntegratedHostedStagingP4PhaseA(
 
       // Consume only after both ephemeral sessions and the exact deployment
       // have been reverified, but before the first acceptance mutation.
+      abortSignal?.throwIfAborted();
       await dependencies.consumeApproval(freshApproval);
+      abortSignal?.throwIfAborted();
       return dependencies.runAcceptance({
+        abortSignal,
         captureCreationManifest,
         captureSocialManifest,
         expectedOwnerUserId: freshApproval.ownerUserId,
@@ -363,13 +371,13 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function main(): Promise<void> {
+async function main(abortSignal: AbortSignal): Promise<void> {
   if (process.argv.length !== 2) {
     throw new P4PhaseACliError(
       "This command accepts no CLI values; use the fixed private P4 phase A approval file.",
     );
   }
-  const result = await runIntegratedHostedStagingP4PhaseA();
+  const result = await runIntegratedHostedStagingP4PhaseA({}, abortSignal);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -378,12 +386,14 @@ const isCli =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCli) {
-  main().catch((error: unknown) => {
-    console.error(
-      error instanceof Error
-        ? `${error.name}: ${error.message}`
-        : "P4PhaseACliError: The integrated P4 phase A acceptance failed.",
-    );
-    process.exitCode = 1;
-  });
+  runWithTerminationSignals((signal) => main(signal)).catch(
+    (error: unknown) => {
+      console.error(
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : "P4PhaseACliError: The integrated P4 phase A acceptance failed.",
+      );
+      process.exitCode = cliExitCode(error);
+    },
+  );
 }

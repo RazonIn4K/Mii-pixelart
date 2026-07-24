@@ -38,6 +38,7 @@ export interface StagingManifestRequest {
 }
 
 export interface HostedStagingWritableOptions {
+  abortSignal?: AbortSignal;
   baseUrl: string;
   captureManifest(
     request: StagingManifestRequest,
@@ -370,6 +371,7 @@ export function assertWritableRequestAllowed(
 export async function runHostedStagingWritableAcceptance(
   options: HostedStagingWritableOptions,
 ): Promise<HostedStagingWritableResult> {
+  options.abortSignal?.throwIfAborted();
   const target = parseHostedStagingWritableTarget(options.baseUrl, {
     allowLoopback: options.unsafeAllowLoopbackFixture === true,
   });
@@ -413,6 +415,7 @@ export async function runHostedStagingWritableAcceptance(
     options.verifyDeployment,
     "Deployment evidence could not be verified safely.",
   );
+  options.abortSignal?.throwIfAborted();
   validateStagingDeploymentEvidence(evidence, {
     origin: target.origin,
     sourceCommit: options.expectedSourceCommit,
@@ -442,6 +445,7 @@ export async function runHostedStagingWritableAcceptance(
       "The pre-run fixture manifest could not be captured safely.",
     ),
   );
+  options.abortSignal?.throwIfAborted();
   expect(
     before.fixtureActiveCreationRows === 0 &&
       before.fixtureDeletedCreationRows === 0 &&
@@ -467,6 +471,7 @@ export async function runHostedStagingWritableAcceptance(
       options.fetchImpl,
       timeoutMs,
       { label: "authenticated session preflight", statuses: [200] },
+      options.abortSignal,
     );
     const sessionData = objectAt(session.body, "data", "Session envelope");
     const sessionUser = objectAt(sessionData, "user", "Session user");
@@ -494,6 +499,7 @@ export async function runHostedStagingWritableAcceptance(
       options.fetchImpl,
       timeoutMs,
       { label: "fixture creation", statuses: [201] },
+      options.abortSignal,
     );
     const createdData = objectAt(created.body, "data", "Creation envelope");
     const creationId = String(createdData.id ?? "");
@@ -529,6 +535,7 @@ export async function runHostedStagingWritableAcceptance(
       options.fetchImpl,
       timeoutMs,
       { label: "fixture read-back", statuses: [200] },
+      options.abortSignal,
     );
     const ownedData = objectAt(owned.body, "data", "Owned creation envelope");
     const ownedCreation = objectAt(ownedData, "creation", "Owned creation");
@@ -557,6 +564,7 @@ export async function runHostedStagingWritableAcceptance(
       options.fetchImpl,
       timeoutMs,
       { label: "fixture revision save", statuses: [200] },
+      options.abortSignal,
     );
     const savedData = objectAt(saved.body, "data", "Saved creation envelope");
     const nextEtag = normalizeEtag(saved.response.headers.get("etag"));
@@ -588,6 +596,7 @@ export async function runHostedStagingWritableAcceptance(
       options.fetchImpl,
       timeoutMs,
       { label: "stale revision conflict", statuses: [409] },
+      options.abortSignal,
     );
     const conflictError = objectAt(conflict.body, "error", "Conflict envelope");
     expect(
@@ -678,6 +687,9 @@ export async function runHostedStagingWritableAcceptance(
     }
   }
 
+  if (options.abortSignal?.aborted && runFailure === undefined) {
+    runFailure = options.abortSignal.reason;
+  }
   if (runFailure && cleanupFailure) {
     const runMsg =
       runFailure instanceof Error ? runFailure.message : String(runFailure);
@@ -689,11 +701,13 @@ export async function runHostedStagingWritableAcceptance(
       `Writable acceptance failed and cleanup or reconciliation also failed. run=${runMsg}; cleanup=${cleanupMsg}`,
     );
   }
-  if (runFailure)
+  if (runFailure) {
+    options.abortSignal?.throwIfAborted();
     throw sanitizeFailure(
       runFailure,
       "Writable acceptance stopped at its first failed assertion.",
     );
+  }
   if (cleanupFailure || !after) {
     throw sanitizeFailure(
       cleanupFailure,
@@ -786,7 +800,9 @@ async function apiRequest(
   fetchImpl: AcceptanceFetch,
   timeoutMs: number,
   expected: ExpectedResponse,
+  abortSignal?: AbortSignal,
 ): Promise<ParsedApiResponse> {
+  abortSignal?.throwIfAborted();
   const headers = new Headers({
     Accept: "application/json",
     "User-Agent": "Tomodachi-Staging-Writable-Acceptance/1.0",
@@ -870,6 +886,7 @@ async function apiRequest(
     if (response?.body && !response.bodyUsed) {
       void response.body.cancel("Writable acceptance stopped.").catch(() => {});
     }
+    abortSignal?.throwIfAborted();
     if (controller.signal.aborted) {
       throw new HostedStagingWritableError(`${expected.label} timed out.`);
     }

@@ -7,6 +7,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
+import { cliExitCode, runWithTerminationSignals } from "./cli-termination";
 import {
   runHostedStagingWritableAcceptance,
   type HostedStagingWritableOptions,
@@ -587,6 +588,7 @@ export function createWranglerManifestCapture(
 
 export async function runIntegratedHostedStagingWritable(
   dependencyOverrides: Partial<IntegratedWritableCliDependencies> = {},
+  abortSignal?: AbortSignal,
 ): Promise<IntegratedWritableCliResult> {
   const dependencies = {
     consumeApproval: (approval: StagingWritableApproval) =>
@@ -601,7 +603,9 @@ export async function runIntegratedHostedStagingWritable(
     ...dependencyOverrides,
   } satisfies IntegratedWritableCliDependencies;
   const approval = await dependencies.loadApproval();
+  abortSignal?.throwIfAborted();
   const liveAuthOptions: StagingLiveAuthOptions = {
+    abortSignal,
     baseUrl: approval.target,
     expectedCommunityMutations: true,
     expectedConsultSales: false,
@@ -612,6 +616,7 @@ export async function runIntegratedHostedStagingWritable(
   const liveAuth = await dependencies.withSessions(
     liveAuthOptions,
     async (identities, deployment) => {
+      abortSignal?.throwIfAborted();
       const freshApproval = parseStagingWritableApproval(
         approval,
         dependencies.now(),
@@ -627,8 +632,11 @@ export async function runIntegratedHostedStagingWritable(
           "The authenticated browser sessions do not match the two approved internal users.",
         );
       }
+      abortSignal?.throwIfAborted();
       await dependencies.consumeApproval(freshApproval);
+      abortSignal?.throwIfAborted();
       return dependencies.runAcceptance({
+        abortSignal,
         baseUrl: freshApproval.target,
         captureManifest,
         expectedSourceCommit: freshApproval.sourceCommit,
@@ -1551,13 +1559,13 @@ async function runBoundedCommand(
   });
 }
 
-async function main(): Promise<void> {
+async function main(abortSignal: AbortSignal): Promise<void> {
   if (process.argv.length !== 2) {
     throw new StagingWritableCliError(
       "This command accepts no CLI values; use the fixed private approval file.",
     );
   }
-  const result = await runIntegratedHostedStagingWritable();
+  const result = await runIntegratedHostedStagingWritable({}, abortSignal);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -1566,12 +1574,14 @@ const isCli =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCli) {
-  main().catch((error: unknown) => {
-    console.error(
-      error instanceof Error
-        ? `${error.name}: ${error.message}`
-        : "StagingWritableCliError: The integrated staging acceptance failed.",
-    );
-    process.exitCode = 1;
-  });
+  runWithTerminationSignals((signal) => main(signal)).catch(
+    (error: unknown) => {
+      console.error(
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : "StagingWritableCliError: The integrated staging acceptance failed.",
+      );
+      process.exitCode = cliExitCode(error);
+    },
+  );
 }
