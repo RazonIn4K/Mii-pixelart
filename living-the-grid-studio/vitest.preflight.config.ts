@@ -10,6 +10,7 @@ export default defineConfig({
       "scripts/verify-hosted-read-only.test.ts",
       "scripts/verify-hosted-staging-writable-cli.test.ts",
       "scripts/verify-hosted-staging-writable.test.ts",
+      "scripts/verify-hosted-staging-p4-phase-a.test.ts",
       "scripts/verify-staging-live-auth.test.ts",
       "scripts/verify-licenses.test.ts",
     ],

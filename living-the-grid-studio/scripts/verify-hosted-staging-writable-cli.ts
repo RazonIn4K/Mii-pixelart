@@ -109,6 +109,15 @@ export interface WranglerManifestDependencies {
   ): Promise<{ bytes: number; sha256: string }>;
 }
 
+export interface WranglerCreationManifestApproval {
+  limits: {
+    fixtureR2Bytes: number;
+    maxPendingR2Objects: number;
+    maxSingleR2ObjectBytes: number;
+  };
+  ownerUserId: string;
+}
+
 export interface ListedR2Object {
   key: string;
   size: number;
@@ -423,7 +432,7 @@ export async function consumeStagingWritableApproval(
 }
 
 export function createWranglerManifestCapture(
-  approval: StagingWritableApproval,
+  approval: WranglerCreationManifestApproval,
   dependencyOverrides: Partial<WranglerManifestDependencies> = {},
 ): (request: StagingManifestRequest) => Promise<StagingFixtureManifest> {
   const dependencies = {
@@ -886,7 +895,7 @@ function parseR2ObjectCount(payload: unknown): number {
 function validateListedR2Objects(
   value: readonly ListedR2Object[],
   creationId: string,
-  limits: typeof FIXED_STAGING_WRITABLE_LIMITS,
+  limits: WranglerCreationManifestApproval["limits"],
 ): ListedR2Object[] {
   if (!Array.isArray(value) || value.length > limits.maxPendingR2Objects) {
     throw new StagingWritableCliError(
@@ -1061,21 +1070,25 @@ function defaultApprovalFileDependencies(): ApprovalFileDependencies {
 function defaultWranglerManifestDependencies(): WranglerManifestDependencies {
   return {
     listR2Prefix: runR2PrefixAuditWorker,
-    runJson: async (args) => {
-      const result = await runBoundedCommand(args, MAX_JSON_OUTPUT_BYTES, true);
-      try {
-        return JSON.parse(result.text) as unknown;
-      } catch {
-        throw new StagingWritableCliError(
-          "Wrangler returned invalid JSON during staging reconciliation.",
-        );
-      }
-    },
+    runJson: runBoundedWranglerJson,
     streamObjectBytes: async (args, byteCeiling) => {
       const result = await runBoundedCommand(args, byteCeiling, false);
       return { bytes: result.bytes, sha256: result.sha256 };
     },
   };
+}
+
+export async function runBoundedWranglerJson(
+  args: readonly string[],
+): Promise<unknown> {
+  const result = await runBoundedCommand(args, MAX_JSON_OUTPUT_BYTES, true);
+  try {
+    return JSON.parse(result.text) as unknown;
+  } catch {
+    throw new StagingWritableCliError(
+      "Wrangler returned invalid JSON during staging reconciliation.",
+    );
+  }
 }
 
 async function runR2PrefixAuditWorker(
