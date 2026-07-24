@@ -21,6 +21,35 @@ Stop and obtain explicit owner approval before each of these independent gates:
 Approval for one gate does not authorize a later gate. Never commit, push,
 deploy, provision, or modify DNS/OAuth from an implementation-only request.
 
+## Current environment truth
+
+This snapshot is operational context, not deployment authority:
+
+- GitHub PR #2 and GitLab MR !2 review exact head
+  `4b5215d850ac4890ef89c523c5d8e6a5379b311b`. Owned GitHub CI and immutable
+  exact-head GitLab SAST, secret-detection, and dependency-scanning evidence
+  passed. The reviews remain Draft / HOLD. This is the provider-reported
+  checkpoint before the acceptance-hardening candidate in this change. The
+  candidate must first be committed, then its resulting immutable commit must
+  receive fresh exact-head CI and security evidence. Only that reviewed commit,
+  named by its full SHA in a new approval, may be deployed; this runbook does
+  not predeclare a future SHA.
+- Staging serves `a964729f643b188f5553ce775ef5bee8a9def6ec` as deployment
+  `17d26641-d145-404f-b78b-4aa9ae1d7d1e`, Worker version
+  `01e306d7-c079-4eda-8fe7-2e098c77b82c`, with community mutations enabled and
+  migrations `0001`-`0009`. Its anonymous and bounded P2/P3 evidence is partial
+  launch evidence; `stagingAcceptancePassed` remains false.
+- Production traffic remains on Pages. A hidden triggerless production Worker
+  exists at deployment `fa682161-be1c-4211-8559-01e14896f4cc`, version
+  `f4e8c796-6e18-4fc9-9e35-2aec0f57391a`, from source `9a4026f`. It has no
+  hostname, route, cron, workers.dev, or preview exposure. Production resources,
+  OAuth, secrets, and migrations `0001`-`0009` exist, but the triggerless
+  approval/evidence is not a cutover record.
+- No current readiness file authorizes deploying `4b5215d`, writing new staging
+  fixtures, merging the reviews, attaching a production hostname, changing a
+  role, or enabling production writes. Every historical evidence file remains
+  immutable.
+
 ## Launch blockers outside infrastructure
 
 - Operator David Ortiz and Illinois, United States governing law are recorded
@@ -54,10 +83,10 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
   configuration in both source and generated staging artifacts and rejects it
   in local or production configuration. Cloudflare may allow occasional CPU
   overruns, so treat this as a cost and runaway-work guardrail rather than a
-  hard wall. This
-  resolves the plan-level 10 ms blocker only: staging remains read-only until
-  an approved writable acceptance run measures full-request image generation,
-  the scheduled cleanup handler, quotas, derivatives, cleanup, and cost. See
+  hard wall. This resolves the plan-level 10 ms blocker only. Staging is now
+  writable for approved acceptance on `a964729f`, but the complete image,
+  quota, retention, scheduled-cleanup, cost, and exact-review-head acceptance
+  remains open. See
   [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 - A real Chrome 150 diagnostic on 2026-07-13 exercised the live read-only
   staging homepage at 390×844 with cache disabled, 4× CPU slowdown, 150 ms
@@ -400,14 +429,39 @@ After explicit approval for resources and staging deployment:
    integration tests to prove the retired payment paths return `410`, do not
    use credentials, and make no upstream request.
 
-7. Run contract/integration/browser/security/accessibility/performance tests,
-   including two-user authorization, OAuth, R2 failure injection, cleanup, and
-   crawler metadata.
+7. Run contract/integration/browser/security/accessibility/performance tests.
+   The exact-head staging exit set is cumulative and must include:
+   - P1 anonymous hosted, Studio, CSP/console/crawler, responsive/accessibility,
+     cold/restored/cloud mobile performance, and rollback checks;
+   - P2/P3 with two approved sessions held only in one runner-created `0700`
+     temporary profile tree, removal of that complete tree on every exit path,
+     D1-proven revocation, the bounded writable create/save/conflict/delete
+     flow, and D1/R2 reconciliation;
+   - every P4 cross-user/private, publish/unlisted, social, human moderation,
+     media/failure/race, quota, export, cleanup, and audit row;
+   - every P5 deletion/cancellation/final-claim, retention, failure-isolation,
+     cron, redacted-log, integrity, and reconciliation scenario;
+   - P6 public-channel delivery/escalation, operator/legal/policy, provider
+     cost, human license disposition, and shipped-asset rights evidence;
+   - P7 source and hosted proof that payment UI/bindings are absent and every
+     compatibility route remains provider-free `410 Gone`; and
+   - P8 exact-head GitHub/GitLab evidence plus the post-P2-P5 staging security
+     work required by the production-readiness plan.
+
+   The earlier 25-assertion writable run is P2/P3 foundation only. It is not a
+   substitute for P4 or P5. A new source commit invalidates every SHA-bound
+   result and requires a fresh immutable candidate.
+
 8. Observe structured logs/traces for at least one complete cleanup schedule.
    Request logs must contain only `requestId`, `routeGroup`, `method`, `status`,
    `duration`, and `environment`. Confirm they contain no raw path, query,
    identity or pseudonym, cookie, OAuth value, email, IP, request body, report
    text, or project content.
+9. Complete the P9 staging-exit review on one exact commit and one active Worker
+   version. Store a new immutable approval/evidence snapshot, account for every
+   synthetic row/object, and set `stagingAcceptancePassed=true` only after the
+   owner signs the complete P1-P8 evidence. Never change an older readiness or
+   evidence file to make it appear current.
 
 Staging acceptance requires zero high/critical security findings, zero failed
 foreign-key/integrity checks, no console errors, complete legacy API parity,
@@ -423,43 +477,57 @@ acceptance and production release.
 After separate explicit approvals for production migration, deployment, and
 domain cutover:
 
-1. Freeze schema-changing writes for the migration window.
-2. Record the current Pages deployment, Worker version, binding IDs, migration
-   list, DNS/routes, OAuth redirect configuration, and rollback owner.
-3. List and apply only reviewed unapplied D1 migrations by production database
-   name. Never re-run SQL manually or edit the migration ledger.
-4. Prepare `.deployment-readiness/production.secrets.json` with exactly the
-   six production secret names using the same non-logging process as staging.
-   Run `pnpm worker:dry-run:production` and inspect the generated output.
-5. The first production deployment uses
-   `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
-   production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
+1. After P9, squash-merge the canonical GitHub PR, mirror the resulting exact
+   `main` commit to GitLab, repeat immutable merged-main security evidence, and
+   run an exact-merged-commit staging smoke. Do not create a second divergent
+   GitLab merge. Any corrective commit returns to exact-head staging evidence.
+2. Freeze schema-changing writes for the migration window.
+3. Record the current Pages deployment, triggerless Worker version, binding
+   IDs, migration list, DNS/routes, OAuth redirect configuration, and rollback
+   owner.
+4. Verify production migrations `0001`-`0009` in the ledger and do not re-run
+   them. List and apply only a later reviewed unapplied migration by production
+   database name under its own approval. Never re-run SQL manually or edit the
+   migration ledger.
+5. Re-validate `.deployment-readiness/production.secrets.json` contains exactly
+   the six production secret names and mode `0600` without printing values.
+   Install or rotate a value only through a separately approved non-logging
+   flow. Run `pnpm worker:dry-run:production` and inspect the generated output.
+6. The first **domain-attaching** production deployment uses a fresh readiness
+   file with `deploymentPhase=production-read-only-bootstrap`, the exact merged
+   `main` SHA, `domainCutover.apex=attach`,
+   `domainCutover.www=redirect-to-apex`,
+   `scheduledMaintenanceWritesApproved=true`, and community/writable flags
+   false. The existing triggerless `9a4026f` approval has deferred domains and
+   must not be reused. This is the explicit production cutover: require passed
    staging acceptance and rollback readiness, and verify the generated config
    contains exactly the two approved Custom Domains for `tomodachi.pw` and
    `www.tomodachi.pw`. Immediately before the approved deploy, detach both
    hostnames from the Pages project through the audited Cloudflare control
    plane; a Worker Custom Domain cannot take over a hostname with a conflicting
-   record or product attachment. Deploy the reviewed artifact to atomically
-   install the production secrets and attach both Worker Custom Domains, which
-   create their DNS records and certificates. Keep the recorded Pages deployment
-   available at its immutable `pages.dev` URL. Verify TLS, assets, SPA fallback,
-   dynamic documents, API headers, AI routes, retired-payment `410` responses,
+   record or product attachment. Deploy the reviewed artifact to attach both
+   Worker Custom Domains. Keep the recorded Pages deployment available at its
+   immutable `pages.dev` URL. Verify TLS, assets, SPA fallback, dynamic
+   documents, API headers, AI routes, retired-payment `410` responses,
    robots/sitemap, the method-preserving www-to-apex redirect, and no
    Pages/Worker route overlap before continuing. If this read-only cutover
    fails, remove the partial Worker Custom Domains and immediately restore both
    hostnames to the recorded Pages deployment.
-6. The named production admin signs in through the production Google client,
+7. The named production admin signs in through the production Google client,
    reads only the internal UUID from `/api/auth/session`, and is promoted with
    the same narrowly scoped, exactly-one-row D1 procedure used in staging.
    Replace the bootstrap readiness file with a fresh `standard` approval bound
    to the clean commit and verified admin role. A later reviewed artifact may
    set `COMMUNITY_MUTATIONS_ENABLED=true`; bootstrap itself never permits
    community writes.
-7. Run anonymous edit/export, Google sign-in/onboarding, explicit private save,
+8. Run anonymous edit/export, Google sign-in/onboarding, explicit private save,
    autosave/conflict, publish/unpublish, unlisted noindex, search, social,
    moderation, export, deletion cancellation, and cross-account denial tests.
-8. Monitor error rate, D1/R2 failures, OAuth errors, rate-limit counts, cleanup
-   failures, and abuse queue during the soak. Keep Pages intact.
+9. Under a separate exact-SHA writable approval, deploy the standard artifact
+   with community mutations enabled and payment surfaces still retired. Use
+   only bounded operator-owned smoke fixtures and remove them.
+10. Monitor error rate, D1/R2 failures, OAuth errors, rate-limit counts, cleanup
+    failures, and abuse queue during the soak. Keep Pages intact.
 
 ## Rollback
 

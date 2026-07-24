@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-24
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -17,59 +17,52 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- Runtime hardening checkpoint
-  `7f0b74f47897c1136ac3996d6332389384720d74` is on both GitHub and GitLab.
-  Its exact Pages preview is `https://611df827.mii-pixelart.pages.dev`; all five
-  owned GitHub checks passed, including 410 browser/accessibility cases, while
-  the separate external `code/snyk` context reported `Code test limit reached`
-  without a code finding. The exact final review head is the provider-reported
-  PR/MR head after this documentation closeout, not a self-referential SHA in
-  this tracked file. Preview evidence is not staging-exit or production proof.
-- The review candidate adds retry-safe first-cloud-save idempotency, exact
-  Worker source-identity headers, the fail-closed P2 writable harness, and the
-  secret-free P3 two-session runner. The implementation is committed, pushed,
-  and locally validated. It still must pass checks at the final documentation
-  head and be deployed under a new exact-SHA gate before earlier hosted
-  evidence can be reused. No P2/P3 remote run, staging mutation, or production
-  change was performed while building or documenting it.
-- Staging is serving exact runtime source
-  `80fdcd5da432b88d06d84bfd084e9f0993edc363` as Cloudflare deployment
-  `9803bbba-4ee5-45fc-9027-7afd4e902089`, active Worker version
-  `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19) at 100 percent traffic.
-  The changes from `80fdcd5` through `b34f821` are documentation and test
-  configuration only. Later commits add runtime behavior and release controls,
-  so staging is no longer equivalent to the review candidate and exact-head
-  hosted P1 evidence is required.
-- The deployed staging flag is `COMMUNITY_MUTATIONS_ENABLED=true`. Payments and
-  consultations are retired; the staging D1 migration ledger contains `0001`
-  through `0008`. That deployment did not apply a migration, rotate a
-  secret, change OAuth, DNS, a role, production, or application data.
-- Anonymous routes, crawler controls, CSP/security headers, the authenticated
-  account menu, one authoritative true-256 Studio canvas, isolated drawing,
-  import/reference/Copy Guide, export-failure recovery, real AI advice, and the
-  publish-review dialog passed the completed functional checks. No project was
-  published and no existing cloud draft was changed during that gate.
-- The performance and AI corrections are present in the deployed runtime, but
-  P1 remains open because the final branch head has not completed the required
-  immutable exact-head cold, restored-draft, cloud-load, interaction, and
-  mobile performance record. Earlier hosted results remain supporting evidence
-  only and may not be promoted to final exact-head acceptance.
-- The assembled local release candidate passes both TypeScript projects,
-  8 preflight files/135 tests, 38 Worker files/345 tests, and the complete
-  Playwright matrix with 410 executed passes plus 396 intentional
-  viewport/project skips. The isolated reruns for the two earlier
-  concurrency-timeout cases also pass. The production bundle remains within
-  budget at 92.3 KiB initial/largest gzip, all three target-explicit Worker
-  dry-runs pass without deployment, and `pnpm audit --audit-level high` reports
-  no known vulnerabilities. These are local candidate checks, not hosted P1-P5
-  evidence.
-- Production remains Cloudflare Pages at exact source
-  `c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
-  `b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. A production Worker and isolated
-  production resources do not exist yet; the checked-in production IDs are
-  placeholders. Nothing in this document authorizes a merge, production
-  deployment, DNS change, migration, resource creation, secret write, OAuth
-  change, or new staging data.
+- The exact review head is
+  `4b5215d850ac4890ef89c523c5d8e6a5379b311b` on GitHub and GitLab. Its owned
+  GitHub checks, unignored production/development audits, immutable tag
+  `security/github-pr-2-4b5215d850ac`, and three-job GitLab security pipeline
+  `2704134924` passed. The external `code/snyk` context remains an account
+  test-limit result, not an owned gate or vulnerability finding.
+  This is the provider-reported checkpoint before the acceptance-hardening
+  candidate in this change. The candidate must first be committed, then its
+  resulting immutable commit must receive fresh exact-head CI, annotated-tag,
+  and security-pipeline evidence. Only that reviewed commit, named by its full
+  SHA in a new approval, may be deployed; this plan does not predeclare a
+  future SHA.
+- Staging remains intentionally pinned to
+  `a964729f643b188f5553ce775ef5bee8a9def6ec`, deployment
+  `17d26641-d145-404f-b78b-4aa9ae1d7d1e`, Worker version
+  `01e306d7-c079-4eda-8fe7-2e098c77b82c`, with
+  `COMMUNITY_MUTATIONS_ENABLED=true`. Its D1 ledger contains migrations
+  `0001`-`0009`. Anonymous hosted acceptance passed 380 assertions, the hosted
+  Studio smoke passed, and the bounded P2/P3 writable run passed 25 assertions
+  with fixture cleanup and two session revocations.
+- The 25-assertion run is foundational P2/P3 evidence only. It exercised one
+  approved user's private create/read/save/stale-ETag conflict/delete flow and
+  reconciliation; it does not satisfy the full P4 cross-user, publishing,
+  social, moderation, media, quota, or export matrix, and it does not satisfy
+  P5 deletion/retention/cron acceptance.
+- Review head `4b5215d` replaces reusable home-backed live-auth profiles with
+  a new owner-only per-run temporary tree that is removed on every exit path.
+  Because this security correction is not deployed to staging, the affected
+  P2/P3 authenticated and cleanup evidence must be rerun on exact head before
+  any staging-exit decision. Historical evidence remains immutable supporting
+  evidence and is never rewritten to claim coverage for a later SHA.
+- Production traffic remains on Cloudflare Pages. Isolated production D1, R2,
+  KV, rate limits, OAuth, secrets, and migrations `0001`-`0009` have been
+  prepared, and a hidden triggerless Worker exists at deployment
+  `fa682161-be1c-4211-8559-01e14896f4cc`, version
+  `f4e8c796-6e18-4fc9-9e35-2aec0f57391a`, from source `9a4026f`. It has no
+  hostname, route, cron, workers.dev, or preview exposure. Its partial
+  triggerless evidence is bootstrap history, not current staging acceptance or
+  production-cutover approval.
+- The next release gate is not a deployment of the historical `4b5215d`
+  checkpoint. First commit and review the acceptance-hardening candidate,
+  obtain fresh exact-head CI and security evidence for that resulting immutable
+  commit, and then seek a separately approved staging deployment of that full
+  SHA followed by complete P1-P9 acceptance on one Worker version. No current
+  approval authorizes that deploy, new staging data, a merge, production
+  cutover, DNS/OAuth/secret/role change, or production write enablement.
 
 ## Authority and evidence rules
 
@@ -96,24 +89,24 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Runtime correction is deployed through `80fdcd5`; the new runtime candidate still needs exact-head hosted evidence |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Local implementation and injected tests complete; no remote writable run is approved or complete |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Local implementation and injected tests complete; no two-session live-auth run is approved or complete |
-| P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete on live staging |
-| P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete on live staging |
-| P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Partially recorded; live checks remain |
-| P7 | Payments-retired proof | Every release candidate | Retired; compatibility tombstones must remain fail-closed |
-| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | Must be rerun on the final SHA |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Historical `4b5215d` checks are green; commit, review, and collect fresh exact-head evidence for the acceptance-hardening candidate before hosted acceptance |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Prior bounded run passed on `a964729f`; exact-head rerun and cleanup proof are pending |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Ephemeral-profile correction is locally green on `4b5215d`; exact-head two-session staging rerun is pending |
+| P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
+| P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
+| P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |
+| P7 | Payments-retired proof | Every release candidate | Exact-head source/CI proof passed; repeat the hosted 410/provider-free checks after staging deploy |
+| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | PR-head CI/tag/three-job scans passed; later staging DAST/API and complete license/CycloneDX dispositions remain before P9 |
 | P9 | Final staging exit review | P1-P8 | Blocked by preceding gates |
-| P10 | Isolated production resources, schema, OAuth, secrets, and bootstrap readiness | P9 | Not authorized by this plan |
+| P10 | Isolated production resources, schema, OAuth, secrets, and bootstrap readiness | P9 | Resources and triggerless bootstrap exist; merged-main parity and fresh cutover inputs remain |
 | P11 | Read-only Worker production cutover and admin bootstrap | P10 | Production remains Pages |
 | P12 | Production community-write enablement | P11 read-only acceptance | Not authorized |
 | P13 | Soak, rollback drill, and Pages-retention decision | P12 | Not started |
 | P14 | Post-launch operations and deliberately deferred features | P13 | Not started |
 
-P1 is the active engineering gate. P2-P5 are required even without organic
-users: a second synthetic identity is what proves object-level authorization,
-and disposable data is what proves irreversible cleanup safely.
+P1-P9 now form the active staging-exit lane. P2-P5 are required even without
+organic users: a second synthetic identity is what proves object-level
+authorization, and disposable data is what proves irreversible cleanup safely.
 
 ## P1 - Close exact-head Studio performance and functional evidence
 
@@ -137,6 +130,7 @@ mode.
 ```bash
 cd living-the-grid-studio
 pnpm install --frozen-lockfile
+pnpm audit --prod --audit-level high
 pnpm audit --audit-level high
 pnpm check
 pnpm db:migrate:local
@@ -419,9 +413,13 @@ consultation offer. `/api/stripe/*` and `/api/webhooks/stripe` are temporary,
 provider-free compatibility tombstones: every method returns `410 Gone`, JSON,
 and `Cache-Control: no-store` without a credential or upstream call. The public
 `/ai-plan` is a free beta; the possible one-time $5 Creator Action Plan is
-clearly marked as future direction and not for sale. The current Pages
-production release `c044134`/`b73cc5ba` and staging Worker release
-`80fdcd5`/`9803bbba` passed this proof; retain it on every later candidate.
+clearly marked as future direction and not for sale. Historical Pages release
+`c044134`/`b73cc5ba` and staging Worker release `80fdcd5`/`9803bbba` passed this
+proof and remain immutable supporting evidence. Historical review head
+`4b5215d` passed source/local/CI retirement checks. Repeat the provider-free
+hosted `410` proof on the later acceptance-hardening commit after that exact
+commit has fresh evidence and separately approved staging deployment, then
+again at production cutover.
 
 Provider-side retirement is recorded in
 `docs/release-evidence/2026-07-16-payment-retirement.md`: identified Tomodachi
@@ -467,8 +465,12 @@ gh pr checks <PR_NUMBER>
   all owned CI/browser/security checks green, no unresolved actionable review,
   and no secret/log finding. A branch changing after a scan invalidates it.
 - Create the immutable GitLab security tag
-  `security/github-pr-<number>-<first-12-sha>` only after verifying the mirror
-  workflow at that commit is byte-for-byte identical to canonical `main`.
+  `security/github-pr-<number>-<first-12-sha>` only after verifying the GitHub
+  and GitLab commit objects are identical and the trusted default-branch mirror
+  workflow is unchanged. The tag records the reviewed PR lineage and need not
+  imply that the tagged commit is already on `main`. After the canonical squash
+  merge, repeat the same non-moving convention with the merged-main SHA unless
+  a separately reviewed CI change introduces a dedicated main-release tag.
   Manually dispatch the trusted `main` mirror workflow, then retain the GitLab
   SAST, secret-detection, dependency, license, and CycloneDX evidence with
   pipeline ID, analyzer versions, counts/dispositions, timestamps, and SHA-256
@@ -500,6 +502,10 @@ CSP/console/crawler, mobile performance, D1 ledger/integrity/foreign keys,
 R2 reconciliation, provider `data_collection=deny`, flags, binding names,
 redacted logs, and rollback drill. Observe a complete cleanup schedule. Record
 the remaining synthetic rows/objects and remove or explicitly retain each.
+The bounded 25-assertion P2/P3 harness is not the P4 matrix. P9 also requires
+every P4 row, every P5 deletion/retention/cron scenario, the P6 operator/legal/
+delivery/license/asset/cost dispositions, the P7 hosted payment-retirement
+proof, and the P8 post-P2-P5 staging security work to be complete.
 
 **Go/no-go:** Sign only a single immutable candidate with no evidence borrowed
 from an older SHA. A waived numerical security, authorization, privacy, data
@@ -519,21 +525,23 @@ production approval. P9 does not authorize any of them.
 
 1. Confirm the exact Cloudflare account/zone, Google project, domain control,
    owners, cost/budget alerts, and incident contacts.
-2. Provision production-only D1, private R2, KV, Images, and six rate-limit
-   namespaces. Do not reuse staging IDs, buckets, OAuth clients, limiter IDs, or
-   secrets and do not clone staging identities/content.
-3. Configure the production Google client with only the canonical homepage,
-   Privacy/Terms URLs, authorized domain, and exact callback. Google OIDC—not
-   Firebase and not Discord—is the launch identity architecture.
-4. List tracked and remote migrations by the production database name. Review
-   the candidate set (currently `0001`-`0009`, plus any later forward-only
-   migration in the final SHA), apply only the explicitly approved files, then
-   verify the ledger, integrity, foreign keys, uniqueness, triggers, and empty
-   bootstrap counts. Never edit or manually re-run an applied migration.
-5. Write exactly the six production secret names through the protected,
-   non-logging flow with unique values for each purpose/environment. Keep the
-   ignored readiness and secrets files regular, mode `0600`, current, and bound
-   to the exact SHA. Do not print or diff values.
+2. Re-verify the already provisioned production-only D1, private R2, KV,
+   Images, and six rate-limit namespaces. Provision a missing item only under a
+   new resource-specific approval. Do not reuse staging IDs, buckets, OAuth
+   clients, limiter IDs, or secrets and do not clone staging identities/content.
+3. Re-verify the isolated production Google client has only the canonical
+   homepage, Privacy/Terms URLs, authorized domain, and exact callback. Google
+   OIDC—not Firebase and not Discord—is the launch identity architecture.
+4. List tracked and remote migrations by the production database name. The
+   current production ledger already contains `0001`-`0009`; verify them and
+   never re-run them. Apply only a later forward-only migration in the merged
+   SHA after file-specific approval, then verify the ledger, integrity, foreign
+   keys, uniqueness, triggers, and bootstrap counts.
+5. Re-validate the ignored production secrets file contains exactly the six
+   required names, remains regular and mode `0600`, and uses unique values for
+   each purpose/environment. Install or rotate a value only through a new
+   protected, non-logging approval. Bind the readiness record to the exact SHA;
+   do not print or diff secret values.
 6. Run `pnpm worker:dry-run:production`, inspect the flattened artifact, and
    require `COMMUNITY_MUTATIONS_ENABLED=false`, no payment bindings or secrets,
    the production-only bindings, exactly `tomodachi.pw` and
@@ -544,6 +552,8 @@ production approval. P9 does not authorize any of them.
 clean empty production application state, valid rollback artifact, and a
 schema-5 `production-read-only-bootstrap` readiness record are mandatory.
 The admin UUID remains null before first production sign-in.
+The existing `production-triggerless-bootstrap` record bound to `9a4026f` has
+deferred domains and is not reusable for cutover.
 
 **Rollback:** Stop before domain cutover. Remove unused newly provisioned
 resources only under separate approval; never delete a migrated database as a
