@@ -36,7 +36,6 @@
     "verify:hosted-staging-writable": "tsx scripts/verify-hosted-staging-writable-cli.ts",
     "verify:staging-live-auth": "tsx scripts/verify-staging-live-auth.ts",
     "verify:release-output": "tsx scripts/verify-release-output.ts",
-    "verify:security-audit": "tsx scripts/verify-security-audit.ts",
     "verify:studio": "tsx scripts/verify-studio-browser.ts",
     "cloudflare:security-insights": "tsx scripts/cloudflare-security-insights.ts",
     "save:templates": "tsx scripts/save-creative-template-fixtures.ts",
@@ -100,9 +99,9 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
-    "@cloudflare/vite-plugin": "1.44.0",
-    "@cloudflare/vitest-pool-workers": "0.18.4",
-    "@cloudflare/workers-types": "5.20260711.1",
+    "@cloudflare/vite-plugin": "1.47.0",
+    "@cloudflare/vitest-pool-workers": "0.18.8",
+    "@cloudflare/workers-types": "5.20260723.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.14",
@@ -113,7 +112,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.10",
-    "postcss": "8.5.17",
+    "postcss": "8.5.18",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.20.6",
@@ -121,7 +120,7 @@
     "typescript": "5.6.3",
     "vite": "^7.3.6",
     "vitest": "^4.1.10",
-    "wrangler": "^4.110.0",
+    "wrangler": "^4.114.0",
     "yaml": "2.9.0"
   },
   "packageManager": "pnpm@11.12.0"

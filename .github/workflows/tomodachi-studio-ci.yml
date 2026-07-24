@@ -56,8 +56,11 @@ jobs:
       - name: Test release preflight gates
         run: pnpm test:preflight
 
-      - name: Audit production and development dependencies
-        run: pnpm verify:security-audit
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+      - name: Audit all dependencies
+        run: pnpm audit --audit-level high
 
       - name: Dry-run local Worker package
         run: pnpm worker:dry-run

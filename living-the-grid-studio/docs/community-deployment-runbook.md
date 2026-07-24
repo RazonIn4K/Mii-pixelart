@@ -188,11 +188,12 @@ Cloudflare documents this direct binding model in the
   Worker-generated responses, headers, or metadata. Treat the route patterns in
   `wrangler.jsonc` as the source of truth and review the flattened output config
   before deployment.
-- Each remote environment declares exactly one Worker Custom Domain:
-  `staging.tomodachi.pw` for staging and `tomodachi.pw` for production. The
-  release wrapper rejects a missing, additional, cross-target, or non-custom
-  route in both the source and Vite-generated configurations before Wrangler
-  can deploy. Local development declares no public route.
+- Staging declares exactly one Worker Custom Domain:
+  `staging.tomodachi.pw`. Production declares exactly the apex and canonical
+  redirect domains: `tomodachi.pw` and `www.tomodachi.pw`. The release wrapper
+  rejects a missing, additional, cross-target, or non-custom route in both the
+  source and Vite-generated configurations before Wrangler can deploy. Local
+  development declares no public route.
 - Every target explicitly sets `workers_dev` and `preview_urls` to `false`.
   The release wrapper validates both source and generated configurations so an
   unreviewed `*.workers.dev` or version-preview origin cannot bypass the exact
@@ -408,22 +409,14 @@ After explicit approval for resources and staging deployment:
    identity or pseudonym, cookie, OAuth value, email, IP, request body, report
    text, or project content.
 
-Staging acceptance requires zero unapproved high/critical security findings,
-zero failed foreign-key/integrity checks, no console errors, complete legacy API
-parity, and documented rollback evidence.
+Staging acceptance requires zero high/critical security findings, zero failed
+foreign-key/integrity checks, no console errors, complete legacy API parity,
+and documented rollback evidence.
 
-The only approved temporary exception is `GHSA-f88m-g3jw-g9cj`, owned by
-David Ortiz (`@RazonIn4K`) through **2026-07-29 UTC**. It is valid only while
-`pnpm audit --prod --audit-level high` remains clean and
-`pnpm verify:security-audit` confirms that the sole high/critical
-development finding is `sharp@0.34.5`, every finding is marked development-only,
-and every dependency path terminates in `miniflare>sharp` through the allowlisted
-Cloudflare Vite, Vitest-pool, or Wrangler toolchain. The verifier fails closed
-after the expiry, when the advisory disappears, when its version or dependency
-paths drift, or when any additional high/critical advisory appears. Remove the
-exception and verifier as soon as the first stable Cloudflare toolchain carrying
-`workers-sdk` PR #14493 is available; never extend or broaden it without a new
-explicit security approval.
+Require both `pnpm audit --prod --audit-level high` and
+`pnpm audit --audit-level high` to complete with zero high or critical findings.
+No dependency security exception is active; either audit failing blocks staging
+acceptance and production release.
 
 ## Production gate and cutover
 
@@ -442,18 +435,19 @@ domain cutover:
    `deploymentPhase=production-read-only-bootstrap`. It is part of the explicit
    production cutover: keep `COMMUNITY_MUTATIONS_ENABLED=false`, require passed
    staging acceptance and rollback readiness, and verify the generated config
-   contains exactly `{ "pattern": "tomodachi.pw", "custom_domain": true }`.
-   Immediately before the approved deploy, detach `tomodachi.pw` from the Pages
-   project through the audited Cloudflare control plane; a Worker Custom Domain
-   cannot take over a hostname with a conflicting record or product attachment.
-   Deploy the reviewed artifact to atomically install the production secrets and
-   attach the Worker Custom Domain, which creates its DNS record and certificate.
-   Keep the recorded Pages deployment available at its immutable `pages.dev`
-   URL. Verify TLS, assets, SPA fallback, dynamic documents, API headers, AI
-   routes, retired-payment `410` responses, robots/sitemap, and no
+   contains exactly the two approved Custom Domains for `tomodachi.pw` and
+   `www.tomodachi.pw`. Immediately before the approved deploy, detach both
+   hostnames from the Pages project through the audited Cloudflare control
+   plane; a Worker Custom Domain cannot take over a hostname with a conflicting
+   record or product attachment. Deploy the reviewed artifact to atomically
+   install the production secrets and attach both Worker Custom Domains, which
+   create their DNS records and certificates. Keep the recorded Pages deployment
+   available at its immutable `pages.dev` URL. Verify TLS, assets, SPA fallback,
+   dynamic documents, API headers, AI routes, retired-payment `410` responses,
+   robots/sitemap, the method-preserving www-to-apex redirect, and no
    Pages/Worker route overlap before continuing. If this read-only cutover
-   fails, remove the partial Worker Custom
-   Domain and immediately restore `tomodachi.pw` to the recorded Pages deployment.
+   fails, remove the partial Worker Custom Domains and immediately restore both
+   hostnames to the recorded Pages deployment.
 6. The named production admin signs in through the production Google client,
    reads only the internal UUID from `/api/auth/session`, and is promoted with
    the same narrowly scoped, exactly-one-row D1 procedure used in staging.
