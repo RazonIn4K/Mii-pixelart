@@ -202,6 +202,11 @@ pnpm verify:hosted-staging-writable
 - Unit-test the complete request allowlist, byte/object ceilings, first-failure
   stop, redaction, idempotent cleanup, and production-host refusal with injected
   fetch; those tests must not contact a remote service.
+- Install cooperative `SIGINT`/`SIGTERM` handling before any preflight or
+  browser work. The first signal wins, repeated signals remain captured while
+  cleanup owns shutdown, and the CLI exits `130`/`143` only after session,
+  fixture, manifest, and browser-profile cleanup settles. Never race an
+  in-flight mutation or call `process.exit()` from a signal handler.
 - Capture sanitized pre/post D1 row counts and R2 manifest counts. Use generated
   fixture IDs and an explicit test prefix; never infer ownership from a title or
   username. The tracked runner starts a loopback-only, non-deployable audit
@@ -252,9 +257,13 @@ only short-lived session state inside per-run browser profiles.
 - The tracked `verify:staging-live-auth` command performs the standalone
   two-context lifecycle check. The integrated P2 command invokes the same
   runner and binds both in-memory sessions to the private approval record. It
-  keeps session IDs private in memory, signs out both contexts, then requires a
-  sanitized read-only staging D1 query to prove both exact session rows are
-  present and revoked; cookie clearing alone does not count as revocation.
+  tracks every opened context before the human prompt, keeps session IDs
+  private in memory, probes and signs out every possibly authenticated context,
+  then requires a bounded sanitized read-only staging D1 query to prove every
+  discovered session row is present and revoked; cookie clearing alone does
+  not count as revocation. Human prompts are abortable, while logout, D1 proof,
+  fixture deletion, reconciliation, context closure, and profile removal use
+  their own non-aborted cleanup path.
 
 **Evidence:** Show verified-email onboarding, Terms attestation, session
 creation/revocation, ten-session eviction, fresh-auth enforcement, sign-out,

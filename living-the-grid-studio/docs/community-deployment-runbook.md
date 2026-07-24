@@ -436,7 +436,9 @@ After explicit approval for resources and staging deployment:
    - P2/P3 with two approved sessions held only in one runner-created `0700`
      temporary profile tree, removal of that complete tree on every exit path,
      D1-proven revocation, the bounded writable create/save/conflict/delete
-     flow, and D1/R2 reconciliation;
+     flow, D1/R2 reconciliation, and deterministic `SIGINT`/`SIGTERM` proof
+     that no new mutation starts after interruption and cleanup finishes before
+     the conventional `130`/`143` exit;
    - every P4 cross-user/private, publish/unlisted, social, human moderation,
      media/failure/race, quota, export, cleanup, and audit row;
    - every P5 deletion/cancellation/final-claim, retention, failure-isolation,

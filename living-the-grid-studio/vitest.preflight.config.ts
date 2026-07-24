@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: [
+      "scripts/cli-termination.test.ts",
       "scripts/worker-release.test.ts",
       "scripts/release-output-hygiene.test.ts",
       "scripts/staging-r2-prefix-audit-worker.test.ts",

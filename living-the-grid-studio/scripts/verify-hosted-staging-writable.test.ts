@@ -657,6 +657,57 @@ describe("writable staging acceptance", () => {
     ]);
   });
 
+  it("finishes fixture cleanup and reconciliation when aborted after creation", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("synthetic termination after create");
+    const fixture = writableFixture();
+    const phases: string[] = [];
+    const abortingFixture = {
+      ...fixture,
+      fetchImpl: async (
+        input: Parameters<AcceptanceFetch>[0],
+        init?: Parameters<AcceptanceFetch>[1],
+      ) => {
+        const response = await fixture.fetchImpl(input, init);
+        if (new Request(input, init).method === "POST") {
+          controller.abort(interruption);
+        }
+        return response;
+      },
+    };
+    const { run } = runFixture(abortingFixture, {
+      abortSignal: controller.signal,
+      captureManifest: async ({ phase }) => {
+        phases.push(phase);
+        return phase === "before"
+          ? emptyManifest()
+          : emptyManifest({
+              fixtureDeletedCreationRows: 1,
+              fixtureObjectBytes: 3_655,
+              fixtureObjectRows: 8,
+              fixtureR2ObjectBytes: 3_655,
+              fixtureR2ObjectCount: 8,
+              fixtureRevisionRows: 2,
+              totalCreationRows: 4,
+              totalObjectBytes: 16_000,
+              totalObjectRows: 16,
+              totalR2ObjectCount: 16,
+              totalRevisionRows: 6,
+            });
+      },
+    });
+
+    await expect(run).rejects.toBe(interruption);
+    expect(controller.signal.reason).toBe(interruption);
+    expect(fixture.seen.map(({ method }) => method)).toEqual([
+      "GET",
+      "POST",
+      "DELETE",
+      "DELETE",
+    ]);
+    expect(phases).toEqual(["before", "after"]);
+  });
+
   it("waits through bounded not-found cleanup races before reconciling", async () => {
     const fixture = writableFixture({
       delayedDeleteMisses: 2,

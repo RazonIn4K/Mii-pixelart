@@ -13,11 +13,13 @@ import {
   HostedStagingP4PhaseAError,
   assertP4PhaseARequestAllowed,
   runHostedStagingP4PhaseA,
+  type HostedStagingP4PhaseAResult,
   type P4PhaseARequestPolicyState,
 } from "./verify-hosted-staging-p4-phase-a";
 import {
   createP4PhaseASocialManifestCapture,
   runIntegratedHostedStagingP4PhaseA,
+  type IntegratedP4PhaseACliDependencies,
 } from "./verify-hosted-staging-p4-phase-a-cli";
 import type {
   StagingFixtureManifest,
@@ -440,6 +442,172 @@ describe("P4 phase A orchestration boundaries", () => {
     ]);
   });
 
+  it("records and deletes a generated comment when interrupted after its response", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("abort after comment response");
+    const api = new InjectedP4Api();
+    const ownerRequest = api.requestFor("owner");
+    const interruptedOwnerRequest: BrowserMemoryIdentity["request"] = async (
+      input,
+      init,
+    ) => {
+      const response = await ownerRequest(input, init);
+      const request = new Request(input, init);
+      if (
+        request.method === "POST" &&
+        new URL(request.url).pathname === `/api/creations/${RUN_ID}/comments`
+      ) {
+        controller.abort(interruption);
+      }
+      return response;
+    };
+    const identities = [
+      identity("owner", OWNER_ID, "admin", interruptedOwnerRequest),
+      identity("second-user", SECOND_ID, "user", api.requestFor("second-user")),
+    ] as const;
+    const scenario = injectedCoreScenario(api, {
+      abortSignal: controller.signal,
+      identities,
+    });
+
+    await expect(scenario.result).rejects.toBe(interruption);
+    expect(
+      api.operationCount(
+        "owner",
+        "DELETE",
+        `/api/comments/${InjectedP4Api.COMMENT_ID}`,
+      ),
+    ).toBe(1);
+    expect(api.deleted).toBe(true);
+    expect(scenario.socialCaptures.at(-1)).toEqual({
+      commentId: InjectedP4Api.COMMENT_ID,
+      creationId: RUN_ID,
+      phase: "after",
+    });
+  });
+
+  it("leaves approval consumption and acceptance untouched when aborted before consume", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("abort before P4 approval consumption");
+    const consumeApproval = vi.fn(async () => undefined);
+    const runAcceptance = vi.fn(async () => successfulP4Result());
+    const withSessions: IntegratedP4PhaseACliDependencies["withSessions"] =
+      async (options, callback) => {
+        expect(options.abortSignal).toBe(controller.signal);
+        controller.abort(interruption);
+        const callbackResult = await callback(
+          integratedIdentities(),
+          integratedDeployment(),
+        );
+        return integratedLiveAuthResult(callbackResult);
+      };
+
+    await expect(
+      runIntegratedHostedStagingP4PhaseA(
+        {
+          consumeApproval,
+          createCreationManifestCapture: () => async () =>
+            creationManifestBefore(),
+          createSocialManifestCapture: () => async () => socialManifestBefore(),
+          loadApproval: async () => approval(),
+          now: () => NOW,
+          runAcceptance,
+          withSessions,
+        },
+        controller.signal,
+      ),
+    ).rejects.toBe(interruption);
+
+    expect(consumeApproval).not.toHaveBeenCalled();
+    expect(runAcceptance).not.toHaveBeenCalled();
+  });
+
+  it("finishes approval consumption before honoring an abort and does not start acceptance", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("abort during P4 approval consumption");
+    const consumeEvents: string[] = [];
+    const consumeApproval = vi.fn(async () => {
+      consumeEvents.push("consume-start");
+      controller.abort(interruption);
+      await Promise.resolve();
+      consumeEvents.push("consume-complete");
+    });
+    const runAcceptance = vi.fn(async () => successfulP4Result());
+    const withSessions: IntegratedP4PhaseACliDependencies["withSessions"] =
+      async (_options, callback) => {
+        const callbackResult = await callback(
+          integratedIdentities(),
+          integratedDeployment(),
+        );
+        return integratedLiveAuthResult(callbackResult);
+      };
+
+    await expect(
+      runIntegratedHostedStagingP4PhaseA(
+        {
+          consumeApproval,
+          createCreationManifestCapture: () => async () =>
+            creationManifestBefore(),
+          createSocialManifestCapture: () => async () => socialManifestBefore(),
+          loadApproval: async () => approval(),
+          now: () => NOW,
+          runAcceptance,
+          withSessions,
+        },
+        controller.signal,
+      ),
+    ).rejects.toBe(interruption);
+
+    expect(consumeEvents).toEqual(["consume-start", "consume-complete"]);
+    expect(consumeApproval).toHaveBeenCalledOnce();
+    expect(runAcceptance).not.toHaveBeenCalled();
+  });
+
+  it("threads one abort signal through live auth and P4 acceptance options", async () => {
+    const controller = new AbortController();
+    const consumeApproval = vi.fn(async () => undefined);
+    const runAcceptance: IntegratedP4PhaseACliDependencies["runAcceptance"] =
+      vi.fn(async (options) => {
+        expect(options.abortSignal).toBe(controller.signal);
+        return successfulP4Result();
+      });
+    const withSessions: IntegratedP4PhaseACliDependencies["withSessions"] =
+      vi.fn(async (options, callback) => {
+        expect(options.abortSignal).toBe(controller.signal);
+        const callbackResult = await callback(
+          integratedIdentities(),
+          integratedDeployment(),
+        );
+        return integratedLiveAuthResult(callbackResult);
+      });
+
+    await expect(
+      runIntegratedHostedStagingP4PhaseA(
+        {
+          consumeApproval,
+          createCreationManifestCapture: () => async () =>
+            creationManifestBefore(),
+          createSocialManifestCapture: () => async () => socialManifestBefore(),
+          loadApproval: async () => approval(),
+          now: () => NOW,
+          runAcceptance,
+          withSessions,
+        },
+        controller.signal,
+      ),
+    ).resolves.toMatchObject({
+      cleanup: "verified",
+      identities: 2,
+      sessionsRevoked: 2,
+      sourceCommit: SOURCE,
+      workerVersion: WORKER_ID,
+    });
+
+    expect(withSessions).toHaveBeenCalledOnce();
+    expect(consumeApproval).toHaveBeenCalledOnce();
+    expect(runAcceptance).toHaveBeenCalledOnce();
+  });
+
   it("continues later cleanup actions and reconciliation after an earlier permanent failure", async () => {
     const api = new InjectedP4Api({
       "owner:DELETE:/api/users/second-user/follow": [
@@ -626,6 +794,58 @@ function identity(
   return { internalUserId, request, role, slot };
 }
 
+function integratedIdentities(): readonly [
+  BrowserMemoryIdentity,
+  BrowserMemoryIdentity,
+] {
+  const request = async () => new Response();
+  return [
+    identity("owner", OWNER_ID, "admin", request),
+    identity("second-user", SECOND_ID, "user", request),
+  ];
+}
+
+function integratedDeployment() {
+  return {
+    communityMutationsEnabled: true as const,
+    consultSalesEnabled: false as const,
+    environment: "staging" as const,
+    origin: "https://staging.tomodachi.pw" as const,
+    sourceCommit: SOURCE,
+    workerVersion: WORKER_ID,
+  };
+}
+
+function integratedLiveAuthResult(callbackResult: HostedStagingP4PhaseAResult) {
+  return {
+    callbackResult,
+    identities: 2 as const,
+    sessionsRevoked: 2 as const,
+    sourceSha: SOURCE,
+    target: "https://staging.tomodachi.pw" as const,
+    workerVersion: WORKER_ID,
+  };
+}
+
+function successfulP4Result(): HostedStagingP4PhaseAResult {
+  return {
+    assertions: 1,
+    cleanup: "verified",
+    coveredScenarios: [],
+    manifests: {
+      creationAfter: creationManifestBefore(),
+      creationBefore: creationManifestBefore(),
+      socialAfter: socialManifestBefore(),
+      socialBefore: socialManifestBefore(),
+    },
+    mutationAttempts: 0,
+    requests: 0,
+    sourceCommit: SOURCE,
+    target: "https://staging.tomodachi.pw",
+    workerVersion: WORKER_ID,
+  };
+}
+
 function creationManifestBefore(): StagingFixtureManifest {
   return {
     fixtureActiveCreationRows: 0,
@@ -680,18 +900,27 @@ type InjectedFault =
   | { call: number; kind: "network" }
   | { call: number; kind: "status"; status: number };
 
-function injectedCoreScenario(api: InjectedP4Api) {
+function injectedCoreScenario(
+  api: InjectedP4Api,
+  overrides: {
+    abortSignal?: AbortSignal;
+    identities?: readonly [BrowserMemoryIdentity, BrowserMemoryIdentity];
+  } = {},
+) {
   const creationCaptures: StagingManifestRequest[] = [];
   const socialCaptures: Array<{
     commentId: string | null;
     creationId: string;
     phase: "before" | "after";
   }> = [];
-  const identities = [
-    identity("owner", OWNER_ID, "admin", api.requestFor("owner")),
-    identity("second-user", SECOND_ID, "user", api.requestFor("second-user")),
-  ] as const;
+  const identities =
+    overrides.identities ??
+    ([
+      identity("owner", OWNER_ID, "admin", api.requestFor("owner")),
+      identity("second-user", SECOND_ID, "user", api.requestFor("second-user")),
+    ] as const);
   const result = runHostedStagingP4PhaseA({
+    abortSignal: overrides.abortSignal,
     captureCreationManifest: async (request) => {
       creationCaptures.push(request);
       return request.phase === "before"

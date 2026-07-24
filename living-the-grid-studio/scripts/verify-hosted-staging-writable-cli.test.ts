@@ -575,4 +575,117 @@ describe("integrated hosted staging writable runner", () => {
     ).rejects.toThrow(/two approved internal users/u);
     expect(runAcceptance).not.toHaveBeenCalled();
   });
+
+  it("does not consume approval or start acceptance when aborted before the session callback", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("synthetic pre-consume termination");
+    const consumeApproval = vi.fn(async () => undefined);
+    const runAcceptance = vi.fn(async () => acceptanceResult());
+    const withSessions: IntegratedWritableCliDependencies["withSessions"] =
+      async (options, callback) => {
+        expect(options.abortSignal).toBe(controller.signal);
+        controller.abort(interruption);
+        await callback(
+          [
+            {
+              internalUserId: OWNER,
+              request: async () => new Response(),
+              role: "admin",
+              slot: "owner",
+            },
+            {
+              internalUserId: SECOND,
+              request: async () => new Response(),
+              role: "user",
+              slot: "second-user",
+            },
+          ],
+          {
+            communityMutationsEnabled: true,
+            consultSalesEnabled: false,
+            environment: "staging",
+            origin: "https://staging.tomodachi.pw",
+            sourceCommit: SOURCE,
+            workerVersion: WORKER,
+          },
+        );
+        throw new Error("callback should have rejected");
+      };
+
+    await expect(
+      runIntegratedHostedStagingWritable(
+        {
+          consumeApproval,
+          createManifestCapture: () => async () => emptyManifest(),
+          loadApproval: async () => approvalValue(),
+          now: () => NOW,
+          runAcceptance,
+          withSessions,
+        },
+        controller.signal,
+      ),
+    ).rejects.toBe(interruption);
+    expect(consumeApproval).not.toHaveBeenCalled();
+    expect(runAcceptance).not.toHaveBeenCalled();
+  });
+
+  it("does not start acceptance when aborted immediately after approval consumption", async () => {
+    const controller = new AbortController();
+    const interruption = new Error("synthetic post-consume termination");
+    const consumeApproval = vi.fn(async () => {
+      controller.abort(interruption);
+    });
+    const runAcceptance = vi.fn(async () => acceptanceResult());
+    const withSessions: IntegratedWritableCliDependencies["withSessions"] =
+      async (_options, callback) => {
+        const callbackResult = await callback(
+          [
+            {
+              internalUserId: OWNER,
+              request: async () => new Response(),
+              role: "admin",
+              slot: "owner",
+            },
+            {
+              internalUserId: SECOND,
+              request: async () => new Response(),
+              role: "user",
+              slot: "second-user",
+            },
+          ],
+          {
+            communityMutationsEnabled: true,
+            consultSalesEnabled: false,
+            environment: "staging",
+            origin: "https://staging.tomodachi.pw",
+            sourceCommit: SOURCE,
+            workerVersion: WORKER,
+          },
+        );
+        return {
+          callbackResult,
+          identities: 2,
+          sessionsRevoked: 2,
+          sourceSha: SOURCE,
+          target: "https://staging.tomodachi.pw",
+          workerVersion: WORKER,
+        };
+      };
+
+    await expect(
+      runIntegratedHostedStagingWritable(
+        {
+          consumeApproval,
+          createManifestCapture: () => async () => emptyManifest(),
+          loadApproval: async () => approvalValue(),
+          now: () => NOW,
+          runAcceptance,
+          withSessions,
+        },
+        controller.signal,
+      ),
+    ).rejects.toBe(interruption);
+    expect(consumeApproval).toHaveBeenCalledOnce();
+    expect(runAcceptance).not.toHaveBeenCalled();
+  });
 });

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { CliTerminationError } from "./cli-termination";
 import {
   activeWorkerVersionFromDeployment,
   assertStagingSessionRowsRevoked,
@@ -639,7 +640,7 @@ describe("secret-free live-auth session lifecycle", () => {
     );
   });
 
-  it("rejects the same Google-backed identity twice and still revokes the first session", async () => {
+  it("rejects the same Google-backed identity twice and revokes both browser sessions", async () => {
     const browser = new FakeBrowser([OWNER_ID, OWNER_ID]);
     const testHarness = harness(browser);
     const callback = vi.fn(async () => undefined);
@@ -650,7 +651,9 @@ describe("secret-free live-auth session lifecycle", () => {
     expect(browser.closed).toBe(true);
     expect(browser.contexts[0].request.authenticated).toBe(false);
     expect(browser.contexts.every((context) => context.closed)).toBe(true);
-    expect(testHarness.verifiedSessionIds).toEqual([[OWNER_SESSION_ID]]);
+    expect(testHarness.verifiedSessionIds).toEqual([
+      [OWNER_SESSION_ID, SECOND_SESSION_ID],
+    ]);
   });
 
   it("blocks source or deployment drift before opening Chrome", async () => {
@@ -740,15 +743,111 @@ describe("secret-free live-auth session lifecycle", () => {
       ["not-a-uuid", SECOND_SESSION_ID],
     );
     const testHarness = harness(browser);
-    await expect(
-      withStagingLiveAuthSessions(
-        OPTIONS,
-        async () => undefined,
-        testHarness.dependencies,
+    const error = await withStagingLiveAuthSessions(
+      OPTIONS,
+      async () => undefined,
+      testHarness.dependencies,
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(AggregateError);
+    expect(
+      (error as AggregateError).errors.some(
+        (nested) =>
+          nested instanceof Error &&
+          nested.message.includes("did not match the live-auth contract"),
       ),
-    ).rejects.toThrow("did not match the live-auth contract");
+    ).toBe(true);
     expect(testHarness.verifiedSessionIds).toEqual([]);
     expect(browser.closed).toBe(true);
+    expect(browser.contexts[0].request.authenticated).toBe(false);
+  });
+
+  it("revokes a session discovered during cleanup when SIGINT interrupts the owner prompt", async () => {
+    const controller = new AbortController();
+    const testHarness = harness();
+    const callback = vi.fn(async () => undefined);
+    const error = await withStagingLiveAuthSessions(
+      { ...OPTIONS, abortSignal: controller.signal },
+      callback,
+      {
+        ...testHarness.dependencies,
+        waitForHuman: async (step, signal) => {
+          expect(step).toBe("owner");
+          expect(signal).toBe(controller.signal);
+          controller.abort(new CliTerminationError("SIGINT"));
+          signal?.throwIfAborted();
+        },
+      },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CliTerminationError);
+    expect(callback).not.toHaveBeenCalled();
+    expect(testHarness.verifiedSessionIds).toEqual([[OWNER_SESSION_ID]]);
+    expect(testHarness.browser.contexts).toHaveLength(1);
+    expect(testHarness.browser.contexts[0].request.authenticated).toBe(false);
+    expect(testHarness.browser.contexts[0].closed).toBe(true);
+    expect(testHarness.browser.closed).toBe(true);
+  });
+
+  it("revokes both sessions when SIGTERM interrupts the second-user prompt", async () => {
+    const controller = new AbortController();
+    const testHarness = harness();
+    const callback = vi.fn(async () => undefined);
+    const prompts: IdentitySlot[] = [];
+    const error = await withStagingLiveAuthSessions(
+      { ...OPTIONS, abortSignal: controller.signal },
+      callback,
+      {
+        ...testHarness.dependencies,
+        waitForHuman: async (step, signal) => {
+          if (step === "sessions-ready") return;
+          prompts.push(step);
+          if (step === "second-user") {
+            controller.abort(new CliTerminationError("SIGTERM"));
+            signal?.throwIfAborted();
+          }
+        },
+      },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CliTerminationError);
+    expect((error as CliTerminationError).exitCode).toBe(143);
+    expect(callback).not.toHaveBeenCalled();
+    expect(prompts).toEqual(["owner", "second-user"]);
+    expect(testHarness.verifiedSessionIds).toEqual([
+      [OWNER_SESSION_ID, SECOND_SESSION_ID],
+    ]);
+    expect(
+      testHarness.browser.contexts.every(
+        (context) => context.closed && !context.request.authenticated,
+      ),
+    ).toBe(true);
+    expect(testHarness.browser.closed).toBe(true);
+  });
+
+  it("waits for an in-flight callback to settle, then revokes both sessions after termination", async () => {
+    const controller = new AbortController();
+    const testHarness = harness();
+    const callback = vi.fn(async () => {
+      controller.abort(new CliTerminationError("SIGINT"));
+      return "must-not-be-reported";
+    });
+    const error = await withStagingLiveAuthSessions(
+      { ...OPTIONS, abortSignal: controller.signal },
+      callback,
+      testHarness.dependencies,
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CliTerminationError);
+    expect(callback).toHaveBeenCalledOnce();
+    expect(testHarness.verifiedSessionIds).toEqual([
+      [OWNER_SESSION_ID, SECOND_SESSION_ID],
+    ]);
+    expect(
+      testHarness.browser.contexts.every(
+        (context) => context.closed && !context.request.authenticated,
+      ),
+    ).toBe(true);
+    expect(testHarness.browser.closed).toBe(true);
   });
 
   it("fails closed when browser logout clears cookies but D1 does not confirm revocation", async () => {
