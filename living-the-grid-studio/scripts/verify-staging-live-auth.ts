@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -81,6 +83,25 @@ export interface LiveAuthBrowserLike {
   }): Promise<LiveAuthBrowserContextLike>;
 }
 
+export type LaunchPersistentChromeContext = (
+  userDataDirectory: string,
+  options: {
+    acceptDownloads: false;
+    args: string[];
+    baseURL: string;
+    channel: "chrome";
+    headless: false;
+    ignoreDefaultArgs: string[];
+    serviceWorkers: "block";
+    viewport: { height: number; width: number };
+  },
+) => Promise<LiveAuthBrowserContextLike>;
+
+export interface EphemeralChromeBrowserOptions {
+  launchPersistentContext: LaunchPersistentChromeContext;
+  profileParentDirectory?: string;
+}
+
 export type BrowserMemoryFetch = (
   input: string | URL | Request,
   init?: RequestInit,
@@ -127,6 +148,86 @@ export class StagingLiveAuthError extends Error {
     super(message);
     this.name = "StagingLiveAuthError";
   }
+}
+
+export async function createEphemeralChromeBrowser({
+  launchPersistentContext,
+  profileParentDirectory = tmpdir(),
+}: EphemeralChromeBrowserOptions): Promise<LiveAuthBrowserLike> {
+  const profileRoot = await mkdtemp(
+    path.join(profileParentDirectory, "tomodachi-live-auth-"),
+  );
+  try {
+    await chmod(profileRoot, 0o700);
+  } catch (error) {
+    await rm(profileRoot, { force: true, recursive: true }).catch(
+      () => undefined,
+    );
+    throw error;
+  }
+
+  let slotIndex = 0;
+  let closed = false;
+  const contexts = new Set<LiveAuthBrowserContextLike>();
+
+  return {
+    close: async () => {
+      if (closed) return;
+      closed = true;
+      const cleanupErrors: unknown[] = [];
+      for (const context of contexts) {
+        try {
+          await context.close();
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      }
+      contexts.clear();
+      try {
+        await rm(profileRoot, { force: true, recursive: true });
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(
+          cleanupErrors,
+          "The ephemeral Chrome profile could not be fully closed and removed.",
+        );
+      }
+    },
+    newContext: async (options) => {
+      if (closed) {
+        throw new StagingLiveAuthError(
+          "The ephemeral Chrome browser is already closed.",
+        );
+      }
+      const slotDirectory = path.join(profileRoot, `slot-${slotIndex++}`);
+      await mkdir(slotDirectory, { mode: 0o700 });
+      await chmod(slotDirectory, 0o700);
+      const context = await launchPersistentContext(slotDirectory, {
+        acceptDownloads: options.acceptDownloads,
+        args: ["--disable-blink-features=AutomationControlled"],
+        baseURL: options.baseURL,
+        channel: "chrome",
+        headless: false,
+        ignoreDefaultArgs: ["--enable-automation"],
+        serviceWorkers: options.serviceWorkers,
+        viewport: options.viewport,
+      });
+      contexts.add(context);
+      let contextClosed = false;
+      return {
+        close: async () => {
+          if (contextClosed) return;
+          await context.close();
+          contextClosed = true;
+          contexts.delete(context);
+        },
+        newPage: () => context.newPage(),
+        request: context.request,
+      };
+    },
+  };
 }
 
 interface ValidatedOptions {
@@ -545,7 +646,7 @@ export async function withStagingLiveAuthSessions<T>(
           slot,
         });
         dependencies.log(
-          `[live-auth] The ${safeSlotLabel(slot)} session is authenticated and onboarded in browser memory.`,
+          `[live-auth] The ${safeSlotLabel(slot)} session is authenticated and onboarded inside its ephemeral browser profile.`,
         );
       } catch (error) {
         if (!acquired.some((identity) => identity.context === context)) {
@@ -564,7 +665,7 @@ export async function withStagingLiveAuthSessions<T>(
       }),
     ) as [BrowserMemoryIdentity, BrowserMemoryIdentity];
     dependencies.log(
-      "[live-auth] Two distinct sessions are ready. No cookies or provider identity values were serialized.",
+      "[live-auth] Two distinct sessions are ready. No cookies or provider identity values were exported from the ephemeral browser profiles.",
     );
     // Interactive sign-in can take several minutes. Recheck Git, the active
     // Worker version, public release identity, and flags immediately before
@@ -620,7 +721,7 @@ export async function withStagingLiveAuthSessions<T>(
   if (cleanupErrors.length > 0) {
     throw new AggregateError(
       cleanupErrors,
-      "One or more browser-memory sessions could not be revoked and closed.",
+      "One or more ephemeral browser sessions could not be revoked and closed.",
     );
   }
 
@@ -689,13 +790,13 @@ async function revokeAndVerify(request: BrowserMemoryFetch): Promise<void> {
   });
   if (logout.status !== 200) {
     throw new StagingLiveAuthError(
-      "A browser-memory session could not be revoked through logout.",
+      "An ephemeral browser session could not be revoked through logout.",
     );
   }
   const snapshot = await readSessionSnapshot(request);
   if (snapshot !== null) {
     throw new StagingLiveAuthError(
-      "A revoked browser-memory session remained authenticated.",
+      "A revoked ephemeral browser session remained authenticated.",
     );
   }
 }
@@ -942,48 +1043,16 @@ function defaultDependencies(): StagingLiveAuthDependencies {
     },
     launchBrowser: async () => {
       const { chromium } = await import("@playwright/test");
-      const { homedir } = await import("node:os");
       // Google's secure-browser policy rejects credential entry inside the
       // automation-flagged bundled Chromium ("This browser or app may not be
-      // secure"). Launch the installed real Chrome with one persistent
-      // profile per identity slot instead: sign-in state survives between
-      // acceptance runs, so after the first manual sign-in the flow passes
-      // the account chooser without hitting the blocked credential screen.
-      const profileRoot =
-        process.env.LTG_LIVE_AUTH_PROFILE_DIR ??
-        path.join(homedir(), ".ltg-live-auth-profiles");
-      let slotIndex = 0;
-      const contexts: Array<{ close(): Promise<void> }> = [];
-      const browserLike = {
-        close: async () => {
-          for (const context of contexts.splice(0)) {
-            await context.close();
-          }
-        },
-        newContext: async (options: {
-          acceptDownloads: false;
-          baseURL: string;
-          serviceWorkers: "block";
-          viewport: { height: number; width: number };
-        }) => {
-          const context = await chromium.launchPersistentContext(
-            path.join(profileRoot, `slot-${slotIndex++}`),
-            {
-              acceptDownloads: options.acceptDownloads,
-              args: ["--disable-blink-features=AutomationControlled"],
-              baseURL: options.baseURL,
-              channel: "chrome",
-              headless: false,
-              ignoreDefaultArgs: ["--enable-automation"],
-              serviceWorkers: options.serviceWorkers,
-              viewport: options.viewport,
-            },
-          );
-          contexts.push(context);
-          return context;
-        },
-      };
-      return browserLike as unknown as LiveAuthBrowserLike;
+      // secure"). Launch the installed real Chrome for manual sign-in, but
+      // keep each run in a newly created 0700 temporary profile tree. The tree
+      // is removed when the runner closes, so provider and session state never
+      // survive into another acceptance run.
+      return createEphemeralChromeBrowser({
+        launchPersistentContext: (userDataDirectory, options) =>
+          chromium.launchPersistentContext(userDataDirectory, options),
+      });
     },
     log: (message) => console.log(message),
     verifySessionsRevoked: verifyStagingSessionsRevoked,

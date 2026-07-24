@@ -1,9 +1,14 @@
+import { mkdtemp, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   activeWorkerVersionFromDeployment,
   assertStagingSessionRowsRevoked,
   createBrowserMemoryFetch,
+  createEphemeralChromeBrowser,
   parseStagingLiveAuthArgs,
   StagingLiveAuthError,
   type BrowserApiRequestLike,
@@ -389,6 +394,128 @@ describe("staging live-auth target and CLI policy", () => {
   });
 });
 
+describe("ephemeral real-Chrome profile lifecycle", () => {
+  const contextOptions = {
+    acceptDownloads: false as const,
+    baseURL: STAGING_ORIGIN,
+    serviceWorkers: "block" as const,
+    viewport: { height: 900, width: 1280 },
+  };
+
+  it("creates fresh 0700 slot profiles and removes the whole run tree", async () => {
+    const parent = await mkdtemp(
+      path.join(tmpdir(), "tomodachi-live-auth-test-"),
+    );
+    try {
+      const userDataDirectories: string[] = [];
+      const contexts: FakeContext[] = [];
+      const browser = await createEphemeralChromeBrowser({
+        launchPersistentContext: async (userDataDirectory, options) => {
+          userDataDirectories.push(userDataDirectory);
+          expect(options).toMatchObject({
+            acceptDownloads: false,
+            baseURL: STAGING_ORIGIN,
+            channel: "chrome",
+            headless: false,
+            serviceWorkers: "block",
+          });
+          expect(options.args).toContain(
+            "--disable-blink-features=AutomationControlled",
+          );
+          expect(options.ignoreDefaultArgs).toContain("--enable-automation");
+          const context = new FakeContext(
+            userDataDirectories.length === 1 ? OWNER_ID : SECOND_USER_ID,
+            "private@example.test",
+            userDataDirectories.length === 1
+              ? OWNER_SESSION_ID
+              : SECOND_SESSION_ID,
+          );
+          contexts.push(context);
+          return context;
+        },
+        profileParentDirectory: parent,
+      });
+
+      const first = await browser.newContext(contextOptions);
+      await browser.newContext(contextOptions);
+
+      expect(userDataDirectories).toHaveLength(2);
+      expect(new Set(userDataDirectories).size).toBe(2);
+      const profileRoot = path.dirname(userDataDirectories[0]!);
+      expect(path.dirname(userDataDirectories[1]!)).toBe(profileRoot);
+      for (const directory of [profileRoot, ...userDataDirectories]) {
+        expect((await stat(directory)).mode & 0o777).toBe(0o700);
+      }
+
+      await first.close();
+      await browser.close();
+
+      expect(contexts.every((context) => context.closed)).toBe(true);
+      await expect(stat(profileRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(parent, { force: true, recursive: true });
+    }
+  });
+
+  it("still removes the run tree when a context fails to close", async () => {
+    const parent = await mkdtemp(
+      path.join(tmpdir(), "tomodachi-live-auth-failure-test-"),
+    );
+    try {
+      let profileRoot = "";
+      const browser = await createEphemeralChromeBrowser({
+        launchPersistentContext: async (userDataDirectory) => {
+          profileRoot = path.dirname(userDataDirectory);
+          return {
+            close: async () => {
+              throw new Error("synthetic context close failure");
+            },
+            newPage: async () => new FakePage([]),
+            request: new FakeApiRequest(
+              OWNER_ID,
+              "private@example.test",
+              OWNER_SESSION_ID,
+            ),
+          };
+        },
+        profileParentDirectory: parent,
+      });
+
+      await browser.newContext(contextOptions);
+      await expect(browser.close()).rejects.toThrow(
+        "ephemeral Chrome profile could not be fully closed and removed",
+      );
+      await expect(stat(profileRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(parent, { force: true, recursive: true });
+    }
+  });
+
+  it("removes the run tree after a persistent-context launch failure", async () => {
+    const parent = await mkdtemp(
+      path.join(tmpdir(), "tomodachi-live-auth-launch-test-"),
+    );
+    try {
+      let profileRoot = "";
+      const browser = await createEphemeralChromeBrowser({
+        launchPersistentContext: async (userDataDirectory) => {
+          profileRoot = path.dirname(userDataDirectory);
+          throw new Error("synthetic Chrome launch failure");
+        },
+        profileParentDirectory: parent,
+      });
+
+      await expect(browser.newContext(contextOptions)).rejects.toThrow(
+        "synthetic Chrome launch failure",
+      );
+      await browser.close();
+      await expect(stat(profileRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(parent, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("browser-memory fetch adapter", () => {
   it("keeps requests same-origin and never exposes cookie headers", async () => {
     const api = new FakeApiRequest(
@@ -637,7 +764,7 @@ describe("secret-free live-auth session lifecycle", () => {
         },
       }),
     ).rejects.toThrow(
-      "One or more browser-memory sessions could not be revoked and closed.",
+      "One or more ephemeral browser sessions could not be revoked and closed.",
     );
     expect(callback).toHaveBeenCalledOnce();
     expect(

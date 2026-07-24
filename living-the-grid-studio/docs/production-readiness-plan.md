@@ -236,7 +236,7 @@ schema reversal.
 
 **Owner/authority:** David Ortiz approves each Google staging identity used.
 The identity owner performs the interactive Google step. The runner may manage
-only browser-memory session state.
+only short-lived session state inside per-run browser profiles.
 
 **Prerequisites and implementation**
 
@@ -245,8 +245,12 @@ only browser-memory session state.
 - Keep Google credentials, OAuth codes, subjects, session tokens, and cookies
   out of source, shell arguments, environment dumps, screenshots, videos,
   traces, Playwright storage-state files, CI artifacts, and logs.
-- Use an ephemeral browser profile and keep the `__Host-tomodachi.sid` cookie
-  in browser memory. Persist only the internal UUID in the private approval
+- Use a newly created `0700` temporary browser-profile tree for every runner
+  invocation and confine the `__Host-tomodachi.sid` cookie to that live browser
+  context and temporary tree. Remove the entire tree on every success or
+  failure cleanup path; no Google or Tomodachi sign-in state may survive
+  between runs. Never export Playwright storage state or copy a profile into a
+  reusable location. Persist only the internal UUID in the private approval
   record when a role or fixture needs it.
 - Reuse the current owner account only for owner/admin checks. Add a distinct
   approved Google staging test user for cross-account checks; do not create a
@@ -260,13 +264,15 @@ only browser-memory session state.
 
 **Evidence:** Show verified-email onboarding, Terms attestation, session
 creation/revocation, ten-session eviction, fresh-auth enforcement, sign-out,
-and a post-run scan proving no auth material was written. Provider credentials
+and a post-run scan proving no auth material remains in the runner-created
+temporary tree or was exported into a reusable artifact. Provider credentials
 must not be changed for this gate.
 
 **Go/no-go:** Go only when two independent staging sessions can be supplied to
-P4 without serialization to disk and revocation invalidates each as expected.
-A Google challenge that requires unsafe credential capture is no-go; complete
-the interactive step manually instead.
+P4 without export into reusable disk artifacts, the per-run temporary profile
+tree is removed, and revocation invalidates each session as expected. A Google
+challenge that requires unsafe credential capture is no-go; complete the
+interactive step manually instead.
 
 **Rollback:** Revoke the disposable sessions through the product endpoint and
 close the ephemeral profiles. Do not delete an external identity merely to
@@ -520,7 +526,7 @@ production approval. P9 does not authorize any of them.
    Privacy/Terms URLs, authorized domain, and exact callback. Google OIDC—not
    Firebase and not Discord—is the launch identity architecture.
 4. List tracked and remote migrations by the production database name. Review
-   the candidate set (currently `0001`-`0008`, plus any later forward-only
+   the candidate set (currently `0001`-`0009`, plus any later forward-only
    migration in the final SHA), apply only the explicitly approved files, then
    verify the ledger, integrity, foreign keys, uniqueness, triggers, and empty
    bootstrap counts. Never edit or manually re-run an applied migration.
@@ -530,12 +536,13 @@ production approval. P9 does not authorize any of them.
    to the exact SHA. Do not print or diff values.
 6. Run `pnpm worker:dry-run:production`, inspect the flattened artifact, and
    require `COMMUNITY_MUTATIONS_ENABLED=false`, no payment bindings or secrets,
-   the production-only bindings, exactly
-   `tomodachi.pw` as a Custom Domain, and no preview/workers.dev exposure.
+   the production-only bindings, exactly `tomodachi.pw` and
+   `www.tomodachi.pw` as Custom Domains with the method-preserving canonical
+   redirect, and no preview/workers.dev exposure.
 
 **Go/no-go:** Zero shared staging identifier/secret, exact migration ledger,
 clean empty production application state, valid rollback artifact, and a
-schema-4 `production-read-only-bootstrap` readiness record are mandatory.
+schema-5 `production-read-only-bootstrap` readiness record are mandatory.
 The admin UUID remains null before first production sign-in.
 
 **Rollback:** Stop before domain cutover. Remove unused newly provisioned
@@ -554,10 +561,11 @@ UUID. Neither authority is granted here.
    `pages.dev` URL, Worker rollback version, bindings, DNS/product attachments,
    production ledger, OAuth redirect, retired-payment tombstone behavior, and
    rollback owner.
-2. Detach `tomodachi.pw` from Pages through the audited Cloudflare control
-   plane and deploy the reviewed `production-read-only-bootstrap` artifact.
-   Attach exactly one Worker Custom Domain; never let Pages and Workers claim
-   the hostname simultaneously.
+2. Detach both `tomodachi.pw` and `www.tomodachi.pw` from Pages through the
+   audited Cloudflare control plane and deploy the reviewed
+   `production-read-only-bootstrap` artifact. Attach exactly those two Worker
+   Custom Domains and verify the method-preserving canonical redirect; never
+   let Pages and Workers claim either hostname simultaneously.
 3. With community mutations false, verify TLS, static assets, SPA/API
    routing, envelopes, security headers/CSP, canonical/robots/sitemaps, public
    404s, anonymous Studio/edit/export, AI status and an approved minimal AI
@@ -577,9 +585,9 @@ UUID. Neither authority is granted here.
 write, OAuth mismatch, non-exact role change, payment-provider request, AI auth
 failure, secret/log leak, or regression triggers immediate no-go.
 
-**Rollback:** Remove the partial Worker Custom Domain, reattach the canonical
-hostname to the recorded Pages deployment, verify DNS/TLS and the immutable
-Pages URL, and keep community mutations disabled and payment surfaces retired.
+**Rollback:** Remove the partial Worker Custom Domains, reattach both hostnames
+to the recorded Pages deployment, verify DNS/TLS and the immutable Pages URL,
+and keep community mutations disabled and payment surfaces retired.
 Do not reverse D1 or delete R2. Revoke new sessions or credentials only when
 incident scope requires it.
 
