@@ -23,7 +23,8 @@ The harness is intentionally narrower than the complete browser and release
 acceptance suites. It verifies:
 
 - the SPA documents, staging canonical metadata, CSP, HSTS, anti-framing,
-  noindex, and UUIDv4 request IDs;
+  noindex, UUIDv4 request IDs, and absence of edge-injected Cloudflare browser
+  analytics in the final transformed HTML and CSP;
 - search/social crawler shells and safe missing-profile/missing-creation 404s;
 - deny-all `robots.txt` and empty, non-cacheable staging sitemaps;
 - standard discovery, search, and tag JSON envelopes; and
@@ -60,6 +61,9 @@ The safety policy is enforced in code rather than relying on operator care:
   fails the harness without creating data;
 - OAuth, account/session, AI, retired-payment compatibility, moderation,
   private-object, scheduled, and destructive routes are never requested; and
+- final HTML containing the Cloudflare browser analytics beacon or
+  `data-cf-beacon`, and a CSP permitting `cloudflareinsights.com`, fail before
+  the harness continues; and
 - redirects are not followed; cross-origin response URLs are rejected; and the
   per-request deadline remains active through bounded 2 MiB body consumption,
   including a server that sends headers and then stalls its body.
@@ -78,8 +82,9 @@ The preflight suite exercises both 28-request expectations against in-memory
 Worker-shaped fetch fixtures. It also proves the target/request allowlists,
 credential stripping, enabled-mode authentication boundary, mode mismatch
 failure, first-failure stop, redirect/`Set-Cookie`/cross-origin response
-rejection, and bounded and stalled-body behavior without contacting staging or
-any other remote system:
+rejection, edge-injected browser-analytics rejection, CSP allowlist rejection,
+and bounded and stalled-body behavior without contacting staging or any other
+remote system:
 
 ```bash
 pnpm test:preflight

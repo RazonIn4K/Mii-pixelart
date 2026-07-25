@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-25
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -18,33 +18,34 @@ staging check does not authorize the next gate.
 ## Current checkpoint
 
 - The exact review head is
-  `6bbadd414204e896a352601ead5852c3379f69f0` on GitHub and GitLab. Its five
-  owned GitHub checks, production/development audits, immutable tag
-  `security/github-pr-2-6bbadd414204`, and exact-tag GitLab security pipeline
-  `2704550271` passed. The external `code/snyk` context remains an account
-  test-limit result, not an owned gate or vulnerability finding.
-- Staging runs exact head `6bbadd414204e896a352601ead5852c3379f69f0`
-  as deployment `1c9f969c-27c0-41c9-bc85-8248d793d3ff`, Worker version
-  `4632d9e1-5a2c-4d07-bc16-848f453e0676`, with community mutations and AI
-  image generation enabled and payment surfaces retired. Its D1 ledger
-  contains migrations `0001`-`0009`; `quick_check` is `ok` and
-  `foreign_key_check` is empty. Anonymous hosted acceptance passed 380
-  assertions, the Studio smoke passed, and the bounded two-user P2/P3 writable
-  run passed 25 assertions with fixture cleanup and both sessions revoked.
-- Exact-head mobile lab evidence passed the numerical P1 targets: cold home
-  LCP p75 was 2,359 ms with CLS 0; cold Studio LCP p75 was 2,322 ms with CLS
-  0; restored-draft readiness p75 was 1,334 ms with maximum CLS 0.03; and
-  canvas input INP was 137 ms with CLS 0.
-- The full hosted browser matrix recorded 410 passes, 408 intentional project
-  skips, and two failures because its local synthetic analytics fixture was
-  incorrectly assumed to exist in the already-built staging bundle. The
-  hosted no-provider behavior and local configured-provider behavior both
-  passed focused checks, so this is a conditional P1 browser result and a
-  blocker to eventual P9 rather than an application defect or unconditional
-  staging exit. The current local harness-only correction makes the provider
-  expectation explicit and fail-closed; its canonical local-candidate rerun
-  passed 412 cases with 408 intentional project skips and zero failures. It is
-  not yet a reviewed remote commit or deployed artifact.
+  `6fab02622996b2aafac16f221e0e78aeb4867458` on GitHub and GitLab. Its owned
+  GitHub checks pass and immutable tag
+  `security/github-pr-2-6fab02622996` exists. The external `code/snyk` context
+  remains an account test-limit result, not an owned gate or vulnerability
+  finding.
+- Staging runs exact head `6fab02622996b2aafac16f221e0e78aeb4867458`
+  as deployment `e9059345-9504-4588-9e2b-cffd77a20357`, Worker version
+  `58ad3432-9ab0-4eec-b1e5-3fc7b52d7600`, with community mutations and AI image
+  generation enabled and payment surfaces retired. The verified rollback
+  remains deployment `1c9f969c-27c0-41c9-bc85-8248d793d3ff`, version
+  `4632d9e1-5a2c-4d07-bc16-848f453e0676`; it was not activated. The anonymous
+  hosted harness passed its prior 380 assertions, Studio and retired-payment
+  checks passed, and the no-provider browser matrix recorded 412 passes, 408
+  intentional project skips, and zero failures.
+- Exact-head anonymous mobile evidence passed the numerical P1 targets: cold
+  home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75 was 2,274 ms with
+  CLS 0; restored-local-draft readiness p75 was 2,235 ms with maximum CLS 0.03
+  and one canvas on every run; and Start blank input INP was 104 ms with CLS 0.
+  Authenticated cloud-load timing was not run because the approved gate did not
+  authorize a new OAuth session or fixture.
+- P1 remains conditional because Cloudflare currently injects its browser
+  analytics beacon after the Worker response and posts `/cdn-cgi/rum` before
+  an application consent choice. A 2026-07-25 private staging attestation
+  records this platform observation without treating it as an application
+  provider call. The current local correction removes the Cloudflare Insights
+  CSP origins and makes source, hosted, and browser checks fail closed on beacon
+  markup, attributes, and RUM requests. It is not a reviewed remote commit,
+  deployed artifact, or control-plane change.
 - The 25-assertion run is foundational P2/P3 evidence only. It exercised one
   bounded private create/read/save/stale-ETag conflict/delete flow across two
   approved identities and reconciliation; it does not satisfy the full P4
@@ -59,14 +60,13 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release gate is a reviewable harness-only correction that preserves
-  configured-provider coverage locally and explicitly validates the hosted
-  no-provider state. Its resulting immutable commit must receive fresh
-  exact-head CI and GitLab security evidence before a separately approved
-  staging deployment and affected P1 rerun. P9 evaluation remains later, after
-  P4-P8 are satisfied. No current approval authorizes that commit/push, deploy,
-  new staging data, merge, production cutover, DNS/OAuth/secret/role change, or
-  production write enablement.
+- The next release lane is a reviewable RUM/consent corrective Git and security
+  gate, followed by a separately approved Cloudflare automatic-Web-Analytics
+  disable gate covering staging/apex/`www`, then an exact-new-head staging
+  deployment and affected P1 rerun. P9 evaluation remains later, after P4-P8
+  are satisfied. No current approval authorizes commit/push, a Cloudflare
+  setting change, deploy, new staging data, merge, production cutover,
+  DNS/OAuth/secret/role change, or production write enablement.
 
 ## Authority and evidence rules
 
@@ -93,14 +93,14 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Numerical, hosted-read-only, Studio, CSP/crawler, and focused consent checks pass on `6bbadd4`; full browser exit remains conditional on the harness-only provider-mode correction and exact-new-head rerun |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Anonymous numerical, hosted-read-only, Studio, CSP/crawler, and no-provider browser checks pass on `6fab026`; exit remains conditional on disabling platform-injected RUM, deploying the corrective head, rerunning all consent paths, and capturing authenticated cloud-load timing |
 | P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4` with fixture cleanup, reconciliation, and both sessions revoked; a later source commit requires fresh exact-head evidence |
 | P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; both sessions were D1-revoked and the complete temporary profile tree was removed |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |
 | P7 | Payments-retired proof | Every release candidate | Exact-head source/CI proof passed; repeat the hosted 410/provider-free checks after staging deploy |
-| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | `6bbadd4` PR-head CI/tag/three-job scans passed; the harness correction requires a new immutable head/tag/pipeline, and later staging DAST/API plus complete license/CycloneDX dispositions remain before P9 |
+| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | `6fab026` PR-head owned CI and immutable tag exist; the local RUM correction requires a new immutable head/tag/pipeline, and later staging DAST/API plus complete license/CycloneDX dispositions remain before P9 |
 | P9 | Final staging exit review | P1-P8 | Blocked by preceding gates |
 | P10 | Isolated production resources, schema, OAuth, secrets, and bootstrap readiness | P9 | Resources and triggerless bootstrap exist; merged-main parity and fresh cutover inputs remain |
 | P11 | Read-only Worker production cutover and admin bootstrap | P10 | Production remains Pages |
@@ -393,6 +393,13 @@ advice.
   90-day report-text purge, two-year minimal moderation retention, data export,
   Google identity disclosure, public-content licensing, appeal/report process,
   copyright notice/counter-notice routing, and cookie behavior.
+- Treat automatic Cloudflare Web Analytics/browser RUM as a release blocker
+  while the public policy and hosted tests promise a no-provider, opt-in
+  posture. Disable automatic edge injection under a separate control-plane
+  approval, then prove the final transformed document, CSP, and network log
+  contain no Cloudflare Insights beacon, `data-cf-beacon`, or `/cdn-cgi/rum`
+  request before and after every consent choice. Do not close this item with a
+  source-only or policy-only edit.
 - Confirm payments, tips, donations, and consultations are not offered. Recheck
   current Workers, D1, R2, and Images pricing and approve the expected
   generated-image transformation/storage cost.

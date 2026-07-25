@@ -4,6 +4,19 @@ All notable user-visible changes to Tomodachi are documented here. The format fo
 
 ## Unreleased
 
+### 2026-07-25
+
+- **Consent-safe edge analytics candidate:** removed Cloudflare browser
+  analytics origins from both authored CSP paths, made hosted and browser
+  acceptance fail on edge-injected beacon markup or RUM requests regardless of
+  the cookie choice, and aligned Privacy/Cookies copy with the current
+  no-provider posture. This source correction does not change the Cloudflare
+  control plane; automatic Web Analytics must be separately disabled and
+  verified before the candidate can ship.
+- **Minimum-width contrast:** darkened the shared coral primary token just
+  enough for conflict-resolution buttons to clear WCAG 2.2 AA at the supported
+  320-pixel viewport while preserving the Island Workshop palette.
+
 ### 2026-07-16
 
 - **Payments retired:** removed the Stripe product catalog, Checkout Session

@@ -439,16 +439,28 @@ After explicit approval for resources and staging deployment:
 
    That command binds the run to the exact
    `https://staging.tomodachi.pw` origin and explicitly declares that the
-   current staging bundle has no analytics provider configured. A hosted run
-   with a missing or invalid `PLAYWRIGHT_ANALYTICS_MODE` fails during
-   configuration, as does any production, preview, arbitrary-host, credential,
-   port, path, query, or fragment target. Hosted `configured-provider` mode is
-   intentionally rejected because runner environment variables cannot change
-   a prebuilt remote bundle. Supporting it later requires a separately reviewed
-   contract for the expected public endpoint, website ID, and permitted
-   analytics egress. Ordinary local/CI `pnpm test:e2e` runs keep the intercepted
-   synthetic configured-provider fixture and contact no external analytics
-   service.
+   current final edge-transformed document has no analytics provider
+   configured. A hosted run with a missing or invalid
+   `PLAYWRIGHT_ANALYTICS_MODE` fails during configuration, as does any
+   production, preview, arbitrary-host, credential, port, path, query, or
+   fragment target. Hosted `configured-provider` mode is intentionally rejected
+   because runner environment variables cannot change a prebuilt remote bundle.
+   Supporting it later requires a separately reviewed contract for the expected
+   public endpoint, website ID, and permitted analytics egress. Ordinary
+   local/CI `pnpm test:e2e` runs keep the intercepted synthetic
+   configured-provider fixture and contact no external analytics service.
+
+   The no-provider claim applies to the final edge-transformed document, not
+   only the source bundle. Cloudflare Web Analytics automatic setup/browser RUM
+   must be disabled through the audited control plane before this gate can pass.
+   Before and after every consent choice, require zero
+   `static.cloudflareinsights.com/beacon.min.js` scripts, zero
+   `data-cf-beacon` attributes, and zero `/cdn-cgi/rum` requests. Any Cloudflare
+   control-plane change requires its own narrow approval and evidence; a source
+   or legal-copy change does not disable edge injection. The observed shared
+   site configuration affects staging, the apex, and `www`; scope the approval
+   and post-change verification to every affected hostname even when only
+   staging receives a source deployment.
 
    The exact-head staging exit set is cumulative and must include:
    - P1 anonymous hosted, Studio, CSP/console/crawler, responsive/accessibility,

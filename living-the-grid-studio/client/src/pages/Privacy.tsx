@@ -17,7 +17,7 @@ export default function Privacy() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      lastUpdated="July 16, 2026"
+      lastUpdated="July 25, 2026"
       intro="Tomodachi is a local-first pixel-art workshop with an optional account and community layer. Local editing and export do not require an account; cloud saving and publishing are deliberate choices."
     >
       <h2>1. Who we are</h2>
@@ -64,8 +64,12 @@ export default function Privacy() {
           request bodies, prompts, or project content.
         </li>
         <li>
-          Aggregate usage events from privacy-respecting analytics, but only if
-          you have consented via the cookie banner.
+          We do not currently load an optional browser analytics script.
+          Cloudflare browser analytics/RUM is disabled at the edge. If optional
+          analytics is introduced later, it will collect only the disclosed
+          aggregate events and load only after you consent through the cookie
+          banner. Cloudflare&apos;s hosting/CDN still processes ordinary request
+          and network-error metadata as described below.
         </li>
       </ul>
 
@@ -100,7 +104,8 @@ export default function Privacy() {
         </li>
         <li>
           <strong>Improve the Site.</strong> Diagnosing errors and measuring
-          which features get used (only with analytics consent).
+          aggregate feature use only if optional analytics is configured and you
+          have consented.
         </li>
         <li>
           <strong>Communicate.</strong> Responding when you contact a published
@@ -119,7 +124,10 @@ export default function Privacy() {
           <strong>Cloudflare</strong> for Workers hosting, DNS/CDN, D1 account
           and community records, private R2 project/media objects, and image
           transformations for generated previews and optional profile or
-          showcase images.
+          showcase images. Cloudflare browser analytics/RUM is disabled.
+          Cloudflare still processes ordinary request and network-error metadata
+          needed for hosting, security, CDN delivery, and network error
+          reporting.
         </li>
         <li>
           <strong>Google</strong> for optional OpenID Connect sign-in. We ask

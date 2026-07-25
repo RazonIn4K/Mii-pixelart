@@ -25,7 +25,7 @@ export default function Cookies() {
   return (
     <LegalLayout
       title="Cookie Notice"
-      lastUpdated="July 16, 2026"
+      lastUpdated="July 25, 2026"
       intro="This page explains what we store in your browser and why. You can change your mind any time."
     >
       <h2>What we use</h2>
@@ -63,13 +63,14 @@ export default function Cookies() {
       </p>
 
       <h3>Analytics (opt-in)</h3>
-      <ul>
-        <li>
-          Aggregate event counts (e.g. &quot;breach-check submitted&quot;,
-          &quot;AI plan generated&quot;). No identifiers, no cross-site
-          tracking. Only loaded after you accept analytics in the cookie banner.
-        </li>
-      </ul>
+      <p>
+        We do not currently load an optional browser analytics script.
+        Cloudflare browser analytics/RUM is disabled. If optional analytics is
+        introduced later, this notice will name the provider and disclosed data,
+        and the provider will load only after you accept analytics in the cookie
+        banner. Cloudflare&apos;s hosting/CDN still processes ordinary request
+        and network-error metadata as described in the Privacy Policy.
+      </p>
 
       <h3>Marketing (opt-in)</h3>
       <ul>
