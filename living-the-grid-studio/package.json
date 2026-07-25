@@ -17,6 +17,7 @@
     "test:worker": "vitest run --config vitest.config.ts",
     "test:preflight": "vitest run --config vitest.preflight.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:staging": "PLAYWRIGHT_BASE_URL=https://staging.tomodachi.pw PLAYWRIGHT_ANALYTICS_MODE=no-provider playwright test",
     "worker:dry-run": "tsx scripts/worker-release.ts --target local --intent dry-run",
     "worker:dry-run:staging": "tsx scripts/worker-release.ts --target staging --intent dry-run",
     "worker:dry-run:production": "tsx scripts/worker-release.ts --target production --intent dry-run",

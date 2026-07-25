@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "scripts/cli-termination.test.ts",
+      "scripts/playwright-hosted-mode.test.ts",
       "scripts/worker-release.test.ts",
       "scripts/release-output-hygiene.test.ts",
       "scripts/staging-r2-prefix-audit-worker.test.ts",

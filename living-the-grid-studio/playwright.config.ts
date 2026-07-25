@@ -1,9 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { resolvePlaywrightHostedMode } from "./scripts/playwright-hosted-mode";
 
 // Keep automated browser runs isolated from developer/CI credentials while
 // satisfying Wrangler's required-secret declaration for the local Worker.
 const ephemeralCredential = () => randomBytes(32).toString("base64url");
+const hostedMode = resolvePlaywrightHostedMode(process.env);
 
 Object.assign(process.env, {
   GOOGLE_CLIENT_ID: ephemeralCredential(),
@@ -12,13 +14,21 @@ Object.assign(process.env, {
   SESSION_PEPPER: ephemeralCredential(),
   PSEUDONYM_KEY: ephemeralCredential(),
   OPENROUTER_API_KEY: ephemeralCredential(),
-  // Give consent tests a same-origin analytics target that Playwright
-  // intercepts locally. No external analytics service is contacted.
-  VITE_ANALYTICS_ENDPOINT: "/__test/analytics",
-  VITE_ANALYTICS_WEBSITE_ID: "playwright-consent-site",
+  PLAYWRIGHT_ANALYTICS_MODE: hostedMode.analyticsMode,
+  // Local configured-provider runs use a same-origin target intercepted by
+  // Playwright. Empty values make local no-provider runs hermetic even if a
+  // developer has analytics values in an untracked environment file. These
+  // runner variables cannot and must not alter an already-built hosted bundle.
+  VITE_ANALYTICS_ENDPOINT:
+    hostedMode.analyticsMode === "configured-provider"
+      ? "/__test/analytics"
+      : "",
+  VITE_ANALYTICS_WEBSITE_ID:
+    hostedMode.analyticsMode === "configured-provider"
+      ? "playwright-consent-site"
+      : "",
 });
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
 const webServerCommand =
   process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ??
   "pnpm dev --host 127.0.0.1 --port 4173 --strictPort";
@@ -29,16 +39,20 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL,
+    baseURL: hostedMode.baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: webServerCommand,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ...(hostedMode.hosted
+    ? {}
+    : {
+        webServer: {
+          command: webServerCommand,
+          url: hostedMode.baseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+        },
+      }),
   projects: [
     {
       name: "desktop",
