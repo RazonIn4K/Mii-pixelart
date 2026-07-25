@@ -3,6 +3,8 @@ import type { PlaywrightAnalyticsMode } from "../../scripts/playwright-hosted-mo
 
 const ANALYTICS_PATH = "/__test/analytics/umami";
 const ANALYTICS_SCRIPT = "#tomodachi-opt-in-analytics";
+const CLOUDFLARE_ANALYTICS_SCRIPT =
+  'script[src*="static.cloudflareinsights.com/beacon.min.js"], [data-cf-beacon]';
 const CONSENT_DIALOG = "Cookie consent";
 const CONSENT_STORAGE_KEY = "ltg.consent.v1";
 const ANALYTICS_MODE = process.env
@@ -24,6 +26,7 @@ type StoredConsent = {
 type NonEssentialProbe = {
   analyticsRequests: string[];
   marketingRequests: string[];
+  platformAnalyticsRequests: string[];
 };
 
 test.beforeEach(async ({}, testInfo) => {
@@ -39,6 +42,7 @@ async function installNonEssentialProbe(
   const probe: NonEssentialProbe = {
     analyticsRequests: [],
     marketingRequests: [],
+    platformAnalyticsRequests: [],
   };
 
   page.on("request", (request) => {
@@ -53,6 +57,14 @@ async function installNonEssentialProbe(
       url.hostname.endsWith(".googleadservices.com")
     ) {
       probe.marketingRequests.push(request.url());
+    }
+    if (
+      url.hostname === "static.cloudflareinsights.com" ||
+      url.hostname === "cloudflareinsights.com" ||
+      url.hostname.endsWith(".cloudflareinsights.com") ||
+      url.pathname === "/cdn-cgi/rum"
+    ) {
+      probe.platformAnalyticsRequests.push(`${url.origin}${url.pathname}`);
     }
   });
 
@@ -90,9 +102,11 @@ async function expectNoNonEssentialLoading(
   probe: NonEssentialProbe,
 ): Promise<void> {
   await expect(page.locator(ANALYTICS_SCRIPT)).toHaveCount(0);
+  await expect(page.locator(CLOUDFLARE_ANALYTICS_SCRIPT)).toHaveCount(0);
   await expect(page.locator(MARKETING_SCRIPT_SELECTOR)).toHaveCount(0);
   expect(probe.analyticsRequests).toEqual([]);
   expect(probe.marketingRequests).toEqual([]);
+  expect(probe.platformAnalyticsRequests).toEqual([]);
 }
 
 async function readAnalyticsLoads(page: Page): Promise<number> {
@@ -111,44 +125,55 @@ async function expectNoAnalyticsLoading(
   probe: NonEssentialProbe,
 ): Promise<void> {
   await expect(page.locator(ANALYTICS_SCRIPT)).toHaveCount(0);
+  await expectNoPlatformAnalyticsLoading(page, probe);
   expect(probe.analyticsRequests).toEqual([]);
   expect(await readAnalyticsLoads(page)).toBe(0);
 }
 
-test("Essential only blocks non-essential loading and persists across reloads", async ({
-  page,
-}) => {
-  const probe = await installNonEssentialProbe(page);
+async function expectNoPlatformAnalyticsLoading(
+  page: Page,
+  probe: NonEssentialProbe,
+): Promise<void> {
+  await expect(page.locator(CLOUDFLARE_ANALYTICS_SCRIPT)).toHaveCount(0);
+  expect(probe.platformAnalyticsRequests).toEqual([]);
+}
 
-  await page.goto("/", { waitUntil: "networkidle" });
-  await expect(
-    page.getByRole("dialog", { name: CONSENT_DIALOG }),
-  ).toBeVisible();
-  expect(await readStoredConsent(page)).toBeNull();
-  await expectNoNonEssentialLoading(page, probe);
+for (const rejectionButton of ["Essential only", "Reject all"] as const) {
+  test(`${rejectionButton} blocks non-essential loading and persists across reloads`, async ({
+    page,
+  }) => {
+    const probe = await installNonEssentialProbe(page);
 
-  await page.getByRole("button", { name: "Essential only" }).click();
-  await expect(page.getByRole("dialog", { name: CONSENT_DIALOG })).toHaveCount(
-    0,
-  );
-  const originalDecision = await expectDecision(page, {
-    analytics: false,
-    decision: "rejected",
-    marketing: false,
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(
+      page.getByRole("dialog", { name: CONSENT_DIALOG }),
+    ).toBeVisible();
+    expect(await readStoredConsent(page)).toBeNull();
+    await expectNoNonEssentialLoading(page, probe);
+
+    await page.getByRole("button", { name: rejectionButton }).click();
+    await expect(
+      page.getByRole("dialog", { name: CONSENT_DIALOG }),
+    ).toHaveCount(0);
+    const originalDecision = await expectDecision(page, {
+      analytics: false,
+      decision: "rejected",
+      marketing: false,
+    });
+
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(
+      page.getByRole("dialog", { name: CONSENT_DIALOG }),
+    ).toHaveCount(0);
+    const persistedDecision = await expectDecision(page, {
+      analytics: false,
+      decision: "rejected",
+      marketing: false,
+    });
+    expect(persistedDecision.decidedAt).toBe(originalDecision.decidedAt);
+    await expectNoNonEssentialLoading(page, probe);
   });
-
-  await page.reload({ waitUntil: "networkidle" });
-  await expect(page.getByRole("dialog", { name: CONSENT_DIALOG })).toHaveCount(
-    0,
-  );
-  const persistedDecision = await expectDecision(page, {
-    analytics: false,
-    decision: "rejected",
-    marketing: false,
-  });
-  expect(persistedDecision.decidedAt).toBe(originalDecision.decidedAt);
-  await expectNoNonEssentialLoading(page, probe);
-});
+}
 
 test("Accept all respects the declared analytics provider mode and persists", async ({
   page,
@@ -169,6 +194,7 @@ test("Accept all respects the declared analytics provider mode and persists", as
   } else {
     await expectNoAnalyticsLoading(page, probe);
   }
+  await expectNoPlatformAnalyticsLoading(page, probe);
   const originalDecision = await expectDecision(page, {
     analytics: true,
     decision: "accepted",
@@ -185,6 +211,7 @@ test("Accept all respects the declared analytics provider mode and persists", as
   } else {
     await expectNoAnalyticsLoading(page, probe);
   }
+  await expectNoPlatformAnalyticsLoading(page, probe);
   const persistedDecision = await expectDecision(page, {
     analytics: true,
     decision: "accepted",
@@ -205,6 +232,7 @@ test("reset preferences unloads analytics and restores the consent choice", asyn
   } else {
     await expectNoAnalyticsLoading(page, probe);
   }
+  await expectNoPlatformAnalyticsLoading(page, probe);
 
   await page.goto("/cookies", { waitUntil: "networkidle" });
   if (ANALYTICS_MODE === "configured-provider") {
@@ -212,6 +240,7 @@ test("reset preferences unloads analytics and restores the consent choice", asyn
   } else {
     await expectNoAnalyticsLoading(page, probe);
   }
+  await expectNoPlatformAnalyticsLoading(page, probe);
   const requestsBeforeReset = probe.analyticsRequests.length;
   if (ANALYTICS_MODE === "configured-provider") {
     const reloaded = page.waitForEvent(
@@ -231,6 +260,7 @@ test("reset preferences unloads analytics and restores the consent choice", asyn
 
   expect(await readStoredConsent(page)).toBeNull();
   await expect(page.locator(ANALYTICS_SCRIPT)).toHaveCount(0);
+  await expectNoPlatformAnalyticsLoading(page, probe);
   await expect(
     page.getByRole("dialog", { name: CONSENT_DIALOG }),
   ).toBeVisible();
@@ -257,4 +287,5 @@ test("reset preferences unloads analytics and restores the consent choice", asyn
     page.getByRole("dialog", { name: CONSENT_DIALOG }),
   ).toBeVisible();
   await expect(page.locator(ANALYTICS_SCRIPT)).toHaveCount(0);
+  await expectNoPlatformAnalyticsLoading(page, probe);
 });

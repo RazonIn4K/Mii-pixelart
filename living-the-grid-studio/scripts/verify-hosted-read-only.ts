@@ -39,6 +39,11 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const WRONG_ORIGIN = "https://example.invalid";
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const FORBIDDEN_EDGE_ANALYTICS_MARKERS = [
+  "static.cloudflareinsights.com/beacon.min.js",
+  "cloudflareinsights.com/cdn-cgi/rum",
+  "data-cf-beacon",
+] as const;
 
 const DOCUMENT_PATHS = [
   "/",
@@ -351,6 +356,10 @@ export async function runHostedReadOnlyAcceptance(
       response.headers.get("x-document-render") === "spa",
       `${pathname} did not use the browser SPA document`,
     );
+    expect(
+      !containsEdgeInjectedAnalytics(body),
+      `${pathname} contains edge-injected analytics`,
+    );
     assertSecurityHeaders(response, csp, pathname, expect);
     assertRequestId(response, pathname, expect);
   }
@@ -389,6 +398,10 @@ export async function runHostedReadOnlyAcceptance(
       !containsProductionOrigin(body),
       `${renderMode} crawler shell contains production metadata`,
     );
+    expect(
+      !containsEdgeInjectedAnalytics(body),
+      `${renderMode} crawler shell contains edge-injected analytics`,
+    );
     assertRequestId(response, `${renderMode} crawler`, expect);
   }
 
@@ -412,6 +425,10 @@ export async function runHostedReadOnlyAcceptance(
     expect(
       !containsProductionOrigin(body),
       `${pathname} 404 contains production metadata`,
+    );
+    expect(
+      !containsEdgeInjectedAnalytics(body),
+      `${pathname} 404 contains edge-injected analytics`,
     );
     assertRequestId(response, pathname, expect);
   }
@@ -591,8 +608,19 @@ function assertSecurityHeaders(
     `${label} permits external Google fonts`,
   );
   expect(
+    !/cloudflareinsights[.]com/iu.test(csp),
+    `${label} permits unconfigured Cloudflare browser analytics`,
+  );
+  expect(
     !response.headers.has("content-security-policy-report-only"),
     `${label} unexpectedly emits a report-only CSP`,
+  );
+}
+
+function containsEdgeInjectedAnalytics(document: string): boolean {
+  const normalized = document.toLowerCase();
+  return FORBIDDEN_EDGE_ANALYTICS_MARKERS.some((marker) =>
+    normalized.includes(marker),
   );
 }
 

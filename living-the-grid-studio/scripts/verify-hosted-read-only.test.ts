@@ -33,7 +33,9 @@ interface SeenRequest {
 
 function fixtureFetch(
   options: {
+    allowCloudflareAnalyticsCsp?: boolean;
     communityMutations?: CommunityMutationsExpectation;
+    injectCloudflareAnalytics?: "document" | "crawler" | "missing-document";
     omitCsp?: boolean;
   } = {},
 ): {
@@ -76,6 +78,12 @@ function fixtureFetch(
     if (options.omitCsp && requestNumber === 1) {
       headers.delete("Content-Security-Policy");
     }
+    if (options.allowCloudflareAnalyticsCsp && requestNumber === 1) {
+      headers.set(
+        "Content-Security-Policy",
+        `${CSP}; script-src-elem 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com`,
+      );
+    }
 
     if (request.method === "POST" && url.pathname === "/api/creations") {
       headers.set("Content-Type", "application/json; charset=utf-8");
@@ -116,8 +124,12 @@ function fixtureFetch(
     const userAgent = request.headers.get("user-agent") ?? "";
     if (url.pathname === "/discover" && /googlebot/iu.test(userAgent)) {
       headers.set("X-Crawler-Render", "search");
+      const edgeAnalytics =
+        options.injectCloudflareAnalytics === "crawler"
+          ? '<script DATA-CF-BEACON=\'{"token":"fixture"}\'></script>'
+          : "";
       return new Response(
-        `<html><head><link rel="canonical" href="${FIXTURE_ORIGIN}/discover"></head></html>`,
+        `<html><head><link rel="canonical" href="${FIXTURE_ORIGIN}/discover">${edgeAnalytics}</head></html>`,
         { headers },
       );
     }
@@ -136,16 +148,25 @@ function fixtureFetch(
       url.pathname === "/creation/does-not-exist" ||
       url.pathname === "/u/missing-user"
     ) {
+      const edgeAnalytics =
+        options.injectCloudflareAnalytics === "missing-document" &&
+        url.pathname === "/creation/does-not-exist"
+          ? '<script src="https://CLOUDFLAREINSIGHTS.COM/CDN-CGI/RUM"></script>'
+          : "";
       return new Response(
-        `<html><head><link rel="canonical" href="${FIXTURE_ORIGIN}${url.pathname}"></head></html>`,
+        `<html><head><link rel="canonical" href="${FIXTURE_ORIGIN}${url.pathname}">${edgeAnalytics}</head></html>`,
         { headers, status: 404 },
       );
     }
 
     headers.set("X-Document-Render", "spa");
     const canonical = `${FIXTURE_ORIGIN}${url.pathname}`;
+    const edgeAnalytics =
+      options.injectCloudflareAnalytics === "document" && url.pathname === "/"
+        ? '<script src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"fixture"}\'></script>'
+        : "";
     return new Response(
-      `<html><head><link rel="canonical" href="${canonical}"></head><body><div id="root"></div></body></html>`,
+      `<html><head><link rel="canonical" href="${canonical}">${edgeAnalytics}</head><body><div id="root"></div></body></html>`,
       { headers },
     );
   };
@@ -387,6 +408,47 @@ describe("hosted read-only acceptance", () => {
         fetchImpl: fixture.fetchImpl,
       }),
     ).rejects.toThrow("incomplete CSP");
+    expect(fixture.seen).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      expected: "/ contains edge-injected analytics",
+      requests: 1,
+      target: "document",
+    },
+    {
+      expected: "search crawler shell contains edge-injected analytics",
+      requests: 14,
+      target: "crawler",
+    },
+    {
+      expected: "/creation/does-not-exist 404 contains edge-injected analytics",
+      requests: 16,
+      target: "missing-document",
+    },
+  ] as const)(
+    "rejects edge-injected browser analytics in the $target response",
+    async ({ expected, requests, target }) => {
+      const fixture = fixtureFetch({ injectCloudflareAnalytics: target });
+      await expect(
+        runHostedReadOnlyAcceptance({
+          baseUrl: FIXTURE_ORIGIN,
+          fetchImpl: fixture.fetchImpl,
+        }),
+      ).rejects.toThrow(expected);
+      expect(fixture.seen).toHaveLength(requests);
+    },
+  );
+
+  it("rejects a CSP that permits unconfigured Cloudflare browser analytics", async () => {
+    const fixture = fixtureFetch({ allowCloudflareAnalyticsCsp: true });
+    await expect(
+      runHostedReadOnlyAcceptance({
+        baseUrl: FIXTURE_ORIGIN,
+        fetchImpl: fixture.fetchImpl,
+      }),
+    ).rejects.toThrow("/ permits unconfigured Cloudflare browser analytics");
     expect(fixture.seen).toHaveLength(1);
   });
 

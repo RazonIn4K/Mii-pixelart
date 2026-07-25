@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
+import { applySecurityHeaders } from "../../worker/http";
 
 const headersSource = readFileSync(
   new URL("../../client/public/_headers", import.meta.url),
@@ -33,6 +34,21 @@ test("uses native font stacks without third-party font origins", () => {
 
 test("does not ship a report-only policy without a reporting endpoint", () => {
   expect(contentSecurityPolicyReportOnly).toBeUndefined();
+});
+
+test("does not permit unconfigured Cloudflare browser analytics", () => {
+  const workerCsp = applySecurityHeaders(
+    new Response(),
+    "csp-parity-test",
+  ).headers.get("content-security-policy");
+
+  expect(workerCsp).toBe(contentSecurityPolicy);
+  expect(indexSource).not.toContain("static.cloudflareinsights.com");
+  expect(indexSource).not.toContain("data-cf-beacon");
+  for (const csp of [contentSecurityPolicy, workerCsp]) {
+    expect(csp).not.toContain("static.cloudflareinsights.com");
+    expect(csp).not.toContain("cloudflareinsights.com");
+  }
 });
 
 test("allows the Google OIDC form redirect required by form-action", async ({

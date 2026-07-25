@@ -29,7 +29,8 @@
   #     a separate refactor.
   #
   # Per-directive notes:
-  #   - script: self + AdSense (loaded only after consent).
+  #   - script: self + AdSense (loaded only after consent). Cloudflare browser
+  #     analytics is intentionally not permitted.
   #     *.google.com was dropped — AdSense doesn't need it.
   #   - style: self. 'unsafe-inline' is required by Tailwind v4 and React's
   #     runtime style injection.
@@ -38,13 +39,14 @@
   #   - img: anywhere over https + data: + blob: (hero CDN, og-image,
   #     studio preview blobs).
   #   - connect: self for our APIs, HIBP for password breach check, OpenRouter
-  #     for AI, and Cloudflare NEL for error reports.
+  #     for AI, and Cloudflare NEL for browser network-error reports. Cloudflare
+  #     browser analytics/RUM is intentionally not permitted.
   #   - frame: AdSense ad frames.
   #   - form: self for the OIDC start POST and Google for the authorization
   #     redirect.
   #   - frame-ancestors 'none' matches the X-Frame-Options: DENY above —
   #     nothing should iframe the studio.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com https://cloudflareinsights.com https://*.cloudflareinsights.com; frame-src https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
   # Do not add a report-only Trusted Types policy until a real report endpoint
   # and report-to directive exist. Browsers otherwise ignore the policy, and
   # WebKit reports the missing destination as a console error. The enforced

@@ -341,7 +341,7 @@ export function applySecurityHeaders(
   if (!headers.has("Content-Security-Policy")) {
     headers.set(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com https://cloudflareinsights.com https://*.cloudflareinsights.com; frame-src https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.pwnedpasswords.com https://openrouter.ai https://*.openrouter.ai https://*.pages.dev https://a.nel.cloudflare.com https://pagead2.googlesyndication.com; frame-src https://googleads.g.doubleclick.net https://www.google.com; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests",
     );
   }
   // A report-only policy without report-to plus a real Reporting-Endpoints

@@ -118,6 +118,9 @@ describe("Worker security primitives", () => {
     expect(response.headers.get("content-security-policy")).not.toContain(
       "fonts.gstatic.com",
     );
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "cloudflareinsights.com",
+    );
     expect(
       response.headers.get("content-security-policy-report-only"),
     ).toBeNull();
