@@ -430,6 +430,26 @@ After explicit approval for resources and staging deployment:
    use credentials, and make no upstream request.
 
 7. Run contract/integration/browser/security/accessibility/performance tests.
+   Run the complete Worker-hosted browser matrix through the tracked,
+   fail-closed command:
+
+   ```bash
+   pnpm test:e2e:staging
+   ```
+
+   That command binds the run to the exact
+   `https://staging.tomodachi.pw` origin and explicitly declares that the
+   current staging bundle has no analytics provider configured. A hosted run
+   with a missing or invalid `PLAYWRIGHT_ANALYTICS_MODE` fails during
+   configuration, as does any production, preview, arbitrary-host, credential,
+   port, path, query, or fragment target. Hosted `configured-provider` mode is
+   intentionally rejected because runner environment variables cannot change
+   a prebuilt remote bundle. Supporting it later requires a separately reviewed
+   contract for the expected public endpoint, website ID, and permitted
+   analytics egress. Ordinary local/CI `pnpm test:e2e` runs keep the intercepted
+   synthetic configured-provider fixture and contact no external analytics
+   service.
+
    The exact-head staging exit set is cumulative and must include:
    - P1 anonymous hosted, Studio, CSP/console/crawler, responsive/accessibility,
      cold/restored/cloud mobile performance, and rollback checks;

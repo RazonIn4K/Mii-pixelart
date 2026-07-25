@@ -18,36 +18,39 @@ staging check does not authorize the next gate.
 ## Current checkpoint
 
 - The exact review head is
-  `4b5215d850ac4890ef89c523c5d8e6a5379b311b` on GitHub and GitLab. Its owned
-  GitHub checks, unignored production/development audits, immutable tag
-  `security/github-pr-2-4b5215d850ac`, and three-job GitLab security pipeline
-  `2704134924` passed. The external `code/snyk` context remains an account
+  `6bbadd414204e896a352601ead5852c3379f69f0` on GitHub and GitLab. Its five
+  owned GitHub checks, production/development audits, immutable tag
+  `security/github-pr-2-6bbadd414204`, and exact-tag GitLab security pipeline
+  `2704550271` passed. The external `code/snyk` context remains an account
   test-limit result, not an owned gate or vulnerability finding.
-  This is the provider-reported checkpoint before the acceptance-hardening
-  candidate in this change. The candidate must first be committed, then its
-  resulting immutable commit must receive fresh exact-head CI, annotated-tag,
-  and security-pipeline evidence. Only that reviewed commit, named by its full
-  SHA in a new approval, may be deployed; this plan does not predeclare a
-  future SHA.
-- Staging remains intentionally pinned to
-  `a964729f643b188f5553ce775ef5bee8a9def6ec`, deployment
-  `17d26641-d145-404f-b78b-4aa9ae1d7d1e`, Worker version
-  `01e306d7-c079-4eda-8fe7-2e098c77b82c`, with
-  `COMMUNITY_MUTATIONS_ENABLED=true`. Its D1 ledger contains migrations
-  `0001`-`0009`. Anonymous hosted acceptance passed 380 assertions, the hosted
-  Studio smoke passed, and the bounded P2/P3 writable run passed 25 assertions
-  with fixture cleanup and two session revocations.
+- Staging runs exact head `6bbadd414204e896a352601ead5852c3379f69f0`
+  as deployment `1c9f969c-27c0-41c9-bc85-8248d793d3ff`, Worker version
+  `4632d9e1-5a2c-4d07-bc16-848f453e0676`, with community mutations and AI
+  image generation enabled and payment surfaces retired. Its D1 ledger
+  contains migrations `0001`-`0009`; `quick_check` is `ok` and
+  `foreign_key_check` is empty. Anonymous hosted acceptance passed 380
+  assertions, the Studio smoke passed, and the bounded two-user P2/P3 writable
+  run passed 25 assertions with fixture cleanup and both sessions revoked.
+- Exact-head mobile lab evidence passed the numerical P1 targets: cold home
+  LCP p75 was 2,359 ms with CLS 0; cold Studio LCP p75 was 2,322 ms with CLS
+  0; restored-draft readiness p75 was 1,334 ms with maximum CLS 0.03; and
+  canvas input INP was 137 ms with CLS 0.
+- The full hosted browser matrix recorded 410 passes, 408 intentional project
+  skips, and two failures because its local synthetic analytics fixture was
+  incorrectly assumed to exist in the already-built staging bundle. The
+  hosted no-provider behavior and local configured-provider behavior both
+  passed focused checks, so this is a conditional P1 browser result and a
+  blocker to eventual P9 rather than an application defect or unconditional
+  staging exit. The current local harness-only correction makes the provider
+  expectation explicit and fail-closed; its canonical local-candidate rerun
+  passed 412 cases with 408 intentional project skips and zero failures. It is
+  not yet a reviewed remote commit or deployed artifact.
 - The 25-assertion run is foundational P2/P3 evidence only. It exercised one
-  approved user's private create/read/save/stale-ETag conflict/delete flow and
-  reconciliation; it does not satisfy the full P4 cross-user, publishing,
-  social, moderation, media, quota, or export matrix, and it does not satisfy
-  P5 deletion/retention/cron acceptance.
-- Review head `4b5215d` replaces reusable home-backed live-auth profiles with
-  a new owner-only per-run temporary tree that is removed on every exit path.
-  Because this security correction is not deployed to staging, the affected
-  P2/P3 authenticated and cleanup evidence must be rerun on exact head before
-  any staging-exit decision. Historical evidence remains immutable supporting
-  evidence and is never rewritten to claim coverage for a later SHA.
+  bounded private create/read/save/stale-ETag conflict/delete flow across two
+  approved identities and reconciliation; it does not satisfy the full P4
+  cross-user, publishing, social, moderation, media, quota, or export matrix,
+  and it does not satisfy P5 deletion/retention/cron acceptance. Any new source
+  commit also requires fresh exact-head evidence before a P9 decision.
 - Production traffic remains on Cloudflare Pages. Isolated production D1, R2,
   KV, rate limits, OAuth, secrets, and migrations `0001`-`0009` have been
   prepared, and a hidden triggerless Worker exists at deployment
@@ -56,13 +59,14 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release gate is not a deployment of the historical `4b5215d`
-  checkpoint. First commit and review the acceptance-hardening candidate,
-  obtain fresh exact-head CI and security evidence for that resulting immutable
-  commit, and then seek a separately approved staging deployment of that full
-  SHA followed by complete P1-P9 acceptance on one Worker version. No current
-  approval authorizes that deploy, new staging data, a merge, production
-  cutover, DNS/OAuth/secret/role change, or production write enablement.
+- The next release gate is a reviewable harness-only correction that preserves
+  configured-provider coverage locally and explicitly validates the hosted
+  no-provider state. Its resulting immutable commit must receive fresh
+  exact-head CI and GitLab security evidence before a separately approved
+  staging deployment and affected P1 rerun. P9 evaluation remains later, after
+  P4-P8 are satisfied. No current approval authorizes that commit/push, deploy,
+  new staging data, merge, production cutover, DNS/OAuth/secret/role change, or
+  production write enablement.
 
 ## Authority and evidence rules
 
@@ -89,14 +93,14 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Historical `4b5215d` checks are green; commit, review, and collect fresh exact-head evidence for the acceptance-hardening candidate before hosted acceptance |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Prior bounded run passed on `a964729f`; exact-head rerun and cleanup proof are pending |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Ephemeral-profile correction is locally green on `4b5215d`; exact-head two-session staging rerun is pending |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Numerical, hosted-read-only, Studio, CSP/crawler, and focused consent checks pass on `6bbadd4`; full browser exit remains conditional on the harness-only provider-mode correction and exact-new-head rerun |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4` with fixture cleanup, reconciliation, and both sessions revoked; a later source commit requires fresh exact-head evidence |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; both sessions were D1-revoked and the complete temporary profile tree was removed |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |
 | P7 | Payments-retired proof | Every release candidate | Exact-head source/CI proof passed; repeat the hosted 410/provider-free checks after staging deploy |
-| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | PR-head CI/tag/three-job scans passed; later staging DAST/API and complete license/CycloneDX dispositions remain before P9 |
+| P8 | Exact-head GitHub and GitLab security/CI evidence | P1-P7 | `6bbadd4` PR-head CI/tag/three-job scans passed; the harness correction requires a new immutable head/tag/pipeline, and later staging DAST/API plus complete license/CycloneDX dispositions remain before P9 |
 | P9 | Final staging exit review | P1-P8 | Blocked by preceding gates |
 | P10 | Isolated production resources, schema, OAuth, secrets, and bootstrap readiness | P9 | Resources and triggerless bootstrap exist; merged-main parity and fresh cutover inputs remain |
 | P11 | Read-only Worker production cutover and admin bootstrap | P10 | Production remains Pages |
