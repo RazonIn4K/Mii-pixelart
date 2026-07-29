@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  OPENROUTER_FREE_ROUTER_ID,
   OPENROUTER_MODEL_PRESETS,
   type AiChatRequest,
   validateAiGridSketch,
@@ -261,6 +262,65 @@ describe("OpenRouter untrusted response hardening", () => {
     expect(body.sketch).toMatchObject({ width: 8, height: 8 });
     expect(body.warning).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes written advice through the free router without sketch parameters", async () => {
+    let upstreamBody: Record<string, unknown> | null = null;
+    const fetchMock = vi.fn(async (_input: unknown, init?: RequestInit) => {
+      upstreamBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "Use a stronger silhouette." } }],
+          model: "routed/free-model",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      request(OPENROUTER_FREE_ROUTER_ID),
+      {
+        OPENROUTER_API_KEY: "test-shared-key",
+      },
+    );
+
+    expect(result).toMatchObject({
+      body: {
+        model: "routed/free-model",
+        reply: "Use a stronger silhouette.",
+      },
+      status: 200,
+    });
+    expect(upstreamBody).toMatchObject({
+      max_tokens: 1200,
+      model: OPENROUTER_FREE_ROUTER_ID,
+      provider: { data_collection: "deny" },
+    });
+    expect(upstreamBody).not.toHaveProperty("response_format");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects the advice-only router for structured-grid requests", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendOpenRouterChat(
+      {
+        ...sketchRequest(),
+        model: OPENROUTER_FREE_ROUTER_ID,
+      },
+      { OPENROUTER_API_KEY: "test-shared-key" },
+    );
+
+    expect(result).toEqual({
+      body: {
+        configured: true,
+        reply: "Choose a sketch-capable model before requesting a grid.",
+      },
+      status: 400,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("isolates sketch creation from earlier advice conversation history", async () => {
@@ -541,7 +601,7 @@ describe("OpenRouter untrusted response hardening", () => {
     });
   });
 
-  it("returns a useful fallback when the provider reply is empty", async () => {
+  it("fails closed when an advice provider returns an empty success", async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
@@ -556,8 +616,12 @@ describe("OpenRouter untrusted response hardening", () => {
         OPENROUTER_API_KEY: "test-shared-key",
       },
     );
-    expect(result.body).toMatchObject({
-      reply: "The model returned an empty response. Try a different model.",
+    expect(result).toMatchObject({
+      body: {
+        reply:
+          "The selected AI model returned no usable text. Your prompt was not saved; try again or choose another model.",
+      },
+      status: 502,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

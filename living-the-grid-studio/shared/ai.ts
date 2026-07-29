@@ -183,6 +183,8 @@ export interface AiChatResponse {
 }
 
 export interface AiModelPreset {
+  /** Router presets may be used for prose guidance but never grid output. */
+  adviceOnly?: boolean;
   context: string;
   id: string;
   label: string;
@@ -200,6 +202,8 @@ export interface AiModelPreset {
   // explicitly true before a rendered canvas may be attached.
   supportsImages?: boolean;
 }
+
+export const OPENROUTER_FREE_ROUTER_ID = "openrouter/free";
 
 export function maxAiRefineDimension(preset: AiModelPreset): number {
   if (preset.supportsImages !== true) return 0;
@@ -261,6 +265,18 @@ export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [
     pricingPrompt: "$0.00/1M",
     rank: 4,
     releaseDate: "2026-03-11",
+    supportsImages: false,
+  },
+  {
+    adviceOnly: true,
+    context: "200,000 tokens",
+    id: OPENROUTER_FREE_ROUTER_ID,
+    label: "Free Model Router (advice)",
+    note: "Automatically selects an available compatible free text model for written advice. Not used for grid generation or canvas refinement.",
+    pricingCompletion: "$0.00/1M",
+    pricingPrompt: "$0.00/1M",
+    rank: 5,
+    releaseDate: "2026-02-01",
     supportsImages: false,
   },
 ];

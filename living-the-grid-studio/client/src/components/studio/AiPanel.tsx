@@ -125,8 +125,35 @@ const DRAWING_STARTER_PROMPTS = [
 
 type AiWorkflow = "create" | "refine" | "advice";
 
-function getFallbackPreset(presets: AiModelPreset[]): AiModelPreset | null {
-  return presets.find((preset) => preset.available !== false) ?? null;
+function supportsWorkflow(
+  preset: AiModelPreset,
+  workflow: AiWorkflow,
+  requiredRefineDimension: number,
+): boolean {
+  if (preset.available === false) return false;
+  if (preset.adviceOnly === true) return workflow === "advice";
+  return (
+    workflow !== "refine" ||
+    maxAiRefineDimension(preset) >= requiredRefineDimension
+  );
+}
+
+function getPreferredPreset(
+  presets: AiModelPreset[],
+  workflow: AiWorkflow,
+  requiredRefineDimension: number,
+): AiModelPreset | null {
+  const compatible = presets.filter((preset) =>
+    supportsWorkflow(preset, workflow, requiredRefineDimension),
+  );
+  if (workflow === "advice") {
+    return (
+      compatible.find((preset) => preset.adviceOnly === true) ??
+      compatible[0] ??
+      null
+    );
+  }
+  return compatible.find((preset) => preset.adviceOnly !== true) ?? null;
 }
 
 export default function AiPanel({
@@ -159,6 +186,15 @@ export default function AiPanel({
   const activeRequestRef = useRef<ActiveAiRequest | null>(null);
   const [presets, setPresets] = useState<AiModelPreset[]>(
     OPENROUTER_MODEL_PRESETS,
+  );
+  const workflow: AiWorkflow = !requestSketch
+    ? "advice"
+    : includeGridImage
+      ? "refine"
+      : "create";
+  const requiredRefineDimension = Math.max(
+    currentDoc?.width ?? AI_SKETCH_LIMITS.minDimension,
+    currentDoc?.height ?? AI_SKETCH_LIMITS.minDimension,
   );
 
   useEffect(() => {
@@ -195,20 +231,23 @@ export default function AiPanel({
 
   useEffect(() => {
     const preset = presets.find((entry) => entry.id === modelChoice);
-    if (!preset || preset.available === false) {
-      const fallback = getFallbackPreset(presets);
+    if (
+      !preset ||
+      !supportsWorkflow(preset, workflow, requiredRefineDimension)
+    ) {
+      const fallback = getPreferredPreset(
+        presets,
+        workflow,
+        requiredRefineDimension,
+      );
       setModelChoice(fallback?.id ?? "");
     }
-  }, [modelChoice, presets]);
+  }, [modelChoice, presets, requiredRefineDimension, workflow]);
 
   const selectedModel = modelChoice;
   const selectedPreset = presets.find((preset) => preset.id === selectedModel);
-  const hasAvailableModels = presets.some(
-    (preset) => preset.available !== false,
-  );
-  const requiredRefineDimension = Math.max(
-    currentDoc?.width ?? AI_SKETCH_LIMITS.minDimension,
-    currentDoc?.height ?? AI_SKETCH_LIMITS.minDimension,
+  const hasAvailableModels = presets.some((preset) =>
+    supportsWorkflow(preset, workflow, requiredRefineDimension),
   );
   const visionPreset = presets.find(
     (preset) =>
@@ -221,11 +260,6 @@ export default function AiPanel({
     currentDoc.height <= AI_SKETCH_LIMITS.maxDimension,
   );
   const canRefine = Boolean(currentDoc && canRefineDimensions && visionPreset);
-  const workflow: AiWorkflow = !requestSketch
-    ? "advice"
-    : includeGridImage
-      ? "refine"
-      : "create";
   const currentSummary = useMemo(
     () => (includeGridSummary ? summarizeDocument(currentDoc) : null),
     [currentDoc, includeGridSummary],
@@ -607,6 +641,14 @@ export default function AiPanel({
     setPendingSketch(null);
     setError(null);
     if (nextWorkflow === "create") {
+      const createPreset = getPreferredPreset(
+        presets,
+        "create",
+        requiredRefineDimension,
+      );
+      if (selectedPreset?.adviceOnly === true && createPreset) {
+        setModelChoice(createPreset.id);
+      }
       setRequestSketch(true);
       setIncludeGridSummary(false);
       setIncludeGridImage(false);
@@ -630,6 +672,12 @@ export default function AiPanel({
       }
       return;
     }
+    const advicePreset = getPreferredPreset(
+      presets,
+      "advice",
+      requiredRefineDimension,
+    );
+    if (advicePreset) setModelChoice(advicePreset.id);
     setRequestSketch(false);
     setIncludeGridSummary(Boolean(currentDoc));
     setIncludeGridImage(false);
@@ -646,6 +694,14 @@ export default function AiPanel({
     // and make it look as though AI Draw silently failed.
     setPendingSketch(null);
     setError(null);
+    const createPreset = getPreferredPreset(
+      presets,
+      "create",
+      requiredRefineDimension,
+    );
+    if (selectedPreset?.adviceOnly === true && createPreset) {
+      setModelChoice(createPreset.id);
+    }
     setRequestSketch(true);
     setIncludeGridSummary(false);
     setIncludeGridImage(false);
@@ -869,14 +925,18 @@ export default function AiPanel({
                       key={preset.id}
                       value={preset.id}
                       disabled={
-                        preset.available === false ||
-                        (workflow === "refine" &&
-                          maxAiRefineDimension(preset) <
-                            requiredRefineDimension)
+                        !supportsWorkflow(
+                          preset,
+                          workflow,
+                          requiredRefineDimension,
+                        )
                       }
                     >
                       #{preset.rank} {preset.label}
                       {preset.available === false ? " (unavailable)" : ""}
+                      {preset.available !== false && preset.adviceOnly === true
+                        ? " (advice only)"
+                        : ""}
                       {preset.available !== false &&
                       maxAiRefineDimension(preset) > 0
                         ? ` (vision ≤${maxAiRefineDimension(preset)}px)`

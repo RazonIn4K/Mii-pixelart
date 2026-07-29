@@ -105,7 +105,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Which AI models does the assistant use?",
         answer:
-          "The image generator uses allowlisted Gemini Flash Lite Image and Gemini Flash Image models through OpenRouter. Advice and refinement use curated compatible models. The server checks model capability and availability before use and rejects arbitrary model IDs.",
+          "The image generator uses allowlisted Gemini Flash Lite Image and Gemini Flash Image models through OpenRouter. Written advice defaults to OpenRouter's free-model router, while structured grids and refinement use curated compatible models. The server checks model capability and availability before use and rejects arbitrary model IDs.",
       },
       {
         question: "How can I support the project?",

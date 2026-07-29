@@ -9,6 +9,7 @@ import type {
 import {
   AI_CHAT_BODY_MAX_BYTES,
   AI_SKETCH_LIMITS,
+  OPENROUTER_FREE_ROUTER_ID,
   OPENROUTER_MODEL_PRESETS,
   PALETTE_COLOR_ID_PATTERN,
   maxAiRefineDimension,
@@ -58,6 +59,7 @@ interface OpenRouterCompletionAttempt {
 }
 
 interface ParsedOpenRouterCompletion {
+  hasContent: boolean;
   reply: string;
   sketch: AiGridSketch | null;
   warning?: string;
@@ -370,6 +372,17 @@ export async function sendOpenRouterChat(
     firstAttempt.payload,
     normalized,
   );
+  if (!normalized.requestSketch && !firstParsed.hasContent) {
+    return {
+      status: 502,
+      body: {
+        configured: true,
+        model: firstAttempt.payload?.model ?? normalized.model,
+        reply:
+          "The selected AI model returned no usable text. Your prompt was not saved; try again or choose another model.",
+      } satisfies AiChatResponse,
+    };
+  }
   let selectedAttempt = firstAttempt;
   let selectedParsed = firstParsed;
   let repairAttempted = false;
@@ -513,6 +526,7 @@ function parseOpenRouterCompletion(
       parsed.sketch.height !== expectedDimensions.height),
   );
   return {
+    hasContent: content.length > 0,
     reply,
     sketch: dimensionsChanged ? null : (parsed?.sketch ?? null),
     warning: dimensionsChanged
@@ -637,6 +651,15 @@ function normalizeAiRequest(
   }
   const preserveDimensions = request.preserveDimensions === true;
   const requestSketch = request.requestSketch === true;
+  if (
+    requestSketch &&
+    (preset?.adviceOnly === true || model === OPENROUTER_FREE_ROUTER_ID)
+  ) {
+    return {
+      ok: false,
+      error: "Choose a sketch-capable model before requesting a grid.",
+    };
+  }
   if (
     requestSketch &&
     !messages.some(

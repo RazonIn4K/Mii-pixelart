@@ -666,7 +666,7 @@ test("generated artwork stays local until review and commits as one undoable rev
   expect(imageRequestCount).toBe(1);
 });
 
-test("AI drawing starters leave Advice mode and disclose a non-drawable reply", async ({
+test("AI advice uses the free router and drawing starters return to a sketch model", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -679,9 +679,11 @@ test("AI drawing starters leave Advice mode and disclose a non-drawable reply", 
   }, userId);
   await mockAiAccount(page, userId);
 
-  let requestBody: Record<string, unknown> | null = null;
+  const requestBodies: Record<string, unknown>[] = [];
   await page.route("**/api/ai/chat", (route) => {
-    requestBody = route.request().postDataJSON() as Record<string, unknown>;
+    requestBodies.push(
+      route.request().postDataJSON() as Record<string, unknown>,
+    );
     return route.fulfill({
       body: JSON.stringify({
         configured: true,
@@ -707,6 +709,17 @@ test("AI drawing starters leave Advice mode and disclose a non-drawable reply", 
   await expect(
     page.getByRole("button", { name: "Ask for advice" }),
   ).toBeVisible();
+  await page.getByText("Advanced AI settings", { exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "AI model" })).toContainText(
+    "Free Model Router",
+  );
+  await page.getByRole("button", { name: "Ask for advice" }).click();
+  await expect
+    .poll(() => requestBodies[0])
+    .toMatchObject({
+      model: "openrouter/free",
+      requestSketch: false,
+    });
   await page
     .getByRole("button", {
       name: /Use drawing starter and switch to Experimental grid sketch: Draw a 16x16 friendly island robot/,
@@ -721,11 +734,18 @@ test("AI drawing starters leave Advice mode and disclose a non-drawable reply", 
   await expect(
     page.getByRole("button", { name: "Try experimental sketch" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "AI model" }),
+  ).not.toContainText("Free Model Router");
   await page.getByRole("button", { name: "Try experimental sketch" }).click();
 
   await expect
-    .poll(() => requestBody)
-    .toMatchObject({ requestSketch: true, preserveDimensions: false });
+    .poll(() => requestBodies[1])
+    .toMatchObject({
+      model: "google/gemma-4-26b-a4b-it:free",
+      requestSketch: true,
+      preserveDimensions: false,
+    });
   await expect(
     page.getByText(
       "The text model replied but did not return a usable structured grid. Nothing can be previewed or applied. Try a simpler prompt or continue with the manual drawing tools.",
@@ -737,7 +757,7 @@ test("AI drawing starters leave Advice mode and disclose a non-drawable reply", 
     page.getByText(
       "I can describe the robot, but this response does not contain structured cells.",
       { exact: true },
-    ),
+    ).last(),
   ).toBeVisible();
 });
 
