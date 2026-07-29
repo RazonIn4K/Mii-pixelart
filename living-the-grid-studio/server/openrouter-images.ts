@@ -22,7 +22,7 @@ export type OpenRouterImageErrorCode =
   | "AI_IMAGE_NOT_CONFIGURED"
   | "AI_IMAGE_REQUEST_ABORTED"
   | "AI_IMAGE_UPSTREAM_INVALID_RESPONSE"
-  | "AI_IMAGE_UPSTREAM_PAYMENT_REQUIRED"
+  | "AI_IMAGE_UPSTREAM_ACCESS_REQUIRED"
   | "AI_IMAGE_UPSTREAM_RATE_LIMITED"
   | "AI_IMAGE_UPSTREAM_REJECTED"
   | "AI_IMAGE_UPSTREAM_RESPONSE_TOO_LARGE"
@@ -90,7 +90,8 @@ class ResponseLimitError extends Error {
  *
  * The caller supplies untrusted request data; this function validates it
  * before any provider contact. It deliberately does not retry or switch to the
- * fallback model automatically because each successful generation is billable.
+ * fallback model automatically because each accepted generation consumes
+ * bounded provider capacity.
  */
 export async function generateOpenRouterImage(
   request: unknown,
@@ -179,7 +180,7 @@ export async function generateOpenRouterImage(
     }
     if (response.status === 402) {
       return failure(
-        "AI_IMAGE_UPSTREAM_PAYMENT_REQUIRED",
+        "AI_IMAGE_UPSTREAM_ACCESS_REQUIRED",
         "Image generation is temporarily unavailable.",
         503,
         false,

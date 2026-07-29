@@ -41,7 +41,7 @@ const SUPPORT_ACTIONS = [
 export default function Support() {
   useDocumentTitle(
     "Support Tomodachi",
-    "Help improve Tomodachi by testing the Studio, sharing original creations, and reporting useful feedback. No payments or tips are accepted.",
+    "Help improve Tomodachi by testing the Studio, sharing original creations, and reporting useful feedback.",
     { canonicalPath: "/support" },
   );
   useStructuredData([
@@ -72,9 +72,9 @@ export default function Support() {
             The most useful support is using it.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--island-muted-ink)]">
-            Tomodachi does not currently accept payments, tips, donations, or
-            consultation bookings. Testing the real workflow and sharing clear
-            feedback helps more than a checkout ever could.
+            Test a real drawing workflow, share original creations, and send
+            clear feedback. Specific examples help turn rough edges into a
+            workshop that is easier for everyone to use.
           </p>
         </section>
 
@@ -121,21 +121,21 @@ export default function Support() {
           <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em]">
-                Curious about the future plan?
+                Need a creative starting point?
               </p>
               <h2 className="mt-2 text-2xl font-black">
-                See the AI Action Plan direction
+                Try the Studio AI tools
               </h2>
               <p className="mt-2 text-sm font-semibold text-[var(--island-ink)]/70">
-                The beta is free. A distinct one-time $5 creator plan is only a
-                product direction today—there is no checkout.
+                Ask for reviewable advice or generate one original source image,
+                then decide whether to convert it into the 256×256 canvas.
               </p>
             </div>
             <Link
-              href="/ai-plan"
+              href="/studio"
               className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-[var(--island-ink)] px-5 text-sm font-black text-white"
             >
-              View AI plan
+              Open the Studio
             </Link>
           </div>
         </Card>

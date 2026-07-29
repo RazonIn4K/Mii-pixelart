@@ -12,7 +12,12 @@ export default function Disclosure() {
   useDocumentTitle("Affiliate Disclosure", undefined, {
     canonicalPath: "/affiliate-disclosure",
   });
-  useStructuredData([breadcrumbFor([{ name: "Home", href: "/" }, { name: "Affiliate Disclosure", href: "/affiliate-disclosure" }])]);
+  useStructuredData([
+    breadcrumbFor([
+      { name: "Home", href: "/" },
+      { name: "Affiliate Disclosure", href: "/affiliate-disclosure" },
+    ]),
+  ]);
 
   return (
     <LegalLayout
@@ -22,10 +27,9 @@ export default function Disclosure() {
     >
       <h2>Plain-language summary</h2>
       <p>
-        Some outbound links on Tomodachi are affiliate links.
-        When you click one and make a purchase, the merchant may pay us a
-        small commission at no extra cost to you. This helps fund the free
-        tools on the Site.
+        Some outbound links on Tomodachi are affiliate links. When you click one
+        and make a purchase, the merchant may pay us a small commission at no
+        extra cost to you. This helps fund the free tools on the Site.
       </p>
 
       <h2>What we recommend</h2>
@@ -42,8 +46,8 @@ export default function Disclosure() {
       <h2>What we do not do</h2>
       <ul>
         <li>
-          We do not accept payment to soften critical reviews or hide problems
-          with a recommended product.
+          We do not allow sponsorship to soften critical reviews or hide
+          problems with a recommended product.
         </li>
         <li>
           We do not bury affiliate links in the breach-recovery flow when free
@@ -67,8 +71,8 @@ export default function Disclosure() {
       <p>
         This disclosure is provided in compliance with the U.S. Federal Trade
         Commission&apos;s 16 CFR Part 255 endorsement guides. If you have
-        questions about a specific recommendation or believe a piece of
-        content does not comply with these guides, email{" "}
+        questions about a specific recommendation or believe a piece of content
+        does not comply with these guides, email{" "}
         <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
       </p>
     </LegalLayout>

@@ -3,7 +3,7 @@
  *
  * Top of the page: short teaser cards for the four recovery + studio guides.
  *   The CTA points at the matching free tool (studio, password check, help)
- *   and may point to the free AI plan or non-payment support page.
+ *   and may point to the AI plan or project support page.
  *
  * Below: four full-length Tomodachi Life player guides, rendered inline so
  * Google indexes the actual content. Each guide has an anchor ID so it can
@@ -392,8 +392,8 @@ const LONG_GUIDES: LongGuide[] = [
           <Link className="underline" href="/ai-plan">
             AI Action Plan
           </Link>{" "}
-          beta. Never include passwords, recovery codes, payment details, or
-          other secrets in an AI prompt.
+          beta. Never include passwords, recovery codes, financial account
+          information, or other secrets in an AI prompt.
         </p>
       </>
     ),

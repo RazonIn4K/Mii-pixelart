@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
-import { onRequest as handleRetiredPayment } from "../functions/api/stripe/[[path]]";
-import { onRequestPost as handleRetiredWebhook } from "../functions/api/webhooks/stripe";
+import { onRequest as handleLegacyApi } from "../functions/api/stripe/[[path]]";
+import { onRequestPost as handleLegacyWebhook } from "../functions/api/webhooks/stripe";
 
 const jsonRequest = (url: string, body: string) =>
   new Request(url, {
@@ -41,7 +41,7 @@ describe("legacy Pages input handling", () => {
     });
   });
 
-  it("returns controlled AI responses for malformed input without parsing payment data", async () => {
+  it("returns controlled AI responses for malformed input without parsing the body", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
@@ -54,19 +54,11 @@ describe("legacy Pages input handling", () => {
   });
 
   it.each([
-    [
-      "catalog",
-      handleRetiredPayment,
-      "https://example.test/api/stripe/products",
-    ],
-    [
-      "checkout",
-      handleRetiredPayment,
-      "https://example.test/api/stripe/checkout",
-    ],
+    ["catalog", handleLegacyApi, "https://example.test/api/stripe/products"],
+    ["checkout", handleLegacyApi, "https://example.test/api/stripe/checkout"],
     [
       "webhook",
-      handleRetiredWebhook,
+      handleLegacyWebhook,
       "https://example.test/api/webhooks/stripe",
     ],
   ])(
@@ -82,7 +74,7 @@ describe("legacy Pages input handling", () => {
       expect(response.status).toBe(410);
       expect(response.headers.get("cache-control")).toBe("no-store");
       await expect(response.json()).resolves.toMatchObject({
-        error: { code: "payments_retired" },
+        error: { code: "route_decommissioned" },
       });
     },
   );

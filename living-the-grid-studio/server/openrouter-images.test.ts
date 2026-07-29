@@ -339,7 +339,7 @@ describe("OpenRouter image generation adapter", () => {
       providerStatus: 429,
     },
     {
-      expectedCode: "AI_IMAGE_UPSTREAM_PAYMENT_REQUIRED",
+      expectedCode: "AI_IMAGE_UPSTREAM_ACCESS_REQUIRED",
       expectedStatus: 503,
       providerStatus: 402,
     },

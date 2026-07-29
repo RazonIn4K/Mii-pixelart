@@ -252,7 +252,7 @@ describe("Worker HTTP integration", () => {
     ["GET", "/api/stripe/session?session_id=legacy"],
     ["POST", "/api/webhooks/stripe"],
   ])(
-    "retires %s %s without contacting a payment provider",
+    "decommissions legacy route %s %s without an external call",
     async (method, path) => {
       const response = await SELF.fetch(`http://localhost:3000${path}`, {
         body: method === "POST" ? "{}" : undefined,
@@ -268,7 +268,7 @@ describe("Worker HTTP integration", () => {
       expect(response.status).toBe(410);
       expect(response.headers.get("cache-control")).toBe("no-store");
       await expect(response.json()).resolves.toMatchObject({
-        error: { code: "payments_retired" },
+        error: { code: "route_decommissioned" },
       });
     },
   );

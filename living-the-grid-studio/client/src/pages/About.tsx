@@ -107,9 +107,8 @@ export default function About() {
             <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Free first</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              The editor, password check, AI assistant, and guides are free.
-              Tomodachi currently accepts no payments, tips, or consultation
-              bookings.
+              The editor, password check, AI assistant, and guides are available
+              without an account. Cloud and community features are opt-in.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
@@ -199,15 +198,15 @@ export default function About() {
               <Link href="/ai-plan" className="underline">
                 AI Action Plan
               </Link>
-              : a free beta for practical, reviewable recovery and creator next
-              steps, plus an honest preview of a possible expanded plan.
+              : practical, reviewable recovery and creator advice plus an
+              original-artwork workflow for the Studio&apos;s 256×256 canvas.
             </li>
             <li>
               <Link href="/support" className="underline">
                 Support
               </Link>
               : ways to test the Studio, share original work, and report useful
-              feedback without a payment.
+              feedback.
             </li>
           </ul>
         </section>

@@ -86,11 +86,6 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
           { label: "Try the free AI Action Plan", href: "/ai-plan" },
         ],
       },
-      {
-        question: "Does Tomodachi accept payments or consultation bookings?",
-        answer:
-          "No. Checkout, tips, donations, paid recovery content, and consultation bookings have been retired. The existing recovery guidance and AI action-plan beta are free.",
-      },
     ],
   },
   {
@@ -99,7 +94,7 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Is the Studio free to use?",
         answer:
-          "Yes. Importing a photo, generating a paint-by-numbers reference, and exporting the reference pack are free. No account is needed for anonymous editing and export. Tomodachi currently has no checkout or paid Studio tier.",
+          "Yes. Importing a photo, generating a paint-by-numbers reference, and exporting the reference pack are available without an account. An account is required only for cloud and community features or AI image generation.",
       },
       {
         question: "Do you store my photos or my password?",
@@ -110,12 +105,12 @@ const FAQ_GROUPS: Array<{ heading: string; items: FaqItem[] }> = [
       {
         question: "Which AI models does the assistant use?",
         answer:
-          "Curated free OpenRouter models only. Gemma 4 vision models handle eligible canvas refinement; GPT-OSS 120B and Nemotron 3 Super provide text and structured-sketch alternatives. Availability and image/output capabilities are checked before use, and the server rejects arbitrary paid-model access.",
+          "The image generator uses allowlisted Gemini Flash Lite Image and Gemini Flash Image models through OpenRouter. Advice and refinement use curated compatible models. The server checks model capability and availability before use and rejects arbitrary model IDs.",
       },
       {
         question: "How can I support the project?",
         answer:
-          "Test a real drawing workflow, publish original work when community sharing opens, report reproducible bugs, or send product feedback. Tomodachi currently accepts no payments or tips.",
+          "Test a real drawing workflow, publish original work when community sharing opens, report reproducible bugs, or send product feedback.",
         links: [
           { label: "Support the workshop", href: "/support" },
           { label: "AI Action Plan", href: "/ai-plan" },
@@ -147,7 +142,7 @@ function buildFaqJsonLd() {
 export default function Faq() {
   useDocumentTitle(
     "FAQ",
-    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and how this site is funded.",
+    "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and the site's AI and privacy boundaries.",
   );
   useStructuredData([
     breadcrumbFor([

@@ -14,7 +14,7 @@ export const AI_IMAGE_MODEL_PRESETS = [
   {
     id: AI_IMAGE_DEFAULT_MODEL,
     label: "Gemini Flash Lite Image",
-    note: "Fast, cost-conscious square artwork generation.",
+    note: "Fast square artwork generation.",
   },
   {
     id: AI_IMAGE_FALLBACK_MODEL,

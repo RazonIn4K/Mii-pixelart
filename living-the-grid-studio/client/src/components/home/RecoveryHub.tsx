@@ -365,8 +365,8 @@ export default function RecoveryHub() {
               <BotMessageSquare className="h-6 w-6 shrink-0 text-[var(--island-blue)]" />
             </div>
             <p className="mt-3 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">
-              Describe the situation without including passwords, payment
-              details, recovery codes, or other secrets.
+              Describe the situation without including passwords, financial
+              account information, recovery codes, or other secrets.
             </p>
             <div className="mt-7 space-y-3">
               <Label htmlFor="breach-situation" className="text-xs font-bold">
@@ -434,9 +434,9 @@ export default function RecoveryHub() {
                   >
                     The description is sent through OpenRouter to an external
                     model provider. Do not include passwords, recovery codes,
-                    payment details, government IDs, or other secrets. The
-                    password breach checker remains separate and never sends the
-                    password to AI.
+                    financial account information, government IDs, or other
+                    secrets. The password breach checker remains separate and
+                    never sends the password to AI.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button

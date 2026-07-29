@@ -50,7 +50,7 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/faq": {
     description:
-      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Face Paint and Palette House reference studio, and how this site is funded.",
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the pixel-art Face Paint and Palette House reference studio, and the site's AI and privacy boundaries.",
     title: "FAQ · Tomodachi",
   },
   "/guides": {
@@ -70,12 +70,12 @@ const LEGACY_STATIC_METADATA: Readonly<Record<string, StaticRouteMetadata>> = {
   },
   "/support": {
     description:
-      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback. No payments or tips are accepted.",
+      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback.",
     title: "Support · Tomodachi",
   },
   "/ai-plan": {
     description:
-      "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+      "Use Tomodachi's AI tools for reviewable advice and original 256×256 artwork preparation.",
     title: "AI Action Plan · Tomodachi",
   },
 };

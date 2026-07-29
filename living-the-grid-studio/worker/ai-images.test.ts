@@ -16,7 +16,7 @@ const SESSION_PEPPER = "test-only-session-pepper";
 const ONE_PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wlq6XcAAAAASUVORK5CYII=";
 
-describe("paid AI image Worker route", () => {
+describe("bounded AI image Worker route", () => {
   beforeEach(async () => {
     vi.unstubAllGlobals();
     await env.DB.exec(`
@@ -45,7 +45,7 @@ describe("paid AI image Worker route", () => {
     });
   });
 
-  it("requires an onboarded account before reserving paid usage", async () => {
+  it("requires an onboarded account before reserving provider capacity", async () => {
     const response = await request("/api/ai/images", {
       body: imageRequest(crypto.randomUUID()),
       headers: mutationHeaders(),

@@ -266,7 +266,10 @@ function publicFetch(
     return Promise.resolve(
       Response.json(
         {
-          error: { code: "payments_retired", message: "Payments retired." },
+          error: {
+            code: "route_decommissioned",
+            message: "This legacy route is no longer available.",
+          },
           requestId: "00000000-0000-4000-8000-000000000011",
         },
         { headers, status: 410 },

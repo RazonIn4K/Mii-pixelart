@@ -16,7 +16,7 @@ async function crawler(
   });
 }
 
-describe("crawler payment retirement", () => {
+describe("crawler product truth", () => {
   it.each([
     "/",
     "/studio",
@@ -27,7 +27,7 @@ describe("crawler payment retirement", () => {
     "/unlock",
     "/support",
     "/donate",
-  ])("serves payment-free crawler truth for %s", async (path) => {
+  ])("serves current crawler truth for %s", async (path) => {
     const response = await crawler(path);
     const body = await response.text();
 
@@ -38,20 +38,20 @@ describe("crawler payment retirement", () => {
     expect(body).not.toMatch(/"price"\s*:\s*"(?:5|9|15|19|25|49)(?:\.00)?"/iu);
   });
 
-  it("canonicalizes the retired unlock route to the AI plan", async () => {
+  it("canonicalizes the legacy unlock route to the AI plan", async () => {
     const body = await (await crawler("/unlock")).text();
     expect(body).toContain(
       '<link rel="canonical" href="https://tomodachi.pw/ai-plan"',
     );
-    expect(body).toContain("Expanded $5 creator plan is only a direction");
-    expect(body).toContain("not for sale");
+    expect(body).toContain("Generate original artwork for review");
+    expect(body).toContain("Nothing paints, saves, uploads, or publishes");
   });
 
   it.each([
     ["/unlock", "/ai-plan"],
     ["/donate", "/support"],
   ])(
-    "serves payment-free social metadata for %s with the %s canonical",
+    "serves current social metadata for %s with the %s canonical",
     async (path, canonicalPath) => {
       const response = await crawler(path, "Twitterbot/1.0");
       const body = await response.text();

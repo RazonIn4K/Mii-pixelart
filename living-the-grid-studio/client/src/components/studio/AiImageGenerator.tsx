@@ -42,7 +42,6 @@ interface AiImageGeneratorProps {
 interface AiImageStatus {
   configured: boolean;
   enabled: boolean;
-  maxPerImageCostUsd: number;
   models: ReadonlyArray<{
     id: AiImageModelId;
     label: string;
@@ -52,7 +51,6 @@ interface AiImageStatus {
 }
 
 interface GeneratedImage {
-  costMicroUsd: number | null;
   file: File;
   model: string;
   requestId: string;
@@ -223,14 +221,7 @@ export function AiImageGenerator({
         `generated-artwork-${requestId.slice(0, 8)}.${extension}`,
         { type: contentType },
       );
-      const costHeader = Number(
-        response.headers.get("x-ai-image-cost-micro-usd"),
-      );
       setGenerated({
-        costMicroUsd:
-          Number.isSafeInteger(costHeader) && costHeader >= 0
-            ? costHeader
-            : null,
         file,
         model: response.headers.get("x-ai-image-model") ?? model,
         requestId,
@@ -304,7 +295,7 @@ export function AiImageGenerator({
           className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950"
           role="status"
         >
-          Paid image generation is disabled on this deployment. The free advice
+          Image generation is unavailable on this deployment. The advice
           assistant and all manual Studio tools remain available.
         </p>
       ) : (
@@ -334,9 +325,8 @@ export function AiImageGenerator({
               </SelectContent>
             </Select>
             <p className="text-[0.68rem] leading-4 text-muted-foreground">
-              Default: fast, cost-conscious Gemini Flash Lite. Full Gemini Flash
-              Image is an explicit higher-detail option—never an automatic
-              second charge.
+              Default: fast Gemini Flash Lite. Full Gemini Flash Image is an
+              explicit higher-detail option and is never selected automatically.
             </p>
           </div>
 
@@ -413,9 +403,9 @@ export function AiImageGenerator({
           </div>
 
           <p className="text-[0.66rem] leading-4 text-muted-foreground">
-            Up to {status.userDailyLimit} accepted requests per UTC day. Each
-            request is capped at ${status.maxPerImageCostUsd.toFixed(2)} by
-            provider routing and D1 reserves shared budget before contact.
+            Up to {status.userDailyLimit} accepted requests per UTC day. The
+            server reserves shared capacity before contacting the model
+            provider.
           </p>
         </>
       )}
@@ -437,9 +427,9 @@ export function AiImageGenerator({
             The prompt goes through OpenRouter to the selected external image
             model under a no-data-collection routing requirement. No source
             photo or current canvas is included. D1 stores a prompt hash,
-            request state, model, and cost—not prompt text or image bytes. The
-            result remains local until you explicitly commit the converted grid.
-            Do not include sensitive information.
+            request state and model—not prompt text or image bytes. The result
+            remains local until you explicitly commit the converted grid. Do not
+            include sensitive information.
           </p>
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={acceptConsentAndGenerate}>
@@ -467,11 +457,7 @@ export function AiImageGenerator({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0 text-[0.68rem] text-emerald-950">
               <p className="truncate font-semibold">{generated.model}</p>
-              <p>
-                {generated.costMicroUsd === null
-                  ? "Cost metadata unavailable"
-                  : `${formatMicroUsd(generated.costMicroUsd)} actual provider usage`}
-              </p>
+              <p>Generation request recorded</p>
             </div>
             <Button
               type="button"
@@ -509,7 +495,6 @@ function parseStatus(value: Record<string, unknown>): AiImageStatus | null {
   if (
     typeof value.configured !== "boolean" ||
     typeof value.enabled !== "boolean" ||
-    value.maxPerImageCostUsd !== AI_IMAGE_LIMITS.maxPerImageCostUsd ||
     !Number.isSafeInteger(value.userDailyLimit) ||
     (value.userDailyLimit as number) < 0 ||
     (value.userDailyLimit as number) > 100 ||
@@ -546,7 +531,6 @@ function parseStatus(value: Record<string, unknown>): AiImageStatus | null {
   return {
     configured: value.configured,
     enabled: value.enabled,
-    maxPerImageCostUsd: value.maxPerImageCostUsd,
     models,
     userDailyLimit: value.userDailyLimit as number,
   };
@@ -571,16 +555,6 @@ async function readErrorMessage(response: Response): Promise<string> {
   return response.status === 429
     ? "The image-generation limit has been reached. Try again later."
     : "Image generation could not be completed. No canvas or cloud data changed.";
-}
-
-function formatMicroUsd(value: number): string {
-  const dollars = value / 1_000_000;
-  return new Intl.NumberFormat("en-US", {
-    currency: "USD",
-    maximumFractionDigits: 4,
-    minimumFractionDigits: 2,
-    style: "currency",
-  }).format(dollars);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

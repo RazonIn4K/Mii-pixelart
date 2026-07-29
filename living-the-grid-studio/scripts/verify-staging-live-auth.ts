@@ -437,7 +437,7 @@ export async function runStagingLiveAuthPreflight(
     );
   }
 
-  const consultResponse = await dependencies.fetchPublic(
+  const legacyResponse = await dependencies.fetchPublic(
     `${validated.target.origin}/api/stripe/products`,
     {
       credentials: "omit",
@@ -446,20 +446,20 @@ export async function runStagingLiveAuthPreflight(
       signal: AbortSignal.timeout(validated.timeoutMs),
     },
   );
-  if (consultResponse.status !== 410) {
+  if (legacyResponse.status !== 410) {
     throw new StagingLiveAuthError(
-      "The retired consultation/payment surface is not returning 410.",
+      "The decommissioned compatibility route is not returning 410.",
     );
   }
-  assertRemoteReleaseIdentity(consultResponse, validated);
-  const consultEnvelope = await readSmallJson(
-    consultResponse,
-    "retired consultation response",
+  assertRemoteReleaseIdentity(legacyResponse, validated);
+  const legacyEnvelope = await readSmallJson(
+    legacyResponse,
+    "decommissioned compatibility response",
   );
-  const consultError = objectAt(consultEnvelope, "error");
-  if (consultError.code !== "payments_retired") {
+  const legacyError = objectAt(legacyEnvelope, "error");
+  if (legacyError.code !== "route_decommissioned") {
     throw new StagingLiveAuthError(
-      "The retired consultation/payment surface returned an unexpected error.",
+      "The decommissioned compatibility route returned an unexpected error.",
     );
   }
 

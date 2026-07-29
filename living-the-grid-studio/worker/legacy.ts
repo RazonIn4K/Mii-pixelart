@@ -15,8 +15,8 @@ const MODELS_CACHE_SECONDS = 3_600;
 export function registerLegacyRoutes(router: Router): void {
   router
     .add("*", "/api/ai/*path", handleAi)
-    .add("*", "/api/stripe/*path", retiredPaymentRoute)
-    .add("*", "/api/webhooks/stripe", retiredPaymentRoute);
+    .add("*", "/api/stripe/*path", decommissionedLegacyRoute)
+    .add("*", "/api/webhooks/stripe", decommissionedLegacyRoute);
 }
 
 async function handleAi(context: WorkerRequestContext): Promise<Response> {
@@ -64,12 +64,12 @@ async function handleAi(context: WorkerRequestContext): Promise<Response> {
   throw new HttpError(404, "ai_route_not_found", "AI route was not found.");
 }
 
-async function retiredPaymentRoute(): Promise<Response> {
+async function decommissionedLegacyRoute(): Promise<Response> {
   return Response.json(
     {
       error: {
-        code: "payments_retired",
-        message: "Payments and checkout are no longer offered by Tomodachi.",
+        code: "route_decommissioned",
+        message: "This legacy route is no longer available.",
       },
     },
     {

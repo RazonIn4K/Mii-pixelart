@@ -1,7 +1,6 @@
 import {
   ArrowRight,
-  CheckCircle2,
-  Clock3,
+  Image as ImageIcon,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -11,22 +10,23 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
 
-const FREE_PLAN_STEPS = [
+const ADVICE_STEPS = [
   "Describe what you are trying to make, improve, or recover from.",
   "Review a short checklist ordered by urgency and effort.",
   "Keep control: AI suggestions never change a project automatically.",
 ];
 
-const EXPANDED_PLAN_IDEAS = [
-  "A saved, account-bound checklist with clear milestones",
-  "Canvas-aware recommendations for the current creation",
-  "One bounded regeneration plus a downloadable summary",
+const IMAGE_STEPS = [
+  "Sign in and finish your profile before starting a generation request.",
+  "Describe original artwork and choose an allowlisted image model.",
+  "Review the source image and exact 256×256 conversion before using it.",
+  "Commit the converted grid or cancel it; nothing is applied automatically.",
 ];
 
 export default function AiPlan() {
   useDocumentTitle(
     "AI Action Plan",
-    "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+    "Use Tomodachi's AI tools for reviewable advice and original 256×256 artwork preparation.",
     { canonicalPath: "/ai-plan" },
   );
   useStructuredData([
@@ -44,7 +44,7 @@ export default function AiPlan() {
             ← Tomodachi
           </Link>
           <span className="rounded-full bg-[var(--island-mint)] px-3 py-1 text-xs font-black">
-            Free beta
+            Available now
           </span>
         </div>
       </header>
@@ -56,12 +56,12 @@ export default function AiPlan() {
           </div>
           <p className="island-kicker mt-7">AI action plan</p>
           <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] sm:text-6xl">
-            Useful next steps, without a sales call.
+            Advice and original artwork, with you in control.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--island-muted-ink)]">
             Tell Tomodachi what you are trying to make or fix. Get a short,
-            reviewable checklist covering what to do first, what can wait, and
-            the quickest useful next action.
+            reviewable checklist—or generate one original source image and
+            decide whether to convert it into the Studio&apos;s 256×256 grid.
           </p>
         </section>
 
@@ -73,16 +73,17 @@ export default function AiPlan() {
                   Available now
                 </p>
                 <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
-                  Free AI plan beta
+                  Reviewable advice
                 </h2>
               </div>
-              <span className="rounded-xl bg-[var(--island-mint)] px-3 py-2 text-sm font-black">
-                $0
-              </span>
+              <Sparkles
+                className="h-7 w-7 text-[var(--island-mint-dark)]"
+                aria-hidden="true"
+              />
             </div>
 
             <ol className="mt-7 space-y-4">
-              {FREE_PLAN_STEPS.map((step, index) => (
+              {ADVICE_STEPS.map((step, index) => (
                 <li
                   key={step}
                   className="flex gap-3 text-sm font-semibold leading-6"
@@ -112,40 +113,42 @@ export default function AiPlan() {
 
           <Card className="rounded-3xl border border-[var(--island-ink)]/15 bg-[var(--island-yellow-soft)] p-6 sm:p-8">
             <div className="flex items-center gap-3">
-              <Clock3
+              <ImageIcon
                 className="h-6 w-6 text-[var(--island-orange)]"
                 aria-hidden="true"
               />
               <p className="text-xs font-black uppercase tracking-[0.18em]">
-                Product direction
+                Studio image workflow
               </p>
             </div>
             <h2 className="mt-4 text-2xl font-black tracking-[-0.035em]">
-              Expanded $5 creator plan
+              Generate artwork for the 256×256 canvas
             </h2>
             <p className="mt-3 text-sm font-semibold leading-6 text-[var(--island-muted-ink)]">
-              A one-time expanded plan is being explored, but it is not for sale
-              yet. Tomodachi currently accepts no payments and has no checkout.
+              Create one original square source image, inspect the result, and
+              open the existing import review before any pixels reach your
+              project.
             </p>
-            <ul className="mt-6 space-y-3">
-              {EXPANDED_PLAN_IDEAS.map((idea) => (
+            <ol className="mt-6 space-y-3">
+              {IMAGE_STEPS.map((step, index) => (
                 <li
-                  key={idea}
+                  key={step}
                   className="flex gap-3 text-sm font-semibold leading-5"
                 >
-                  <CheckCircle2
-                    className="mt-0.5 h-4 w-4 shrink-0 text-[var(--island-mint-dark)]"
-                    aria-hidden="true"
-                  />
-                  {idea}
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black">
+                    {index + 1}
+                  </span>
+                  {step}
                 </li>
               ))}
-            </ul>
-            <p className="mt-6 rounded-2xl bg-white/80 p-4 text-xs font-semibold leading-5 text-[var(--island-muted-ink)]">
-              No waitlist or payment details are collected. A paid version will
-              launch only after account entitlements, refunds, usage limits,
-              privacy controls, and fulfillment are tested end to end.
-            </p>
+            </ol>
+            <Link
+              href="/studio"
+              className="mt-7 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--island-ink)] bg-white px-5 text-sm font-black shadow-[4px_4px_0_var(--island-ink)] transition-transform hover:-translate-y-0.5"
+            >
+              Open image tools
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </Card>
         </div>
 
@@ -162,9 +165,9 @@ export default function AiPlan() {
               <p className="mt-2 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">
                 Your description is sent through OpenRouter and its selected
                 model provider only after you agree. Do not include passwords,
-                payment details, recovery codes, government IDs, or other
-                secrets. AI output is guidance—not legal, financial, medical, or
-                emergency advice.
+                financial account information, recovery codes, government IDs,
+                or other secrets. AI output is guidance—not legal, financial,
+                medical, or emergency advice.
               </p>
             </div>
           </div>

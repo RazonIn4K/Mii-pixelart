@@ -281,7 +281,7 @@ const ROUTES: Record<string, RouteShell> = {
   "/faq": {
     title: "FAQ · Tomodachi",
     description:
-      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and how this site is funded.",
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and the site's AI and privacy boundaries.",
     h1: "Frequently asked questions",
     body: `
       <h2>Tomodachi Life releases</h2>
@@ -300,7 +300,7 @@ const ROUTES: Record<string, RouteShell> = {
       <p>Change your email password before anything else (because email controls every other password reset). Then turn on 2FA on that email, then rotate other accounts. <a href="/help">Free 24-hour action plan here</a>.</p>
       <h2>The site</h2>
       <h3>Is the Studio free?</h3>
-      <p>Yes. Import, reduce, export, password breach check, and AI assistant are free. Tomodachi currently accepts no payments, tips, or consultation bookings.</p>
+      <p>Yes. Importing, reducing, exporting, the password breach check, and AI advice are available without an account. An account is required only for cloud and community features or AI image generation.</p>
       <h3>Do you store my photos or my password?</h3>
       <p>Local reference imports stay in your browser unless you deliberately choose a separate showcase upload for a cloud creation. Showcase files are normalized, metadata-stripped, and the raw upload is discarded. The password check uses k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
     jsonLd: [
@@ -364,7 +364,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: "Is the Studio free?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. Import, reduce, export, password breach check, and AI assistant are free. Tomodachi currently accepts no payments, tips, or consultation bookings.",
+              text: "Yes. Importing, reducing, exporting, the password breach check, and AI advice are available without an account. An account is required only for cloud and community features or AI image generation.",
             },
           },
           {
@@ -386,8 +386,8 @@ const ROUTES: Record<string, RouteShell> = {
     h1: "About Tomodachi",
     body: `
       <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual Face Paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
-      <h2>Free, useful, and honest about what exists</h2>
-      <p>The editor, the password check, the AI assistant, and every guide are free. Tomodachi does not currently accept payments or consultation bookings. See the <a href="/ai-plan">AI Action Plan</a> for the free beta and future product direction.</p>
+      <h2>Useful and honest about what exists</h2>
+      <p>The editor, password check, AI assistant, and guides are ready to use. See the <a href="/ai-plan">AI Action Plan</a> for the active advice and original-artwork workflows.</p>
       <h2>Privacy on principle</h2>
       <p>Local reference imports stay in the browser unless you deliberately choose a separate, normalized showcase upload. Google accounts and private cloud projects are optional; anonymous editing and export remain available. The password check uses k-anonymity against Have I Been Pwned, and optional tracking waits for cookie consent.</p>
       <h2>How to reach the project</h2>
@@ -440,7 +440,7 @@ const ROUTES: Record<string, RouteShell> = {
       </ol>
       <h2>Next 24 hours</h2>
       <p>Rotate passwords on accounts in priority order: financial (banks, brokerage, PayPal, crypto), cloud (Google Drive, iCloud, Dropbox), identity (Apple ID, Microsoft, Google), social (X, Instagram, Discord, Reddit), everything else. A password manager makes this an evening of work rather than a month-long fight.</p>
-      <p>For personalized next steps, try the free <a href="/ai-plan">AI Action Plan beta</a>. Review every suggestion before acting and never include passwords, recovery codes, payment details, or other secrets.</p>`,
+      <p>For personalized next steps, try the <a href="/ai-plan">AI Action Plan</a>. Review every suggestion before acting and never include passwords, recovery codes, financial account information, or other secrets.</p>`,
     jsonLd: [
       breadcrumbFor("Help", "/help"),
       {
@@ -460,15 +460,15 @@ const ROUTES: Record<string, RouteShell> = {
   "/ai-plan": {
     title: "AI Action Plan · Tomodachi",
     description:
-      "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+      "Use Tomodachi's AI tools for reviewable advice and original 256×256 artwork preparation.",
     h1: "AI Action Plan",
     body: `
       <p>Tell Tomodachi what you are trying to make or fix and get a short, reviewable checklist covering what to do first, what can wait, and the quickest useful next action.</p>
-      <h2>Free beta available now</h2>
+      <h2>Reviewable advice</h2>
       <p>Recovery planning is available from the home page, and creative advice is available inside the Studio. AI suggestions never change a project automatically.</p>
-      <h2>Expanded $5 creator plan is only a direction</h2>
-      <p>A one-time expanded plan is being explored, but it is not for sale. Tomodachi currently accepts no payments and has no checkout. A paid version will launch only after account entitlements, refunds, usage limits, privacy controls, and fulfillment are tested end to end.</p>
-      <p>Do not include passwords, payment details, recovery codes, government IDs, or other secrets in an AI prompt. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
+      <h2>Generate original artwork for review</h2>
+      <p>Signed-in creators can describe one original square image, choose an allowlisted model, review the source, and inspect its 256×256 conversion. Nothing paints, saves, uploads, or publishes until the creator explicitly commits it.</p>
+      <p>Do not include passwords, financial account information, recovery codes, government IDs, or other secrets in an AI prompt. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
     jsonLd: [
       breadcrumbFor("AI Action Plan", "/ai-plan"),
       {
@@ -486,11 +486,11 @@ const ROUTES: Record<string, RouteShell> = {
   "/support": {
     title: "Support · Tomodachi",
     description:
-      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback. No payments or tips are accepted.",
+      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback.",
     h1: "Support the workshop by using it",
     body: `
-      <p>Tomodachi does not currently accept payments, tips, donations, or consultation bookings.</p>
       <p>Help by testing the Studio with a real workflow, sharing original work when community publishing opens, reporting reproducible bugs, or sending product feedback to help@tomodachi.pw.</p>
+      <p>Creators can also try the AI advice and original-artwork tools, then report where review or 256×256 conversion could be clearer.</p>
       <p>Security reports belong at security@tomodachi.pw and should never contain passwords, session cookies, or private project files.</p>`,
     jsonLd: [
       breadcrumbFor("Support", "/support"),

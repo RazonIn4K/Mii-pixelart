@@ -4,8 +4,8 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 // These routes remain available during a community incident so people can
 // control authentication and account deletion, while the pre-existing Studio
-// and AI behavior continues to operate. Retired payment routes remain listed
-// only so old clients receive a truthful 410 instead of a community-mode 503.
+// and AI behavior continues to operate. Decommissioned compatibility routes
+// remain listed so old clients receive a truthful 410 instead of a 503.
 const OPERATIONAL_MUTATIONS = new Set([
   "POST /api/auth/google/start",
   "POST /api/auth/logout",

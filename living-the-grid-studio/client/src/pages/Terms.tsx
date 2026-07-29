@@ -24,9 +24,8 @@ export default function Terms() {
       <p>
         Tomodachi is a browser-based Mii pixel-art studio paired with
         breach-recovery tools and guides. The Studio, AI assistant, password
-        breach check, community features, and guides are currently offered
-        without a checkout. We do not accept payments, tips, donations, or
-        consultation bookings through the Site.
+        breach check, community features, and guides make up the current
+        service.
       </p>
 
       <h2>2. Acceptable use</h2>
@@ -100,17 +99,7 @@ export default function Terms() {
         generate.
       </p>
 
-      <h2>7. Payments</h2>
-      <p>
-        Tomodachi currently offers no paid service and contains no active
-        checkout. A possible one-time expanded AI creator plan is only a product
-        direction, not an offer for sale. Any future paid feature will require
-        updated Terms that clearly identify its price, scope, fulfillment,
-        cancellation and refund rules, data handling, and payment provider
-        before anyone can purchase it.
-      </p>
-
-      <h2>8. Intellectual property</h2>
+      <h2>7. Intellectual property</h2>
       <p>
         The Site, including code, design, and original written content, is owned
         by or licensed to David Ortiz and protected by intellectual-property
@@ -121,14 +110,14 @@ export default function Terms() {
         assets or claim affiliation with Nintendo or any other rights holder.
       </p>
 
-      <h2>9. Disclaimers</h2>
+      <h2>8. Disclaimers</h2>
       <p>
         The Site is provided &quot;as is&quot; without warranties of any kind,
         either express or implied. We do not warrant that the Site will be
         uninterrupted, error-free, or secure.
       </p>
 
-      <h2>10. Limitation of liability</h2>
+      <h2>9. Limitation of liability</h2>
       <p>
         To the maximum extent permitted by law, David Ortiz, operating
         Tomodachi, is not liable for indirect, incidental, special,
@@ -137,7 +126,7 @@ export default function Terms() {
         related to the Site will not exceed USD 50.
       </p>
 
-      <h2>11. Termination and deletion</h2>
+      <h2>10. Termination and deletion</h2>
       <p>
         We may suspend or terminate access to the Site for users who violate
         these Terms or whose use poses a risk to other users. User-requested
@@ -145,7 +134,7 @@ export default function Terms() {
         days before erasure; canceled accounts return with creations private.
       </p>
 
-      <h2>12. Governing law</h2>
+      <h2>11. Governing law</h2>
       <p>
         These Terms are governed by the laws of the State of Illinois and
         applicable United States federal law, without regard to conflict-of-law
@@ -153,13 +142,13 @@ export default function Terms() {
         applies in your place of residence.
       </p>
 
-      <h2>13. Changes</h2>
+      <h2>12. Changes</h2>
       <p>
         We may update these Terms occasionally. Material changes will be
         announced on the Site at least 30 days before they take effect.
       </p>
 
-      <h2>14. Contact</h2>
+      <h2>13. Contact</h2>
       <p>
         The operator and postal contact for legal notices and service is David
         Ortiz, 122 W Taylor St, DeKalb, Illinois 60115, United States.

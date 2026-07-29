@@ -49,12 +49,12 @@ for (const route of publicRoutes) {
   });
 }
 
-test("AI plan and support surfaces expose no payment or checkout action", async ({
+test("AI plan and support surfaces focus on active creator workflows", async ({
   page,
 }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop",
-    "One desktop check covers the shared payment-free product surfaces.",
+    "One desktop check covers the shared AI and support surfaces.",
   );
 
   const paymentRequests: string[] = [];
@@ -67,12 +67,15 @@ test("AI plan and support surfaces expose no payment or checkout action", async 
   await page.goto("/ai-plan", { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Free AI plan beta", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Reviewable advice", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      "A one-time expanded plan is being explored, but it is not for sale yet. Tomodachi currently accepts no payments and has no checkout.",
-      { exact: true },
-    ),
+    page.getByRole("heading", {
+      name: "Generate artwork for the 256×256 canvas",
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     page.locator("a, button").filter({ hasText: /buy|checkout|pay/i }),
@@ -81,12 +84,15 @@ test("AI plan and support surfaces expose no payment or checkout action", async 
   await page.goto("/unlock", { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Free AI plan beta", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Reviewable advice", exact: true }),
   ).toBeVisible();
 
   await page.goto("/support", { waitUntil: "networkidle" });
   await expect(
     page.getByText(
-      "Tomodachi does not currently accept payments, tips, donations, or consultation bookings. Testing the real workflow and sharing clear feedback helps more than a checkout ever could.",
+      "Test a real drawing workflow, share original creations, and send clear feedback. Specific examples help turn rough edges into a workshop that is easier for everyone to use.",
       { exact: true },
     ),
   ).toBeVisible();
