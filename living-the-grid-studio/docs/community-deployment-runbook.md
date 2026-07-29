@@ -3,6 +3,7 @@
 **Status:** Implementation runbook; remote execution is not authorized by this
 document.
 **Last checked against Cloudflare documentation:** 2026-07-13
+**Operational state refreshed:** 2026-07-29
 
 This runbook supersedes the compute portion of `cloudflare-deployment.md` only
 after the Worker cutover. Until then, the existing Pages project remains the
@@ -26,26 +27,25 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 This snapshot is operational context, not deployment authority:
 
 - GitHub PR #2 and GitLab MR !2 review exact head
-  `4b5215d850ac4890ef89c523c5d8e6a5379b311b`. Owned GitHub CI and immutable
+  `151447b91f6c0e2f07632cac5ddc555f839a2034`. Owned GitHub CI and immutable
   exact-head GitLab SAST, secret-detection, and dependency-scanning evidence
-  passed. The reviews remain Draft / HOLD. This is the provider-reported
-  checkpoint before the acceptance-hardening candidate in this change. The
-  candidate must first be committed, then its resulting immutable commit must
-  receive fresh exact-head CI and security evidence. Only that reviewed commit,
-  named by its full SHA in a new approval, may be deployed; this runbook does
-  not predeclare a future SHA.
-- Staging serves `a964729f643b188f5553ce775ef5bee8a9def6ec` as deployment
-  `17d26641-d145-404f-b78b-4aa9ae1d7d1e`, Worker version
-  `01e306d7-c079-4eda-8fe7-2e098c77b82c`, with community mutations enabled and
-  migrations `0001`-`0009`. Its anonymous and bounded P2/P3 evidence is partial
-  launch evidence; `stagingAcceptancePassed` remains false.
+  passed. The reviews remain Draft / HOLD, and this exact head is not deployed
+  to staging or production.
+- Staging serves `6796f563847f1fa71d2d3cdca5df422ded528cc1` as deployment
+  `62c4d58f-b3c0-464e-9f7e-acbe5ade4ff0`, Worker version
+  `0e2159c4-62b0-4912-b4dc-f873483ed842`, with community mutations and AI image
+  generation enabled, payment surfaces retired, and migrations `0001`-`0009`.
+  Its anonymous and bounded P2/P3 evidence is partial launch evidence;
+  `stagingAcceptancePassed` remains false. The review-head cleanup removes only
+  unreachable modules and unused dependencies, but it still requires a fresh
+  exact-head staging deployment and acceptance evidence.
 - Production traffic remains on Pages. A hidden triggerless production Worker
   exists at deployment `fa682161-be1c-4211-8559-01e14896f4cc`, version
   `f4e8c796-6e18-4fc9-9e35-2aec0f57391a`, from source `9a4026f`. It has no
   hostname, route, cron, workers.dev, or preview exposure. Production resources,
   OAuth, secrets, and migrations `0001`-`0009` exist, but the triggerless
   approval/evidence is not a cutover record.
-- No current readiness file authorizes deploying `4b5215d`, writing new staging
+- No current readiness file authorizes deploying `151447b`, writing new staging
   fixtures, merging the reviews, attaching a production hostname, changing a
   role, or enabling production writes. Every historical evidence file remains
   immutable.
@@ -84,7 +84,7 @@ This snapshot is operational context, not deployment authority:
   in local or production configuration. Cloudflare may allow occasional CPU
   overruns, so treat this as a cost and runaway-work guardrail rather than a
   hard wall. This resolves the plan-level 10 ms blocker only. Staging is now
-  writable for approved acceptance on `a964729f`, but the complete image,
+  writable for approved acceptance on `6796f563`, but the complete image,
   quota, retention, scheduled-cleanup, cost, and exact-review-head acceptance
   remains open. See
   [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).

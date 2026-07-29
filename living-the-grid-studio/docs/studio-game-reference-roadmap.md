@@ -266,12 +266,13 @@ Use copy such as: **An independent fan-made art planner and sharing community. R
 
 Status: the true-256 slice and its Studio-shell/AI-history corrections are live
 on staging at exact runtime source
-`80fdcd5da432b88d06d84bfd084e9f0993edc363`. The current branch checkpoint is
-`b34f821373657ccf8e5d38401af6c4ff255fc65c`; changes between those commits are
-documentation and test configuration, so the application runtime is
-equivalent. Final P1 acceptance nevertheless remains open until one immutable
-exact head passes the full hosted cold, restored-draft, cloud-load,
-interaction, and mobile performance matrix.
+`6796f563847f1fa71d2d3cdca5df422ded528cc1`. The current review checkpoint is
+`151447b91f6c0e2f07632cac5ddc555f839a2034`; changes between those commits remove
+only unreachable client modules, unused dependencies, lockfile entries, and
+the corresponding license-baseline rows. No intended application behavior
+changes, but final P1 acceptance remains open until this immutable exact head
+passes the full hosted cold, restored-draft, cloud-load, interaction, and
+mobile performance matrix.
 
 - Keep one 256×256 coordinate surface so one Studio cell can represent one
   reported game-surface pixel without conflating document resolution and brush
@@ -364,7 +365,8 @@ Exit evidence:
 This record applies to the game-matched drawing slice based on
 `d3ec2f9f889677a5859972c2e21935619e032f90`. It is local evidence, not a hosted
 staging approval or production result, and is superseded for release decisions
-by the current hosted `80fdcd5` runtime and the exact-head requirements below.
+by the current hosted `6796f563` runtime and the `151447b` exact-head
+requirements below.
 
 - TypeScript client and Worker checks passed.
 - Worker tests passed: 37 files and 318 tests.
@@ -385,22 +387,26 @@ by the current hosted `80fdcd5` runtime and the exact-head requirements below.
   measured 74ms INP and 0.00 CLS. No console errors or failed network requests
   appeared in the traced workflow.
 
-### Current release gates after published checkpoint `b34f821`
+### Current release gates after review checkpoint `151447b`
 
-1. Keep the P1 exact-head rule: the existing staging runtime is equivalent to
-   the branch application code, but fresh immutable exact-head cold,
+1. Keep the P1 exact-head rule: the existing staging runtime predates the
+   dependency/unreachable-module cleanup, so fresh immutable exact-head cold,
    restored-draft, cloud-load, interaction, and mobile evidence is still
    required before staging exit.
 2. The fail-closed writable hosted harness and secret-free live-auth runner are
-   implemented and locally proven. Do not count those injected tests as an
-   approved remote writable or two-session run; the first live run still needs
-   a fresh private approval and distinct second Google staging identity.
-3. After separately scoped identity and fixture approval, complete the
-   two-user authorization, social, report, moderation, conflict, deletion,
-   cancellation, retention, and cleanup matrices on staging.
+   implemented and locally proven. Earlier bounded two-account P2/P3 staging
+   runs passed and cleaned up their fixtures, but they do not satisfy P4/P5 or
+   the exact-head exit gate.
+3. After separately scoped identity and fixture approval, complete every
+   remaining two-user authorization, social, report, moderation, conflict,
+   deletion, cancellation, retention, scheduled-cleanup, and reconciliation
+   matrix on the exact staging head.
 4. Require final GitHub/GitLab CI and security evidence on the same immutable
    SHA and active staging Worker version used for exit review.
-5. Keep production on Pages source `c044134`/deployment `b73cc5ba`; no
-   production Worker or isolated resource set exists, and every resource,
-   OAuth, secret, migration, deploy, DNS, and write-enable action retains its
-   separate approval gate.
+5. Keep production traffic on Pages source `c044134`/deployment `b73cc5ba`
+   until cutover approval. A hidden triggerless production Worker exists at
+   deployment `fa682161-be1c-4211-8559-01e14896f4cc`, version
+   `f4e8c796-6e18-4fc9-9e35-2aec0f57391a`, with isolated production resources,
+   OAuth, secrets, and migrations `0001`-`0009`, but it has no hostname, route,
+   cron, workers.dev, or preview exposure. Every deployment, domain, role, and
+   write-enable action retains its separate approval gate.
