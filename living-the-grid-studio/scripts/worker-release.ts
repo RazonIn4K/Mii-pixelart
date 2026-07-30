@@ -439,21 +439,43 @@ function validateVariables(config: JsonRecord, target: ReleaseTarget): boolean {
     throw new ReleaseError("Terms version is missing or invalid.");
   }
   if (target === "production") {
-    expectExact(
-      vars.AI_IMAGE_GENERATION_ENABLED,
-      "false",
-      "Production AI generation mode",
-    );
-    expectExact(
-      vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD,
-      "0",
-      "Production AI daily budget",
-    );
-    expectExact(
-      vars.AI_IMAGE_USER_DAILY_LIMIT,
-      "0",
-      "Production AI user daily limit",
-    );
+    const aiImagesEnabled = vars.AI_IMAGE_GENERATION_ENABLED === "true";
+    if (
+      vars.AI_IMAGE_GENERATION_ENABLED !== "true" &&
+      vars.AI_IMAGE_GENERATION_ENABLED !== "false"
+    ) {
+      throw new ReleaseError(
+        "Production AI generation mode must be an explicit true or false string.",
+      );
+    }
+    if (aiImagesEnabled) {
+      expectExact(
+        vars.COMMUNITY_MUTATIONS_ENABLED,
+        "true",
+        "Production AI writable-mode dependency",
+      );
+      expectExact(
+        vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD,
+        "2000000",
+        "Production AI daily budget",
+      );
+      expectExact(
+        vars.AI_IMAGE_USER_DAILY_LIMIT,
+        "3",
+        "Production AI user daily limit",
+      );
+    } else {
+      expectExact(
+        vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD,
+        "0",
+        "Production AI daily budget",
+      );
+      expectExact(
+        vars.AI_IMAGE_USER_DAILY_LIMIT,
+        "0",
+        "Production AI user daily limit",
+      );
+    }
   }
   return vars.COMMUNITY_MUTATIONS_ENABLED === "true";
 }

@@ -731,6 +731,43 @@ describe("runRelease dry-run", () => {
     expect(harness.calls).toHaveLength(0);
   });
 
+  it("permits the bounded production AI image mode only with writable community mutations", async () => {
+    const harness = makeHarness("production", { remoteWritable: true });
+    for (const configPath of [SOURCE_PATH, GENERATED_PATH]) {
+      const config = JSON.parse(harness.files.get(configPath)!);
+      const selected =
+        configPath === SOURCE_PATH ? config.env.production : config;
+      selected.vars.AI_IMAGE_GENERATION_ENABLED = "true";
+      selected.vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD = "2000000";
+      selected.vars.AI_IMAGE_USER_DAILY_LIMIT = "3";
+      harness.files.set(configPath, JSON.stringify(config));
+    }
+
+    await runRelease(
+      { cwd: CWD, target: "production", intent: "dry-run" },
+      harness.dependencies,
+    );
+
+    expect(harness.calls.at(-1)?.args.at(-1)).toBe("--dry-run");
+  });
+
+  it("rejects production AI image generation outside the bounded release budget", async () => {
+    const harness = makeHarness("production", { remoteWritable: true });
+    const source = JSON.parse(harness.files.get(SOURCE_PATH)!);
+    source.env.production.vars.AI_IMAGE_GENERATION_ENABLED = "true";
+    source.env.production.vars.AI_IMAGE_DAILY_BUDGET_MICRO_USD = "2000001";
+    source.env.production.vars.AI_IMAGE_USER_DAILY_LIMIT = "3";
+    harness.files.set(SOURCE_PATH, JSON.stringify(source));
+
+    await expect(
+      runRelease(
+        { cwd: CWD, target: "production", intent: "dry-run" },
+        harness.dependencies,
+      ),
+    ).rejects.toThrow("Production AI daily budget");
+    expect(harness.calls).toHaveLength(0);
+  });
+
   it("rejects a generated config that drops the custom-domain route", async () => {
     const harness = makeHarness("staging");
     const generated = JSON.parse(harness.files.get(GENERATED_PATH)!);
@@ -1783,4 +1820,3 @@ describe("production triggerless bootstrap", () => {
     expect(harness.calls).toHaveLength(0);
   });
 });
-
