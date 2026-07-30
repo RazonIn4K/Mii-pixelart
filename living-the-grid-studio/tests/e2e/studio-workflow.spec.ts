@@ -546,8 +546,15 @@ test("AI applies one validated document revision that Undo removes in one step",
     page.getByRole("alertdialog", { name: "AI processing consent" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Agree and send" }).click();
-  await expect(page.getByRole("button", { name: "New" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Delete" })).toBeDisabled();
+  const aiSessionControls = page.locator("details").filter({
+    has: page.getByText("Advanced AI settings", { exact: true }),
+  });
+  await expect(
+    aiSessionControls.getByRole("button", { name: "New", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    aiSessionControls.getByRole("button", { name: "Delete", exact: true }),
+  ).toBeDisabled();
   await expect(page.getByText("AI edit", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply once" }).click();
 
