@@ -663,11 +663,7 @@ function validateSourceConfig(
     "production",
     "Production environment",
   );
-  if ("assets" in productionSource) {
-    throw new ReleaseError(
-      "Production must inherit the version-controlled Static Assets routing policy.",
-    );
-  }
+  validateAssets(productionSource, true);
   const triggers = objectAt(
     source,
     "triggers",
@@ -818,7 +814,7 @@ function validateGeneratedConfig(
   );
   validateAssets(
     generated,
-    target === "staging" ? true : REQUIRED_ASSET_ROUTES,
+    target === "local" ? REQUIRED_ASSET_ROUTES : true,
   );
   validateGeneratedTriggers(generated, source, phase);
 

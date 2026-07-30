@@ -218,6 +218,11 @@
       "name": "tomodachi-studio-production",
       "workers_dev": false,
       "preview_urls": false,
+      "assets": {
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": true,
+      },
       "routes": [
         { "pattern": "tomodachi.pw", "custom_domain": true },
         { "pattern": "www.tomodachi.pw", "custom_domain": true },

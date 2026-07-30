@@ -191,7 +191,7 @@ function environmentConfig(
     workers_dev: false,
     preview_urls: false,
     ...(target === "staging" ? { limits: { cpu_ms: 2_000 } } : {}),
-    ...(target === "staging"
+    ...(target !== "local"
       ? {
           assets: {
             binding: "ASSETS",
