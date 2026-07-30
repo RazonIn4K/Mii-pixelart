@@ -1,4 +1,10 @@
-# Cloudflare Pages + Unstoppable Domains deployment guide
+# Legacy Cloudflare Pages + Unstoppable Domains deployment guide
+
+> **Migration status (2026-07-13):** This remains the production Pages rollback runbook
+> until an explicitly approved Worker cutover. Community-platform staging,
+> migration, cutover, and rollback are governed by
+> [`community-deployment-runbook.md`](community-deployment-runbook.md). Do not
+> combine the two procedures or infer remote authorization from either file.
 
 This is the operational runbook for getting `tomodachi.pw` (ICANN ccTLD) and `tomodachi.brave` (Web3 / alt-root) live on Cloudflare Pages. It assumes the repo state at or after the breach recovery hub work.
 
@@ -21,19 +27,22 @@ Check the **build log**. These lines mean Pages is still using **repo root** (`/
 
 | Log line | Meaning |
 | --- | --- |
-| `No Wrangler configuration file found` | `wrangler.toml` lives under `living-the-grid-studio/`; Cloudflare never entered that directory. |
+| `No Wrangler configuration file found` | `wrangler.jsonc` lives under `living-the-grid-studio/`; Cloudflare never entered that directory. |
 | `No build command specified. Skipping build step` | **Build command** is empty in project settings. |
 | `No functions dir at /functions found` | Pages looked for `/functions` at repo root; this app’s Functions are at `living-the-grid-studio/functions`. |
 
 **Fix:** **Workers & Pages** → your project → **Settings** → **Builds** → set **Root directory** to `living-the-grid-studio`, **Build command** to `pnpm install --frozen-lockfile && pnpm vite build`, **Build output directory** to `dist/public`, then **Retry deployment** on the latest commit. After a correct build, the log should show install + `vite build`, and Functions should be discovered from the subfolder.
 
-**Project name:** Your URL uses **`mii-pixelart`**. That is fine, but then in **Doppler → Cloudflare Pages** pick this **Pages project name** exactly. Our `wrangler.toml` uses `name = "tomodachi-studio"` for CLI deploys; either rename the Pages project to match later or pass `--project-name=mii-pixelart` when using Wrangler against this deployment.
+**Project name:** The existing rollback project is **`mii-pixelart`**. In
+**Doppler → Cloudflare Pages**, select that exact Pages project. Worker names and
+bindings come from `wrangler.jsonc`; do not rename the Pages project during the
+cutover or remove its rollback deployment prematurely.
 
 ## Workers Routes (zone) vs Workers & Pages (account)
 
 In the Cloudflare dashboard for **tomodachi.pw** (a **zone**), the sidebar may show **Workers Routes**. That screen maps URL patterns on the domain to a **Worker**. It is **not** where you create or manage **Cloudflare Pages** projects, Git builds, or **Doppler → Cloudflare Pages** secret sync—an empty routes table there is normal.
 
-For this app: use **Workers & Pages** from the **account** navigation (click the Cloudflare logo / account switcher if you are stuck inside the zone), open your **Pages** project (`tomodachi-studio`), and manage builds and domains there. Wire secrets through **Doppler** ([`docs/doppler-secrets-setup.md`](doppler-secrets-setup.md)) → **Integrations → Cloudflare Pages**; that flow runs in Doppler’s UI, not on the zone Workers Routes page.
+For this app: use **Workers & Pages** from the **account** navigation (click the Cloudflare logo / account switcher if you are stuck inside the zone), open the existing **Pages** project (`mii-pixelart`), and manage builds and domains there. Wire secrets through **Doppler** ([`docs/doppler-secrets-setup.md`](doppler-secrets-setup.md)) → **Integrations → Cloudflare Pages**; that flow runs in Doppler’s UI, not on the zone Workers Routes page.
 
 > Important context on the two domains
 >
@@ -47,7 +56,7 @@ For this app: use **Workers & Pages** from the **account** navigation (click the
 2. In the left sidebar, go to **Workers & Pages → Create application → Pages → Connect to Git**.
 3. Authorize Cloudflare to read your GitHub account, then pick the repository for this project.
 4. Configure the build (same as [Cloudflare Pages build settings](#cloudflare-pages-build-settings-canonical) above):
-   - **Project name:** `tomodachi-studio` (matches `wrangler.toml`)
+   - **Project name:** `mii-pixelart` (the existing Pages rollback project)
    - **Production branch:** `main`
    - **Framework preset:** None (custom)
    - **Build command:** `pnpm install --frozen-lockfile && pnpm vite build`
@@ -79,8 +88,8 @@ Pages distinguishes between two scopes: **Production** and **Preview**. If [Dopp
 Set them in the dashboard or with `wrangler`:
 
 ```bash
-wrangler pages secret put OPENROUTER_API_KEY --project-name=tomodachi-studio
-wrangler pages secret put OPENROUTER_API_KEY --project-name=tomodachi-studio --env=preview
+wrangler pages secret put OPENROUTER_API_KEY --project-name=mii-pixelart
+wrangler pages secret put OPENROUTER_API_KEY --project-name=mii-pixelart --env=preview
 ```
 
 ## 3. Pages Functions: how the API is served at the edge
@@ -98,7 +107,10 @@ pnpm vite build
 npx wrangler pages dev dist/public --compatibility-flag=nodejs_compat
 ```
 
-You can keep using `pnpm dev` for normal day-to-day work (the Vite middleware in `vite.config.ts` proxies `/api/ai/*` for the dev server). Wrangler is only needed when you want to test the edge runtime locally.
+Use `pnpm dev` for normal day-to-day work. The Cloudflare Vite plugin runs the
+same unified Worker and local bindings used by the target deployment, so there
+is no separate Node API middleware. Direct Wrangler commands remain useful for
+migrations, generated binding types, and release preflight operations.
 
 ## 4. Custom domain: tomodachi.pw (standard DNS)
 
@@ -113,7 +125,7 @@ There are two patterns. Choose one.
 1. In the Cloudflare dashboard, click **+ Add a site**, enter `tomodachi.pw`, choose the Free plan.
 2. Cloudflare will scan existing records (if any) and assign you a pair of nameservers like `liz.ns.cloudflare.com` and `walt.ns.cloudflare.com`.
 3. In Unstoppable Domains → **My Domains → tomodachi.pw → Manage → DNS**, switch the nameservers to the Cloudflare pair. Save. Propagation is usually 10–60 minutes; DNSSEC may take longer.
-4. Once Cloudflare shows the zone as **Active**, go to **Workers & Pages → tomodachi-studio → Custom domains → Set up a custom domain** and enter `tomodachi.pw` (apex) and `www.tomodachi.pw`. Cloudflare auto-creates the right CNAME-flattened records and a managed TLS cert.
+4. Once Cloudflare shows the zone as **Active**, go to **Workers & Pages → mii-pixelart → Custom domains → Set up a custom domain** and enter `tomodachi.pw` (apex) and `www.tomodachi.pw`. Cloudflare auto-creates the right CNAME-flattened records and a managed TLS cert.
 
 **Pattern B: Leave nameservers at Unstoppable, point records manually.**
 
@@ -121,8 +133,8 @@ If you do not want to delegate the entire zone to Cloudflare, you can keep Unsto
 
 | Type   | Name             | Value                                   | TTL | Notes                                                            |
 |--------|------------------|-----------------------------------------|-----|------------------------------------------------------------------|
-| CNAME  | `www`            | `tomodachi-studio.pages.dev`            | 300 | Points the `www` subdomain at the Pages project.                 |
-| ALIAS / ANAME | `@` (apex) | `tomodachi-studio.pages.dev`            | 300 | Required because CNAME at the apex is illegal in classic DNS.    |
+| CNAME  | `www`            | `mii-pixelart.pages.dev`                 | 300 | Points the `www` subdomain at the Pages project.                 |
+| ALIAS / ANAME | `@` (apex) | `mii-pixelart.pages.dev`                 | 300 | Required because CNAME at the apex is illegal in classic DNS.    |
 | TXT    | `_cf-pages`      | (value shown in Cloudflare dashboard)   | 300 | Domain verification record Cloudflare prompts you for.           |
 
 Then in Cloudflare Pages → **Custom domains**, enter `tomodachi.pw` and `www.tomodachi.pw` and follow the on-screen verification.
@@ -194,9 +206,7 @@ If you want `tomodachi.brave` to serve content directly via Web3 without dependi
 
 ### Option 3: Hybrid (link out for interactive features)
 
-Mirror only static breach-recovery content over IPFS (option 2) and add an
-obvious link from the IPFS site to `tomodachi.pw` for the consented AI assistant
-and any feature that needs server-side compute.
+Mirror the static breach-recovery content over IPFS (option 2) and add an obvious link from the IPFS site to `tomodachi.pw` for the AI assistant, paid checklists, and anything that needs server-side compute.
 
 ## 6. Caching strategy
 
@@ -278,8 +288,8 @@ Expected: `robots.txt` includes Cloudflare's managed AI crawler block plus the o
 
 After your first successful Cloudflare deploy:
 
-1. `https://tomodachi-studio.pages.dev/` loads the SPA.
-2. `https://tomodachi-studio.pages.dev/api/ai/status` returns JSON with `"configured": true`.
+1. `https://mii-pixelart.pages.dev/` loads the SPA.
+2. `https://mii-pixelart.pages.dev/api/ai/status` returns JSON with `"configured": true`.
 3. The homepage breach hub's "Run AI recovery plan" button gets a real response.
 4. After custom domain attach, `https://tomodachi.pw/` works and has a valid TLS cert.
 5. `curl -I https://tomodachi.pw/assets/<any-hashed-file>` shows the long-cache header.
@@ -288,34 +298,12 @@ After your first successful Cloudflare deploy:
 
 ## 9. Rollback
 
-Cloudflare Pages keeps every deploy. To roll back: **Workers & Pages → tomodachi-studio → Deployments → ⋯ → Rollback to this deployment**. DNS does not change; only the active build pointer flips.
+Cloudflare Pages keeps every deploy. To roll back: **Workers & Pages → mii-pixelart → Deployments → ⋯ → Rollback to this deployment**. DNS does not change; only the active build pointer flips.
 
-## 10. Pre-provisioned Cloudflare resources
+## 10. Worker resources
 
-These were created against account `d45bbb1a6d3f779af15c93a9f2603bc9` (`Davidinfosec07@gmail.com`):
-
-| Resource           | ID                                       | Purpose                                                                                                |
-|--------------------|------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| KV namespace       | `5129b5ce8d2d435cb704b398a437f355`        | `tomodachi-edge-cache`. Reserved for edge caching (OpenRouter models list, rate-limit counters, Brave Rewards verification token, etc.). |
-
-The binding lives commented out in `wrangler.toml`. To activate:
-
-1. Uncomment the `[[kv_namespaces]]` block in `wrangler.toml`.
-2. In any Pages Function you can now read/write through `context.env.EDGE_CACHE`:
-
-   ```ts
-   export const onRequest = async (context) => {
-     const cached = await context.env.EDGE_CACHE.get("openrouter:models");
-     if (cached) return new Response(cached, { headers: { "Cache-Control": "no-store" } });
-     const fresh = await fetch("https://openrouter.ai/api/v1/models");
-     const body = await fresh.text();
-     await context.env.EDGE_CACHE.put("openrouter:models", body, { expirationTtl: 3600 });
-     return new Response(body);
-   };
-   ```
-
-3. If the build runs but the binding is missing at runtime, also add a manual KV binding in the Pages dashboard under **Settings → Functions → KV namespace bindings**. The wrangler.toml binding takes effect on `wrangler pages deploy` from CI; the dashboard binding takes effect on Git-triggered builds. Set both for now.
-
-> Free tier KV gives us 100k reads, 1k writes, and 1k deletes per day. Plenty for caching the OpenRouter models list and basic rate limiting; the moment we approach those limits the answer is Workers Cache API at the request layer, not more KV.
-
-R2 is not required by the current Pages application. Enable it only when a reviewed feature has a concrete object-storage need, retention policy, authorization model, and cleanup plan.
+Do not copy account emails, account IDs, or binding IDs into this public legacy
+runbook. The reviewed environment names and bindings live in `wrangler.jsonc`;
+the provisioning, migration, deployment, and rollback gates live in
+`community-deployment-runbook.md`. Pages remains intact only as the rollback
+surface until the approved Worker production soak is complete.

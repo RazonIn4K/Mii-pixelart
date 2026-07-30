@@ -14,7 +14,7 @@ The Living The Grid tool at [living-the-grid.com](https://living-the-grid.com/) 
 Based on the tool's public behavior and community documentation:
 
 - The tool runs entirely in the browser (no server-side processing).
-- It uses the Tomodachi Life: Living the Dream 84-color palette (77 base + 7 saturated).
+- Its export uses an 84-color working palette (77 base + 7 saturated); this repository treats those colors as reference data, not verified Nintendo palette data.
 - The canvas is 256x256 pixels maximum.
 - Users can adjust grid size, color count, brightness, and contrast.
 - The tool supports both "pixel-perfect" and "smooth" brush modes.

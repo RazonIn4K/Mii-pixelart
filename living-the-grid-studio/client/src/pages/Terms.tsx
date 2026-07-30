@@ -1,9 +1,4 @@
-/**
- * Terms of Service.
- *
- * Template language. Substitute jurisdiction and operator entity before going
- * live. NOT legal advice.
- */
+/** Terms of Service for the current operator and governing jurisdiction. */
 
 import LegalLayout from "@/components/LegalLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -23,17 +18,21 @@ export default function Terms() {
     <LegalLayout
       title="Terms of Service"
       lastUpdated="July 16, 2026"
-      intro="These Terms govern your use of Tomodachi. By using the Site you agree to them."
+      intro="These Terms govern your use of Tomodachi, a service operated by David Ortiz. By using the Site you agree to them."
     >
       <h2>1. The service</h2>
       <p>
         Tomodachi is a browser-based Mii pixel-art studio paired with
         breach-recovery tools and guides. The Studio, AI assistant, password
-        breach check, and current AI Action Plan beta are free. We do not accept
-        payments, tips, donations, or consultation bookings through the Site.
+        breach check, community features, and guides make up the current
+        service.
       </p>
 
       <h2>2. Acceptable use</h2>
+      <p>
+        You must be at least 13 years old to create an account or use community
+        features.
+      </p>
       <p>You agree not to:</p>
       <ul>
         <li>
@@ -41,8 +40,8 @@ export default function Terms() {
           violent threats, or other content that violates applicable law.
         </li>
         <li>
-          Attempt to bypass rate limits, access controls, or interfere with the
-          Site&apos;s normal operation.
+          Attempt to bypass rate limits, access another user&apos;s private
+          content, or interfere with the Site&apos;s normal operation.
         </li>
         <li>
           Submit information about people other than yourself to the
@@ -53,7 +52,35 @@ export default function Terms() {
         </li>
       </ul>
 
-      <h2>3. No professional advice</h2>
+      <h2>3. Accounts, projects, and publishing</h2>
+      <p>
+        Editing and export remain available without an account. Signing in does
+        not upload or publish your local work. The first cloud save is an
+        explicit private action, and publishing requires a separate review of
+        the title, description, tags, visibility, comments, and download
+        permission. You may separately choose one profile image and attach up to
+        four showcase images to a cloud creation; each is an explicit upload and
+        is never inferred from Google sign-in or a local Studio import. Unlisted
+        links are not secret access controls.
+      </p>
+
+      <h2>4. Community content and moderation</h2>
+      <p>
+        You keep ownership of content you create. You grant us a limited,
+        non-exclusive license to store, transform into previews, display, and
+        distribute project content, your selected profile image, and selected
+        showcase images only as needed to operate the identity, visibility, and
+        sharing choices you make. You represent that you have permission to
+        share every person and work depicted. We may remove an image, hide
+        content, lock comments, or suspend accounts to enforce these Terms and
+        the Community Guidelines. Automated systems may help prioritize,
+        summarize, and recommend a response, but they do not make or execute
+        enforcement decisions. An authorized human reviewer must approve each
+        moderation action. Reports and copyright notices must be made in good
+        faith.
+      </p>
+
+      <h2>5. No professional advice</h2>
       <p>
         The breach recovery guidance and AI assistant output is informational
         only. It is not legal, security, medical, or financial advice. For an
@@ -61,73 +88,71 @@ export default function Terms() {
         professional.
       </p>
 
-      <h2>4. AI output</h2>
+      <h2>6. AI output</h2>
       <p>
         AI-generated text and sketches are produced by third-party language
         models. They may be incorrect, biased, or out of date. You are
-        responsible for reviewing AI output before relying on it. We do not
-        claim ownership over the AI output you generate, but you grant us a
-        non-exclusive license to operate, debug, and improve the Site using
-        de-identified prompts and outputs.
+        responsible for reviewing AI output before relying on it. Prompts and
+        related grid JSON transit OpenRouter and the selected model provider;
+        review their applicable terms and privacy practices before submitting
+        sensitive material. We do not claim ownership over the AI output you
+        generate.
       </p>
 
-      <h2>5. Payments</h2>
-      <p>
-        Tomodachi currently offers no paid service and has no checkout. A
-        possible one-time expanded $5 creator plan is only product direction,
-        not an offer for sale. Before any paid version launches, we will publish
-        its scope, pricing, fulfillment, cancellation, refund, and data-handling
-        terms and test them end to end.
-      </p>
-
-      <h2>6. Intellectual property</h2>
+      <h2>7. Intellectual property</h2>
       <p>
         The Site, including code, design, and original written content, is owned
-        by Tomodachi and protected by intellectual-property laws. The Tomodachi
-        Life palette and references are used under fair use for an unofficial
-        fan tool. We do not bundle official game assets.
+        by or licensed to David Ortiz and protected by intellectual-property
+        laws. References to third-party games, products, palettes, or
+        compatibility targets identify the subject of this unofficial fan-made
+        tool; all associated trademarks and copyrighted material remain the
+        property of their respective owners. We do not bundle official game
+        assets or claim affiliation with Nintendo or any other rights holder.
       </p>
 
-      <h2>7. Disclaimers</h2>
+      <h2>8. Disclaimers</h2>
       <p>
         The Site is provided &quot;as is&quot; without warranties of any kind,
         either express or implied. We do not warrant that the Site will be
         uninterrupted, error-free, or secure.
       </p>
 
-      <h2>8. Limitation of liability</h2>
+      <h2>9. Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, Tomodachi is not liable for
-        indirect, incidental, special, consequential, or punitive damages, or
-        any loss of data or profits, arising from your use of the Site. To the
-        extent a monetary cap is permitted, our total liability for any claim
-        related to the free Site will not exceed USD 50.
+        To the maximum extent permitted by law, David Ortiz, operating
+        Tomodachi, is not liable for indirect, incidental, special,
+        consequential, or punitive damages, or any loss of data or profits,
+        arising from your use of the Site. Our total liability for any claim
+        related to the Site will not exceed USD 50.
       </p>
 
-      <h2>9. Termination</h2>
+      <h2>10. Termination and deletion</h2>
       <p>
         We may suspend or terminate access to the Site for users who violate
-        these Terms or whose use poses a risk to other users.
+        these Terms or whose use poses a risk to other users. User-requested
+        deletion immediately hides content and allows cancellation for seven
+        days before erasure; canceled accounts return with creations private.
       </p>
 
-      <h2>10. Governing law</h2>
+      <h2>11. Governing law</h2>
       <p>
-        These Terms are governed by the laws of the State of Illinois and the
-        United States, without regard to conflict-of-law rules, except where
-        mandatory consumer-protection law requires otherwise.
+        These Terms are governed by the laws of the State of Illinois and
+        applicable United States federal law, without regard to conflict-of-law
+        rules. This choice does not limit any mandatory consumer protection that
+        applies in your place of residence.
       </p>
 
-      <h2>11. Changes</h2>
+      <h2>12. Changes</h2>
       <p>
         We may update these Terms occasionally. Material changes will be
         announced on the Site at least 30 days before they take effect.
       </p>
 
-      <h2>12. Contact</h2>
+      <h2>13. Contact</h2>
       <p>
-        Operator: David Ortiz. Questions may be sent to{" "}
-        <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a> or by mail to
-        122 W Taylor St, DeKalb, Illinois, United States.
+        The operator and postal contact for legal notices and service is David
+        Ortiz, 122 W Taylor St, DeKalb, Illinois 60115, United States.
+        Questions: <a href="mailto:legal@tomodachi.pw">legal@tomodachi.pw</a>.
       </p>
     </LegalLayout>
   );

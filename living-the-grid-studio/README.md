@@ -5,17 +5,34 @@
 [![Live site](https://img.shields.io/badge/live-tomodachi.pw-d94f4f?style=flat-square)](https://tomodachi.pw/)
 [![Brave mirror](https://img.shields.io/badge/web3%20mirror-tomodachi.brave-fb542b?style=flat-square)](https://tomodachi.brave)
 [![License: MIT](https://img.shields.io/badge/license-MIT-101016?style=flat-square)](./LICENSE)
-[![Help improve it](https://img.shields.io/badge/help-test%20%26%20report-d94f4f?style=flat-square)](https://tomodachi.pw/support)
+[![Support](https://img.shields.io/badge/support-%E2%99%A1-d94f4f?style=flat-square)](https://tomodachi.pw/support)
 
 <p align="center">
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for Mii face masks. Import a face photo or character art, reduce the colors against the in-game Tomodachi Life: Living the Dream palette, and export a paint-by-numbers reference you can recreate on a real 3DS. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
+> **Deployment status (2026-07-16):** Exact source
+> `80fdcd5da432b88d06d84bfd084e9f0993edc363` is the active deployment on
+> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) as Cloudflare
+> deployment `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
+> `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19, 100% traffic).
+> Community mutations are enabled only on staging, its D1 ledger contains
+> migrations `0001` through `0008`, and payments, tips, recovery-product sales,
+> and consultations are retired. The current review branch adds retry-safe
+> first cloud saves, exact runtime source identity, and fail-closed P2/P3
+> release runners. Those changes are locally and CI validated but are not
+> deployed; they require a new approval naming the exact final review SHA.
+> Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
+> Cloudflare Pages deployment until cross-user staging, merge, production
+> provisioning, cutover, and soak receive their independent approvals. See the
+> [production-readiness plan](docs/production-readiness-plan.md) and
+> [local release-tooling record](docs/release-evidence/2026-07-16-local-release-tooling.md).
+
+Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
 ## Why this exists
 
-The 3DS touch editor is fine for freehand sketching but brutal for anything reference-based. Recreating a face from a photo means picking colors one at a time from a tiny on-screen palette while squinting at a print-out next to the console. A desktop editor that snaps to the same 84-color palette and exports a paint-by-numbers reference is 10x faster, and works on phones too.
+Freeform console editors are fine for sketching but difficult for reference-based work. Recreating a face from a photo means choosing colors manually while comparing the source on another screen. A browser editor that reduces the image to a consistent 84-color working palette and exports a paint-by-numbers Copy Guide makes that planning easier, and it works on phones too. The palette and grid dimensions are Studio conventions rather than verified proprietary game data.
 
 The recovery section came later. When the Tomodachishare leak hit, players started showing up to community channels looking for somewhere calm and free to learn what to do next. So this site does both: a real tool for a hobby, and a soft landing for people in a bad week.
 
@@ -23,35 +40,52 @@ The recovery section came later. When the Tomodachishare leak hit, players start
 
 **Studio** — [`/studio`](https://tomodachi.pw/studio)
 
-- 16×16 through 256×256 import/detail presets that snap to the 84-color Tomodachi Life: Living the Dream palette
-- Every color labeled by row + column (R9C5, R10C1, etc.) for exact in-game matching
+- Canonical 256×256 game-reference surface plus explicitly labeled 8–256 custom/legacy imports
+- Observed smooth 1/3/7/13/19/27px footprints and snapped 4/8/16/32px planning stamps, with exact cursor previews
+- Independent cell, snapped-stamp, 2×2/4×4/8×8 section, and center-axis guides without a doubled grid
+- Browser-local source board with Side, Under, Over, and Split comparison modes
+- Every color labeled by row + column (R9C5, R10C1, etc.) for consistent manual matching in the Copy Guide
 - Image import with preview-before-commit, same-file reprocessing, subject focus, background flattening, brightness/contrast/saturation, and readability-preserving color reduction
 - Manual pencil, eraser, eyedropper, fill, inspect, undo/redo, and detail-upscale tools
-- AI sketch assistant with local chat sessions, optional grid snapshot context, validation, and cell-by-cell apply animation
+- Interactive read-only Copy Guide with exact one-based row runs, highlighted cells, browser-local progress, and a direct reference-image entry point
+- Account-gated AI sketch assistant with local per-user chat sessions, explicit grid-snapshot consent, validation, visual review, and one-step undoable apply
 - Export individual repaint assets or a ZIP reference pack with JSON, labeled PNG guide, clean PNG, palette sheet PNG, paint-order CSV, notes, manifest, and HTML reference
 
 **Recovery hub** — [`/`](https://tomodachi.pw/)
 
 - Browser-only password breach check using HIBP k-anonymity (only the first 5 chars of the SHA-1 hash ever leave the page)
-- OpenRouter-backed AI recovery assistant on free-tier models (no signup)
+- OpenRouter-backed AI recovery assistant on curated free-tier models after Google sign-in
 
 **Guides** — [`/guides`](https://tomodachi.pw/guides)
 
-- Long-form articles on Mii creation, gameplay basics (apartments / food / jobs / marriage), Tomodachishare recovery, QR codes + save backup
+- Long-form articles on Mii creation, clearly labeled legacy 3DS daily-play basics, Tomodachishare recovery, QR codes + save backup
 
-**AI action plan + project support**
+**Island Workshop community** — opt-in only; single-account writable-staging
+acceptance is complete, while cross-user acceptance remains gated and the
+community is not enabled on production
 
-- [`/ai-plan`](https://tomodachi.pw/ai-plan) — free AI action-plan beta; a distinct one-time $5 creator plan is product direction only and is not for sale
-- [`/support`](https://tomodachi.pw/support) — non-payment ways to test the Studio, report issues, and send feedback
+- Google OIDC accounts with generated avatars and private cloud projects
+- Explicit review before public or unlisted publishing; authentication never publishes work
+- Discovery, search, profiles, likes, comments, follows, reports, and role-gated moderation
+- Anonymous editing plus JSON, PNG, CSV, HTML, and ZIP exports remain available without an account
+
+**AI Action Plan** — [`/ai-plan`](https://tomodachi.pw/ai-plan)
+
+- The free beta turns a visitor's situation into a practical next-step plan.
+- A possible one-time $5 creator plan is product direction only. It is not for sale and will not launch until account entitlements, fulfillment, refunds, usage limits, privacy disclosures, and acceptance tests exist.
+- [`/support`](https://tomodachi.pw/support) lists no-payment ways to test the Studio, share creations, report bugs, and give feedback.
 
 ## Tech stack
 
 - **Frontend:** Vite, React 19, TypeScript 5, Tailwind CSS v4 (OKLCH color space), shadcn/ui/Radix primitives, wouter
-- **Edge runtime:** Cloudflare Pages Functions (TypeScript)
+- **Target/staging edge runtime:** One Cloudflare Worker with Static Assets, built through the Cloudflare Vite plugin
+- **Current production runtime:** Cloudflare Pages, retained as the rollback surface through the approved Worker soak
+- **Community data:** D1 for relational state and FTS5; private R2 for immutable project revisions and generated media
 - **Edge cache:** Cloudflare KV (1-hour TTL on the OpenRouter model list)
-- **Payments:** retired; legacy payment paths return provider-free `410 Gone` tombstones
-- **AI:** OpenRouter with free-tier model rotation (DeepSeek V4 Flash, GPT-OSS 120B, GLM 4.5 Air, Nemotron 3 Super 120B)
-- **Secrets:** Doppler → Cloudflare Pages integration
+- **Authentication:** Google authorization-code OIDC, encrypted transaction cookies, and hashed opaque sessions
+- **Payments:** Retired. Legacy checkout and webhook paths return provider-free `410 Gone` tombstones so stale clients cannot fall through to the SPA.
+- **AI:** OpenRouter with capability-checked free-tier rotation (Gemma 4 vision, GPT-OSS 120B, Nemotron 3 Super 120B)
+- **Secrets:** Environment-scoped Wrangler secrets, optionally sourced from Doppler after deployment approval
 - **Analytics:** Cloudflare Web Analytics (cookieless, no PII)
 
 For the detailed implementation atlas, see [`PROJECT_STACK_AND_IMPLEMENTATION.md`](./PROJECT_STACK_AND_IMPLEMENTATION.md).
@@ -62,7 +96,7 @@ Most SPAs are invisible to Bing / DuckDuckGo because they don't execute JavaScri
 
 ```mermaid
 flowchart LR
-    REQ([Incoming request]) --> EDGE{Cloudflare edge<br/>functions/_middleware.ts}
+    REQ([Incoming request]) --> EDGE{Cloudflare Worker<br/>worker/documents.ts}
     EDGE -- User-Agent matches<br/>Googlebot, Bingbot,<br/>DuckDuckBot, Applebot,<br/>Slurp, Baidu, Yandex,<br/>Mojeek, Ahrefs --> SHELL[Pre-rendered HTML shell<br/>+ per-route JSON-LD]
     EDGE -- Real browser --> SPA[React SPA<br/>index.html]
     SHELL --> CRAWL([Search index])
@@ -78,24 +112,29 @@ flowchart LR
     class REQ,CRAWL,USER terminal
 ```
 
-One TypeScript file at the edge UA-sniffs known search crawlers and serves route-appropriate JSON-LD: `WebApplication` on `/`, `SoftwareApplication` + `BreadcrumbList` on `/studio`, `CollectionPage` with embedded `HowTo` + `Article` on `/guides`, `FAQPage` on `/faq`, `AboutPage` + `Organization` on `/about`, `Article` on `/help`, and informational `WebPage` shells on `/ai-plan` and `/support`. Real browsers continue to get the React app. No build-step prerender, no separate SSR runtime, no Next.js — just one edge function and a `ROUTES` map.
+On the target Worker, known search crawlers receive route-appropriate JSON-LD
+for legacy routes plus safe canonical/Open Graph documents for public profiles
+and creations. Private account pages and unlisted work receive `noindex`. Real
+browsers receive the React app through Static Assets with SPA fallback; there
+is no separate SSR runtime. Until cutover, production Pages continues to use
+the retained `functions/_middleware.ts` compatibility path.
 
-See [`functions/_middleware.ts`](./functions/_middleware.ts) for the implementation.
+See [`worker/documents.ts`](./worker/documents.ts) for the implementation.
 
 ## Studio workflow
 
 ```mermaid
 flowchart LR
     IMG[Drop image<br/>photo / character art /<br/>logo / meme] --> FRAME[Crop + frame source<br/>face / head / full image]
-    FRAME --> QUANT[Color reduction<br/>snap to 84-color<br/>Living the Dream palette]
+    FRAME --> QUANT[Color reduction<br/>Studio 84-color<br/>working palette]
     QUANT --> PREVIEW[Preview before commit<br/>adjust same source image<br/>without re-uploading]
-    PREVIEW --> GRID[Editable grid<br/>16×16 through 256×256<br/>cell labels: R9C5, R10C1]
+    PREVIEW --> GRID[Editable 256×256 reference surface<br/>optional custom/legacy import<br/>cell labels: R9C5, R10C1]
     GRID --> AI{Need a sketch?}
-    AI -- yes --> SKETCH[AI sketch helper<br/>OpenRouter free tier<br/>cell-by-cell paint anim]
+    AI -- yes --> SKETCH[AI sketch helper<br/>vision-capability gate<br/>review then apply once]
     SKETCH --> GRID
     AI -- no --> EXPORT[Reference export<br/>ZIP pack or individual assets<br/>JSON + guide PNGs<br/>palette sheet + HTML]
     GRID --> EXPORT
-    EXPORT --> COPY([Copy on 3DS])
+    EXPORT --> COPY([Recreate manually<br/>with Copy Guide])
 
     classDef io fill:#fff7e8,stroke:#d94f4f,color:#101016,stroke-width:2px
     classDef step fill:#f5f5f5,stroke:#666,color:#101016
@@ -114,23 +153,34 @@ pnpm install
 pnpm dev          # Vite dev server on http://localhost:3000
 pnpm check        # TypeScript type check
 pnpm verify       # Full verification suite (LTG import, image import, templates, AI sketch, residents)
+pnpm test:worker  # Worker + local D1/R2 integration and security tests
+pnpm test:e2e     # Browser routes at all required responsive widths
 ```
 
-To run the Cloudflare Pages Functions locally:
+To run the unified Cloudflare Worker locally, apply the forward-only D1
+migrations once and start Vite. To validate the deployable Worker bundle without
+contacting Cloudflare:
 
 ```bash
-pnpm build
-pnpm wrangler pages dev dist/public --compatibility-date=2025-05-01
+pnpm db:migrate:local
+pnpm dev
+pnpm worker:dry-run
 ```
 
-Required environment variables (set via `.env.local` for dev, via Doppler → Cloudflare Pages for prod):
+Worker secrets use an untracked `.dev.vars` locally and Cloudflare secrets after
+an explicit deployment approval. Vite-only `VITE_*` values may use `.env.local`:
 
-| Variable                        | Required for                   | Notes                              |
-| ------------------------------- | ------------------------------ | ---------------------------------- |
-| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                |
-| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw` |
-| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent   |
-| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                   |
+| Variable                        | Required for                   | Notes                                               |
+| ------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`              | Google sign-in                 | Separate localhost, staging, and production clients |
+| `GOOGLE_CLIENT_SECRET`          | Google sign-in                 | Secret; never expose to Vite                        |
+| `OIDC_COOKIE_KEY`               | OAuth transaction cookie       | 32 random bytes                                     |
+| `SESSION_PEPPER`                | Session-token hashing          | Independent random secret                           |
+| `PSEUDONYM_KEY`                 | Privacy-safe abuse identifiers | Independent HMAC secret                             |
+| `OPENROUTER_API_KEY`            | AI sketch + recovery assistant | Free-tier key works                                 |
+| `PUBLIC_SITE_URL`               | Sitemap canonical URLs         | Defaults to `https://tomodachi.pw`                  |
+| `VITE_ADSENSE_PUBLISHER_ID`     | Optional, AdSense              | Only loaded after cookie consent                    |
+| `VITE_ADSENSE_HOMEPAGE_SLOT_ID` | Optional, AdSense              | Homepage slot ID                                    |
 
 ## Project structure
 
@@ -143,18 +193,21 @@ client/                  Vite + React SPA
       ui/                shadcn/ui primitives
     hooks/               useDocumentTitle, useStructuredData, useGridDocument
     lib/                 engine (JSON import/export, palette ops), breadcrumb, consent
-  public/                Static assets (sitemap.xml, og-image.png, robots.txt, _headers, manifest)
-functions/               Cloudflare Pages Functions
-  _middleware.ts         Search-crawler pre-render + per-route JSON-LD
+  public/                Static assets (original WebP artwork, community social card, PWA icons, sitemap, robots, headers)
+worker/                  Unified staging/target Worker (API, auth, documents, jobs)
+migrations/              Forward-only D1 migrations
+shared/                  Shared validation and legacy contracts
+functions/               Current production Pages and retained rollback compatibility
   api/
-    ai/[[path]].ts       OpenRouter chat + KV-cached model list
+    ai/[[path]].ts       KV-cached model list; chat fails closed without Worker auth/rate limits
     stripe/[[path]].ts   Provider-free 410 tombstone for retired payment clients
     webhooks/stripe.ts   Provider-free 410 tombstone for retired webhook deliveries
-server/                  Shared TS modules imported by Functions + dev middleware
-shared/                  Types shared between client + functions (ai, residents, const)
+server/                  Portable OpenRouter helper shared by legacy parity code and the Worker
 fixtures/                Real-world JSON fixtures for the verify scripts
 scripts/                 Verification scripts run by `pnpm verify`
 ```
+
+Visual artwork, deterministic avatars, and Cloudflare media boundaries are documented in [`docs/visual-assets.md`](docs/visual-assets.md).
 
 ## Contributing
 
@@ -169,15 +222,17 @@ pnpm check        # tsc --noEmit
 pnpm verify       # Full verification suite
 ```
 
-## Help improve the project
+## Support and sponsorship
 
-If the Studio or guides have helped, useful ways to support the project are:
+If the studio or the guides have helped, a few no-payment ways to support the project:
 
-- Test a real drawing, import, export, or AI workflow and send specific feedback.
-- Report reproducible bugs or accessibility issues through [GitHub Issues](https://github.com/RazonIn4K/Mii-pixelart/issues).
-- Try the free [AI Action Plan beta](https://tomodachi.pw/ai-plan) and verify every recommendation before acting.
+- Test a Studio workflow and report anything confusing through [GitHub issues](https://github.com/RazonIn4K/Mii-pixelart/issues).
+- Share a creation or compare a Copy Guide with the in-game drawing tools.
+- Send product and accessibility feedback through [tomodachi.pw/support](https://tomodachi.pw/support).
 
-Tomodachi currently accepts no payments, tips, donations, or consultation bookings.
+Payments are not accepted. The free AI Action Plan beta lives at
+[tomodachi.pw/ai-plan](https://tomodachi.pw/ai-plan); a possible one-time $5
+creator plan remains gated product direction and is not for sale.
 
 ## License
 

@@ -14,6 +14,7 @@ import { getCell, replaceColor, recomputeUsedColors, getColorUsageCounts } from 
 import { findIslands, findDominantNeighborColor } from "./components";
 import { deltaERgb, type RGB } from "./color";
 import { TOMODACHI_PALETTE } from "./palette";
+import { formatCountLabel } from "../format-count";
 
 /** Configuration for the optimizer */
 export interface OptimizerConfig {
@@ -291,7 +292,7 @@ export function passLimitPalette(
 
   return {
     doc: result,
-    description: `Limited palette from ${colorsBefore} to ${result.usedColors.length} colors`,
+    description: `Limited palette from ${formatCountLabel(colorsBefore, "color")} to ${formatCountLabel(result.usedColors.length, "color")}`,
     cellsChanged: totalChanged,
     colorsBefore,
     colorsAfter: result.usedColors.length,

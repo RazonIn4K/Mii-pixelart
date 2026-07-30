@@ -1,99 +1,81 @@
 import { describe, expect, it } from "vitest";
 
 import { onRequest as handleAi } from "../functions/api/ai/[[path]]";
-import { onRequest as handleRetiredPayment } from "../functions/api/stripe/[[path]]";
-import { onRequest as handleRetiredWebhook } from "../functions/api/webhooks/stripe";
+import { onRequest as handleLegacyApi } from "../functions/api/stripe/[[path]]";
+import { onRequestPost as handleLegacyWebhook } from "../functions/api/webhooks/stripe";
 
-const jsonRequest = (url: string, body: string, contentLength?: number) =>
+const jsonRequest = (url: string, body: string) =>
   new Request(url, {
     body,
-    headers: {
-      "Content-Type": "application/json",
-      ...(contentLength === undefined
-        ? {}
-        : { "Content-Length": String(contentLength) }),
-    },
+    headers: { "Content-Type": "application/json" },
     method: "POST",
   });
 
 describe("legacy Pages input handling", () => {
-  it("returns a controlled AI error for a JSON null body", async () => {
+  it("advertises AI as unavailable when authenticated Worker bindings are absent", async () => {
+    const response = await handleAi({
+      env: { OPENROUTER_API_KEY: "test-key" },
+      params: { path: "status" },
+      request: new Request("https://example.test/api/ai/status"),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      configured: false,
+      unavailableReason: expect.stringContaining(
+        "authenticated community Worker",
+      ),
+    });
+  });
+
+  it("fails the legacy Pages AI chat route closed", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "null"),
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      configured: true,
-      reply: "Choose one of the supported free OpenRouter models.",
+      configured: false,
+      reply:
+        "AI Draw requires the authenticated community Worker and is unavailable on this legacy Pages deployment.",
     });
   });
 
-  it.each([
-    [
-      "products",
-      "GET",
-      "https://example.test/api/stripe/products",
-      handleRetiredPayment,
-    ],
-    [
-      "checkout",
-      "POST",
-      "https://example.test/api/stripe/checkout",
-      handleRetiredPayment,
-    ],
-    [
-      "session",
-      "GET",
-      "https://example.test/api/stripe/session?session_id=legacy",
-      handleRetiredPayment,
-    ],
-    [
-      "webhook",
-      "POST",
-      "https://example.test/api/webhooks/stripe",
-      handleRetiredWebhook,
-    ],
-  ])(
-    "returns a provider-free 410 tombstone for retired %s requests",
-    async (_label, method, url, handler) => {
-      const response = await handler({
-        request: new Request(url, {
-          body: method === "GET" ? undefined : "{}",
-          headers:
-            method === "GET"
-              ? undefined
-              : { "Content-Type": "application/json" },
-          method,
-        }),
-      });
-      expect(response.status).toBe(410);
-      expect(response.headers.get("cache-control")).toBe("no-store");
-      await expect(response.json()).resolves.toMatchObject({
-        error: { code: "payments_retired" },
-      });
-    },
-  );
-
-  it("returns a controlled 400 response for malformed AI JSON", async () => {
+  it("returns controlled AI responses for malformed input without parsing the body", async () => {
     const response = await handleAi({
       env: { OPENROUTER_API_KEY: "test-key" },
       params: { path: "chat" },
       request: jsonRequest("https://example.test/api/ai/chat", "{"),
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
-      reply: "Invalid JSON request body.",
+      reply: expect.stringContaining("authenticated community Worker"),
     });
   });
 
-  it("rejects declared oversized AI bodies with 413", async () => {
-    const response = await handleAi({
-      env: { OPENROUTER_API_KEY: "test-key" },
-      params: { path: "chat" },
-      request: jsonRequest("https://example.test/api/ai/chat", "{}", 1_000_001),
-    });
-    expect(response.status).toBe(413);
-  });
+  it.each([
+    ["catalog", handleLegacyApi, "https://example.test/api/stripe/products"],
+    ["checkout", handleLegacyApi, "https://example.test/api/stripe/checkout"],
+    [
+      "webhook",
+      handleLegacyWebhook,
+      "https://example.test/api/webhooks/stripe",
+    ],
+  ])(
+    "retires the legacy Pages %s endpoint with no provider call",
+    async (_label, handler, url) => {
+      const response = await handler({
+        request: new Request(url, {
+          body: JSON.stringify({ card: "must-not-be-read" }),
+          method: "POST",
+        }),
+      });
+
+      expect(response.status).toBe(410);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "route_decommissioned" },
+      });
+    },
+  );
 });

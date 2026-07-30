@@ -1,20 +1,21 @@
-# Roadmap — Living The Grid Repaint Studio
+# Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-04-27
+**Last Updated:** 2026-07-19
 
 ---
 
 ## Phase Overview
 
-| Phase | Title                   | Status      | Description                                                                                               |
-| ----- | ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| 0     | JSON Fixture Inspection | ✅ Complete | Inspect the real Living The Grid JSON and finalize the import adapter                                     |
-| 1     | JSON Round-Trip         | Current     | Import JSON → normalize to GridDocument → render canvas → export JSON                                     |
-| 2     | Palette Panel           | In Progress | Usage counts, color locking, manual merges, palette editing                                               |
-| 3     | One-Click Optimizer     | In Progress | Deterministic color merging, island removal, cleanup passes                                               |
-| 4     | Image Upload            | In Progress | Framing, background cleanup, tone controls, color limiting, and palette quantization from uploaded images |
-| 5     | Reference Pack Export   | Planned     | Download complete reference packs with guide, palette sheet, and JSON                                     |
-| 6     | AI Suggestions          | Partial     | OpenRouter chat/sketch tab exists; future work can add merge, contrast, and paint-order suggestions       |
+| Phase | Title                      | Status                  | Description                                                                                                  |
+| ----- | -------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 0     | JSON Fixture Inspection    | ✅ Complete             | Inspect the real Living The Grid JSON and finalize the import adapter                                        |
+| 1     | JSON Round-Trip            | ✅ Complete             | Import JSON → normalize to GridDocument → render canvas → export JSON                                        |
+| 2     | Palette Panel              | ✅ Complete             | Usage counts, color locking, manual merges, and palette reference                                            |
+| 3     | One-Click Optimizer        | ✅ Complete             | Deterministic color merging, island removal, cleanup passes, and palette limiting                            |
+| 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
+| 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
+| 6     | AI Suggestions             | Chat implemented; image prototype gated | Account-gated advice/sketch review remains; a dedicated generated-artwork import path is local-only and not deployed |
+| 7     | Island Workshop Community  | Writable single-account staging; final release gates open | Staging runs exact runtime `80fdcd5`; branch checkpoint `b34f821` is runtime-equivalent, but exact-head P1 evidence and P2-P5 hosted acceptance remain incomplete |
 
 ---
 
@@ -39,7 +40,7 @@
 
 ---
 
-## Phase 1: JSON Round-Trip (Current)
+## Phase 1: JSON Round-Trip
 
 **Goal:** Full import → edit → export cycle using the native GridDocument format.
 
@@ -61,11 +62,11 @@
 
 **Completed:**
 
-- [x] 84-color Tomodachi Life: Living the Dream palette data (`palette.ts`)
+- [x] Original 84-color Studio working-palette data (`palette.ts`)
 - [x] Color usage counts and percentage display
 - [x] Color lock/unlock toggle
 - [x] Manual merge mode (click source → click target)
-- [x] Game palette reference grid (11×7 + saturated row)
+- [x] Studio palette reference grid (11×7 + saturated row)
 - [x] Hover-to-highlight on canvas
 
 ---
@@ -85,7 +86,7 @@
 
 ---
 
-## Phase 4: Image Upload
+## Phase 4: Image Import
 
 **Goal:** Convert character references, face photos, logos/marks, memes, and other uploaded images into palette-limited grids.
 
@@ -99,7 +100,7 @@
 - [x] Aspect-preserving framing modes: fill, fit, stretch
 - [x] Focus X/Y controls for face and subject positioning
 - [x] Draggable source-image subject target for faster face positioning
-- [x] Mii Mask, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 import presets
+- [x] Face Paint, Character 64, Face 96, Character 128, Sprite 32, Logo 64, Sticker 64, Icon 16, Full 64, and Pixel 256 import presets
 - [x] Photo vs Pixel/Logo sampling modes for smoother portraits and sharper local character/logo assets
 - [x] Retain the last uploaded source image for settings changes
 - [x] Reprocess retained images without reopening the file picker
@@ -109,15 +110,17 @@
 - [x] Non-destructive image preview with commit/cancel controls
 - [x] 28 original starter templates for face guides, mascot heads, space-crew suits, tiny dinos, cute monsters, horror mascots, bald schoolhouse teachers, masked villains, pumpkin ghouls, sheet ghosts, vampires, zombies, spooky clowns, heart stickers, star badges, compact icons, portrait busts, cap heroes, adventurers, speed mascots, arcade fighters, space helmets, robot faces, letter marks, controller icons, racing karts, pizza slices, and sword badges
 - [x] Saved native JSON fixtures for all creative templates (`fixtures/creative-templates/`, regenerated with `pnpm save:templates`)
-- [x] Blank starter canvases for Mii mask, character, sprite, sticker, icon, and full-image work
+- [x] Blank starter canvases for Face Paint, character, sprite, sticker, icon, and full-image work
 - [x] Inspect, pencil, eraser, eyedropper, and fill bucket tools for manual creation/touch-up
 - [x] Canvas detail controls to resample current grids to 64, 96, 128, 256, or 2x dimensions without overflowing the workspace
 - [x] Pure placement and background-cleanup coverage (`scripts/verify-image-import.ts`)
 - [x] Browser smoke coverage for creation tools, local character assets, generated mascot/sprite/emblem/sticker/icon fixtures, JPG, AVIF, LTG JSON, unsupported files, preview commit, and export downloads (`scripts/verify-studio-browser.ts`)
 
-**Remaining:**
+**Optional refinement:**
 
-- [ ] Full crop rectangle / pan-and-zoom crop controls
+- [ ] Add finer pan-and-zoom controls inside the implemented draggable crop
+      rectangle when user testing shows the current crop and focus controls are
+      insufficient.
 
 ---
 
@@ -131,12 +134,10 @@
 - [x] PNG guide export (with grid lines and labels)
 - [x] Clean PNG export (without overlays)
 - [x] HTML reference page export
-
-**Remaining:**
-
-- [ ] Palette sheet image (swatches with labels and IDs)
-- [ ] Step-by-step painting order suggestion
-- [ ] ZIP bundle of all files
+- [x] Palette sheet PNG with labels and working-palette IDs
+- [x] Paint-order CSV sorted by usage
+- [x] ZIP reference pack with guides, project JSON, palette sheet, paint order,
+      source notes, manifest, and HTML reference
 
 ---
 
@@ -144,22 +145,51 @@
 
 **Goal:** Optional AI-powered suggestions that the user explicitly accepts or rejects.
 
-**Completed:**
+**Existing chat path:**
 
 - [x] Server-side OpenRouter proxy routes (`/api/ai/status`, `/api/ai/models`, `/api/ai/chat`) so API keys stay out of the browser bundle
-- [x] AI tab in Studio with 25 OpenRouter model presets, custom model entry, chat history, local saved sessions, sketch mode, and current-grid summary toggle
+- [x] Account-gated AI tab with four curated free presets, per-user bounded local history, sketch/advice modes, explicit current-grid consent, and model-capability/output-budget gates
 - [x] Optional visual grid snapshot context so image-capable models can inspect the current canvas before proposing a sketch
-- [x] Applyable AI sketch JSON path that converts palette-ID rows into a normal undoable `GridDocument`
+- [x] Reviewable AI sketch JSON path that validates palette-ID rows and applies one normal, undoable `GridDocument` revision
 - [x] Fenced/loose JSON recovery for models that wrap valid sketch JSON in Markdown
 - [x] AI sketch validation coverage (`scripts/verify-ai-sketch.ts`) and browser smoke coverage for the AI tab
-- [x] Local session persistence in browser `localStorage`; no database is required for single-device private chat history
+- [x] Per-account session persistence in browser `localStorage`; no database is required for single-device private chat history
 - [x] OpenRouter model-comparison script (`pnpm compare:models`) that saves ranked-model outputs to `reports/` when `OPENROUTER_API_KEY` is configured
+
+**Why the image path is separate:**
+
+- [x] Live staging diagnosis reproduced the failure: a free chat model returned
+      prose plus malformed 16-by-16 sketch JSON, which validation rejected.
+- [x] Confirmed that `openrouter/free` is a text-output router, not an image
+      generator.
+- [x] Complete the local dedicated Images API candidate with exact allowlist
+      default `google/gemini-3.1-flash-lite-image` and explicit fallback
+      `google/gemini-3.1-flash-image`, exposed only through the unreleased
+      `GET /api/ai/images/status` and `POST /api/ai/images` Worker routes.
+- [x] Prove bounded provider bytes feed the existing alpha-aware canonical
+      256-by-256 import review without mutating, saving, uploading, or publishing
+      before explicit commit.
+- [x] Prove authentication, same-Origin JSON, edge throttling, D1 idempotency,
+      per-user daily reservation, environment budget, timeout, MIME/signature,
+      and stale-reservation behavior.
+- [x] Run the original-art two-model benchmark with a hard aggregate spend cap
+      of $2.00 and no committed or uploaded benchmark images.
+- [x] Pass local Worker, browser, accessibility, CSP/console, privacy/log,
+      build, and migration verification.
+- [ ] Request a separate immutable exact-head staging deployment and acceptance
+      gate. Production remains disabled and requires a later independent gate.
+
+See
+[AI image-generation prototype gate](ai-image-generation-gate.md) for the
+complete contract and acceptance matrix.
 
 **Principles:**
 
 - AI is a **suggestion layer only** — never a hidden automatic editor.
 - Every AI suggestion is presented as a preview that the user can accept, modify, or dismiss.
 - The user always has the final say.
+- Generated artwork is also an import source, not a special save or publish
+  path; provider bytes are discarded when review ends.
 
 **Potential features:**
 
@@ -168,7 +198,99 @@
 - Generate a "painting order" that minimizes brush changes.
 - Auto-detect and suggest removal of compression artifacts.
 - Let models propose localized edits to the current grid instead of replacing the full document.
-- Optional future database only if the app adds accounts, cross-device sync, shared team sessions, or public galleries.
+- Keep AI chat history browser-local unless a later privacy review explicitly
+  approves opt-in cloud sync; account-backed project sync and public galleries
+  use the separate Island Workshop data model.
+
+---
+
+## Phase 7: Island Workshop Community
+
+**Goal:** Preserve anonymous local Studio use while adding explicit opt-in
+accounts, private cloud projects, publishing, discovery, social tools, and
+human-authorized moderation.
+
+**Implemented and locally/CI tested:**
+
+- [x] Unified Hono Worker with Static Assets, D1, private R2, KV, Images, rate
+      limits, scheduled maintenance, dynamic documents, AI compatibility, and
+      provider-free `410 Gone` tombstones for retired payment routes
+- [x] Google authorization-code OIDC, onboarding, hashed opaque sessions,
+      generated avatars, avatar regeneration, optional normalized profile
+      images, profile/settings, export, and deletion lifecycle
+- [x] Explicit first private save, IndexedDB resume/sync metadata, autosave,
+      offline/conflict states, immutable project revisions, quotas, and media
+      generation
+- [x] Review-before-publish flow, public/unlisted visibility, project-download
+      control, profiles, search, tags, recent/popular discovery, sharing, and
+      normalized showcase images
+- [x] Likes, comments, follows, reports, reversible moderation, legal/community
+      documents, structured redacted logs, and retention jobs
+- [x] ADRs, threat model, data-flow documentation, OpenAPI contract, forward-only
+      migrations `0001` through `0008`, release guards, Worker integration
+      tests, and responsive/accessibility coverage
+- [x] Direct local Chromium 200 percent page-scale regression with keyboard
+      focus and no document-level overflow
+- [x] Retire checkout, tips, paid recovery, and consultations; keep the AI
+      Action Plan beta free and mark the possible one-time $5 creator plan as
+      gated product direction, not an offer for sale
+
+**Accepted on isolated staging:**
+
+- [x] Exact runtime source
+      `80fdcd5da432b88d06d84bfd084e9f0993edc363` deployed as Cloudflare
+      deployment `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
+      `c56f580f-2238-4775-846d-3d2c08f17c78`, with community mutations enabled
+      only on isolated staging; authenticated Studio, account navigation, share
+      review, security, crawler, accessibility, CSP, and isolation checks pass
+- [x] Authenticated single-account profile setup and Terms reacceptance,
+      generated/custom avatar lifecycle, private cloud restore, showcase-image
+      lifecycle, generated-avatar fallback, and empty moderation workspace
+- [x] Studio single-canvas painting plus browser-local Guided Copy reference
+      lifecycle without an unintended cloud revision
+- [x] Anonymous API/security/crawler, CSP/font, responsive browser,
+      accessibility, local-only Studio stroke/undo, zero-write D1, and rollback
+      checks
+- [x] Last unchanged-homepage acceptance: 2,185 ms median LCP, 0.00 CLS, and
+      100 Accessibility/Best Practices Lighthouse scores
+- [ ] Final exact-head Studio performance closeout: branch checkpoint
+      `b34f821373657ccf8e5d38401af6c4ff255fc65c` differs from deployed
+      `80fdcd5` only by documentation and test configuration, but the release
+      rule still requires fresh immutable exact-head cold, restored-draft,
+      cloud-load, interaction, and mobile evidence. Earlier hosted records are
+      supporting evidence only.
+
+**Remaining approval gates:**
+
+- [ ] Complete P1 on one final exact-head staging deployment with Worker-hosted
+      cold, restored-draft, authenticated cloud-load, live Create,
+      accessibility, CSP/console, crawler, and mobile-performance acceptance
+- [x] Implement and locally prove the fail-closed writable hosted harness and
+      secret-free live-auth runner with production-host refusal, fixed
+      route/write/byte ceilings, private `0600` approval binding, exact D1/R2
+      key/size/SHA-256 reconciliation, HMAC-attested loopback enumeration, two
+      ephemeral browser contexts, and D1-confirmed session revocation
+- [ ] Run those tools on the next exact staging SHA with a fresh private
+      approval and a distinct approved second Google identity; no remote
+      writable/two-session run is approved or complete yet
+- [ ] Distinct second-user cross-account, social, report, moderation, and
+      destructive account-lifecycle acceptance
+- [x] Exact branch preview
+      `https://02e85e33.mii-pixelart.pages.dev` and green owned PR checks for
+      checkpoint `b34f821`; this does not substitute for exact-head Worker
+      acceptance
+- [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
+      cutover, admin bootstrap, writable enablement, rollback drill, and soak
+
+Production `tomodachi.pw` remains on Cloudflare Pages at exact source
+`c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
+`b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. No production Worker or isolated
+production resources exist; checked-in production IDs remain placeholders.
+The accepted staging deployment enables community mutations only in isolated
+staging for its approved single-account scope. Payments and consultations are
+retired everywhere, and no roadmap status grants approval for production. See
+`docs/release-evidence/2026-07-16-payment-retirement.md` and the remaining gates
+in `docs/production-readiness-plan.md`.
 
 ---
 

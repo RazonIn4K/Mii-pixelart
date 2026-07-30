@@ -831,7 +831,7 @@ export const ISLAND_FACILITY_PLANS: IslandFacilityPlan[] = [
     id: "palette-house",
     name: "Palette House",
     purpose:
-      "Store face-paint guides, palette sheets, and repaint notes for each resident.",
+      "Store Face Paint guides, palette sheets, and repaint notes for each resident.",
     unlocksAfter: "welcome-edition",
   },
   {
@@ -890,7 +890,7 @@ export const RESIDENT_CREATION_STEPS: ResidentCreationStep[] = [
     id: "encode-pixel-art",
     title: "Encode Pixel Art",
     output:
-      "Make the face-paint motif represent the concept instead of only decorating.",
+      "Make the Face Paint motif represent the concept instead of only decorating.",
   },
   {
     id: "add-study-loop",
@@ -902,7 +902,7 @@ export const RESIDENT_CREATION_STEPS: ResidentCreationStep[] = [
     id: "export-pack",
     title: "Export Resident Pack",
     output:
-      "Include JSON, HTML feature sheet, face-paint guide, palette sheet, credits, and fan-made note.",
+      "Include JSON, HTML feature sheet, Face Paint guide, palette sheet, credits, and fan-made note.",
   },
 ];
 

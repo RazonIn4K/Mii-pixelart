@@ -1,0 +1,45 @@
+title = "Tomodachi Studio secret-detection extensions"
+
+[extend]
+path = "/gitleaks.toml"
+
+[allowlist]
+description = "Verified deterministic test and browser-storage literals"
+regexTarget = "match"
+regexes = [
+  '''OIDC_COOKIE_KEY:[ \t]*["']AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA["']''',
+  '''PSEUDONYM_KEY:[ \t]*["']pseudonym-key-a1b2c3d4e5f6g7h8i9j0k1l2["']''',
+  '''AI_CONSENT_STORAGE_KEY[ \t]*=[ \t]*["']ltg\.ai\.consent\.v1["']''',
+]
+
+[[rules]]
+id = "tomodachi_openrouter_api_key"
+title = "OpenRouter API key"
+description = "Detects an OpenRouter API key committed to the repository."
+remediation = "Revoke and rotate the key, then move the replacement to the approved secret manager."
+keywords = ["sk-or-v1-"]
+regex = '''\bsk-or-v1-[A-Za-z0-9]{32,}\b'''
+
+[[rules]]
+id = "tomodachi_stripe_webhook_secret"
+title = "Stripe webhook signing secret"
+description = "Detects a Stripe webhook signing secret committed to the repository."
+remediation = "Roll the endpoint signing secret with overlap, update the approved secret manager, verify a signed probe, and revoke the old value."
+keywords = ["whsec_"]
+regex = '''\bwhsec_[A-Za-z0-9]{16,}\b'''
+
+[[rules]]
+id = "tomodachi_runpod_api_key_assignment"
+title = "Runpod API key assignment"
+description = "Detects a high-confidence Runpod API key assignment without assuming an undocumented provider-wide token shape."
+remediation = "Revoke and rotate the key, then store the replacement only in the approved secret manager."
+keywords = ["RUNPOD_API_KEY"]
+regex = '''(?i)RUNPOD_API_KEY[ \t]{0,16}[:=][ \t]{0,16}["']?[A-Za-z0-9_-]{20,}'''
+
+[[rules]]
+id = "tomodachi_n8n_webhook_url_assignment"
+title = "N8N webhook endpoint assignment"
+description = "Detects a credential-bearing N8N webhook URL assigned to an environment-style variable."
+remediation = "Rotate or replace the webhook path, update downstream callers, and keep the endpoint in the approved secret manager."
+keywords = ["N8N_", "WEBHOOK_URL"]
+regex = '''(?i)N8N_[A-Z0-9_]*WEBHOOK_URL[ \t]{0,16}[:=][ \t]{0,16}["']?https://[A-Za-z0-9.-]+/(webhook|webhook-test)/[A-Za-z0-9_-]{16,}'''

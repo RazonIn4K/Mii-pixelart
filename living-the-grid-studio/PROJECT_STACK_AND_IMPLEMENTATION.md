@@ -2,7 +2,26 @@
 
 Generated: 2026-05-20
 
+Last reconciled with the Worker branch: 2026-07-16
+
 This document is the single source-of-truth overview for what the current project uses, how the code is organized, how the pixel-art studio works internally, which visuals are included, and how the local/deployed app connects to AI, exports, security, and the retired-payment compatibility boundary.
+
+> **Runtime status:** `codex/island-workshop-community` targets one Cloudflare
+> Worker (Hono) with Worker Static Assets, D1, private R2, KV, Images, rate-limit
+> bindings, and scheduled cleanup. Exact source
+> `1bded7eda46f9be9f9a184656e535256467919d4` is accepted on the isolated
+> staging Worker for the approved authenticated single-account scope with
+> community mutations enabled only on staging. Payments, tips, recovery-product
+> sales, and consultations are retired.
+> Post-gate Studio refinements on the current branch are not deployed.
+> Production `tomodachi.pw` still
+> serves the rollback-safe Cloudflare Pages deployment; record its exact
+> immutable deployment and source at the production cutover gate rather than
+> carrying a stale commit identifier here. Pages Functions references explain
+> that active production/rollback surface. The authoritative decision is
+> [ADR 0001](docs/adr/0001-workers-community-platform.md), and deployment,
+> migration, cutover, and rollback steps live in the
+> [community deployment runbook](docs/community-deployment-runbook.md).
 
 The project is a browser-first React/TypeScript studio for turning images, JSON files, AI sketches, and starter templates into repaintable Tomodachi Life: Living the Dream style pixel guides. The important product idea is not only "make pixels"; it is "make a grid a person can repaint square by square without guessing."
 
@@ -16,22 +35,22 @@ The repo document is the code-facing implementation map. The Obsidian atlas is t
 
 ## 1. Current Purpose
 
-Tomodachi Studio currently combines four product lanes:
+Tomodachi Studio currently combines five product lanes:
 
 1. **Pixel-art repaint studio**
    - Import photos, character art, logos, memes, or JSON.
-   - Convert them into a grid backed by Tomodachi palette color IDs.
+   - Convert them into a grid backed by Studio working-palette color IDs.
    - Preview before commit.
    - Touch up with paint tools.
    - Optimize colors/noise for hand repainting.
    - Export JSON, PNG guides, palette sheets, paint-order notes, and reference packs.
 
-2. **Tomodachi Life Mii mask workflow**
+2. **Tomodachi Life Face Paint and workshop reference workflow**
    - Face-oriented import presets.
    - Subject focus controls.
    - Background flattening.
    - 64x64, 96x96, 128x128, and 256x256 detail paths.
-   - Starter canvases and character/mask templates.
+   - Starter canvases and original face, portrait, character, and object templates.
 
 3. **AI-assisted pixel sketching**
    - Local browser chat sessions.
@@ -41,10 +60,19 @@ Tomodachi Studio currently combines four product lanes:
    - Palette-ID validation before an AI sketch is converted into a `GridDocument`.
 
 4. **Public website support**
-   - Home, studio, guides, FAQ, help, legal, AI Action Plan, and non-payment support pages.
-   - Provider-free `410 Gone` tombstones for retired payment clients.
-   - Cloudflare Pages deployment with Pages Functions.
+   - Home, studio, guides, FAQ, help, legal, AI Action Plan, and no-payment support pages.
+   - A free AI Action Plan beta; a possible one-time $5 creator plan is product direction only and is not for sale.
+   - Provider-free `410 Gone` tombstones for retired checkout and webhook routes.
+   - Current production Pages rollback plus the branch's Worker parity routes.
    - Security headers, robots policy, crawler controls, and Cloudflare security helper scripts.
+
+5. **Opt-in account and community platform**
+   - Google OIDC, onboarding, private cloud projects, revision-aware autosave,
+     publishing, discovery, profiles, and generated media.
+   - Likes, comments, follows, reports, account export/deletion, and role-gated
+     moderation.
+   - D1 is authoritative for identity and access; immutable project/media
+     objects live in private R2. Anonymous Studio use remains local-first.
 
 ## 2. High-Level Architecture
 
@@ -78,30 +106,36 @@ flowchart TD
   AI --> ApiAI["/api/ai/*"]
   ApiAI --> OpenRouter["OpenRouter"]
 
-  SitePages --> RetiredPayment["Retired payment paths"]
-  RetiredPayment --> Gone["Provider-free 410 Gone"]
+  SitePages --> AiPlan["Free /ai-plan beta"]
+  LegacyPayment["Retired payment paths"] --> Gone["Provider-free 410 Gone"]
 
-  BrowserBuild["Vite build output"] --> CloudflarePages["Cloudflare Pages"]
-  Functions["Cloudflare Pages Functions"] --> ApiAI
-  Functions --> RetiredPayment
-  CloudflarePages --> Headers["Security headers + robots"]
+  BrowserBuild["Cloudflare Vite build"] --> Worker["Unified Worker + Static Assets"]
+  Worker --> ApiAI
+  Worker --> LegacyPayment
+  Worker --> Community["Auth + projects + discovery + social + moderation"]
+  Community --> D1["D1 relational authority"]
+  Community --> R2["Private R2 projects/media"]
+  Worker --> Headers["Dynamic + static security headers"]
+
+  Worker --> Staging["staging.tomodachi.pw\napproved scope exact 1bded7e"]
+  LegacyPages["Current production and rollback\nCloudflare Pages"] --> Live["tomodachi.pw until approved cutover"]
 ```
 
 ## 3. Layer Model For This Project
 
 This is how the user's abstraction-layer thinking maps onto the actual codebase.
 
-| Layer                        | What It Means Here                                                                                           | Concrete Project Pieces                                                                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| L0 Domain/game context       | Tomodachi Life: Living the Dream workflow, Palette House repainting, Mii face masks, character/fan-art grids | Product copy, guide pages, import presets, palette naming, starter templates                                                               |
-| L1 Source inputs             | Raw files and source ideas                                                                                   | Image files, AVIF/JPG/PNG/WebP/BMP/GIF, LTG JSON, starter templates, AI chat prompts                                                       |
-| L2 Core data model           | The normalized repaintable representation                                                                    | `GridDocument`, palette IDs, row-major `cells`, metadata, locked colors                                                                    |
-| L3 Engine logic              | Pure transformations that do not depend on React                                                             | `grid.ts`, `image-import.ts`, `json-io.ts`, `optimizer.ts`, `canvas-renderer.ts`, `color.ts`, `palette.ts`, `templates.ts`, `ai-sketch.ts` |
-| L4 UI state and interactions | How the user edits the document                                                                              | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools                                                            |
-| L5 Local browser persistence | State that stays in this browser only                                                                        | AI chat sessions in `localStorage`, consent state, no database in V1                                                                       |
-| L6 API/runtime services      | Server or edge endpoints                                                                                     | Vite dev middleware, Express server, Cloudflare Pages Functions                                                                            |
-| L7 External integrations     | Services outside the app                                                                                     | OpenRouter, Cloudflare KV, Have I Been Pwned password range API                                                                            |
-| L8 Deployment/security/ops   | How it runs publicly and stays controlled                                                                    | Cloudflare Pages, `wrangler.toml`, `_headers`, `robots.txt`, Cloudflare Bot Management helper, Doppler-managed secrets                     |
+| Layer                        | What It Means Here                                                                                            | Concrete Project Pieces                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| L0 Domain/game context       | Tomodachi Life: Living the Dream Face Paint options, Palette House workshop creations, and manual Copy Guides | Product copy, guide pages, import presets, palette naming, starter templates                                                                           |
+| L1 Source inputs             | Raw files and source ideas                                                                                    | Image files, AVIF/JPG/PNG/WebP/BMP/GIF, LTG JSON, starter templates, AI chat prompts                                                                   |
+| L2 Core data model           | The normalized repaintable representation                                                                     | `GridDocument`, palette IDs, row-major `cells`, metadata, locked colors                                                                                |
+| L3 Engine logic              | Pure transformations that do not depend on React                                                              | `grid.ts`, `image-import.ts`, `json-io.ts`, `optimizer.ts`, `canvas-renderer.ts`, `color.ts`, `palette.ts`, `templates.ts`, `ai-sketch.ts`             |
+| L4 UI state and interactions | How the user edits the document                                                                               | `useGridDocument`, `Studio.tsx`, panels, undo/redo, preview/commit, paint tools                                                                        |
+| L5 Persistence               | Local state plus explicit opt-in cloud state                                                                  | IndexedDB/local storage for drafts and AI sessions; cloud project bytes only after an explicit account save                                            |
+| L6 API/runtime services      | Server or edge endpoints                                                                                      | Unified Hono Worker for local/deployed APIs, dynamic documents, and scheduled jobs; legacy Pages/Express helpers retained for rollback parity          |
+| L7 External integrations     | Services outside the app                                                                                      | OpenRouter, Cloudflare KV, Have I Been Pwned password range API                                                                                        |
+| L8 Deployment/security/ops   | How it runs publicly and stays controlled                                                                     | Worker Static Assets, `wrangler.jsonc`, isolated D1/R2/KV bindings, `_headers`, Worker security middleware, Doppler-managed secrets, and gated cutover |
 
 ## 4. Repository Layout
 
@@ -116,10 +150,14 @@ living-the-grid-studio/
       sitemap-images.xml
       manifest.webmanifest
       hero.webp
-      canvas-demo.webp
+      canvas-demo-v2.webp
+      island-creator-collective.webp
+      community-empty-state.webp
+      community-search-empty.webp
+      community-og.jpg
       empty-state.webp
       palette-swatches.webp
-      og-image.png
+      brand-mark.svg
       icon-192.png
       icon-512.png
       icon-maskable.png
@@ -135,24 +173,43 @@ living-the-grid-studio/
       lib/
         engine/
       contexts/
-  functions/
+  functions/                  # Legacy Pages rollback Functions
     _middleware.ts
     api/
       ai/[[path]].ts
-      stripe/[[path]].ts
-      webhooks/stripe.ts
-  server/
+      stripe/[[path]].ts      # Provider-free 410 tombstone
+      webhooks/stripe.ts      # Provider-free 410 tombstone
+  server/                     # Shared AI helper retained for parity
     index.ts
     openrouter.ts
   shared/
     ai.ts
+    community.ts
     residents.ts
+  worker/                     # Unified branch runtime
+    index.ts
+    auth.ts
+    accounts.ts
+    creations.ts
+    discovery.ts
+    social.ts
+    moderation.ts
+    scheduled.ts
+  migrations/                 # Forward-only D1 schema
+    0001_community.sql
+    0002_comment_locks.sql
+    0003_atomic_quota_reservations.sql
+    0004_preserve_moderation_state.sql
+  config/
+    deployment-readiness.example.json
   fixtures/
     living-the-grid-real.json
     ltg-indexed-palette-sample.json
     sample-grid-document.json
     creative-templates/
   scripts/
+    verify-openapi-routes.ts
+    verify-migrations.ts
     verify-ltg-import.ts
     verify-image-import.ts
     verify-creative-templates.ts
@@ -162,37 +219,42 @@ living-the-grid-studio/
     compare-openrouter-models.ts
     cloudflare-security-insights.ts
     save-creative-template-fixtures.ts
-    sync-cloudflare-worker-secrets.sh
+    verify-bundle-budgets.ts
+    worker-release.ts
   package.json
   vite.config.ts
+  vitest.config.ts
+  vitest.preflight.config.ts
   tsconfig.json
-  wrangler.toml
+  wrangler.jsonc
 ```
 
 ## 5. Main Technologies Being Used
 
-| Area             | Tooling                         | How It Is Used                                                                        |
-| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
-| Language         | TypeScript                      | Shared across client, engine, server helpers, Cloudflare Functions, and scripts       |
-| Frontend         | React 19                        | Studio UI, pages, panels, editor state display                                        |
-| Routing          | `wouter`                        | Lightweight route map in `client/src/App.tsx`                                         |
-| Build/dev server | Vite 7                          | React dev server, middleware API proxy, build output to `dist/public`                 |
-| Styling          | Tailwind CSS v4                 | Global styles in `client/src/index.css`; utility styling throughout components        |
-| UI primitives    | Radix UI family                 | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes         |
-| Icons            | `lucide-react`                  | Studio toolbar icons, panel actions, import/export affordances                        |
-| Canvas           | HTML Canvas 2D                  | Grid renderer, image sampling, PNG export, palette sheet generation                   |
-| Image import     | Browser canvas APIs             | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels |
-| Color matching   | CIELAB + CIE76 Delta E          | Match source pixels to the closest Tomodachi palette color                            |
-| State            | React state + `useGridDocument` | Holds `GridDocument`, image preview, undo/redo history, stroke transactions           |
-| AI               | OpenRouter Chat Completions     | Model picker, chat, optional image snapshot, applyable sketch JSON                    |
-| Payments         | Retired compatibility routes    | Legacy catalog, checkout, session, and webhook paths return provider-free `410 Gone`  |
-| ZIP export       | JSZip                           | Bundles reference-pack assets into one downloadable archive                           |
-| Edge hosting     | Cloudflare Pages                | Static site plus Pages Functions                                                      |
-| Edge functions   | Cloudflare Pages Functions      | `/api/ai/*` plus retired-payment tombstone routes                                     |
-| Edge cache       | Cloudflare KV                   | OpenRouter model list cache through `EDGE_CACHE` binding                              |
-| Security         | Cloudflare + response headers   | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                   |
-| Secrets          | Doppler / env vars              | OpenRouter and Cloudflare tokens are expected from environment, not committed         |
-| Verification     | `pnpm verify` scripts           | Type-checking and fixture-based verification                                          |
+| Area                | Tooling                             | How It Is Used                                                                                               |
+| ------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Language            | TypeScript                          | Shared across client, engine, Worker, compatibility helpers, and scripts                                     |
+| Frontend            | React 19                            | Studio UI, pages, panels, editor state display                                                               |
+| Routing             | `wouter`                            | Lightweight route map in `client/src/App.tsx`                                                                |
+| Build/dev server    | Vite 7 + Cloudflare Vite plugin     | React development through the Worker runtime; emits Static Assets and a Worker bundle                        |
+| Styling             | Tailwind CSS v4                     | Global styles in `client/src/index.css`; utility styling throughout components                               |
+| UI primitives       | Radix UI family                     | Buttons, tabs, sliders, selects, tooltips, scroll areas, switches, checkboxes                                |
+| Icons               | `lucide-react`                      | Studio toolbar icons, panel actions, import/export affordances                                               |
+| Canvas              | HTML Canvas 2D                      | Grid renderer, image sampling, PNG export, palette sheet generation                                          |
+| Image import        | Browser canvas APIs                 | Decode images, crop/frame/focus, filter brightness/contrast/saturation, sample pixels                        |
+| Color matching      | CIELAB + CIE76 Delta E              | Match source pixels to the closest Studio working-palette color                                              |
+| State               | React state + `useGridDocument`     | Holds `GridDocument`, image preview, undo/redo history, stroke transactions                                  |
+| AI                  | OpenRouter Chat Completions         | Model picker, chat, optional image snapshot, applyable sketch JSON                                           |
+| Payments            | Retired compatibility routes        | Legacy product, checkout, session, and webhook paths return provider-free `410 Gone`                         |
+| ZIP export          | JSZip                               | Bundles reference-pack assets into one downloadable archive                                                  |
+| Target hosting      | Cloudflare Workers + Static Assets  | SPA, dynamic documents, APIs, and scheduled jobs in one deployment unit                                      |
+| Production rollback | Current Cloudflare Pages deployment | Record its exact immutable identity at cutover and retain it through the Worker soak                         |
+| Edge runtime        | Hono Worker                         | AI compatibility, retired-payment tombstones, auth, account, project, discovery, social, and moderation APIs |
+| Data/storage        | D1 + private R2                     | Relational authorization state plus immutable validated projects and generated media                         |
+| Edge cache/media    | Cloudflare KV + Images              | Bounded OpenRouter cache and deterministic generated preview transformation                                  |
+| Security            | Cloudflare + response headers       | CSP, HSTS, robots, bot/crawler policies, AI crawler blocking helper                                          |
+| Secrets             | Doppler / env vars                  | OpenRouter and Cloudflare tokens are expected from environment, not committed                                |
+| Verification        | `pnpm verify` scripts               | Type-checking and fixture-based verification                                                                 |
 
 ## 6. App Entry And Routing
 
@@ -222,10 +284,10 @@ Routes are declared with `wouter`:
 | `/guides`               | `Guides`     | Guide content                      |
 | `/faq`                  | `Faq`        | FAQ                                |
 | `/about`                | `About`      | About                              |
-| `/ai-plan`              | `AiPlan`     | Free AI beta and future direction  |
-| `/unlock`               | `Redirect`   | Legacy alias to `/ai-plan`         |
-| `/support`              | `Support`    | Non-payment project support        |
-| `/donate`               | `Support`    | Alias route                        |
+| `/ai-plan`              | `AiPlan`     | Free AI next-step plan beta        |
+| `/unlock`               | redirect     | Legacy alias to `/ai-plan`         |
+| `/support`              | `Support`    | No-payment project support         |
+| `/donate`               | `Support`    | Legacy alias to no-payment support |
 | `/404`                  | `NotFound`   | Explicit 404                       |
 | fallback                | `NotFound`   | Unknown route                      |
 
@@ -251,7 +313,7 @@ Important implementation rules:
 - `cells` is a flat row-major array, not a nested 2D grid.
 - Each painted cell stores a palette color ID such as `R10C1`, not a raw hex value.
 - `null` means empty/transparent/unpainted.
-- `palette` is the Tomodachi palette.
+- `palette` is the Studio's original 84-color working palette.
 - `usedColors` is derived from current cells.
 - `lockedColors` protects colors from optimizer passes.
 - `meta.sourceMetadata` is used to preserve imported information, including Living The Grid metadata and optional resident specs.
@@ -267,7 +329,7 @@ flowchart LR
   XY["x,y coordinate"] --> Index["row-major index"]
   Index --> Cell["cells[index]"]
   Cell --> PaletteID["palette ID or null"]
-  PaletteID --> Swatch["Tomodachi palette swatch"]
+  PaletteID --> Swatch["Studio palette swatch"]
 ```
 
 ### Core Grid Helpers
@@ -432,7 +494,7 @@ Data:
 
 | Preset        |    Size | Important Settings                                   |
 | ------------- | ------: | ---------------------------------------------------- |
-| Mii Mask      |   64x64 | face focus high, background flatten, moderate colors |
+| Face Paint    |   64x64 | face focus high, background flatten, moderate colors |
 | Character 64  |   64x64 | crisp sampling, stronger contrast/saturation         |
 | Face 96       |   96x96 | more facial detail, background flatten               |
 | Character 128 | 128x128 | higher detail, more colors                           |
@@ -578,7 +640,7 @@ Examples:
 Current caveat:
 
 - The palette has row/column, hex, RGB, and display names.
-- It does not yet include complete in-game H/S/B press-count recipes as first-class fields.
+- It does not claim or include verified in-game color recipes; row and column IDs are Studio planning conventions.
 
 ## 13. Canvas Rendering And Coordinate Mapping
 
@@ -674,12 +736,12 @@ The templates are original/generic starter designs, not direct copyrighted sprit
 
 ### Current Template Categories
 
-| Category        | Examples                                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------------------- |
-| People & Masks  | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face                                                 |
-| Characters      | Mascot Head, Space Crew, Tiny Dino, Cute Monster, Red Cap Hero, Green Adventurer, Blue Speed Mascot                 |
-| Horror & Spooky | Haunted Mascot, Bald Teacher, Masked Slasher, Pumpkin Ghoul, Ghost Sheet, Vampire Count, Zombie Buddy, Creepy Clown |
-| Marks & Objects | Heart Sticker, Star Badge, Smile Icon, Letter Mark, Controller Icon, Racing Kart, Pizza Slice, Sword Badge          |
+| Category          | Examples                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Faces & Portraits | Face Guide, Portrait Bust, Arcade Fighter, Space Helmet, Robot Face                                                 |
+| Characters        | Mascot Head, Space Crew, Tiny Dino, Cute Monster, Red Cap Hero, Green Adventurer, Blue Speed Mascot                 |
+| Horror & Spooky   | Haunted Mascot, Bald Teacher, Masked Slasher, Pumpkin Ghoul, Ghost Sheet, Vampire Count, Zombie Buddy, Creepy Clown |
+| Marks & Objects   | Heart Sticker, Star Badge, Smile Icon, Letter Mark, Controller Icon, Racing Kart, Pizza Slice, Sword Badge          |
 
 ### Template Flow
 
@@ -704,8 +766,9 @@ AI code is split between client, shared types, and API helpers.
 | `shared/ai.ts`                             | Shared request/response/model/sketch TypeScript types and model presets             |
 | `client/src/lib/engine/ai-sketch.ts`       | Converts validated AI sketch rows into a `GridDocument`                             |
 | `server/openrouter.ts`                     | Shared OpenRouter request, prompt, model list, parsing, salvage logic               |
-| `functions/api/ai/[[path]].ts`             | Cloudflare Pages Function for deployed `/api/ai/*`                                  |
-| `vite.config.ts`                           | Vite middleware for local `/api/ai/*`                                               |
+| `worker/legacy.ts`                         | Unified Worker AI routes plus provider-free `410 Gone` retired-payment tombstones   |
+| `functions/api/ai/[[path]].ts`             | Legacy Pages Function retained for the production rollback deployment               |
+| `vite.config.ts`                           | Cloudflare Vite plugin entry for the local Worker runtime                           |
 
 ### AI Session Storage
 
@@ -715,9 +778,10 @@ AI sessions are saved in browser `localStorage` under:
 ltg.ai.sessions.v1
 ```
 
-The app keeps up to 20 sessions. This is intentionally local-first. There is no database for V1, which means:
+The app keeps up to 20 AI chat sessions. This remains intentionally local-first;
+the community D1 database does not store these chat transcripts. This means:
 
-- Good: no account system needed.
+- Good: AI sessions do not require an account.
 - Good: private sketches/chats stay in the browser unless sent to OpenRouter.
 - Limitation: no cross-device sync.
 - Limitation: clearing browser storage removes sessions.
@@ -726,7 +790,8 @@ The app keeps up to 20 sessions. This is intentionally local-first. There is no 
 
 The user can choose:
 
-- Model preset or custom OpenRouter model ID.
+- One of the curated free OpenRouter model presets. The picker and the
+  server-side allowlist reject custom, arbitrary, and paid model IDs.
 - Include current grid summary.
 - Include current grid PNG snapshot.
 - Request applyable sketch JSON.
@@ -805,10 +870,7 @@ interface QuestHook {
   id: string;
   title: string;
   trigger:
-    | "residentChat"
-    | "districtBridge"
-    | "relationshipConflict"
-    | "studySession";
+    "residentChat" | "districtBridge" | "relationshipConflict" | "studySession";
   input: string;
   artifactType:
     | "truthTable"
@@ -884,31 +946,35 @@ The HTML reference includes:
 - Palette swatches.
 - Full project JSON in a `<pre>` block.
 
-### Known Export Copy Drift
+### Export Copy Alignment
 
-Some older crawler-shell/public-copy text may still refer to a PDF reference pack. The actual implemented export path currently generates a ZIP containing PNG, JSON, CSV, text notes, manifest JSON, and HTML. PDF export is not implemented in the current code.
+Crawler-shell and public product copy now describe the implemented ZIP reference pack: PNG, JSON, CSV, text notes, manifest JSON, and HTML. PDF export is not implemented or advertised.
 
 ## 19. Public Visual Assets
 
 These are the raster/static assets in `client/public/`.
 
-| Asset                   | Used For                             |
-| ----------------------- | ------------------------------------ |
-| `hero.webp`             | Public homepage hero/branding visual |
-| `canvas-demo.webp`      | Studio/demo visual                   |
-| `empty-state.webp`      | Empty state illustration             |
-| `palette-swatches.webp` | Palette preview visual               |
-| `og-image.png`          | OpenGraph/social card image          |
-| `icon-192.png`          | PWA/app icon                         |
-| `icon-512.png`          | PWA/app icon                         |
-| `icon-maskable.png`     | Maskable PWA icon                    |
-| `manifest.webmanifest`  | PWA metadata                         |
-| `ads.txt`               | Ad network declaration               |
-| `robots.txt`            | Search/AI crawler policy             |
-| `sitemap.xml`           | Page sitemap                         |
-| `sitemap-images.xml`    | Image sitemap                        |
-| `_headers`              | Cloudflare Pages HTTP headers        |
-| `_redirects`            | Cloudflare Pages redirects           |
+| Asset                            | Used For                                          |
+| -------------------------------- | ------------------------------------------------- |
+| `hero.webp`                      | Public homepage hero/branding visual              |
+| `canvas-demo-v2.webp`            | Original workshop-robot grid demo                 |
+| `island-creator-collective.webp` | Discover community hero artwork                   |
+| `community-empty-state.webp`     | General community empty states                    |
+| `community-search-empty.webp`    | Search-specific empty states                      |
+| `community-og.jpg`               | Default OpenGraph/social card image               |
+| `empty-state.webp`               | Empty state illustration                          |
+| `palette-swatches.webp`          | Palette preview visual                            |
+| `brand-mark.svg`                 | Source artwork for installed-app icons            |
+| `icon-192.png`                   | PWA/app icon                                      |
+| `icon-512.png`                   | PWA/app icon                                      |
+| `icon-maskable.png`              | Maskable PWA icon                                 |
+| `manifest.webmanifest`           | PWA metadata                                      |
+| `ads.txt`                        | Ad network declaration                            |
+| `robots.txt`                     | Search/AI crawler policy                          |
+| `sitemap.xml`                    | Page sitemap                                      |
+| `sitemap-images.xml`             | Image sitemap                                     |
+| `_headers`                       | Static-asset headers (and Pages rollback headers) |
+| `_redirects`                     | Static redirects retained for Pages rollback      |
 
 ### Embedded Asset Preview Paths
 
@@ -916,57 +982,84 @@ These links render when the Markdown viewer supports local relative images:
 
 ![Hero image](client/public/hero.webp)
 
-![Canvas demo](client/public/canvas-demo.webp)
+![Canvas demo](client/public/canvas-demo-v2.webp)
+
+![Creator collective](client/public/island-creator-collective.webp)
 
 ![Palette swatches](client/public/palette-swatches.webp)
 
-![OpenGraph image](client/public/og-image.png)
+![OpenGraph image](client/public/community-og.jpg)
 
-## 20. Cloudflare Pages, Functions, And Security
+## 20. Cloudflare Worker, Pages Rollback, And Security
 
 ### Deployment Config
 
-`wrangler.toml` defines:
+`wrangler.jsonc` is the Worker configuration source of truth. Its core shape is:
 
-```toml
-name = "tomodachi-studio"
-compatibility_date = "2025-05-01"
-compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "dist/public"
-PUBLIC_SITE_URL = "https://tomodachi.pw"
+```jsonc
+{
+  "name": "tomodachi-studio",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2025-05-01",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/creation/*", "/u/*", "..."],
+  },
+}
 ```
 
-It also declares the KV namespace binding:
+Local, staging, and production environments declare isolated D1, private R2,
+KV, Images, rate-limit, OAuth, and secret bindings. The compatibility date is
+intentionally held for parity and must be advanced in a separate verified
+change.
 
-```toml
-[[kv_namespaces]]
-binding = "EDGE_CACHE"
-id = "5129b5ce8d2d435cb704b398a437f355"
-```
+`enable_request_signal` makes an incoming browser disconnect observable through
+`request.signal`, allowing a canceled AI request to abort the corresponding
+OpenRouter fetch instead of consuming provider time until the Worker deadline.
 
-### Pages Functions
+### Unified Worker Routes
 
-| Route                  | File                               | Purpose                                                                  |
-| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| `/api/ai/status`       | `functions/api/ai/[[path]].ts`     | Report whether OpenRouter key is configured                              |
-| `/api/ai/models`       | `functions/api/ai/[[path]].ts`     | Return model presets with optional OpenRouter availability, cached in KV |
-| `/api/ai/chat`         | `functions/api/ai/[[path]].ts`     | Send chat/sketch requests to OpenRouter                                  |
-| `/api/stripe/*`        | `functions/api/stripe/[[path]].ts` | Return provider-free `410 Gone` for retired payment clients              |
-| `/api/webhooks/stripe` | `functions/api/webhooks/stripe.ts` | Return provider-free `410 Gone` for retired webhook deliveries           |
+`worker/index.ts` registers one policy boundary for:
 
-### Edge Middleware
+| Route group                             | Primary module                               | Purpose                                              |
+| --------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
+| `/api/ai/*`                             | `worker/legacy.ts`                           | Preserve the AI compatibility API in the Worker      |
+| `/api/stripe/*`, `/api/webhooks/stripe` | `worker/legacy.ts`                           | Return provider-free `410 Gone` for retired payments |
+| `/api/auth/*`, `/api/me/*`              | `worker/auth.ts`, `worker/accounts.ts`       | OIDC, sessions, onboarding, export, deletion         |
+| `/api/creations/*`                      | `worker/creations.ts`, `worker/media.ts`     | Private revisions, generated media, publishing       |
+| discovery/search/profile routes         | `worker/discovery.ts`, `worker/documents.ts` | Public data and safe dynamic metadata                |
+| social/report routes                    | `worker/social.ts`                           | Likes, comments, follows, and reports                |
+| moderation routes                       | `worker/moderation.ts`                       | Role-gated moderation transitions                    |
+| scheduled handler                       | `worker/scheduled.ts`                        | Cleanup, deletion, retention, and popularity work    |
 
+### Legacy Pages Rollback Compatibility
+
+Production still serves the current Cloudflare Pages deployment. Its
+`functions/api/*` handlers and `functions/_middleware.ts` remain in the tree so
+that production and the rollback deployment continue to provide AI, crawler,
+and retired-payment `410 Gone` behavior while the Worker is staged and soaked. They are
+not a second target implementation for new community features. The cutover
+procedure records the then-current immutable Pages deployment and source rather
+than relying on this architecture map for release identity.
+
+On the branch, `worker/documents.ts` serves safe crawler/public-profile/creation
+documents and delegates ordinary SPA assets to `ASSETS`. On the Pages rollback,
 `functions/_middleware.ts` serves crawler-specific HTML shells:
 
 - Social crawlers get compact OpenGraph/Twitter metadata.
 - Search crawlers get static text, internal links, and JSON-LD.
 - Regular users get the normal SPA.
 
-The middleware sets `Vary: User-Agent` so crawler shells do not get mixed with browser responses.
+Both paths keep crawler responses separated from normal browser assets and
+escape dynamic metadata before placing it in HTML.
 
 ### HTTP Security Headers
 
-`client/public/_headers` configures:
+`client/public/_headers` configures Static Asset and Pages rollback responses.
+The Worker applies the aligned policy to dynamic responses in code. The policy
+includes:
 
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
@@ -975,7 +1068,8 @@ The middleware sets `Vary: User-Agent` so crawler shells do not get mixed with b
 - `Strict-Transport-Security`
 - `X-DNS-Prefetch-Control`
 - `Content-Security-Policy`
-- `Content-Security-Policy-Report-Only` for Trusted Types observation
+- no Trusted Types report-only header until a real reporting endpoint and
+  `report-to` policy are available; the enforced CSP remains active
 - long immutable cache for `/assets/*`
 - no-cache for `/index.html`
 - no-store for `/api/*`
@@ -1028,87 +1122,101 @@ CLOUDFLARE_ZONE_NAME
 
 The user has indicated these are managed through Doppler.
 
-## 21. Retired Payments And AI Action Plan
+## 21. Retired Payments And AI Action Plan Scope
 
-Tomodachi no longer accepts payments, tips, recovery-product purchases, or
-consultation bookings. The catalog, checkout/session provider client, webhook
-processing, client redirect guard, payment secrets, and provider CSP origins
-were removed.
+Tomodachi does not currently sell recovery products, accept tips, or book
+consultations. The Stripe product catalog and provider client were removed.
+Legacy product, checkout, session, and webhook paths remain temporarily in both
+the Worker and Pages rollback surface as provider-free `410 Gone` tombstones.
+They use no payment binding, never call a payment provider, and prevent an old
+bookmark or client bundle from receiving a misleading SPA `200` response.
 
-Historic `/api/stripe/*` and `/api/webhooks/stripe` paths remain as temporary,
-provider-free `410 Gone` tombstones in Pages, Express, and Vite development.
-They use no payment credentials, perform no outbound request, and prevent a
-stale client from receiving a misleading SPA response.
+`/ai-plan` now offers a free beta that turns a visitor's situation into a
+practical next-step plan. A possible one-time $5 creator plan is explicitly
+product direction, not an available offer. It must remain unsellable until a
+separate decision and implementation add account-bound entitlements,
+authoritative fulfillment and usage state, refund/revocation handling, privacy
+and legal updates, and end-to-end acceptance. The legacy `/unlock` route
+redirects to `/ai-plan`; `/support` contains no-payment ways to help.
 
-`/ai-plan` exposes the current free AI action-plan beta. A distinct one-time $5
-creator plan is documented only as product direction and is not for sale. It
-requires a new architecture, entitlement, refund, privacy, usage-limit, and
-fulfillment gate before any payment provider can be reintroduced.
+The operational retirement sequence also includes deactivating provider-side
+payment links and webhook endpoints, expiring practical open sessions, removing
+environment secrets, and revoking only credentials confirmed to be exclusive
+to this project. Historical release records remain unchanged evidence of the
+former implementation.
 
 ## 22. Local Development Runtime
 
 The main scripts are in `package.json`.
 
-| Command                             | Purpose                                                   |
-| ----------------------------------- | --------------------------------------------------------- |
-| `pnpm install`                      | Install dependencies                                      |
-| `pnpm dev`                          | Start Vite dev server on port 3000 or next available port |
-| `pnpm build`                        | Build Vite app and bundle Express server                  |
-| `pnpm start`                        | Run production Express server from `dist/index.js`        |
-| `pnpm preview`                      | Preview Vite build                                        |
-| `pnpm check`                        | TypeScript check                                          |
-| `pnpm verify`                       | Type-check plus core verification scripts                 |
-| `pnpm verify:studio`                | Browser-style studio verification script                  |
-| `pnpm cloudflare:security-insights` | Cloudflare security audit/helper                          |
-| `pnpm compare:models`               | Compare OpenRouter model behavior                         |
-| `pnpm save:templates`               | Save creative template fixtures                           |
+| Command                             | Purpose                                                      |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `pnpm install`                      | Install dependencies                                         |
+| `pnpm dev`                          | Start Vite dev server on port 3000 or next available port    |
+| `pnpm build`                        | Build Worker Static Assets and the unified Worker bundle     |
+| `pnpm start` / `pnpm preview`       | Preview the Vite/Worker build locally                        |
+| `pnpm check`                        | TypeScript-check client/shared code and the Worker           |
+| `pnpm test:worker`                  | Run Worker integration tests with local bindings             |
+| `pnpm worker:dry-run:staging`       | Build and validate the staging artifact without deploying    |
+| `pnpm worker:dry-run:production`    | Build and validate the production artifact without deploying |
+| `pnpm verify`                       | Type-check plus contract, migration, and fixture checks      |
+| `pnpm verify:studio`                | Browser-style studio verification script                     |
+| `pnpm cloudflare:security-insights` | Cloudflare security audit/helper                             |
+| `pnpm compare:models`               | Compare OpenRouter model behavior                            |
+| `pnpm save:templates`               | Save creative template fixtures                              |
 
-### Vite Dev Middleware
+### Worker Development Runtime
 
-`vite.config.ts` adds local middleware for:
+`vite.config.ts` loads React before the Cloudflare Vite plugin, so local API,
+dynamic-document, scheduled-handler, and Static Asset behavior uses
+`worker/index.ts` rather than an Express approximation. Local bindings persist
+under `.wrangler/state`.
 
-- `/api/ai/status`
-- `/api/ai/models`
-- `/api/ai/chat`
-- `/api/stripe/*` (`410 Gone` tombstone)
-- `/api/webhooks/stripe` (`410 Gone` tombstone)
-
-This lets local development use the same endpoint shapes as Cloudflare Pages.
-
-### Manus Debug Tooling
-
-The Vite config includes Manus debug collector/runtime tooling only in dev mode. Production does not inject this runtime.
+The small `pagesRollbackAssets()` build plugin copies the client output to
+`dist/public` solely so the existing Pages project can continue building a
+rollback-compatible static artifact while the Worker migration is in progress.
 
 ## 23. Environment Variables And Secrets
 
-The project expects secrets from the shell, Doppler, Cloudflare Pages, or Wrangler, not from committed files.
+The project expects secrets from the shell/Doppler and target-specific
+Cloudflare secret bindings, not from committed files. Pages environment values
+apply only to the current rollback deployment.
 
-| Variable                                | Used By                           | Purpose                          |
-| --------------------------------------- | --------------------------------- | -------------------------------- |
-| `OPENROUTER_API_KEY`                    | AI API                            | Authenticate OpenRouter requests |
-| `PUBLIC_SITE_URL`                       | AI/Cloudflare                     | Referer and canonical site URL   |
-| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` | Cloudflare script                 | Bot/security config audit/apply  |
-| `CLOUDFLARE_ZONE_ID`                    | Cloudflare script                 | Optional direct zone lookup      |
-| `CLOUDFLARE_ZONE_NAME`                  | Cloudflare script                 | Defaults to `tomodachi.pw`       |
-| `EDGE_CACHE`                            | Cloudflare Pages Function binding | KV cache for OpenRouter models   |
+| Variable                                               | Used By                   | Purpose                                                              |
+| ------------------------------------------------------ | ------------------------- | -------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                   | AI API                    | Authenticate OpenRouter requests                                     |
+| `PUBLIC_SITE_URL`                                      | AI/Cloudflare             | Referer and canonical site URL                                       |
+| `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN`                | Cloudflare script         | Bot/security config audit/apply                                      |
+| `CLOUDFLARE_ZONE_ID`                                   | Cloudflare script         | Optional direct zone lookup                                          |
+| `CLOUDFLARE_ZONE_NAME`                                 | Cloudflare script         | Defaults to `tomodachi.pw`                                           |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`            | Worker OIDC               | Google authorization-code login                                      |
+| `OIDC_COOKIE_KEY` / `SESSION_PEPPER` / `PSEUDONYM_KEY` | Worker security           | Encrypted OIDC transaction, session hashing, privacy-preserving keys |
+| `DB`                                                   | Worker D1 binding         | Identity, authorization, creation, and community state               |
+| `PROJECTS`                                             | Worker private R2 binding | Immutable project and generated-media objects                        |
+| `EDGE_CACHE`                                           | Worker KV binding         | Bounded OpenRouter cache                                             |
+| `IMAGES`                                               | Worker Images binding     | Deterministic generated preview transcoding                          |
 
 ## 24. Verification Coverage
 
 Current verification scripts:
 
-| Script                         | What It Verifies                             |
-| ------------------------------ | -------------------------------------------- |
-| `verify-ltg-import.ts`         | Living The Grid fixture import compatibility |
-| `verify-image-import.ts`       | Image import path and options                |
-| `verify-creative-templates.ts` | Starter templates produce valid grid docs    |
-| `verify-ai-sketch.ts`          | AI sketch validation/conversion              |
-| `verify-residents.ts`          | Resident schema/spec validity                |
-| `verify-studio-browser.ts`     | Browser-style studio smoke path              |
+| Script                         | What It Verifies                                               |
+| ------------------------------ | -------------------------------------------------------------- |
+| `verify-openapi-routes.ts`     | Community OpenAPI methods/paths match registered Worker routes |
+| `verify-migrations.ts`         | Migrations 0001-0004 plus SQLite foreign-key/integrity checks  |
+| `verify-ltg-import.ts`         | Living The Grid fixture import compatibility                   |
+| `verify-image-import.ts`       | Image import path and options                                  |
+| `verify-creative-templates.ts` | Starter templates produce valid grid docs                      |
+| `verify-ai-sketch.ts`          | AI sketch validation/conversion                                |
+| `verify-residents.ts`          | Resident schema/spec validity                                  |
+| `verify-studio-browser.ts`     | Browser-style studio smoke path                                |
 
 `pnpm verify` runs:
 
 ```text
 pnpm check
+pnpm verify:openapi
+pnpm verify:migrations
 pnpm verify:ltg
 pnpm verify:image-import
 pnpm verify:templates
@@ -1116,7 +1224,8 @@ pnpm verify:ai-sketch
 pnpm verify:residents
 ```
 
-`verify:studio` is available separately.
+Worker integration, preflight, browser, and bundle suites remain separate as
+`test:worker`, `test:preflight`, `test:e2e`, and `verify:bundle`.
 
 ## 25. Fixtures
 
@@ -1180,6 +1289,9 @@ Based on the current code, these improvements are already implemented:
 - Brightness, contrast, saturation, crop, frame mode, focus, sampling mode, and color limits are part of import options.
 - Detail presets include 64, 96, 128, and 256 paths.
 - Manual pixel editing exists through pencil, eraser, eyedropper, fill, and inspect.
+- Copy Guide v1 produces deterministic one-based row runs, highlights the active
+  run on the same read-only canvas, and stores completion progress only in the
+  browser.
 - Drag painting groups into a single undo history entry.
 - Fast drag strokes use Bresenham interpolation.
 - Canvas detail can be upscaled/resampled after creation.
@@ -1196,16 +1308,16 @@ Based on the current code, these improvements are already implemented:
 
 These are the most useful next engineering targets.
 
-| Priority | Improvement                                                         | Why It Matters                                                                      |
-| -------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| P0       | Run full live browser verification after every import/export change | The studio is visual and file-based; browser proof matters more than static reading |
-| P1       | Add per-pass optimizer preview and change log                       | Makes optimization trustworthy instead of magical                                   |
-| P1       | Add repaintability score                                            | Shows why one grid is easier to paint than another                                  |
-| P2       | Add in-game H/S/B press-count data to `PaletteColor`                | Makes output more game-ready                                                        |
-| P2       | Add editable resident feature-sheet UI                              | Schema exists, but the studio UI tab is not currently active                        |
-| P2       | Move heavy image/optimizer/export work into a Web Worker            | Prevents UI blocking at 128x128 and 256x256                                         |
-| P2       | Add Playwright visual tests                                         | Pixel output and upload flows need browser-level regression checks                  |
-| P3       | Add optional local database/cloud sync only after V1                | Current AI sessions are local-first by design                                       |
+| Priority | Improvement                                                          | Why It Matters                                                                                                                                                                      |
+| -------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Complete approval-gated cross-user staging and launch checks         | Exact `1bded7e` single-account writable-staging acceptance passes; distinct-user boundaries, destructive lifecycle checks, merge, and production cutover remain independently gated |
+| P1       | Add per-pass optimizer preview and change log                        | Makes optimization trustworthy instead of magical                                                                                                                                   |
+| P1       | Add repaintability score                                             | Shows why one grid is easier to paint than another                                                                                                                                  |
+| P2       | Validate Studio colors against documented, legally usable references | Improves manual matching without claiming proprietary game data                                                                                                                     |
+| P2       | Add editable resident feature-sheet UI                               | Schema exists, but the studio UI tab is not currently active                                                                                                                        |
+| P2       | Move heavy image/optimizer/export work into a Web Worker             | Prevents UI blocking at 128x128 and 256x256                                                                                                                                         |
+| P2       | Add Playwright visual tests                                          | Pixel output and upload flows need browser-level regression checks                                                                                                                  |
+| P3       | Decide whether AI chat histories should ever opt into cloud sync     | Project sync now exists, but AI sessions intentionally remain browser-local                                                                                                         |
 
 ## 29. Implementation Constraints To Preserve
 
@@ -1217,6 +1329,7 @@ These constraints keep the project coherent:
 - Keep AI as a suggestion/sketch layer, not an unvalidated grid mutator.
 - Keep source image reprocessing non-destructive.
 - Keep preview separate from committed document state.
+- Keep anonymous edit/import/export local; first cloud save must remain explicit and private.
 - Keep secrets out of repo files.
 - Keep resident/source credits and fan-made/unaffiliated notes in exports.
 - Keep starter designs original/generic and let users adapt local assets themselves.

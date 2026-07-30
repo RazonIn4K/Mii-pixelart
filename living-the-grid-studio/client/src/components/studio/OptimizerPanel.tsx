@@ -25,9 +25,15 @@ export default function OptimizerPanel({
   onRunOptimizer,
   disabled,
 }: OptimizerPanelProps) {
-  const [mergeThreshold, setMergeThreshold] = useState(DEFAULT_CONFIG.mergeThreshold);
-  const [maxIslandSize, setMaxIslandSize] = useState(DEFAULT_CONFIG.maxIslandSize);
-  const [cleanupSingleCells, setCleanupSingleCells] = useState(DEFAULT_CONFIG.cleanupSingleCells);
+  const [mergeThreshold, setMergeThreshold] = useState(
+    DEFAULT_CONFIG.mergeThreshold,
+  );
+  const [maxIslandSize, setMaxIslandSize] = useState(
+    DEFAULT_CONFIG.maxIslandSize,
+  );
+  const [cleanupSingleCells, setCleanupSingleCells] = useState(
+    DEFAULT_CONFIG.cleanupSingleCells,
+  );
   const [maxColors, setMaxColors] = useState(0);
   const [limitPalette, setLimitPalette] = useState(false);
 
@@ -53,13 +59,14 @@ export default function OptimizerPanel({
       <div className="space-y-2 p-3 rounded-sm border border-border bg-card">
         <div className="flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <Label className="text-xs font-semibold">Merge Similar Colors</Label>
+          <p className="text-xs font-semibold">Merge Similar Colors</p>
         </div>
         <p className="text-xs text-muted-foreground">
           Merge colors with Delta E below threshold. Lower = stricter.
         </p>
         <div className="flex items-center gap-3">
           <Slider
+            aria-label="Color merge threshold"
             value={[mergeThreshold]}
             onValueChange={([v]) => setMergeThreshold(v)}
             min={1}
@@ -68,7 +75,9 @@ export default function OptimizerPanel({
             className="flex-1"
             disabled={disabled}
           />
-          <span className="text-xs font-mono w-8 text-right">{mergeThreshold}</span>
+          <span className="text-xs font-mono w-8 text-right">
+            {mergeThreshold}
+          </span>
         </div>
       </div>
 
@@ -76,13 +85,14 @@ export default function OptimizerPanel({
       <div className="space-y-2 p-3 rounded-sm border border-border bg-card">
         <div className="flex items-center gap-2">
           <Eraser className="w-3.5 h-3.5 text-primary" />
-          <Label className="text-xs font-semibold">Remove Islands</Label>
+          <p className="text-xs font-semibold">Remove Islands</p>
         </div>
         <p className="text-xs text-muted-foreground">
           Merge small isolated regions into surrounding colors.
         </p>
         <div className="flex items-center gap-3">
           <Slider
+            aria-label="Maximum island size"
             value={[maxIslandSize]}
             onValueChange={([v]) => setMaxIslandSize(v)}
             min={1}
@@ -91,7 +101,9 @@ export default function OptimizerPanel({
             className="flex-1"
             disabled={disabled}
           />
-          <span className="text-xs font-mono w-12 text-right">≤{maxIslandSize}px</span>
+          <span className="text-xs font-mono w-12 text-right">
+            ≤{maxIslandSize}px
+          </span>
         </div>
       </div>
 
@@ -100,11 +112,19 @@ export default function OptimizerPanel({
         <div className="flex items-center gap-2">
           <Shrink className="w-3.5 h-3.5 text-primary" />
           <div>
-            <Label className="text-xs font-semibold">Single-Cell Cleanup</Label>
-            <p className="text-xs text-muted-foreground">Remove lone isolated pixels</p>
+            <Label
+              htmlFor="optimizer-single-cell-cleanup"
+              className="text-xs font-semibold"
+            >
+              Single-Cell Cleanup
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Remove lone isolated pixels
+            </p>
           </div>
         </div>
         <Switch
+          id="optimizer-single-cell-cleanup"
           checked={cleanupSingleCells}
           onCheckedChange={setCleanupSingleCells}
           disabled={disabled}
@@ -116,9 +136,15 @@ export default function OptimizerPanel({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Palette className="w-3.5 h-3.5 text-primary" />
-            <Label className="text-xs font-semibold">Limit Palette</Label>
+            <Label
+              htmlFor="optimizer-limit-palette"
+              className="text-xs font-semibold"
+            >
+              Limit Palette
+            </Label>
           </div>
           <Switch
+            id="optimizer-limit-palette"
             checked={limitPalette}
             onCheckedChange={setLimitPalette}
             disabled={disabled}
@@ -131,6 +157,7 @@ export default function OptimizerPanel({
             </p>
             <div className="flex items-center gap-3">
               <Slider
+                aria-label="Maximum optimized palette colors"
                 value={[maxColors || currentColorCount]}
                 onValueChange={([v]) => setMaxColors(v)}
                 min={2}

@@ -3,14 +3,14 @@
  *
  * Top of the page: short teaser cards for the four recovery + studio guides.
  *   The CTA points at the matching free tool (studio, password check, help)
- *   and points to the free AI plan or non-payment support page.
+ *   and may point to the AI plan or project support page.
  *
  * Below: four full-length Tomodachi Life player guides, rendered inline so
  * Google indexes the actual content. Each guide has an anchor ID so it can
  * be deep-linked from elsewhere on the site or from external posts.
  *
  *   #mii-creation       — designing custom Miis
- *   #gameplay-basics    — apartments, food, jobs, marriage
+ *   #gameplay-basics    — legacy 3DS daily-play basics
  *   #breach-recovery    — what to do after the Tomodachishare incident
  *   #qr-and-backup      — QR codes, sharing, save backup
  */
@@ -59,14 +59,14 @@ const GUIDES: GuideCard[] = [
       "Free: a printable rotation order so you do the highest-value accounts first.",
     ],
     cta: { href: "/help", label: "Read the free 24-hour actions" },
-    upsell: { href: "/ai-plan", label: "Build a free AI action plan" },
+    upsell: { href: "/ai-plan", label: "Try the free AI Action Plan" },
   },
   {
     id: "mii-face-mask-from-image",
     icon: Sparkles,
-    title: "Turn a photo into a repaintable Mii face mask",
+    title: "Turn a photo into a custom Face Paint reference",
     summary:
-      "Walks through importing a face photo, choosing the right preset, and tuning the result so it actually paints square-by-square in-game.",
+      "Import a face photo locally, simplify it into editable pixel art, and use the result as a manual Copy Guide alongside Living the Dream's Face Paint tools.",
     audience:
       "Players who want a custom Mii based on a real face or character.",
     freePreview: [
@@ -105,7 +105,7 @@ const GUIDES: GuideCard[] = [
     cta: { href: "/", label: "Run the browser-only password check" },
     upsell: {
       href: "/ai-plan",
-      label: "Turn the steps into a free AI action plan",
+      label: "Pair it with a free AI Action Plan",
     },
   },
 ];
@@ -124,7 +124,7 @@ const LONG_GUIDES: LongGuide[] = [
     icon: ScanFace,
     title: "How to make custom Miis for Tomodachi Life",
     tagline:
-      "Mii Maker tricks, face presets, hair, eyes, eyebrows, and the small adjustments that take a Mii from 'okay' to 'looks like the person'.",
+      "A clearly labeled legacy 3DS Mii Maker workflow, plus where the separate Living the Dream creation paths fit.",
     body: (
       <>
         <p>
@@ -136,7 +136,19 @@ const LONG_GUIDES: LongGuide[] = [
         </p>
 
         <h4 className="font-semibold mt-4">
-          Start from a real face, not a blank slate
+          Choose the workflow for your game
+        </h4>
+        <p>
+          The steps below are for the original Tomodachi Life and Mii Maker on
+          Nintendo 3DS or 2DS. Tomodachi Life: Living the Dream is a separate
+          Nintendo Switch title released on April 16, 2026, with its own Get
+          Help and From Scratch creation paths. Tomodachi Studio does not
+          transfer projects into either title; its Copy Guide is a manual
+          reference.
+        </p>
+
+        <h4 className="font-semibold mt-4">
+          Legacy 3DS: start from a real face
         </h4>
         <p>
           The 3DS Mii Maker has a built-in "Look-Alike Mii" tool: from the home
@@ -148,10 +160,9 @@ const LONG_GUIDES: LongGuide[] = [
           else.
         </p>
         <p>
-          On a Wii U, use the same flow from the Mii Maker app via the GamePad
-          camera. On the Nintendo Switch (Tomodachi Life isn't on Switch, but
-          your Miis travel via QR), the System Settings Mii editor has the same
-          starting point.
+          On a Wii U, the comparable legacy flow starts in the Mii Maker app
+          with the GamePad camera. This QR-era workflow is distinct from Living
+          the Dream's Get Help and From Scratch tools on Nintendo Switch.
         </p>
 
         <h4 className="font-semibold mt-4">
@@ -217,15 +228,15 @@ const LONG_GUIDES: LongGuide[] = [
           exaggerates the same thing.
         </p>
         <p>
-          If you want to repaint the same face square-by-square as a pixel-art
-          Mii face mask (the in-game item that lets the Mii wear a custom
-          painted face), upload the source image into the{" "}
+          If you want to plan custom Face Paint from a photo or drawing, import
+          the source into the{" "}
           <Link className="underline" href="/studio">
             Tomodachi Studio
           </Link>{" "}
-          and run the import-to-grid flow. The studio handles the color
-          reduction and exports a paint-by-numbers reference you can follow in
-          the in-game editor without guessing.
+          and run the import-to-grid flow. The Studio handles color reduction
+          and exports a paint-by-numbers Copy Guide for manual recreation. It
+          does not transfer game files or claim Nintendo&apos;s exact palette or
+          canvas dimensions.
         </p>
       </>
     ),
@@ -233,109 +244,58 @@ const LONG_GUIDES: LongGuide[] = [
   {
     id: "gameplay-basics",
     icon: Gamepad2,
-    title:
-      "Tomodachi Life gameplay basics: apartments, food, jobs, friendship, marriage",
+    title: "Legacy 3DS Tomodachi Life: daily-play basics",
     tagline:
-      "The shortest path from 'I just got a Mii apartment' to a stable island with paired-up Miis, satisfied appetites, and steady cash flow.",
+      "A clearly labeled orientation for the original Nintendo 3DS/2DS game—not a guide to Living the Dream on Switch.",
     body: (
       <>
         <p>
-          Tomodachi Life looks like a chill sandbox but rewards a tiny bit of
-          structure. Here's the early-game loop that gets you out of the
-          unfocused phase fast.
-        </p>
-
-        <h4 className="font-semibold mt-4">Day one: the four daily checks</h4>
-        <ol className="list-decimal pl-5 space-y-1">
-          <li>
-            Open every Mii apartment that has a status icon (thought bubble,
-            sweat drop, food, etc.). The icon tells you what they want; ignoring
-            it slows their happiness growth.
-          </li>
-          <li>
-            Feed any Mii showing the food icon. Each Mii has favorites and
-            dislikes — favorites give "all-time best" reactions and boost
-            happiness faster than neutral foods.
-          </li>
-          <li>
-            Solve any "Problem" notification. Problems are short mini-events
-            (someone wants to confess, two Miis are fighting, a kid Mii is sick)
-            and they only run once.
-          </li>
-          <li>
-            Walk through the park, beach, and observation tower to trigger
-            random events. Many friendships and relationships start here, not in
-            the apartment.
-          </li>
-        </ol>
-
-        <h4 className="font-semibold mt-4">
-          Food: don't waste it on neutral reactions
-        </h4>
-        <p>
-          Every Mii has a hidden favorite-foods list. The first time you feed a
-          new food, the reaction tells you the grade: "I love it!" is favorite,
-          "It's all right." is neutral, "I don't like it." is dislike. Stop
-          feeding any food a Mii rated neutral or below — it costs money and
-          gives almost nothing back.
-        </p>
-        <p>
-          Cheap favorites are everywhere on the food list. You don't need to
-          spring for expensive items. The reaction grade is what matters, not
-          the price tag.
-        </p>
-
-        <h4 className="font-semibold mt-4">Jobs and cash flow</h4>
-        <p>
-          Money comes from three places: leveling up Miis (each level grants
-          coins), selling stuff from the suggestion box, and minigames triggered
-          by Mii requests. The suggestion box quietly accumulates value while
-          you ignore it — empty it weekly or it stops generating new items.
-        </p>
-        <p>
-          Don't hoard money. Every food you don't buy and every clothing item
-          you skip is a happiness boost the Mii doesn't get. The compound effect
-          on relationship progression is real.
+          This section describes the original Tomodachi Life on Nintendo
+          3DS/2DS. Tomodachi Life: Living the Dream is a separate Switch title
+          with different systems and creation tools.
         </p>
 
         <h4 className="font-semibold mt-4">
-          Friendship and relationship gating
+          Follow the requests the game presents
         </h4>
         <p>
-          Two Miis become friends after a series of triggered events when you
-          place them in the same apartment, send them to the park together, or
-          let them randomly bump into each other. A Mii can have many friends.
-        </p>
-        <p>
-          Romantic partners are stricter: a Mii has one "current crush" at a
-          time, and confession events fire when the crush meter is high enough.
-          You can nudge crushes by repeatedly placing two Miis in social
-          situations, but if the meter never fills it usually means a
-          personality mismatch — pair them with someone else.
+          Apartment icons and resident conversations are the original
+          game&apos;s clearest prompts. Open them, read the request, and decide
+          whether to help. There is no need to follow an invented optimization
+          schedule; the appeal is seeing different residents react in unexpected
+          ways.
         </p>
 
-        <h4 className="font-semibold mt-4">Marriage and the next generation</h4>
+        <h4 className="font-semibold mt-4">
+          Record discoveries instead of assuming them
+        </h4>
         <p>
-          Married couples can have a baby Mii after enough happy meals together.
-          Baby Miis grow up over real-world days, eventually become teenagers,
-          and at adulthood can either stay on your island or be sent traveling
-          (with a QR code you can save). This is the engine for long-running
-          islands: each generation introduces new face combinations that you
-          didn't design yourself.
+          Food and gift reactions vary by resident. Keep a small note or
+          screenshot of memorable reactions if you want consistency later,
+          rather than relying on universal favorites or guaranteed outcomes.
         </p>
 
-        <h4 className="font-semibold mt-4">When the island gets boring</h4>
+        <h4 className="font-semibold mt-4">
+          Let relationships unfold through game events
+        </h4>
         <p>
-          The classic mid-game slump hits around 40 Miis when every couple is
-          paired off and most personalities have been seen. Three good reset
-          moves: invite Miis from QR codes you haven't scanned (other people's
-          designs introduce new personality combos), redo the apartment
-          interiors in a coordinated theme (which renews the visual variety), or
-          start a side project of pixel-art Mii face masks in the{" "}
+          Friendships, arguments, confessions, and family events are presented
+          by the game. You can respond to a resident&apos;s request, but this
+          guide does not promise a hidden meter, a guaranteed pairing strategy,
+          or a specific event schedule.
+        </p>
+
+        <h4 className="font-semibold mt-4">
+          Preserve the island you care about
+        </h4>
+        <p>
+          Use the legacy QR and backup section below for original-game Mii
+          sharing and preservation. For art practice outside the game, create an
+          original resident-inspired pixel project in the{" "}
           <Link className="underline" href="/studio">
-            studio
+            Studio
           </Link>{" "}
-          so you can return with new wearable items.
+          and share it as community artwork without implying a game-file export.
         </p>
       </>
     ),
@@ -430,10 +390,10 @@ const LONG_GUIDES: LongGuide[] = [
           For a structured set of next steps you can review with a
           less-technical friend or family member, try the free{" "}
           <Link className="underline" href="/ai-plan">
-            AI Action Plan beta
-          </Link>
-          . Never include passwords, recovery codes, payment details, or other
-          secrets in an AI prompt.
+            AI Action Plan
+          </Link>{" "}
+          beta. Never include passwords, recovery codes, financial account
+          information, or other secrets in an AI prompt.
         </p>
       </>
     ),
@@ -441,16 +401,17 @@ const LONG_GUIDES: LongGuide[] = [
   {
     id: "qr-and-backup",
     icon: QrCode,
-    title: "Tomodachi Life QR codes, Mii sharing, and save backup",
+    title: "Legacy 3DS Tomodachi Life QR codes and save backup",
     tagline:
-      "How to share Miis with friends, scan QR codes from the wider community, and back up your save before the hardware finally dies.",
+      "A legacy 3DS/Wii U QR-sharing and save-preservation workflow, separate from Living the Dream on Nintendo Switch.",
     body: (
       <>
         <p>
-          Tomodachi Life shipped before the era of always-on cloud saves, which
-          means the responsibility for protecting your island sits with you. The
-          good news: QR codes and the SD card backup pathway are reliable if you
-          set them up before something breaks.
+          This section applies to the original Tomodachi Life on Nintendo 3DS or
+          2DS and its legacy Mii Maker QR workflow. Tomodachi Life: Living the
+          Dream is a separate Nintendo Switch title, and Tomodachi Studio does
+          not bridge save files or online sharing between either game. Verify
+          any backup pathway before changing or deleting source data.
         </p>
 
         <h4 className="font-semibold mt-4">Exporting a Mii as a QR code</h4>
@@ -532,9 +493,8 @@ const LONG_GUIDES: LongGuide[] = [
           even if the physical save doesn't.
         </p>
         <p>
-          If you want to recreate Mii face masks (custom painted faces worn by
-          Miis in-game) from photos or character art before you lose access, run
-          the source images through the{" "}
+          If you want to preserve a photo or character-art idea as an editable
+          Face Paint reference, run the source image through the{" "}
           <Link className="underline" href="/studio">
             Tomodachi Studio
           </Link>{" "}
@@ -558,19 +518,19 @@ const GUIDES_STRUCTURED_DATA = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to make custom Miis for Tomodachi Life",
+    name: "Legacy 3DS workflow for making custom Miis for Tomodachi Life",
     description:
-      "Step-by-step process for designing recognizable custom Miis: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants in Mii Maker before they're locked into the game save.",
+      "A legacy Nintendo 3DS Mii Maker workflow: start with the Look-Alike camera tool, dial in eyes and mouth before hair, and save iteration variants before importing into the original Tomodachi Life.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#mii-creation",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     totalTime: "PT15M",
     step: [
       {
         "@type": "HowToStep",
         position: 1,
-        name: "Start from a Look-Alike Mii, not a blank slate",
-        text: "Open Mii Maker on the 3DS, choose Start from Scratch, then Look-Alike Mii. Use the camera to seed the head shape and skin tone. Output is almost always wrong but faster to fix than to build from blank.",
+        name: "Legacy 3DS: start from a Look-Alike Mii",
+        text: "For the original Tomodachi Life workflow, open Mii Maker on the 3DS, choose Start from Scratch, then Look-Alike Mii. Use the camera output as a rough starting point before manual edits.",
       },
       {
         "@type": "HowToStep",
@@ -595,13 +555,12 @@ const GUIDES_STRUCTURED_DATA = [
   {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline:
-      "Tomodachi Life gameplay basics: apartments, food, jobs, friendship, marriage",
+    headline: "Legacy 3DS Tomodachi Life: daily-play basics",
     description:
-      "Beginner walkthrough of the core daily loop in Tomodachi Life — what to check each day, how to read food reactions, how friendship and crush gating actually works, and how to keep an island interesting past 40 Miis.",
+      "A clearly labeled orientation for the original Nintendo 3DS/2DS Tomodachi Life, with cautious daily-play and preservation guidance distinct from Living the Dream on Switch.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#gameplay-basics",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     author: {
       "@type": "Organization",
       name: "Tomodachi",
@@ -613,7 +572,7 @@ const GUIDES_STRUCTURED_DATA = [
       url: "https://tomodachi.pw/",
       logo: {
         "@type": "ImageObject",
-        url: "https://tomodachi.pw/og-image.png",
+        url: "https://tomodachi.pw/icon-512.png",
       },
     },
   },
@@ -626,7 +585,7 @@ const GUIDES_STRUCTURED_DATA = [
       "Hour-by-hour breach recovery plan for Tomodachishare users: which password to change first, which 2FA method to pick, how to assess Nintendo Network ID exposure, and a 30-day monitoring rhythm.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#breach-recovery",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     author: {
       "@type": "Organization",
       name: "Tomodachi",
@@ -638,19 +597,19 @@ const GUIDES_STRUCTURED_DATA = [
       url: "https://tomodachi.pw/",
       logo: {
         "@type": "ImageObject",
-        url: "https://tomodachi.pw/og-image.png",
+        url: "https://tomodachi.pw/icon-512.png",
       },
     },
   },
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "Tomodachi Life QR codes, Mii sharing, and save backup",
+    name: "Legacy 3DS Tomodachi Life QR codes, Mii sharing, and save backup",
     description:
-      "How to export Miis as QR codes from a 3DS or Wii U, scan QR codes from the wider community into Tomodachi Life, and back up a Tomodachi Life save before the hardware dies.",
+      "A legacy workflow for exporting Miis as QR codes from a 3DS or Wii U, scanning those QR codes into the original Tomodachi Life, and preserving its save data.",
     inLanguage: "en",
     url: "https://tomodachi.pw/guides#qr-and-backup",
-    image: "https://tomodachi.pw/og-image.png",
+    image: "https://tomodachi.pw/community-og.jpg",
     totalTime: "PT10M",
     step: [
       {
@@ -684,7 +643,7 @@ const GUIDES_STRUCTURED_DATA = [
 export default function Guides() {
   useDocumentTitle(
     "Guides",
-    "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.",
+    "Free walkthroughs on Mii creation, legacy 3DS Tomodachi Life basics, Tomodachishare breach recovery, and QR codes + save backup.",
   );
   useStructuredData(GUIDES_STRUCTURED_DATA);
 
@@ -709,8 +668,9 @@ export default function Guides() {
             Practical walkthroughs for the people we actually serve: Tomodachi
             Life players turning faces and characters into Mii repaint plans,
             and visitors arriving from the Tomodachishare breach notice. Every
-            guide gives you the working actions for free, with optional links to
-            the free AI beta when a structured checklist would help.
+            guide gives you the useful actions for free. When you want a
+            personalized checklist, the free AI Action Plan beta can help you
+            decide what to do next.
           </p>
           <nav
             aria-label="Jump to guide"
@@ -765,8 +725,8 @@ export default function Guides() {
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
-                {/* Buttons stack vertically so longer guide labels remain
-                    readable at narrow card widths. */}
+                {/* Buttons always stack vertically inside the card so longer
+                    action labels remain readable at narrow card widths. */}
                 <div className="mt-auto flex flex-col gap-2 pt-2">
                   <Button
                     asChild
@@ -833,23 +793,27 @@ export default function Guides() {
               <footer className="pt-2 text-xs text-muted-foreground">
                 Found this helpful?{" "}
                 <Link href="/support" className="underline">
-                  Test another workflow or send feedback
+                  Test another workflow
                 </Link>{" "}
-                to help improve the next guide.
+                or{" "}
+                <Link href="/ai-plan" className="underline">
+                  try the free AI Action Plan
+                </Link>{" "}
+                and send useful feedback.
               </footer>
             </article>
           );
         })}
 
         <section className="border-t border-border pt-6">
-          <h2 className="text-lg font-semibold">Help keep guides free</h2>
+          <h2 className="text-lg font-semibold">Help improve the next guide</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every guide here stays free. The most useful support is testing a
-            real workflow and sharing clear feedback through{" "}
+            Every guide here is free. Use the workflows, then share specific
+            feedback through{" "}
             <Link href="/support" className="underline">
               /support
-            </Link>
-            .
+            </Link>{" "}
+            so the next revision solves a real problem.
           </p>
         </section>
       </main>

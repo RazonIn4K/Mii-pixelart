@@ -15,14 +15,14 @@ const SUPPORT_ACTIONS = [
   },
   {
     description:
-      "Use the free AI beta and tell us which recommendations were useful, unclear, or missing.",
-    href: "/ai-plan",
+      "Publish original work when community sharing opens and help other creators learn from a clear reference.",
+    href: "/discover",
     icon: Share2,
-    label: "Test the AI plan",
+    label: "Share a creation",
   },
   {
     description:
-      "Report reproducible bugs or accessibility problems without including private account data.",
+      "Report reproducible bugs or accessibility problems in the public repository without including private account data.",
     href: "https://github.com/RazonIn4K/Mii-pixelart/issues",
     icon: Bug,
     label: "Report an issue",
@@ -41,7 +41,8 @@ const SUPPORT_ACTIONS = [
 export default function Support() {
   useDocumentTitle(
     "Support Tomodachi",
-    "Help improve Tomodachi by testing the Studio and reporting useful feedback. No payments or tips are accepted.",
+    "Help improve Tomodachi by testing the Studio, sharing original creations, and reporting useful feedback.",
+    { canonicalPath: "/support" },
   );
   useStructuredData([
     breadcrumbFor([
@@ -51,60 +52,93 @@ export default function Support() {
   ]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border">
+    <div className="min-h-screen bg-[var(--island-paper)] text-[var(--island-ink)]">
+      <header className="border-b border-[var(--island-ink)]/10 bg-white/75">
         <div className="container flex items-center justify-between py-4">
-          <Link href="/" className="text-sm font-medium hover:underline">
+          <Link href="/" className="text-sm font-extrabold hover:underline">
             ← Tomodachi
           </Link>
-          <Heart className="h-5 w-5 text-primary" aria-hidden="true" />
+          <Heart
+            className="h-5 w-5 text-[var(--island-coral)]"
+            aria-hidden="true"
+          />
         </div>
       </header>
 
       <main id="main-content" className="container max-w-5xl py-12 sm:py-16">
         <section className="mx-auto max-w-3xl text-center">
-          <p className="section-header">Support the workshop</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">
+          <p className="island-kicker">Support the workshop</p>
+          <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] sm:text-6xl">
             The most useful support is using it.
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
-            Tomodachi does not currently accept payments, tips, donations, or
-            consultation bookings. Testing the real workflow and sharing clear
-            feedback helps more than a checkout ever could.
+          <p className="mx-auto mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--island-muted-ink)]">
+            Test a real drawing workflow, share original creations, and send
+            clear feedback. Specific examples help turn rough edges into a
+            workshop that is easier for everyone to use.
           </p>
         </section>
 
         <div className="mt-12 grid gap-5 sm:grid-cols-2">
           {SUPPORT_ACTIONS.map(
-            ({ description, external, href, icon: Icon, label }) => (
-              <Card key={label} className="border-border bg-card p-6">
-                <Icon className="h-6 w-6 text-primary" aria-hidden="true" />
-                <h2 className="mt-4 text-xl font-semibold">{label}</h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {description}
-                </p>
-                {external ? (
-                  <a
-                    href={href}
-                    className="mt-5 inline-flex min-h-10 items-center rounded-sm border border-border bg-background px-4 text-sm font-medium hover:bg-accent"
-                    {...(href.startsWith("http")
-                      ? { rel: "noopener noreferrer", target: "_blank" }
-                      : {})}
-                  >
-                    {label}
-                  </a>
-                ) : (
-                  <Link
-                    href={href}
-                    className="mt-5 inline-flex min-h-10 items-center rounded-sm border border-border bg-background px-4 text-sm font-medium hover:bg-accent"
-                  >
-                    {label}
-                  </Link>
-                )}
-              </Card>
-            ),
+            ({ description, external, href, icon: Icon, label }) => {
+              const className =
+                "mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border-2 border-[var(--island-ink)]/15 bg-white px-4 text-sm font-black hover:border-[var(--island-ink)]/40";
+              return (
+                <Card
+                  key={label}
+                  className="rounded-3xl border border-[var(--island-ink)]/15 bg-white/85 p-6"
+                >
+                  <Icon
+                    className="h-7 w-7 text-[var(--island-ink)]/75"
+                    aria-hidden="true"
+                  />
+                  <h2 className="mt-4 text-xl font-black">{label}</h2>
+                  <p className="mt-2 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">
+                    {description}
+                  </p>
+                  {external ? (
+                    <a
+                      href={href}
+                      className={className}
+                      {...(href.startsWith("http")
+                        ? { rel: "noopener noreferrer", target: "_blank" }
+                        : {})}
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    <Link href={href} className={className}>
+                      {label}
+                    </Link>
+                  )}
+                </Card>
+              );
+            },
           )}
         </div>
+
+        <Card className="mt-8 rounded-3xl border-2 border-[var(--island-ink)] bg-[var(--island-yellow)] p-6 shadow-[7px_7px_0_var(--island-ink)] sm:p-8">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em]">
+                Need a creative starting point?
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                Try the Studio AI tools
+              </h2>
+              <p className="mt-2 text-sm font-semibold text-[var(--island-ink)]/70">
+                Ask for reviewable advice or generate one original source image,
+                then decide whether to convert it into the 256×256 canvas.
+              </p>
+            </div>
+            <Link
+              href="/studio"
+              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-[var(--island-ink)] px-5 text-sm font-black text-white"
+            >
+              Open the Studio
+            </Link>
+          </div>
+        </Card>
       </main>
     </div>
   );

@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["./**/*.ts", "../shared/**/*.ts", "./env.d.ts"],
+  "exclude": ["./**/*.test.ts", "./test-setup.ts"],
+  "compilerOptions": {
+    "incremental": false,
+    "lib": ["ESNext", "WebWorker", "WebWorker.Iterable"],
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "target": "ES2022",
+    "types": ["@cloudflare/workers-types", "node"]
+  }
+}

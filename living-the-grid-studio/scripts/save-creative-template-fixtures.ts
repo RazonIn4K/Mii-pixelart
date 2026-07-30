@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CREATIVE_TEMPLATES,
   createCreativeTemplateDocument,
+  createCreativeTemplateFixtureDocument,
 } from "../client/src/lib/engine/templates";
 import { exportGridJson } from "../client/src/lib/engine/json-io";
 
@@ -15,16 +16,22 @@ mkdirSync(outputDir, { recursive: true });
 
 const index = CREATIVE_TEMPLATES.map((template) => {
   const doc = createCreativeTemplateDocument(template.id);
+  const fixtureDoc = createCreativeTemplateFixtureDocument(template.id);
   const filename = `${template.id}.json`;
-  writeFileSync(path.join(outputDir, filename), `${exportGridJson(doc)}\n`);
+  writeFileSync(
+    path.join(outputDir, filename),
+    `${exportGridJson(fixtureDoc)}\n`,
+  );
 
   return {
     id: template.id,
-    name: template.name,
+    name: template.displayName,
     category: template.category,
     description: template.description,
     width: template.width,
     height: template.height,
+    fixtureWidth: fixtureDoc.width,
+    fixtureHeight: fixtureDoc.height,
     filename,
     colors: doc.usedColors.length,
   };

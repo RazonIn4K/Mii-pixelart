@@ -1,7 +1,7 @@
 {
-  "name": "Tomodachi · Mii Studio & Recovery Guides",
+  "name": "Tomodachi · Island Workshop",
   "short_name": "Tomodachi",
-  "description": "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
+  "description": "A local-first pixel-art workshop with private cloud projects and an opt-in creator community.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -28,19 +28,13 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/og-image.png",
-      "sizes": "1200x630",
-      "type": "image/png",
-      "purpose": "any"
     }
   ],
   "shortcuts": [
     {
       "name": "Open Studio",
       "short_name": "Studio",
-      "description": "Browser-first pixel-art editor for Mii face masks.",
+      "description": "Pixel-art editor for Face Paint and Palette House references.",
       "url": "/studio"
     },
     {
@@ -48,6 +42,12 @@
       "short_name": "Guides",
       "description": "Mii creation, gameplay basics, breach recovery, QR + save backup.",
       "url": "/guides"
+    },
+    {
+      "name": "Discover creations",
+      "short_name": "Discover",
+      "description": "Browse public, community-made pixel guides.",
+      "url": "/discover"
     },
     {
       "name": "Breach recovery help",

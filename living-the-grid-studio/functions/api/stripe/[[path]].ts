@@ -1,25 +1,22 @@
-/**
- * Provider-free tombstone for retired Tomodachi payment routes.
- *
- * Keep this route during the Pages transition so stale checkout clients get a
- * truthful terminal response instead of the SPA fallback. It has no provider
- * binding and performs no outbound request.
- */
+/** Retained as a fail-closed tombstone for obsolete API clients and links. */
 
 interface PagesContext {
   request: Request;
 }
 
-export const onRequest = async (_context: PagesContext): Promise<Response> =>
-  Response.json(
-    {
-      error: {
-        code: "payments_retired",
-        message: "Payments and checkout are no longer offered by Tomodachi.",
-      },
+const DECOMMISSIONED_BODY = JSON.stringify({
+  error: {
+    code: "route_decommissioned",
+    message: "This legacy route is no longer available.",
+  },
+});
+
+export async function onRequest(_context: PagesContext): Promise<Response> {
+  return new Response(DECOMMISSIONED_BODY, {
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": "application/json; charset=utf-8",
     },
-    {
-      headers: { "Cache-Control": "no-store" },
-      status: 410,
-    },
-  );
+    status: 410,
+  });
+}

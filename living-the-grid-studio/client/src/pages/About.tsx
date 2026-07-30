@@ -37,14 +37,14 @@ const ABOUT_STRUCTURED_DATA = [
       "@id": "https://tomodachi.pw/#org",
       name: "Tomodachi",
       url: "https://tomodachi.pw/",
-      logo: "https://tomodachi.pw/og-image.png",
+      logo: "https://tomodachi.pw/icon-512.png",
       description:
         "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
       sameAs: ["https://github.com/RazonIn4K", "https://tomodachi.brave"],
       knowsAbout: [
         "Tomodachi Life",
         "Mii pixel art",
-        "Mii face mask",
+        "custom Face Paint reference",
         "Tomodachishare breach recovery",
         "k-anonymity password breach lookup",
       ],
@@ -84,10 +84,11 @@ export default function About() {
             <Link href="/studio" className="underline">
               Studio
             </Link>{" "}
-            is a browser-first pixel-art editor for Mii face masks — import a
-            photo or character art, reduce its colors against the in-game
-            Tomodachi Life: Living the Dream palette, and export a paint-by-
-            numbers reference you can recreate on a real 3DS. The{" "}
+            is a browser-first pixel-art editor for planning Mii-inspired face
+            art — import a photo or character art, reduce its colors against the
+            Studio's 84-color working palette, and export a paint-by-numbers
+            Copy Guide for manual recreation. It does not transfer game files or
+            connect directly to a Nintendo title. The{" "}
             <Link href="/guides" className="underline">
               Guides
             </Link>{" "}
@@ -106,18 +107,18 @@ export default function About() {
             <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Free first</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              The editor, the password check, the AI assistant, and every guide
-              stay free. Tomodachi currently accepts no payments, tips, or
-              consultation bookings.
+              The editor, password check, AI assistant, and guides are available
+              without an account. Cloud and community features are opt-in.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <h2 className="mt-3 text-sm font-semibold">Privacy on principle</h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Photos never leave the browser. The password check uses
-              k-anonymity against Have I Been Pwned. No accounts, no tracking
-              until you opt in via the cookie banner.
+              Studio imports stay in the browser. Cloud saving, publishing, and
+              showcase-image uploads are separate choices. The password check
+              uses k-anonymity against Have I Been Pwned, and non-essential
+              analytics waits for your cookie choice.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4">
@@ -126,8 +127,8 @@ export default function About() {
               Solo-built, community-tested
             </h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              One developer, open source, improved by people who test real
-              workflows and report clear, reproducible feedback.
+              One developer, open source, improved through real Studio testing,
+              original community creations, and useful issue reports.
             </p>
           </div>
         </section>
@@ -147,10 +148,12 @@ export default function About() {
             recovery assistant, and a free 24-hour action plan.
           </p>
           <p className="text-sm leading-relaxed text-foreground/85">
-            The site is hosted on Cloudflare Pages with Pages Functions for the
-            API surface, a small KV namespace for caching the model catalog,
-            OpenRouter for the AI assistant, and the Have I Been Pwned API for
-            the password check. The full stack is documented in the repo README.
+            The production architecture uses one Cloudflare Worker for the API
+            and the React app's Static Assets, with D1 for community data,
+            private R2 for project and generated media objects, and KV for edge
+            caching. OpenRouter powers optional AI tools, and the Have I Been
+            Pwned API powers the password check. The full stack is documented in
+            the repo README.
           </p>
         </section>
 
@@ -163,9 +166,11 @@ export default function About() {
               <Link href="/studio" className="underline">
                 Studio
               </Link>
-              : import → reduce colors → export a paint-by-numbers reference
-              pack (PDF + JSON + palette sheet). 84-color in-game palette with
-              row/column labels for exact matching.
+              : import → reduce colors → export editable JSON, labeled or clean
+              PNGs, or a ZIP Copy Guide with a palette sheet, paint order, and
+              reference HTML. The Studio's 84-color working palette uses
+              row/column labels for consistent manual matching; it is not a
+              verified proprietary game palette.
             </li>
             <li>
               <Link href="/" className="underline">
@@ -193,13 +198,15 @@ export default function About() {
               <Link href="/ai-plan" className="underline">
                 AI Action Plan
               </Link>
-              : free, reviewable next steps for a creation or recovery task.
+              : practical, reviewable recovery and creator advice plus an
+              original-artwork workflow for the Studio&apos;s 256×256 canvas.
             </li>
             <li>
               <Link href="/support" className="underline">
-                Support the workshop
+                Support
               </Link>
-              : test the Studio, report issues, and send product feedback.
+              : ways to test the Studio, share original work, and report useful
+              feedback.
             </li>
           </ul>
         </section>
@@ -230,17 +237,12 @@ export default function About() {
               short bio, hero image, or numbers you need for the story.
             </li>
             <li>
-              <strong>Project support:</strong> testing, issue reports, and
-              product feedback via the{" "}
+              <strong>Project support:</strong> test the product or send useful
+              feedback through the{" "}
               <Link href="/support" className="underline">
                 support page
               </Link>
               .
-            </li>
-            <li>
-              <strong>Brave Rewards:</strong> the domain is a verified Brave
-              Creator. The Rewards icon in the Brave address bar will recognize
-              it.
             </li>
           </ul>
         </section>

@@ -1,13 +1,31 @@
 # Technical Architecture — Living The Grid Repaint Studio
 
-**Version:** 2.0  
-**Last Updated:** 2026-05-15
+**Version:** 2.5
+
+**Last Updated:** 2026-07-19
+
+> **Deployment status (2026-07-14):** The target architecture on this branch is
+> one Cloudflare Worker (Hono) plus Worker Static Assets, D1, private R2, KV,
+> Images, and scheduled handlers. Exact source
+> `520d0f287d390ba14b0fef179a6394893a5ab92d` is the last accepted isolated
+> staging Worker source in standard read-only mode. The current branch prepares
+> the separately approved writable-staging acceptance gate. Production
+> `tomodachi.pw` still runs the rollback-safe Cloudflare Pages deployment from
+> protected `main`; PR merge, production resources, and Worker domain cutover
+> remain independent approval gates. References below to Pages
+> Functions describe the active production/rollback compatibility surface, not
+> the staging branch runtime. See [ADR 0001](adr/0001-workers-community-platform.md)
+> and the [community deployment runbook](community-deployment-runbook.md).
 
 ---
 
 ## Overview
 
-The studio is a **client-side single-page application** built with React 19 and TypeScript. All processing happens in the browser — no server, no uploads, no accounts. This architecture was chosen to match the privacy-first approach of the original Living The Grid tool and to ensure zero-latency interaction with the pixel grid.
+The studio is a **local-first single-page application** built with React 19 and
+TypeScript. Anonymous editing, import, and JSON/PNG/ZIP export stay in the
+browser. Account-backed cloud save and community features are explicit opt-ins
+served by the unified Worker; authentication alone never uploads or publishes a
+local project.
 
 ---
 
@@ -24,28 +42,28 @@ Mii-pixelart/
     │       ├── App.tsx            ← Root component + router
     │       ├── main.tsx           ← React DOM entry point
     │       ├── index.css          ← Tailwind + design tokens
-    │       ├── const.ts           ← App-wide constants
     │       ├── components/
     │       │   ├── studio/        ← Studio panel components
-    │       │   └── ui/            ← shadcn/ui primitives (53 files)
-    │       ├── contexts/          ← ThemeContext
+    │       │   ├── community/     ← Account, publishing, gallery, and sharing UI
+    │       │   └── ui/            ← shadcn/ui primitives
+    │       ├── contexts/          ← AuthContext and ThemeContext
     │       ├── hooks/
     │       │   └── useGridDocument.ts  ← Central state hook
     │       ├── lib/
     │       │   └── engine/        ← Pure TS engine (no React deps)
     │       └── pages/             ← Route-level page components
-    ├── server/                    ← Thin Express server (dev only)
-    │   ├── index.ts
+    ├── server/                    ← Shared OpenRouter helper retained for parity
     │   └── openrouter.ts
-    ├── functions/                 ← Cloudflare Pages Functions (edge)
+    ├── functions/                 ← Legacy Pages rollback Functions
     │   └── api/
+    ├── worker/                    ← Unified Worker routes, policy, jobs, and documents
+    ├── migrations/                ← Forward-only D1 migrations
     ├── shared/                    ← Shared types/constants
     ├── fixtures/                  ← Test fixtures and creative templates
     ├── scripts/                   ← Verification and utility scripts
-    ├── patches/                   ← pnpm patches (wouter)
     ├── package.json
     ├── vite.config.ts
-    ├── wrangler.toml
+    ├── wrangler.jsonc
     └── doppler.yaml
 ```
 
@@ -56,14 +74,16 @@ Mii-pixelart/
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
 | Framework | React 19 + TypeScript | Type safety for complex grid operations |
-| Build | Vite 7 + esbuild | Fast HMR, native ESM; esbuild bundles the server |
+| Build | Vite 7 + Cloudflare Vite plugin | Fast HMR, SPA assets, and one Worker deploy artifact |
 | Styling | Tailwind CSS 4 + shadcn/ui | Utility-first with accessible Radix primitives |
 | Routing | Wouter | Lightweight client-side routing |
 | State | React hooks (`useState`, `useCallback`) | No external state library needed |
 | Canvas | HTML5 Canvas API | Direct pixel rendering for grid display |
 | Color Science | Custom CIELAB + Delta E (CIE76) | Perceptual color matching |
 | Package manager | pnpm | Required; lockfile committed |
-| Deploy | Cloudflare Pages + Functions | Edge-hosted SPA + serverless API routes |
+| Target deploy | Cloudflare Worker + Static Assets | One runtime for SPA, APIs, dynamic documents, and scheduled jobs |
+| Production rollback | Current protected-`main` Cloudflare Pages deployment | Record the exact immutable URL and source commit at cutover; preserve it through the Worker soak |
+| Data | D1 + private R2 + KV + Images | Relational authority, immutable projects/media, bounded cache, generated previews, and normalized optional showcase variants |
 | Secrets | Doppler | Runtime injection; no `.env` files committed |
 
 ---
@@ -72,33 +92,40 @@ Mii-pixelart/
 
 ```mermaid
 graph TB
-    subgraph Browser["Browser (all processing here)"]
+    subgraph Browser["Browser (local editor and exports)"]
         SPA["React SPA<br/>/studio"]
         Engine["Engine Modules<br/>(pure TypeScript)"]
         Canvas["HTML5 Canvas API"]
         FileAPI["File API / Blob / URL"]
-        LS["localStorage<br/>(AI sessions)"]
+        LS["localStorage<br/>(written AI sessions only)"]
+        IDB["IndexedDB<br/>(draft resume + sync metadata)"]
+        Generated["Transient generated raster<br/>(review state only)"]
 
         SPA -->|"calls"| Engine
         Engine -->|"renders to"| Canvas
         Engine -->|"reads/writes"| FileAPI
         SPA -->|"persists"| LS
+        SPA -->|"persists"| IDB
+        SPA -->|"reviews locally"| Generated
     end
 
-    subgraph Edge["Cloudflare Pages (Edge)"]
-        Static["Static Assets<br/>dist/public/"]
-        Fn_AI["Function: /api/ai/*"]
-        Fn_Retired["410 tombstones<br/>historic payment paths"]
+    subgraph Edge["Target branch: Cloudflare Worker"]
+        Worker["Hono Worker<br/>auth + API + dynamic documents"]
+        Static["Worker Static Assets<br/>dist/public/"]
+        Data["D1 + private R2 + KV + Images"]
+        Worker --> Static
+        Worker --> Data
     end
 
     subgraph External["External Services"]
-        OR["OpenRouter API<br/>(AI models)"]
+        ORChat["OpenRouter Chat API<br/>(written advice + grid experiment)"]
+        ORImages["OpenRouter Images API<br/>(bounded generated raster)"]
     end
 
-    Browser -->|"GET /"| Static
-    Browser -->|"POST /api/ai/chat"| Fn_AI
-    Fn_AI -->|"OPENROUTER_API_KEY"| OR
-    Browser -.->|"historic payment request"| Fn_Retired
+    Browser -->|"assets, APIs, public documents"| Worker
+    Worker -->|"OPENROUTER_API_KEY"| ORChat
+    Worker -->|"allowlisted model + bounded prompt"| ORImages
+    ORImages -->|"verified PNG/JPEG/WebP bytes"| Generated
 
     style Browser fill:#faf8f5,stroke:#d4c9b8
     style Edge fill:#f0f4ff,stroke:#b8c4d4
@@ -114,7 +141,7 @@ All engine modules are **pure TypeScript with zero React dependencies**. They ca
 ```mermaid
 graph LR
     subgraph Engine["client/src/lib/engine/"]
-        palette["palette.ts<br/>84-color game palette<br/>PaletteColor[]"]
+        palette["palette.ts<br/>84-color Studio palette<br/>PaletteColor[]"]
         color["color.ts<br/>RGB ↔ HSL ↔ CIELAB<br/>Delta E CIE76"]
         grid["grid.ts<br/>GridDocument type<br/>immutable mutations"]
         components["components.ts<br/>BFS flood fill<br/>connected components"]
@@ -215,7 +242,8 @@ graph TD
     Studio["/studio  →  Studio.tsx"]
     Help["/help  →  Help.tsx"]
     Guides["/guides  →  Guides.tsx"]
-    Unlock["/unlock  →  Unlock.tsx"]
+    AiPlan["/ai-plan  →  AiPlan.tsx"]
+    Unlock["/unlock  →  redirect to /ai-plan"]
     Support["/support  →  Support.tsx"]
     Legal["Legal pages<br/>Privacy / Terms / Cookies<br/>Disclosure"]
     NotFound["* → NotFound.tsx"]
@@ -225,6 +253,7 @@ graph TD
     Router --> Studio
     Router --> Help
     Router --> Guides
+    Router --> AiPlan
     Router --> Unlock
     Router --> Support
     Router --> Legal
@@ -335,6 +364,33 @@ flowchart TD
     M -->|"no"| O
 ```
 
+Generated artwork uses this same local review pipeline. The dedicated Worker
+adapter accepts only the reviewed image-model allowlist and verifies one bounded
+PNG, JPEG, or WebP response before returning bytes to the browser. Those bytes
+become a temporary local import source; they are not applied, saved, uploaded,
+or published until the user explicitly commits the normal import preview. See
+the [AI image-generation prototype gate](ai-image-generation-gate.md).
+
+### AI-generated image review pipeline
+
+```mermaid
+flowchart LR
+    Prompt["Original-art prompt"] --> Guard["Authenticated Worker guard<br/>Origin + JSON + edge limit"]
+    Guard --> Ledger["D1 idempotency + daily reservation<br/>hash and cost metadata only"]
+    Ledger --> ImagesAPI["OpenRouter Images API<br/>exact two-model allowlist"]
+    ImagesAPI --> Verify["Bounded response<br/>base64 + MIME signature + usage cost"]
+    Verify --> Blob["Transient browser Blob/File"]
+    Blob --> Import["Existing 256x256 import review<br/>alpha-aware palette conversion"]
+    Import --> Decision{"User decision"}
+    Decision -->|"Commit"| Grid["One undoable GridDocument revision"]
+    Decision -->|"Cancel or failure"| Unchanged["Active document unchanged"]
+```
+
+The prompt text and generated image are not retained in D1 or R2. The ledger
+stores only the user-scoped idempotency record, model, timestamps, reserved and
+actual cost, failure code, and prompt SHA-256. Automatic model fallback is
+forbidden because every generation can be billable.
+
 ---
 
 ## Optimization Pipeline
@@ -419,7 +475,8 @@ sequenceDiagram
 
 ## File I/O Model
 
-All file operations use browser-native APIs. **No files ever leave the user's browser.**
+Anonymous file operations use browser-native APIs. **No project leaves the
+browser unless the user explicitly chooses the first private cloud save.**
 
 ```mermaid
 flowchart LR
@@ -450,33 +507,39 @@ flowchart LR
 
 ## API Routes
 
-The same API logic runs in two environments: the Vite dev server (Express middleware) and Cloudflare Pages Functions (edge).
+The branch runs local development and deployed requests through the same Worker
+entry point. Existing AI and crawler behavior is ported into that Worker. Paid
+recovery, tips, checkout, and consultations are retired; the old payment and
+webhook paths remain only as provider-free `410 Gone` tombstones so stale
+clients cannot fall through to the SPA. The Pages paths remain for rollback
+compatibility.
 
 ```mermaid
 graph LR
-    subgraph Dev["Dev: vite.config.ts middleware"]
-        D1["GET /api/ai/status"]
-        D2["GET /api/ai/models"]
-        D3["POST /api/ai/chat"]
-        D4["historic payment paths<br/>410 Gone + no-store"]
+    subgraph Runtime["worker/index.ts + router.ts"]
+        Legacy["AI compatibility<br/>written chat + local/unreleased<br/>GET /api/ai/images/status<br/>POST /api/ai/images<br/>+ retired-payment 410 tombstones"]
+        Auth["Auth + account<br/>/api/auth/* + /api/me/*"]
+        Creations["Projects + publishing<br/>/api/creations/*"]
+        Discovery["Public discovery<br/>search + tags + profiles"]
+        Social["Likes + comments + follows + reports"]
+        Moderation["Role-gated moderation"]
     end
 
-    subgraph Edge["Prod: functions/api/"]
-        E1["ai/[[path]].ts"]
-        E2["retired payment tombstones"]
+    subgraph Bindings["Worker bindings"]
+        DB["D1"]
+        Objects["Private R2"]
+        Cache["KV"]
+        Images["Images"]
     end
 
-    subgraph Shared["Shared logic: server/"]
-        OR["openrouter.ts\ngetOpenRouterStatus()\ngetOpenRouterModels()\nsendOpenRouterChat()"]
-    end
+    Legacy --> Cache
+    Legacy --> DB
+    Auth & Creations & Discovery & Social & Moderation --> DB
+    Creations & Discovery --> Objects
+    Creations --> Images
 
-    D1 & D2 & D3 --> OR
-    E1 --> OR
-    D4 -.-> E2
-
-    style Dev fill:#faf8f5,stroke:#d4c9b8
-    style Edge fill:#f0f4ff,stroke:#b8c4d4
-    style Shared fill:#f5f0fa,stroke:#c4b8d4
+    style Runtime fill:#faf8f5,stroke:#d4c9b8
+    style Bindings fill:#f0f4ff,stroke:#b8c4d4
 ```
 
 ---
@@ -486,7 +549,7 @@ graph LR
 ```mermaid
 graph TB
     subgraph Repo["GitHub: RazonIn4K/Mii-pixelart"]
-        Code["Source code\n(main branch)"]
+        Code["Source code\ncodex/island-workshop-community"]
     end
 
     subgraph Doppler["Doppler: tomodachi-platform"]
@@ -495,25 +558,36 @@ graph TB
         Prd_cfg["config: prd\n(production)"]
     end
 
-    subgraph CF["Cloudflare Pages: tomodachi-studio"]
-        Build["Build step\npnpm install --frozen-lockfile\npnpm vite build\nRoot: living-the-grid-studio\nOutput: dist/public"]
-        Preview["Preview deployment\n*.pages.dev"]
-        Production["Production deployment\ntomodachi.pw"]
-        Fns["Pages Functions\n/api/ai/*\npayment 410 tombstones"]
+    subgraph Target["Target branch artifact"]
+        Build["Cloudflare Vite build\nStatic Assets + Worker bundle"]
+        Staging["Isolated staging Worker\nstaging.tomodachi.pw"]
+        ProductionWorker["Production Worker\ntomodachi.pw after approval"]
+        Bindings["Environment-isolated\nD1 + private R2 + KV + Images"]
+    end
+
+    subgraph Rollback["Current production and rollback surface"]
+        Pages["Cloudflare Pages project: mii-pixelart\nrecord exact deployment at cutover"]
+        Production["tomodachi.pw"]
     end
 
     Code -->|"git push → triggers build"| Build
-    Doppler -->|"Doppler → CF Pages integration\nstg → Preview env vars"| Preview
-    Doppler -->|"prd → Production env vars"| Production
-    Build --> Preview
-    Build --> Production
-    Production --> Fns
-    Preview --> Fns
+    Build -.->|"approved staging gate"| Staging
+    Build -.->|"approved production gate"| ProductionWorker
+    Doppler -->|"target-specific secrets"| Staging
+    Doppler -->|"target-specific secrets"| ProductionWorker
+    Staging & ProductionWorker --> Bindings
+    Pages --> Production
 
     style Repo fill:#faf8f5,stroke:#d4c9b8
     style Doppler fill:#f5f0fa,stroke:#c4b8d4
-    style CF fill:#f0f4ff,stroke:#b8c4d4
+    style Target fill:#f0f4ff,stroke:#b8c4d4
+    style Rollback fill:#fff7ed,stroke:#d97706
 ```
+
+Worker provisioning, migration, deployment, domain cutover, and rollback are
+approval-gated. The operational source of truth is the
+[community deployment runbook](community-deployment-runbook.md); do not infer
+authorization from this diagram.
 
 ---
 
@@ -544,7 +618,7 @@ flowchart LR
 
 ## Palette Structure
 
-The game palette has 84 colors organized in a 12-row grid:
+The Studio working palette has 84 colors organized in a 12-row grid. It is a consistent planning convention, not verified proprietary game-palette data:
 
 ```
 Rows 1–11: 7 columns each = 77 base colors
@@ -566,7 +640,12 @@ Row themes:
 ## Future Considerations
 
 - **Web Workers:** For grids larger than 128×128, optimizer passes could move off the main thread.
-- **IndexedDB:** Project auto-save and recovery using browser storage.
 - **WASM:** If Delta E calculations become a bottleneck at 256×256, a Rust/WASM module could accelerate the inner loop.
-- **Crop rectangle:** Full pan-and-zoom crop controls for image import (Phase 4 remaining).
-- **Palette sheet export:** Swatches with labels and IDs as a downloadable image (Phase 5 remaining).
+- **Crop refinement:** Add finer pan-and-zoom controls inside the implemented draggable crop rectangle if user testing warrants them.
+- **Optimizer explanation:** Add per-pass previews, change summaries, and a repaintability score without changing deterministic output.
+- **AI history:** Keep written chat browser-local unless a later privacy review
+  approves explicit opt-in cloud sync. Generated prompts and raster responses
+  are transient and must not enter chat history.
+- **AI image release:** The dedicated image path remains an undeployed local
+  prototype until the acceptance and exact-head staging gates in
+  [AI image-generation prototype gate](ai-image-generation-gate.md) pass.

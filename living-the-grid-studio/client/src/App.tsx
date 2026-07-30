@@ -1,28 +1,99 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { DeferredToaster } from "./components/DeferredToaster";
+import { ScrollRestoration } from "./components/ScrollRestoration";
 import CookieConsent from "./components/CookieConsent";
+import { AnalyticsLoader } from "./components/AnalyticsLoader";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import {
+  currentRelativeReturnTo,
+  setupPathForReturnTo,
+} from "./lib/community/return-to";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import About from "./pages/About";
-import Cookies from "./pages/Cookies";
-import Disclosure from "./pages/Disclosure";
-import Faq from "./pages/Faq";
-import Guides from "./pages/Guides";
-import Help from "@/pages/Help";
+import { StudioStartShell } from "./components/studio/StudioStartShell";
 import Home from "./pages/Home";
-import Privacy from "./pages/Privacy";
-import Studio from "./pages/Studio";
-import Support from "./pages/Support";
-import Terms from "./pages/Terms";
-import AiPlan from "./pages/AiPlan";
+
+const About = lazy(() => import("./pages/About"));
+const Cookies = lazy(() => import("./pages/Cookies"));
+const Disclosure = lazy(() => import("./pages/Disclosure"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Guides = lazy(() => import("./pages/Guides"));
+const Help = lazy(() => import("./pages/Help"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Support = lazy(() => import("./pages/Support"));
+const Terms = lazy(() => import("./pages/Terms"));
+const AiPlan = lazy(() => import("./pages/AiPlan"));
+const Discover = lazy(() => import("./pages/community/Discover"));
+const Search = lazy(() => import("./pages/community/Search"));
+const UserProfile = lazy(() => import("./pages/community/UserProfile"));
+const CreationDetail = lazy(() => import("./pages/community/CreationDetail"));
+const Setup = lazy(() => import("./pages/community/Setup"));
+const Me = lazy(() => import("./pages/community/Me"));
+const Projects = lazy(() => import("./pages/community/Projects"));
+const Settings = lazy(() => import("./pages/community/Settings"));
+const Moderation = lazy(() => import("./pages/community/Moderation"));
+const CommunityGuidelines = lazy(
+  () => import("./pages/community/CommunityGuidelines"),
+);
+const Copyright = lazy(() => import("./pages/community/Copyright"));
+const Security = lazy(() => import("./pages/community/Security"));
+
+function OnboardedAccountRoute({ children }: { children: ReactNode }) {
+  const { status, user } = useAuth();
+  if (
+    status === "authenticated" &&
+    user &&
+    (!user.username || user.termsAccepted !== true)
+  ) {
+    return (
+      <Redirect to={setupPathForReturnTo(currentRelativeReturnTo())} replace />
+    );
+  }
+  return <>{children}</>;
+}
+
+function StudioRoute() {
+  return (
+    <Suspense fallback={<StudioStartShell />}>
+      <Studio />
+    </Suspense>
+  );
+}
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
-      <Route path={"/studio"} component={Studio} />
+      <Route path={"/studio"} component={StudioRoute} />
+      <Route path={"/discover"} component={Discover} />
+      <Route path={"/search"} component={Search} />
+      <Route path={"/u/:username"} component={UserProfile} />
+      <Route path={"/creation/:slug"} component={CreationDetail} />
+      <Route path={"/me/setup"} component={Setup} />
+      <Route path={"/me/projects"}>
+        <OnboardedAccountRoute>
+          <Projects />
+        </OnboardedAccountRoute>
+      </Route>
+      <Route path={"/me/settings"}>
+        <Settings />
+      </Route>
+      <Route path={"/me"}>
+        <OnboardedAccountRoute>
+          <Me />
+        </OnboardedAccountRoute>
+      </Route>
+      <Route path={"/moderation"}>
+        <OnboardedAccountRoute>
+          <Moderation />
+        </OnboardedAccountRoute>
+      </Route>
+      <Route path={"/community-guidelines"} component={CommunityGuidelines} />
+      <Route path={"/copyright"} component={Copyright} />
+      <Route path={"/security"} component={Security} />
       <Route path={"/privacy"} component={Privacy} />
       <Route path={"/terms"} component={Terms} />
       <Route path={"/cookies"} component={Cookies} />
@@ -68,11 +139,24 @@ function App() {
         >
           Skip to main content
         </a>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
+        <ScrollRestoration />
+        <AuthProvider>
+          <DeferredToaster />
+          <Suspense
+            fallback={
+              <div
+                className="flex min-h-screen items-center justify-center bg-[var(--island-paper)] px-6 text-center text-sm font-bold text-[var(--island-ink)]/60"
+                role="status"
+              >
+                Opening the workshop…
+              </div>
+            }
+          >
+            <Router />
+          </Suspense>
+          <AnalyticsLoader />
           <CookieConsent />
-        </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

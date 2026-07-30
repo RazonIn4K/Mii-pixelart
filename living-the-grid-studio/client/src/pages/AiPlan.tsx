@@ -1,33 +1,33 @@
 import {
   ArrowRight,
-  CheckCircle2,
-  Clock3,
+  Image as ImageIcon,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useStructuredData } from "@/hooks/useStructuredData";
 import { breadcrumbFor } from "@/lib/breadcrumb";
 
-const FREE_PLAN_STEPS = [
+const ADVICE_STEPS = [
   "Describe what you are trying to make, improve, or recover from.",
   "Review a short checklist ordered by urgency and effort.",
   "Keep control: AI suggestions never change a project automatically.",
 ];
 
-const EXPANDED_PLAN_IDEAS = [
-  "A saved, account-bound checklist with clear milestones",
-  "Canvas-aware recommendations for the current creation",
-  "One bounded regeneration plus a downloadable summary",
+const IMAGE_STEPS = [
+  "Sign in and finish your profile before starting a generation request.",
+  "Describe original artwork and choose an allowlisted image model.",
+  "Review the source image and exact 256×256 conversion before using it.",
+  "Commit the converted grid or cancel it; nothing is applied automatically.",
 ];
 
 export default function AiPlan() {
   useDocumentTitle(
     "AI Action Plan",
-    "Try Tomodachi's free AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+    "Use Tomodachi's AI tools for reviewable advice and original 256×256 artwork preparation.",
+    { canonicalPath: "/ai-plan" },
   );
   useStructuredData([
     breadcrumbFor([
@@ -37,52 +37,58 @@ export default function AiPlan() {
   ]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-background/95">
+    <div className="min-h-screen bg-[var(--island-paper)] text-[var(--island-ink)]">
+      <header className="border-b border-[var(--island-ink)]/10 bg-white/75 backdrop-blur">
         <div className="container flex items-center justify-between py-4">
-          <Link href="/" className="text-sm font-medium hover:underline">
+          <Link href="/" className="text-sm font-extrabold hover:underline">
             ← Tomodachi
           </Link>
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            Free beta
+          <span className="rounded-full bg-[var(--island-mint)] px-3 py-1 text-xs font-black">
+            Available now
           </span>
         </div>
       </header>
 
       <main id="main-content" className="container max-w-5xl py-12 sm:py-16">
         <section className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-            <Sparkles className="h-7 w-7 text-primary" aria-hidden="true" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--island-blue)] shadow-[6px_6px_0_var(--island-ink)]">
+            <Sparkles className="h-8 w-8" aria-hidden="true" />
           </div>
-          <p className="section-header mt-7">AI action plan</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">
-            Useful next steps, without a sales call.
+          <p className="island-kicker mt-7">AI action plan</p>
+          <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] sm:text-6xl">
+            Advice and original artwork, with you in control.
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
+          <p className="mx-auto mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--island-muted-ink)]">
             Tell Tomodachi what you are trying to make or fix. Get a short,
-            reviewable checklist covering what to do first, what can wait, and
-            the quickest useful next action.
+            reviewable checklist—or generate one original source image and
+            decide whether to convert it into the Studio&apos;s 256×256 grid.
           </p>
         </section>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <Card className="border-border bg-card p-6 sm:p-8">
+          <Card className="rounded-3xl border-2 border-[var(--island-ink)] bg-white p-6 shadow-[8px_8px_0_var(--island-ink)] sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="section-header">Available now</p>
-                <h2 className="mt-2 text-2xl font-semibold">
-                  Free AI plan beta
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--island-ink)]/65">
+                  Available now
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-[-0.04em]">
+                  Reviewable advice
                 </h2>
               </div>
-              <span className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
-                $0
-              </span>
+              <Sparkles
+                className="h-7 w-7 text-[var(--island-mint-dark)]"
+                aria-hidden="true"
+              />
             </div>
 
             <ol className="mt-7 space-y-4">
-              {FREE_PLAN_STEPS.map((step, index) => (
-                <li key={step} className="flex gap-3 text-sm leading-6">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-xs font-semibold">
+              {ADVICE_STEPS.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex gap-3 text-sm font-semibold leading-6"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--island-yellow)] text-xs font-black">
                     {index + 1}
                   </span>
                   {step}
@@ -90,65 +96,80 @@ export default function AiPlan() {
               ))}
             </ol>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Button asChild>
-                <a href="/#recovery">
-                  Build a recovery plan
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </a>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/studio">Get creative advice</Link>
-              </Button>
-            </div>
+            <a
+              href="/#recovery"
+              className="island-button mt-8 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-black"
+            >
+              Build a recovery plan
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+            <Link
+              href="/studio"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--island-ink)]/15 bg-[var(--island-paper)] px-5 text-sm font-black hover:border-[var(--island-ink)]/35"
+            >
+              Get creative advice in Studio
+            </Link>
           </Card>
 
-          <Card className="border-border bg-muted/60 p-6 sm:p-8">
+          <Card className="rounded-3xl border border-[var(--island-ink)]/15 bg-[var(--island-yellow-soft)] p-6 sm:p-8">
             <div className="flex items-center gap-3">
-              <Clock3 className="h-5 w-5 text-primary" aria-hidden="true" />
-              <p className="section-header">Product direction</p>
+              <ImageIcon
+                className="h-6 w-6 text-[var(--island-orange)]"
+                aria-hidden="true"
+              />
+              <p className="text-xs font-black uppercase tracking-[0.18em]">
+                Studio image workflow
+              </p>
             </div>
-            <h2 className="mt-4 text-2xl font-semibold">
-              Expanded $5 creator plan
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.035em]">
+              Generate artwork for the 256×256 canvas
             </h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              A one-time expanded plan is being explored, but it is not for sale
-              yet. Tomodachi currently accepts no payments and has no checkout.
+            <p className="mt-3 text-sm font-semibold leading-6 text-[var(--island-muted-ink)]">
+              Create one original square source image, inspect the result, and
+              open the existing import review before any pixels reach your
+              project.
             </p>
-            <ul className="mt-6 space-y-3">
-              {EXPANDED_PLAN_IDEAS.map((idea) => (
-                <li key={idea} className="flex gap-3 text-sm leading-5">
-                  <CheckCircle2
-                    className="mt-0.5 h-4 w-4 shrink-0 text-primary"
-                    aria-hidden="true"
-                  />
-                  {idea}
+            <ol className="mt-6 space-y-3">
+              {IMAGE_STEPS.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex gap-3 text-sm font-semibold leading-5"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black">
+                    {index + 1}
+                  </span>
+                  {step}
                 </li>
               ))}
-            </ul>
-            <p className="mt-6 rounded-sm border border-border bg-background p-4 text-xs leading-5 text-muted-foreground">
-              No waitlist or payment details are collected. A paid version will
-              launch only after account entitlements, refunds, usage limits,
-              privacy controls, and fulfillment are tested end to end.
-            </p>
+            </ol>
+            <Link
+              href="/studio"
+              className="mt-7 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--island-ink)] bg-white px-5 text-sm font-black shadow-[4px_4px_0_var(--island-ink)] transition-transform hover:-translate-y-0.5"
+            >
+              Open image tools
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </Card>
         </div>
 
-        <section className="mt-8 flex gap-4 rounded-sm border border-border bg-card p-6 sm:p-8">
-          <ShieldCheck
-            className="h-6 w-6 shrink-0 text-primary"
-            aria-hidden="true"
-          />
-          <div>
-            <h2 className="text-lg font-semibold">
-              Use AI without sharing secrets
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Your description is sent through OpenRouter and its selected model
-              provider only after you agree. Never include passwords, payment
-              details, recovery codes, government IDs, or other secrets. AI
-              output is guidance, not professional or emergency advice.
-            </p>
+        <section className="mt-8 rounded-3xl border border-[var(--island-ink)]/10 bg-white/70 p-6 sm:p-8">
+          <div className="flex gap-4">
+            <ShieldCheck
+              className="h-7 w-7 shrink-0 text-[var(--island-mint-dark)]"
+              aria-hidden="true"
+            />
+            <div>
+              <h2 className="text-lg font-black">
+                Use AI without sharing secrets
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--island-muted-ink)]">
+                Your description is sent through OpenRouter and its selected
+                model provider only after you agree. Do not include passwords,
+                financial account information, recovery codes, government IDs,
+                or other secrets. AI output is guidance—not legal, financial,
+                medical, or emergency advice.
+              </p>
+            </div>
           </div>
         </section>
       </main>

@@ -27,6 +27,9 @@ secrets*.json
 .wrangler/
 .dev.vars
 
+# Fresh, target-specific release approvals are local-only and must never ship.
+.deployment-readiness/
+
 # IDE / editor
 .vscode/
 .idea/
@@ -57,6 +60,9 @@ lerna-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+test-results/
+playwright-report/
+reports/
 
 # Temp / cache
 .cache/
@@ -82,6 +88,20 @@ AI-CONTEXT.md
 # Exception: docs/distribution/ holds launch-day post drafts — re-track those
 # explicitly if you want them in the public repo with `git add -f docs/distribution/`.
 docs/
+# Public implementation artifacts for the community platform are intentional
+# exceptions to the private/internal docs rule above.
+!docs/
+docs/*
+!docs/adr/
+!docs/adr/**
+!docs/community-openapi.yaml
+!docs/community-data-flow.md
+!docs/community-deployment-runbook.md
+!docs/community-threat-model.md
+!docs/ai-image-generation-gate.md
+!docs/hosted-read-only-acceptance.md
+!docs/studio-game-reference-roadmap.md
+!docs/visual-assets.md
 
 # Cowork session output (in case it ever lands in the repo dir)
 cowork-output/

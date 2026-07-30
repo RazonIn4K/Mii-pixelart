@@ -1,38 +1,74 @@
-# Guides, support, and AI-plan roadmap
+# Guides, support, and AI Action Plan roadmap
 
-Updated: 2026-07-16
+**Status:** Current product boundary as of 2026-07-16.
 
-## Current public routes
+```text
+Homepage
+   |-- /guides   -> free tools and learning paths
+   |-- /ai-plan  -> free AI Action Plan beta
+   |-- /support  -> testing, sharing, issue reporting, and email feedback
+   `-- /unlock   -> redirect to /ai-plan (legacy bookmark compatibility)
+```
 
-- `/guides`: free Studio and account-safety guidance.
-- `/support`: non-payment ways to test the product, report issues, and send
-  feedback.
-- `/ai-plan`: free AI action-plan beta plus clearly labeled future product
-  direction.
-- `/unlock`: legacy client and crawler alias to `/ai-plan`.
-- `/donate`: legacy client and crawler alias to `/support`.
+## Current public surfaces
 
-Tomodachi accepts no payments, tips, donations, or consultation bookings.
-Historic Stripe products, payment links, sessions, webhooks, and identifiers are
-not active product configuration and must not be restored from repository
-history.
+### `/guides`
 
-## Free AI beta
+Guide cards connect people to existing free Studio, recovery, safety, and
+community workflows. They must not contain paid upgrades or checkout calls.
 
-The beta should help a user describe a creative or recovery goal and receive a
-short, reviewable sequence of next steps. AI output never mutates a Studio
-project automatically. Prompts must exclude passwords, payment details,
-recovery codes, government IDs, and other secrets.
+### `/ai-plan`
 
-## Possible one-time $5 creator plan
+The AI Action Plan is a free beta. It can turn the visitor's stated goal and
+current context into suggested next steps, but it is not professional, legal,
+medical, financial, or game-authoritative advice. The UI should explain what is
+sent to the AI provider and discourage sensitive information.
 
-This is product direction, not an offer for sale. Candidate value includes:
+The planned one-time **$5 Creator Action Plan** is not for sale. Its intended
+value is a saved, canvas-aware plan with milestones, bounded regeneration, and
+export. It must not ship as a renamed checkout link. Product, entitlement,
+payment, refund, privacy, tax, usage-limit, and fulfillment work listed in
+`stripe-paywall-setup.md` must pass a separate future gate first.
 
-- account-bound saved milestones;
-- canvas-aware recommendations;
-- one bounded regeneration;
-- a downloadable summary.
+### `/support`
 
-Before sale, approve and test account entitlements, fulfillment, usage limits,
-refunds, privacy/retention, abuse controls, taxes and merchant disclosures, and
-the complete purchase-to-access lifecycle in a new ADR and release gate.
+Support is non-monetary. It asks visitors to test the Studio, share public
+creations, report reproducible issues, or send feedback through the published
+help channel. `/donate` redirects here for legacy bookmark compatibility. The
+page must not present tips, donations, Payment Links, or consultations.
+
+## Implementation contract
+
+| Surface | Current behavior |
+| --- | --- |
+| `client/src/pages/AiPlan.tsx` | Free beta explanation and links to available free tools |
+| `client/src/pages/Support.tsx` | Non-payment contribution and contact paths |
+| `/unlock` | Redirects to `/ai-plan` |
+| `/donate` | Redirects to `/support` |
+| `/api/stripe/*` | Provider-free `410 Gone` tombstone |
+| `/api/webhooks/stripe` | Provider-free `410 Gone` tombstone |
+
+The client build has no payment-link environment variable. The Worker has six
+required secrets and six rate-limit bindings; neither set includes a payment
+provider.
+
+## Acceptance
+
+- No public page renders a buy, checkout, pay, tip, donation, or consultation
+  control.
+- Loading `/ai-plan`, `/guides`, `/support`, `/unlock`, or `/donate` makes no
+  request to a payment provider or retired payment API.
+- Legacy payment API paths return `410`, JSON, and `Cache-Control: no-store`.
+- AI guidance remains usable without payment and is covered by consent,
+  redaction, rate-limit, failure, and accessibility tests.
+- Crawler documents use canonical `/ai-plan` and `/support` URLs and contain no
+  Product, Offer, price, or availability schema.
+- Historical evidence stays unchanged and is clearly separated from current
+  operational instructions.
+
+## Deferred work
+
+Do not add subscriptions, a waitlist that implies an offer is purchasable, or
+autonomous AI moderation as part of this roadmap. Revisit a paid creator plan
+only after real use of the free beta demonstrates a need and the separate
+product/security gate is approved.

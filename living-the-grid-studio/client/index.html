@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1"
+      content="width=device-width, initial-scale=1.0"
     />
-    <title>Tomodachi · Mii Studio &amp; Recovery Guides</title>
+    <title>Tomodachi.pw · Turn Ideas Into Paintable Pixel Guides</title>
     <meta
       name="description"
-      content="Tomodachi is a free Mii pixel-art studio paired with practical breach-recovery guides and a reviewable AI action-plan beta."
+      content="Turn faces, characters, logos, and sketches into clear, paintable pixel guides with an unofficial browser-first creator studio for Tomodachi fans."
     />
-    <meta name="theme-color" content="#101016" />
+    <meta name="theme-color" content="#F8F5ED" />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href="https://tomodachi.pw/" />
 
@@ -20,32 +20,32 @@
     <meta property="og:site_name" content="Tomodachi" />
     <meta
       property="og:title"
-      content="Tomodachi · Mii Studio &amp; Recovery Guides"
+      content="Tomodachi.pw · Your Island, Your Style, Pixel by Pixel"
     />
     <meta
       property="og:description"
-      content="A free Mii pixel-art studio paired with practical breach-recovery guides and a reviewable AI action-plan beta."
+      content="Turn faces, characters, logos, and sketches into clear, paintable pixel guides in a private, browser-first creator studio."
     />
     <meta property="og:url" content="https://tomodachi.pw/" />
-    <meta property="og:image" content="https://tomodachi.pw/og-image.png" />
+    <meta property="og:image" content="https://tomodachi.pw/community-og.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Tomodachi · Mii Studio and Recovery Guides"
+      content="Tomodachi.pw pixel guide creator studio"
     />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Tomodachi · Mii Studio &amp; Recovery Guides"
+      content="Tomodachi.pw · Your Island, Your Style, Pixel by Pixel"
     />
     <meta
       name="twitter:description"
-      content="A Mii pixel-art studio paired with practical breach-recovery guides."
+      content="A playful browser-first studio for turning ideas into paintable pixel guides."
     />
-    <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
+    <meta name="twitter:image" content="https://tomodachi.pw/community-og.jpg" />
 
     <link
       rel="icon"
@@ -55,28 +55,11 @@
          Brand color matches the studio header; background_color matches the
          Paper Studio off-white surface. -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/og-image.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Tomodachi" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Preload the LCP hero image so the browser kicks off the fetch before
-         it finishes parsing the JS bundle. Image is now served from the same
-         origin so no preconnect hint is needed. -->
-    <link
-      rel="preload"
-      as="image"
-      href="/hero.webp"
-      fetchpriority="high"
-      type="image/webp"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-
     <!-- Schema.org WebApplication: tells Google this is a free, browser-based
          pixel-art design tool. Eligible for rich results in search. -->
     <script type="application/ld+json">
@@ -86,16 +69,22 @@
         "name": "Tomodachi",
         "alternateName": "Tomodachi Studio",
         "url": "https://tomodachi.pw/",
-        "description": "Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players. Turn photos or character art into repaintable Mii face masks square-by-square, or pick up free guides for QR codes, gameplay basics, and breach recovery.",
+        "description": "Browser-first pixel-art planning studio paired with practical breach-recovery guides for Tomodachi Life players. Turn photos or character art into manual Face Paint and Palette House references, or pick up free guides for QR codes, gameplay basics, and breach recovery.",
         "applicationCategory": "DesignApplication",
         "applicationSubCategory": "Pixel Art Editor",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript. Modern browser (Chrome, Firefox, Safari, Edge).",
-        "image": "https://tomodachi.pw/og-image.png",
-        "screenshot": "https://tomodachi.pw/og-image.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "category": "free"
+        },
+        "image": "https://tomodachi.pw/community-og.jpg",
+        "screenshot": "https://tomodachi.pw/community-og.jpg",
         "featureList": [
           "Photo-to-pixel-art conversion",
-          "84-color Tomodachi Life palette",
+          "Original 84-color Studio working palette",
           "Paint-by-numbers reference export",
           "Color reduction optimizer",
           "Reference pack download",
@@ -106,7 +95,7 @@
           "@type": "Organization",
           "name": "Tomodachi",
           "url": "https://tomodachi.pw/",
-          "logo": "https://tomodachi.pw/og-image.png",
+          "logo": "https://tomodachi.pw/icon-512.png",
           "sameAs": ["https://github.com/RazonIn4K", "https://tomodachi.brave"]
         }
       }
@@ -116,17 +105,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script type="module">
-      const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
-      const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
-
-      if (endpoint && websiteId) {
-        const script = document.createElement("script");
-        script.defer = true;
-        script.src = `${endpoint.replace(/\/$/, "")}/umami`;
-        script.dataset.websiteId = websiteId;
-        document.body.appendChild(script);
-      }
-    </script>
   </body>
 </html>

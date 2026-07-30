@@ -20,7 +20,7 @@ In scope:
 
 - `tomodachi.pw` and any subdomains (including `www.tomodachi.pw`)
 - `tomodachi.brave` (the IPFS mirror)
-- Cloudflare Pages Functions at `/api/*` (AI proxy, model list, and provider-free retired-payment tombstones)
+- Cloudflare Pages Functions and Worker routes at `/api/*` (AI proxy, community APIs, model list, and the provider-free `410 Gone` tombstones retained for legacy payment clients)
 - This GitHub repository's CI / build pipeline configuration
 
 Out of scope:
@@ -39,7 +39,7 @@ Out of scope:
 
 ## What we don't currently offer
 
-Tomodachi is a solo-maintained fan tool and does not accept payments or consultation bookings, so we cannot offer monetary bug bounties at this time. We will gladly:
+Tomodachi is a solo-maintained fan tool and does not accept payments, tips, or consultation bookings, so we cannot offer monetary bug bounties at this time. We will gladly:
 
 - Credit you publicly in the [release notes](./CHANGELOG.md) and a `SECURITY-THANKS.md` once we have a first qualifying report
 - Provide a public acknowledgement on the [`/about`](https://tomodachi.pw/about) page
@@ -49,9 +49,11 @@ Tomodachi is a solo-maintained fan tool and does not accept payments or consulta
 
 For context on prior security work, see [`CHANGELOG.md`](./CHANGELOG.md) and the relevant headers below:
 
-- Content Security Policy is locked down per Google CSP Evaluator with Trusted Types in report-only mode (see [`client/public/_headers`](./client/public/_headers))
+- Content Security Policy is locked down per Google CSP Evaluator. A Trusted
+  Types report-only policy is intentionally withheld until a real reporting
+  endpoint exists (see [`client/public/_headers`](./client/public/_headers)).
+- Retired checkout, session, product, and webhook routes return provider-free `410 Gone` responses with `Cache-Control: no-store`; they do not contact a payment provider or fall through to the SPA
 - Password breach checks use HIBP k-anonymity (only the first 5 chars of SHA-1 ever leave the browser)
-- Retired payment API and webhook paths return provider-free `410 Gone` responses with `Cache-Control: no-store`
 - AdSense and AI calls only fire after explicit user consent through the cookie banner
 - `frame-ancestors 'none'` + `X-Frame-Options: DENY` prevent clickjacking
 - Strict-Transport-Security: 1-year max-age, includeSubDomains, preload-eligible

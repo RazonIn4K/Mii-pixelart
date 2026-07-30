@@ -85,7 +85,7 @@ const PUBLISHER_ORG = {
   "@type": "Organization",
   name: "Tomodachi",
   url: "https://tomodachi.pw/",
-  logo: { "@type": "ImageObject", url: "https://tomodachi.pw/og-image.png" },
+  logo: { "@type": "ImageObject", url: "https://tomodachi.pw/icon-512.png" },
 };
 
 const COMMON_HEAD = `
@@ -93,7 +93,7 @@ const COMMON_HEAD = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#101016" />
   <meta name="robots" content="index,follow" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%23d94f4f'/%3E%3C/svg%3E" />`;
+  <link rel="icon" href="/icon-192.png" />`;
 
 function shellFor(route: string, shell: RouteShell): string {
   const url = `https://tomodachi.pw${route}`;
@@ -119,13 +119,13 @@ function shellFor(route: string, shell: RouteShell): string {
   <meta property="og:title" content="${shell.title}" />
   <meta property="og:description" content="${shell.description}" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:image" content="https://tomodachi.pw/og-image.png" />
+  <meta property="og:image" content="https://tomodachi.pw/community-og.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${shell.title}" />
   <meta name="twitter:description" content="${shell.description}" />
-  <meta name="twitter:image" content="https://tomodachi.pw/og-image.png" />
+  <meta name="twitter:image" content="https://tomodachi.pw/community-og.jpg" />
   ${jsonLdTag}
 </head>
 <body>
@@ -157,7 +157,7 @@ const ROUTES: Record<string, RouteShell> = {
       "A browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides for Tomodachi Life players.",
     h1: "Tomodachi · Mii Studio & Recovery Guides",
     body: `
-      <p>Tomodachi is two things stacked on one site. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for Mii face masks — import a face photo or character art, reduce the colors against the in-game Tomodachi Life: Living the Dream palette, and export a paint-by-numbers reference you can recreate on a real 3DS.</p>
+      <p>Tomodachi is two things stacked on one site. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for planning Mii-inspired face art — import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation. It does not transfer game files or connect directly to a Nintendo title.</p>
       <p>The <a href="/guides">guides</a> and the free <a href="/help">recovery help</a> page are for visitors arriving from the Tomodachishare credential leak — calm, free, no-spam steps to rotate passwords and lock down accounts.</p>
       <h2>What's inside</h2>
       <ul>
@@ -165,8 +165,8 @@ const ROUTES: Record<string, RouteShell> = {
         <li><a href="/">Home recovery hub</a> — browser-only k-anonymity password breach check + AI recovery assistant.</li>
         <li><a href="/guides">Long-form guides</a> — Mii creation, Tomodachi Life gameplay basics, post-breach recovery, QR codes + save backup.</li>
         <li><a href="/faq">FAQ</a> — common questions answered.</li>
-        <li><a href="/ai-plan">AI Action Plan</a> — free, reviewable next steps for a creation or recovery task.</li>
-        <li><a href="/support">Support</a> — test the workflow, report issues, and send feedback.</li>
+        <li><a href="/ai-plan">AI Action Plan</a> — a free beta for practical, reviewable next steps.</li>
+        <li><a href="/support">Support</a> — test the Studio, share original work, and report useful feedback.</li>
       </ul>`,
     jsonLd: [
       {
@@ -178,7 +178,8 @@ const ROUTES: Record<string, RouteShell> = {
           "Browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players.",
         applicationCategory: "DesignApplication",
         operatingSystem: "Any",
-        image: "https://tomodachi.pw/og-image.png",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        image: "https://tomodachi.pw/community-og.jpg",
         publisher: PUBLISHER_ORG,
       },
     ],
@@ -186,17 +187,17 @@ const ROUTES: Record<string, RouteShell> = {
   "/studio": {
     title: "Studio · Tomodachi",
     description:
-      "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the in-game palette, export a paint-by-numbers reference pack.",
+      "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio working palette, and export a manual Copy Guide.",
     h1: "Tomodachi Studio",
     body: `
-      <p>A browser-first pixel-art editor for designing custom Mii face masks square-by-square. Import a face photo, character art, or JSON file; reduce noise against the 84-color Tomodachi Life: Living the Dream palette; export a paint-by-numbers reference pack (PDF + palette sheet + JSON).</p>
+      <p>A browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo, character art, or JSON file; reduce noise against the Studio's 84-color working palette; export editable JSON, guide PNGs, and a ZIP Copy Guide with a palette sheet, paint order, and reference HTML. The palette and grid dimensions are Studio conventions, not verified proprietary game data.</p>
       <h2>Features</h2>
       <ul>
         <li>Import any image or LTG JSON file.</li>
-        <li>84-color in-game palette labeled by row and column for exact matching.</li>
+        <li>Studio 84-color working palette labeled by row and column for consistent manual matching.</li>
         <li>Color-reduction optimizer that preserves facial readability.</li>
         <li>AI assistant for sketch drafts (OpenRouter, free tier).</li>
-        <li>Reference pack export — PDF + JSON + palette sheet.</li>
+        <li>Reference pack export — ZIP with JSON, guide PNGs, palette sheet, paint order, and reference HTML.</li>
       </ul>
       <p>See the <a href="/guides">guides</a> for step-by-step walkthroughs and the <a href="/faq">FAQ</a> for common questions.</p>`,
     jsonLd: [
@@ -207,12 +208,13 @@ const ROUTES: Record<string, RouteShell> = {
         name: "Tomodachi Studio",
         url: "https://tomodachi.pw/studio",
         description:
-          "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the 84-color in-game palette, export a paint-by-numbers reference pack.",
+          "Browser-first Mii pixel-art editor. Import a face photo, reduce colors to the Studio 84-color working palette, and export a manual Copy Guide.",
         applicationCategory: "DesignApplication",
         applicationSubCategory: "Pixel Art Editor",
         operatingSystem: "Any",
         browserRequirements: "Modern browser with JavaScript enabled.",
-        image: "https://tomodachi.pw/og-image.png",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        image: "https://tomodachi.pw/community-og.jpg",
         publisher: PUBLISHER_ORG,
       },
     ],
@@ -220,15 +222,15 @@ const ROUTES: Record<string, RouteShell> = {
   "/guides": {
     title: "Guides · Tomodachi",
     description:
-      "Free walkthroughs on Mii creation, Tomodachi Life gameplay basics, Tomodachishare breach recovery, and QR codes + save backup.",
+      "Free walkthroughs on Mii creation, legacy 3DS Tomodachi Life basics, Tomodachishare breach recovery, and QR codes + save backup.",
     h1: "Guides",
     body: `
       <p>Practical walkthroughs for Tomodachi Life players turning faces and characters into Mii repaint plans, and visitors arriving from the Tomodachishare breach notice.</p>
       <h2>Tomodachi Life player guides</h2>
       <h3 id="mii-creation"><a href="/guides#mii-creation">How to make custom Miis for Tomodachi Life</a></h3>
       <p>Mii Maker tricks, face presets, hair, eyes, eyebrows. Start with the Look-Alike Mii camera tool, dial in eyes and mouth before hair, save Mii Maker variants before importing to Tomodachi Life.</p>
-      <h3 id="gameplay-basics"><a href="/guides#gameplay-basics">Tomodachi Life gameplay basics</a></h3>
-      <p>Apartments, food, jobs, friendship, marriage. The four daily checks, why neutral food reactions waste money, how crush gating actually works, and the mid-game-slump reset moves.</p>
+      <h3 id="gameplay-basics"><a href="/guides#gameplay-basics">Legacy 3DS Tomodachi Life: daily-play basics</a></h3>
+      <p>A clearly labeled orientation for the original Nintendo 3DS/2DS game, with cautious request, reaction, relationship, and preservation guidance. It is not a guide to Living the Dream on Switch.</p>
       <h3 id="breach-recovery"><a href="/guides#breach-recovery">After the Tomodachishare breach</a></h3>
       <p>Step-by-step recovery: change your email password first, turn on 2FA, work through financial / cloud / identity / social accounts in priority order. 30-day monitoring rhythm.</p>
       <h3 id="qr-and-backup"><a href="/guides#qr-and-backup">QR codes, Mii sharing, save backup</a></h3>
@@ -236,7 +238,7 @@ const ROUTES: Record<string, RouteShell> = {
       <h2>Recovery + studio teasers</h2>
       <ul>
         <li><a href="/help">Tomodachi breach recovery checklist</a> — free 24-hour actions.</li>
-        <li><a href="/studio">Turn a photo into a repaintable Mii face mask</a>.</li>
+        <li><a href="/studio">Turn a photo into a custom Face Paint Copy Guide</a>.</li>
         <li><a href="/studio">Reduce colors for repaintable pixel art</a>.</li>
         <li><a href="/">Password reuse cleanup after a community breach</a>.</li>
       </ul>`,
@@ -259,7 +261,7 @@ const ROUTES: Record<string, RouteShell> = {
           },
           {
             "@type": "Article",
-            headline: "Tomodachi Life gameplay basics",
+            headline: "Legacy 3DS Tomodachi Life: daily-play basics",
             url: "https://tomodachi.pw/guides#gameplay-basics",
           },
           {
@@ -279,16 +281,16 @@ const ROUTES: Record<string, RouteShell> = {
   "/faq": {
     title: "FAQ · Tomodachi",
     description:
-      "Common questions about Tomodachi Life in 2026, breach recovery, the pixel-art Mii face mask studio, and the free AI action-plan beta.",
+      "Common questions about Tomodachi Life in 2026, the Tomodachishare breach recovery process, the Face Paint Copy Guide, and the site's AI and privacy boundaries.",
     h1: "Frequently asked questions",
     body: `
-      <h2>Tomodachi Life as a game</h2>
+      <h2>Tomodachi Life releases</h2>
       <h3>Is Tomodachi Life still playable in 2026?</h3>
-      <p>Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The eShop is closed so you can't buy it digitally anymore, but cartridges and previously-downloaded copies work fine.</p>
+      <p>Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.</p>
       <h3>Can I make my Mii look like a real person?</h3>
-      <p>Yes. The 3DS Mii Maker has a Look-Alike Mii tool that generates a rough Mii from a front-camera photo. The <a href="/guides#mii-creation">Mii creation guide</a> walks through the fine-tuning.</p>
-      <h3>What's a Mii face mask?</h3>
-      <p>A wearable in-game item that lets a Mii put on a custom face painted square-by-square. The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers reference.</p>
+      <p>Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. The <a href="/guides#mii-creation">Mii creation guide</a> clearly labels the legacy workflow.</p>
+      <h3>What is the Studio's Face Paint Copy Guide?</h3>
+      <p>The <a href="/studio">Studio</a> converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.</p>
       <h2>The Tomodachishare breach</h2>
       <h3>What was the Tomodachishare breach?</h3>
       <p>A credential dump from the Tomodachishare community site exposed email addresses and password hashes. Reused passwords elsewhere are now at elevated risk.</p>
@@ -298,9 +300,9 @@ const ROUTES: Record<string, RouteShell> = {
       <p>Change your email password before anything else (because email controls every other password reset). Then turn on 2FA on that email, then rotate other accounts. <a href="/help">Free 24-hour action plan here</a>.</p>
       <h2>The site</h2>
       <h3>Is the Studio free?</h3>
-      <p>Yes. Import, reduce, export, password breach check, AI assistant, and the current AI Action Plan beta are free. Tomodachi currently accepts no payments or consultation bookings.</p>
+      <p>Yes. Importing, reducing, exporting, the password breach check, and AI advice are available without an account. An account is required only for cloud and community features or AI image generation.</p>
       <h3>Do you store my photos or my password?</h3>
-      <p>No. The Studio runs entirely in your browser; uploads never leave the page. The password check is k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
+      <p>Local reference imports stay in your browser unless you deliberately choose a separate showcase upload for a cloud creation. Showcase files are normalized, metadata-stripped, and the raw upload is discarded. The password check uses k-anonymity, so only a 5-character SHA-1 prefix is sent.</p>`,
     jsonLd: [
       breadcrumbFor("FAQ", "/faq"),
       {
@@ -314,7 +316,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: "Is Tomodachi Life still playable in 2026?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. Tomodachi Life: Living the Dream still runs on any working 3DS or 2DS. The 3DS eShop is closed so you cannot buy it digitally anymore, but cartridges and previously-downloaded copies work fine.",
+              text: "Yes, but there are two different releases. Tomodachi Life: Living the Dream is a separate Nintendo Switch title released on April 16, 2026. The original Tomodachi Life remains playable on 3DS or 2DS hardware if you already own it. Tomodachi Studio does not transfer game files or provide an online bridge to either game.",
             },
           },
           {
@@ -322,15 +324,15 @@ const ROUTES: Record<string, RouteShell> = {
             name: "Can I make my Mii look like a real person?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. The 3DS Mii Maker has a Look-Alike Mii tool that generates a rough Mii from a front-camera photo. The Mii creation guide walks through the fine-tuning.",
+              text: "Yes. The legacy 3DS Mii Maker has a Look-Alike Mii tool for a rough camera-based starting point. Tomodachi Life: Living the Dream on Nintendo Switch has separate Get Help and From Scratch creation paths. Tomodachi Studio only provides a manual Copy Guide.",
             },
           },
           {
             "@type": "Question",
-            name: "What is a Mii face mask?",
+            name: "What is the Studio Face Paint Copy Guide?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "A wearable in-game item that lets a Mii put on a custom face painted square-by-square. The Studio converts a photo or character image into a paint-by-numbers reference.",
+              text: "Tomodachi Studio converts a photo or character image into a paint-by-numbers Copy Guide for manual recreation. It does not edit a save, upload directly to a Nintendo title, or claim exact proprietary palette or canvas dimensions.",
             },
           },
           {
@@ -362,7 +364,7 @@ const ROUTES: Record<string, RouteShell> = {
             name: "Is the Studio free?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Yes. Import, reduce, export, password breach check, the AI assistant, and the current AI Action Plan beta are free. Tomodachi currently accepts no payments or consultation bookings.",
+              text: "Yes. Importing, reducing, exporting, the password breach check, and AI advice are available without an account. An account is required only for cloud and community features or AI image generation.",
             },
           },
           {
@@ -383,15 +385,15 @@ const ROUTES: Record<string, RouteShell> = {
       "Why Tomodachi exists, what is in it, who is behind it, and how to reach the project for press or partnership.",
     h1: "About Tomodachi",
     body: `
-      <p>Tomodachi is a Mii pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first pixel-art editor for Mii face masks; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
-      <h2>Free first, community-tested</h2>
-      <p>The editor, the password check, the AI assistant, and every guide stay free. Tomodachi currently accepts no payments, tips, donations, or consultation bookings.</p>
+      <p>Tomodachi is a Mii-inspired pixel-art studio paired with practical breach recovery. The <a href="/studio">Studio</a> is a browser-first editor for original pixel art and manual Face Paint Copy Guides; the <a href="/guides">Guides</a> and <a href="/help">recovery help</a> page serve visitors arriving from the Tomodachishare breach notice.</p>
+      <h2>Useful and honest about what exists</h2>
+      <p>The editor, password check, AI assistant, and guides are ready to use. See the <a href="/ai-plan">AI Action Plan</a> for the active advice and original-artwork workflows.</p>
       <h2>Privacy on principle</h2>
-      <p>Photos never leave the browser. The password check uses k-anonymity against Have I Been Pwned. No accounts, no tracking until you opt in via the cookie banner.</p>
+      <p>Local reference imports stay in the browser unless you deliberately choose a separate, normalized showcase upload. Google accounts and private cloud projects are optional; anonymous editing and export remain available. The password check uses k-anonymity against Have I Been Pwned, and optional tracking waits for cookie consent.</p>
       <h2>How to reach the project</h2>
       <ul>
         <li>Source code &amp; issues: <a href="https://github.com/RazonIn4K/Mii-pixelart">github.com/RazonIn4K/Mii-pixelart</a></li>
-        <li>Project support: test a real workflow, report reproducible issues, or send feedback through <a href="/support">/support</a>.</li>
+        <li>Project support: test the Studio, share original work, or report useful feedback through <a href="/support">/support</a>.</li>
         <li>Brave Creators: tomodachi.pw is a verified Brave Creator.</li>
       </ul>`,
     jsonLd: [
@@ -407,14 +409,14 @@ const ROUTES: Record<string, RouteShell> = {
           "@id": "https://tomodachi.pw/#org",
           name: "Tomodachi",
           url: "https://tomodachi.pw/",
-          logo: "https://tomodachi.pw/og-image.png",
+          logo: "https://tomodachi.pw/icon-512.png",
           description:
             "Browser-first Mii pixel-art studio paired with practical Tomodachishare breach-recovery guides.",
           sameAs: ["https://github.com/RazonIn4K", "https://tomodachi.brave"],
           knowsAbout: [
             "Tomodachi Life",
             "Mii pixel art",
-            "Mii face mask",
+            "custom Face Paint reference",
             "Tomodachishare breach recovery",
             "k-anonymity password breach lookup",
           ],
@@ -438,7 +440,7 @@ const ROUTES: Record<string, RouteShell> = {
       </ol>
       <h2>Next 24 hours</h2>
       <p>Rotate passwords on accounts in priority order: financial (banks, brokerage, PayPal, crypto), cloud (Google Drive, iCloud, Dropbox), identity (Apple ID, Microsoft, Google), social (X, Instagram, Discord, Reddit), everything else. A password manager makes this an evening of work rather than a month-long fight.</p>
-      <p>For a structured checklist ordered by urgency and effort, try the free <a href="/ai-plan">AI Action Plan beta</a>. Never include passwords, recovery codes, payment details, or other secrets.</p>`,
+      <p>For personalized next steps, try the <a href="/ai-plan">AI Action Plan</a>. Review every suggestion before acting and never include passwords, recovery codes, financial account information, or other secrets.</p>`,
     jsonLd: [
       breadcrumbFor("Help", "/help"),
       {
@@ -451,22 +453,22 @@ const ROUTES: Record<string, RouteShell> = {
         inLanguage: "en",
         author: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
-        image: "https://tomodachi.pw/og-image.png",
+        image: "https://tomodachi.pw/community-og.jpg",
       },
     ],
   },
   "/ai-plan": {
     title: "AI Action Plan · Tomodachi",
     description:
-      "Try the free Tomodachi AI action-plan beta for practical, reviewable next steps. No payment or checkout is required.",
+      "Use Tomodachi's AI tools for reviewable advice and original 256×256 artwork preparation.",
     h1: "AI Action Plan",
     body: `
-      <p>Describe what you are trying to make, improve, or recover from. Tomodachi turns that context into a short checklist ordered by urgency and effort. Review every suggestion before acting.</p>
-      <h2>Available now: free beta</h2>
-      <p>The current recovery and Studio AI tools are free. Tomodachi accepts no payments and has no checkout.</p>
-      <h2>Possible one-time $5 creator plan</h2>
-      <p>An expanded plan with saved milestones, canvas-aware recommendations, one bounded regeneration, and a downloadable summary is product direction only. It is not for sale and no waitlist or payment details are collected.</p>
-      <p>Never include passwords, payment details, recovery codes, government IDs, or other secrets in an AI prompt. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
+      <p>Tell Tomodachi what you are trying to make or fix and get a short, reviewable checklist covering what to do first, what can wait, and the quickest useful next action.</p>
+      <h2>Reviewable advice</h2>
+      <p>Recovery planning is available from the home page, and creative advice is available inside the Studio. AI suggestions never change a project automatically.</p>
+      <h2>Generate original artwork for review</h2>
+      <p>Signed-in creators can describe one original square image, choose an allowlisted model, review the source, and inspect its 256×256 conversion. Nothing paints, saves, uploads, or publishes until the creator explicitly commits it.</p>
+      <p>Do not include passwords, financial account information, recovery codes, government IDs, or other secrets in an AI prompt. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>.</p>`,
     jsonLd: [
       breadcrumbFor("AI Action Plan", "/ai-plan"),
       {
@@ -475,22 +477,21 @@ const ROUTES: Record<string, RouteShell> = {
         url: "https://tomodachi.pw/ai-plan",
         name: "Tomodachi AI Action Plan",
         description:
-          "Free AI action-plan beta for practical, reviewable next steps.",
+          "A free AI action-plan beta for practical, reviewable next steps.",
         inLanguage: "en",
-        about: PUBLISHER_ORG,
-        publisher: PUBLISHER_ORG,
+        isPartOf: { "@id": "https://tomodachi.pw/#website" },
       },
     ],
   },
   "/support": {
     title: "Support · Tomodachi",
     description:
-      "Help improve Tomodachi by testing the Studio and reporting useful feedback. No payments or tips are accepted.",
-    h1: "Support the workshop",
+      "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback.",
+    h1: "Support the workshop by using it",
     body: `
-      <p>Tomodachi currently accepts no payments, tips, donations, or consultation bookings.</p>
-      <p>Test a real Studio workflow, try the free AI beta, report a reproducible issue, or send product feedback. Never include private account or project data in a public issue.</p>
-      <p><a href="/studio">Test the Studio</a> · <a href="/ai-plan">Try the AI plan</a> · <a href="https://github.com/RazonIn4K/Mii-pixelart/issues">Report an issue</a>.</p>`,
+      <p>Help by testing the Studio with a real workflow, sharing original work when community publishing opens, reporting reproducible bugs, or sending product feedback to help@tomodachi.pw.</p>
+      <p>Creators can also try the AI advice and original-artwork tools, then report where review or 256×256 conversion could be clearer.</p>
+      <p>Security reports belong at security@tomodachi.pw and should never contain passwords, session cookies, or private project files.</p>`,
     jsonLd: [
       breadcrumbFor("Support", "/support"),
       {
@@ -499,7 +500,7 @@ const ROUTES: Record<string, RouteShell> = {
         url: "https://tomodachi.pw/support",
         name: "Support the Tomodachi project",
         description:
-          "Non-payment ways to test Tomodachi, report issues, and share product feedback.",
+          "Help improve Tomodachi by testing the Studio, sharing original work, and reporting useful feedback.",
         inLanguage: "en",
         about: PUBLISHER_ORG,
         publisher: PUBLISHER_ORG,
@@ -510,8 +511,8 @@ const ROUTES: Record<string, RouteShell> = {
 
 // Routes that should resolve to identical SEO shells via aliasing.
 const ROUTE_ALIASES: Record<string, string> = {
-  "/unlock": "/ai-plan",
   "/donate": "/support",
+  "/unlock": "/ai-plan",
   "/disclosure": "/about", // /affiliate-disclosure is a separate static legal page
   "": "/",
 };

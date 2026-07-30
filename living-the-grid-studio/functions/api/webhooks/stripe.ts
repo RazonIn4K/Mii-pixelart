@@ -1,24 +1,22 @@
 /**
- * Provider-free tombstone for the retired Tomodachi payment webhook.
- *
- * The provider endpoint is disabled. This handler performs no signature
- * verification, storage mutation, logging, or outbound provider request.
+ * Retained only so stale requests receive an explicit decommissioned response.
+ * This route performs no verification, storage, logging, or external calls.
  */
 
 interface PagesContext {
   request: Request;
 }
 
-export const onRequest = async (_context: PagesContext): Promise<Response> =>
-  Response.json(
+export async function onRequest(_context: PagesContext): Promise<Response> {
+  return Response.json(
     {
       error: {
-        code: "payments_retired",
-        message: "The payment webhook is retired.",
+        code: "route_decommissioned",
+        message: "This legacy route is no longer available.",
       },
     },
-    {
-      headers: { "Cache-Control": "no-store" },
-      status: 410,
-    },
+    { headers: { "Cache-Control": "no-store" }, status: 410 },
   );
+}
+
+export const onRequestPost = onRequest;

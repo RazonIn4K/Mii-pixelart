@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Compass } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -36,8 +35,8 @@ const SUGGESTIONS: Array<{
   },
   {
     href: "/ai-plan",
-    title: "Build an AI action plan",
-    description: "Free, reviewable next steps for a creation or recovery task.",
+    title: "AI Action Plan",
+    description: "Free beta for practical, reviewable next steps.",
   },
 ];
 
@@ -45,20 +44,9 @@ export default function NotFound() {
   const [path] = useLocation();
   useDocumentTitle(
     "Page not found",
-    "The page you're looking for doesn't exist. Try the studio, free guides, or AI action plan.",
+    "The page you're looking for doesn't exist. Try the Studio, free guides, or AI Action Plan.",
+    { noindex: true },
   );
-
-  // SPA returns HTTP 200 for unmatched routes; inject a noindex hint so
-  // Googlebot doesn't accidentally index 404 URLs as real pages.
-  useEffect(() => {
-    const meta = document.createElement("meta");
-    meta.name = "robots";
-    meta.content = "noindex, follow";
-    document.head.appendChild(meta);
-    return () => {
-      meta.parentNode?.removeChild(meta);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

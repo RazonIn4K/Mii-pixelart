@@ -3,27 +3,36 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://tomodachi.pw/</loc>
-    <lastmod>2026-05-16</lastmod>
+    <lastmod>2026-07-10</lastmod>
     <image:image>
-      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
-      <image:title>Tomodachi · Mii Studio &amp; Recovery Guides</image:title>
-      <image:caption>Tomodachi is a browser-first Mii pixel-art studio paired with practical breach-recovery guides for Tomodachi Life players.</image:caption>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
+      <image:title>Tomodachi Island Workshop</image:title>
+      <image:caption>An original pixel-art tabletop workshop for Tomodachi's local-first creator studio and opt-in community.</image:caption>
     </image:image>
   </url>
   <url>
     <loc>https://tomodachi.pw/studio</loc>
-    <lastmod>2026-05-16</lastmod>
+    <lastmod>2026-07-10</lastmod>
     <image:image>
-      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
       <image:title>Tomodachi Studio · pixel-art editor</image:title>
-      <image:caption>Browser-based pixel-art editor for designing custom Mii face masks square-by-square.</image:caption>
+      <image:caption>Browser-based pixel-art editor for planning Face Paint and Palette House creations square-by-square.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://tomodachi.pw/discover</loc>
+    <lastmod>2026-07-10</lastmod>
+    <image:image>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
+      <image:title>Discover Tomodachi community creations</image:title>
+      <image:caption>Browse public, original pixel guides shared by Island Workshop creators.</image:caption>
     </image:image>
   </url>
   <url>
     <loc>https://tomodachi.pw/guides</loc>
     <lastmod>2026-05-16</lastmod>
     <image:image>
-      <image:loc>https://tomodachi.pw/og-image.png</image:loc>
+      <image:loc>https://tomodachi.pw/community-og.jpg</image:loc>
       <image:title>Tomodachi Life player guides</image:title>
       <image:caption>Free in-depth guides covering Mii creation, gameplay basics, Tomodachishare breach recovery, and QR code save backup.</image:caption>
     </image:image>

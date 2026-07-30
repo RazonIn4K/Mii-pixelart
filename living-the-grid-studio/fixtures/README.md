@@ -6,7 +6,7 @@ This directory contains test fixtures for the Living The Grid Repaint Studio.
 
 | File                              | Description                                                                               |
 | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `sample-grid-document.json`       | A minimal 4×4 test grid using 4 Tomodachi Life palette colors                             |
+| `sample-grid-document.json`       | A minimal 4×4 test grid using 4 Studio working-palette colors                              |
 | `ltg-indexed-palette-sample.json` | Synthetic indexed-palette import sample for adapter smoke tests                           |
 | `living-the-grid-real.json`       | ✅ **Real Living The Grid v2 export** (64×64, 15-color palette, from living-the-grid.com) |
 | `creative-templates/`             | 28 generated original starter designs saved as native `GridDocument` JSON                 |

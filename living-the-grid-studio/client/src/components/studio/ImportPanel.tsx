@@ -9,15 +9,21 @@ import {
   Crop,
   Crosshair,
   FileJson,
+  Gamepad2,
   Image as ImageIcon,
   Maximize2,
   RefreshCw,
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import type { GridDocument } from "@/lib/engine/grid";
+import {
+  checkImageSignature,
+  readFileSignature,
+} from "@/lib/engine/file-signature";
 import type {
   BackgroundMode,
   ImageFrameMode,
@@ -26,11 +32,16 @@ import type {
 } from "@/lib/engine/image-import";
 
 interface ImportPanelProps {
+  externalImage?: {
+    file: File;
+    requestId: string;
+  } | null;
   previewDoc: GridDocument | null;
+  onExternalImageConsumed?: (requestId: string) => void;
   onPreviewImage: (file: File, options?: Partial<ImageImportOptions>) => void;
   onCommitPreview: () => void;
   onCancelPreview: () => void;
-  onImportJson: (json: string) => void;
+  onImportJson: (json: string) => boolean;
   isLoading: boolean;
 }
 
@@ -38,6 +49,7 @@ type CropDragMode = "move" | "nw" | "ne" | "sw" | "se";
 
 interface CropDragState {
   mode: CropDragMode;
+  pointerId: number;
   startPoint: { x: number; y: number };
   startCrop: {
     x: number;
@@ -59,8 +71,36 @@ interface PreviewImageBox {
   height: number;
 }
 
+const LOCAL_IMAGE_LIMITS = {
+  bytes: 15 * 1024 * 1024,
+  dimension: 8_192,
+  pixels: 40_000_000,
+} as const;
+const LOCAL_JSON_LIMIT_BYTES = 2 * 1024 * 1024;
+
+const GAME_BRUSH_FOOTPRINTS = [4, 8, 16, 32] as const;
+
+const IMAGE_INPUT_ACCEPT = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+  "image/x-ms-bmp",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".bmp",
+].join(",");
+
 export default function ImportPanel({
+  externalImage,
   previewDoc,
+  onExternalImageConsumed,
   onPreviewImage,
   onCommitPreview,
   onCancelPreview,
@@ -71,8 +111,10 @@ export default function ImportPanel({
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const sourcePreviewRef = useRef<HTMLDivElement>(null);
   const cropDragRef = useRef<CropDragState | null>(null);
-  const [gridWidth, setGridWidth] = useState(32);
-  const [gridHeight, setGridHeight] = useState(32);
+  const validationRequestRef = useRef(0);
+  const externalImageRequestRef = useRef<string | null>(null);
+  const [gridWidth, setGridWidth] = useState(256);
+  const [gridHeight, setGridHeight] = useState(256);
   const [frameMode, setFrameMode] = useState<ImageFrameMode>("cover");
   const [focusX, setFocusX] = useState(50);
   const [focusY, setFocusY] = useState(50);
@@ -95,6 +137,7 @@ export default function ImportPanel({
     useState<Partial<ImageImportOptions> | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [isInspectingFile, setIsInspectingFile] = useState(false);
 
   const imageOptions = useMemo<Partial<ImageImportOptions>>(
     () => ({
@@ -192,8 +235,14 @@ export default function ImportPanel({
 
   const handlePreviewPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
       event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture can be unavailable for synthetic events and embedded
+        // browsers. Focus dragging still works while the pointer stays inside.
+      }
       setFocusFromPointer(event.clientX, event.clientY);
     },
     [setFocusFromPointer],
@@ -203,6 +252,13 @@ export default function ImportPanel({
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = cropDragRef.current;
       if (drag) {
+        if (drag.pointerId !== event.pointerId) return;
+        // A lost capture can be followed by hover-only pointer moves. Ending
+        // the drag here prevents the crop from remaining stuck to the cursor.
+        if (event.buttons !== 1) {
+          cropDragRef.current = null;
+          return;
+        }
         const point = getImagePointFromPointer(event.clientX, event.clientY);
         if (!point) return;
         const dx = point.x - drag.startPoint.x;
@@ -223,9 +279,15 @@ export default function ImportPanel({
 
   const handlePreviewPointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      cropDragRef.current = null;
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      if (cropDragRef.current?.pointerId === event.pointerId) {
+        cropDragRef.current = null;
+      }
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // The browser may already have released capture during cancellation.
       }
     },
     [],
@@ -233,13 +295,19 @@ export default function ImportPanel({
 
   const handleCropPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, mode: CropDragMode) => {
+      if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       const point = getImagePointFromPointer(event.clientX, event.clientY);
       if (!point) return;
-      sourcePreviewRef.current?.setPointerCapture(event.pointerId);
+      try {
+        sourcePreviewRef.current?.setPointerCapture(event.pointerId);
+      } catch {
+        // Keep the local drag functional even when capture is unavailable.
+      }
       cropDragRef.current = {
         mode,
+        pointerId: event.pointerId,
         startPoint: point,
         startCrop: {
           x: cropX,
@@ -253,35 +321,115 @@ export default function ImportPanel({
   );
 
   const processFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
+      const requestNumber = validationRequestRef.current + 1;
+      validationRequestRef.current = requestNumber;
       setImportError(null);
       const fileKind = getImportFileKind(file);
 
       if (fileKind === "json") {
+        setIsInspectingFile(false);
         setLastImageFile(null);
         setLastAppliedOptions(null);
+        if (file.size > LOCAL_JSON_LIMIT_BYTES) {
+          setImportError(
+            "That Studio JSON is larger than the 2 MiB project limit.",
+          );
+          return;
+        }
         const reader = new FileReader();
         reader.onload = () => {
+          if (validationRequestRef.current !== requestNumber) return;
           if (typeof reader.result === "string") {
-            onImportJson(reader.result);
+            const imported = onImportJson(reader.result);
+            if (!imported) {
+              setImportError(
+                "That JSON file is not a valid Tomodachi Studio document.",
+              );
+            }
           } else {
             setImportError("Could not read that JSON file.");
           }
         };
-        reader.onerror = () => setImportError("Could not read that JSON file.");
+        reader.onerror = () => {
+          if (validationRequestRef.current !== requestNumber) return;
+          setImportError("Could not read that JSON file.");
+        };
         reader.readAsText(file);
-      } else if (fileKind === "image") {
+        return;
+      }
+
+      if (fileKind === "unsupported") {
+        setIsInspectingFile(false);
+        setImportError(
+          "Unsupported file. Choose PNG, JPG, GIF, WebP, AVIF, BMP, or Studio JSON. SVG, HEIC, and TIFF are not accepted.",
+        );
+        return;
+      }
+
+      if (file.size > LOCAL_IMAGE_LIMITS.bytes) {
+        setIsInspectingFile(false);
+        setImportError("That image is larger than the 15 MB local limit.");
+        return;
+      }
+
+      setIsInspectingFile(true);
+      try {
+        // Content check before any decode work: the extension and MIME type
+        // are attacker-controlled metadata, so verify the actual leading
+        // bytes match a supported raster signature.
+        const signature = checkImageSignature(
+          await readFileSignature(file),
+          file.name,
+          file.type,
+        );
+        if (validationRequestRef.current !== requestNumber) return;
+        if (!signature.ok) {
+          setImportError(
+            signature.reason === "svg"
+              ? "SVG files are not accepted, even when renamed. Export the graphic as PNG and import that instead."
+              : signature.reason === "mismatch"
+                ? "That file's content does not match its extension. Re-export the image as PNG, JPG, or WebP and try again."
+                : "That file is not a recognizable PNG, JPG, GIF, WebP, AVIF, or BMP image.",
+          );
+          return;
+        }
+
+        const dimensions = await decodeImageDimensions(file);
+        if (validationRequestRef.current !== requestNumber) return;
+        const dimensionError = validateDecodedDimensions(dimensions);
+        if (dimensionError) {
+          setImportError(dimensionError);
+          return;
+        }
         setLastImageFile(file);
         setLastAppliedOptions(imageOptions);
         onPreviewImage(file, imageOptions);
-      } else {
+      } catch {
+        if (validationRequestRef.current !== requestNumber) return;
         setImportError(
-          "Unsupported file. Use PNG, JPG, GIF, WebP, AVIF, BMP, or JSON.",
+          "This browser could not decode that image. Try PNG, JPG, or WebP, or convert the file before importing.",
         );
+      } finally {
+        if (validationRequestRef.current === requestNumber) {
+          setIsInspectingFile(false);
+        }
       }
     },
     [imageOptions, onPreviewImage, onImportJson],
   );
+
+  useEffect(() => {
+    if (
+      !externalImage ||
+      externalImageRequestRef.current === externalImage.requestId
+    ) {
+      return;
+    }
+    externalImageRequestRef.current = externalImage.requestId;
+    onExternalImageConsumed?.(externalImage.requestId);
+    void processFile(externalImage.file);
+  }, [externalImage, onExternalImageConsumed, processFile]);
 
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {
@@ -289,7 +437,7 @@ export default function ImportPanel({
       setIsDragOver(false);
       const file = e.dataTransfer.files[0];
       if (!file) return;
-      processFile(file);
+      void processFile(file);
     },
     [processFile],
   );
@@ -308,7 +456,7 @@ export default function ImportPanel({
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) processFile(file);
+      if (file) void processFile(file);
       e.currentTarget.value = "";
     },
     [processFile],
@@ -337,9 +485,9 @@ export default function ImportPanel({
     setCropValues(...getSourceSquareCrop(sourceImageSize, "head"));
   }, [setCropValues, sourceImageSize]);
 
-  const applyMiiMaskPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+  const applyFacePaintPreset = useCallback(() => {
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(38);
@@ -354,8 +502,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyCharacterPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(44);
@@ -370,8 +518,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyFaceDetailPreset = useCallback(() => {
-    setGridWidth(96);
-    setGridHeight(96);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(38);
@@ -386,8 +534,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyCharacterDetailPreset = useCallback(() => {
-    setGridWidth(128);
-    setGridHeight(128);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("cover");
     setFocusX(50);
     setFocusY(45);
@@ -402,8 +550,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applySpritePreset = useCallback(() => {
-    setGridWidth(32);
-    setGridHeight(32);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -418,8 +566,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyLogoPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -434,8 +582,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyStickerPreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -450,8 +598,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyIconPreset = useCallback(() => {
-    setGridWidth(16);
-    setGridHeight(16);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -466,8 +614,8 @@ export default function ImportPanel({
   }, [setCropValues]);
 
   const applyFullImagePreset = useCallback(() => {
-    setGridWidth(64);
-    setGridHeight(64);
+    setGridWidth(256);
+    setGridHeight(256);
     setFrameMode("contain");
     setFocusX(50);
     setFocusY(50);
@@ -497,6 +645,12 @@ export default function ImportPanel({
     setSamplingMode("crisp");
   }, [setCropValues]);
 
+  const applyGameMatchedGrid = useCallback(() => {
+    setGridWidth(256);
+    setGridHeight(256);
+    setSamplingMode("crisp");
+  }, []);
+
   const hasPendingImageChanges =
     !!lastImageFile && !areImageOptionsEqual(imageOptions, lastAppliedOptions);
   const hasCurrentPreview = !!previewDoc && !hasPendingImageChanges;
@@ -516,7 +670,7 @@ export default function ImportPanel({
       <div>
         <p className="section-header mb-1">Import</p>
         <p className="text-xs text-muted-foreground">
-          Drop a character, face, logo, meme, or JSON file to begin.
+          Drop a character, face, logo, meme, or Studio JSON file to begin.
         </p>
       </div>
 
@@ -538,52 +692,78 @@ export default function ImportPanel({
         <p className="text-xs text-muted-foreground mb-3">Drag & drop here</p>
         <div className="flex items-center justify-center gap-2">
           <Button
-            asChild
+            type="button"
             variant="outline"
             size="sm"
-            className={`cursor-pointer text-xs ${
-              isLoading ? "pointer-events-none opacity-50" : ""
-            }`}
+            className="text-xs"
+            disabled={isLoading || isInspectingFile}
+            aria-describedby="studio-supported-formats"
+            onClick={() => fileInputRef.current?.click()}
           >
-            <label htmlFor="ltg-image-input" aria-disabled={isLoading}>
-              <ImageIcon className="w-3 h-3 mr-1" />
-              Image
-            </label>
+            <ImageIcon className="w-3 h-3 mr-1" />
+            Image
           </Button>
           <Button
-            asChild
+            type="button"
             variant="outline"
             size="sm"
-            className={`cursor-pointer text-xs ${
-              isLoading ? "pointer-events-none opacity-50" : ""
-            }`}
+            className="text-xs"
+            disabled={isLoading || isInspectingFile}
+            onClick={() => jsonInputRef.current?.click()}
           >
-            <label htmlFor="ltg-json-input" aria-disabled={isLoading}>
-              <FileJson className="w-3 h-3 mr-1" />
-              JSON
-            </label>
+            <FileJson className="w-3 h-3 mr-1" />
+            JSON
           </Button>
         </div>
         <input
           id="ltg-image-input"
+          name="studio-image-file"
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp"
+          accept={IMAGE_INPUT_ACCEPT}
+          aria-hidden="true"
+          tabIndex={-1}
           className="sr-only"
           onChange={handleFileSelect}
         />
         <input
           id="ltg-json-input"
+          name="studio-json-file"
           ref={jsonInputRef}
           type="file"
           accept=".json"
+          aria-hidden="true"
+          tabIndex={-1}
           className="sr-only"
           onChange={handleFileSelect}
         />
+        <p
+          id="studio-supported-formats"
+          className="mt-3 text-[0.68rem] font-medium leading-5 text-muted-foreground"
+        >
+          PNG, JPG, GIF (first frame), WebP, AVIF, or BMP · up to 15 MB, 8192px
+          per side, and 40 megapixels.
+        </p>
+        <p className="mt-1 text-[0.65rem] leading-4 text-muted-foreground">
+          SVG, HEIC, and TIFF are not supported. Source images stay in this
+          browser; only the converted grid is saved if you opt into cloud sync.
+        </p>
       </div>
 
+      {isInspectingFile ? (
+        <p
+          className="rounded-sm border border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground"
+          role="status"
+        >
+          Checking image format and dimensions…
+        </p>
+      ) : null}
+
       {importError && (
-        <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-3">
+        <div
+          className="rounded-sm border border-destructive/30 bg-destructive/10 p-3"
+          role="alert"
+        >
           <p className="text-xs leading-relaxed text-destructive">
             {importError}
           </p>
@@ -598,19 +778,26 @@ export default function ImportPanel({
               <p className="text-xs font-medium truncate">
                 {lastImageFile.name}
               </p>
-              <p className="text-[0.7rem] text-muted-foreground">
-                {hasPendingImageChanges
-                  ? "Settings changed"
-                  : previewDoc
-                    ? "Preview ready"
-                    : "Source image ready"}
+              <p
+                className="text-[0.7rem] text-muted-foreground"
+                aria-live="polite"
+              >
+                {isInspectingFile
+                  ? "Checking source image…"
+                  : isLoading
+                    ? "Building preview…"
+                    : hasPendingImageChanges
+                      ? "Settings changed"
+                      : previewDoc
+                        ? "Preview ready"
+                        : "Source image ready"}
               </p>
             </div>
           </div>
           {sourcePreviewUrl && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Source Frame</Label>
+                <p className="text-xs font-semibold">Source Frame</p>
                 <span className="text-[0.7rem] text-muted-foreground">
                   {Math.round(cropWidth)}×{Math.round(cropHeight)}%
                 </span>
@@ -622,6 +809,7 @@ export default function ImportPanel({
                 onPointerMove={handlePreviewPointerMove}
                 onPointerUp={handlePreviewPointerUp}
                 onPointerCancel={handlePreviewPointerUp}
+                onLostPointerCapture={handlePreviewPointerUp}
                 aria-label="Set image crop and subject position"
                 role="img"
               >
@@ -716,6 +904,57 @@ export default function ImportPanel({
                   Head
                 </Button>
               </div>
+              <fieldset className="rounded-sm border border-border/80 p-2.5">
+                <legend className="px-1 text-xs font-semibold">
+                  Crop values
+                </legend>
+                <p
+                  id="crop-keyboard-help"
+                  className="mb-2 text-[0.68rem] leading-4 text-muted-foreground"
+                >
+                  Enter percentages or use the arrow keys for precise framing.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <CropNumberControl
+                    id="studio-crop-x"
+                    label="Crop X"
+                    value={cropX}
+                    max={100 - cropWidth}
+                    onChange={(value) =>
+                      setCropValues(value, cropY, cropWidth, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-y"
+                    label="Crop Y"
+                    value={cropY}
+                    max={100 - cropHeight}
+                    onChange={(value) =>
+                      setCropValues(cropX, value, cropWidth, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-width"
+                    label="Crop width"
+                    value={cropWidth}
+                    min={8}
+                    max={100 - cropX}
+                    onChange={(value) =>
+                      setCropValues(cropX, cropY, value, cropHeight)
+                    }
+                  />
+                  <CropNumberControl
+                    id="studio-crop-height"
+                    label="Crop height"
+                    value={cropHeight}
+                    min={8}
+                    max={100 - cropY}
+                    onChange={(value) =>
+                      setCropValues(cropX, cropY, cropWidth, value)
+                    }
+                  />
+                </div>
+              </fieldset>
             </div>
           )}
           <Button
@@ -724,7 +963,7 @@ export default function ImportPanel({
             className="w-full justify-start text-xs"
             variant={hasPendingImageChanges ? "default" : "outline"}
             onClick={handleReprocessImage}
-            disabled={isLoading}
+            disabled={isLoading || isInspectingFile}
             aria-label="Update preview using the same source file"
           >
             <RefreshCw className="w-3.5 h-3.5 mr-2" />
@@ -738,7 +977,7 @@ export default function ImportPanel({
                 size="sm"
                 className="text-xs"
                 onClick={onCommitPreview}
-                disabled={isLoading || !hasCurrentPreview}
+                disabled={isLoading || isInspectingFile || !hasCurrentPreview}
               >
                 Commit Preview
               </Button>
@@ -748,7 +987,7 @@ export default function ImportPanel({
                 className="text-xs"
                 variant="outline"
                 onClick={handleCancelPreview}
-                disabled={isLoading}
+                disabled={isLoading || isInspectingFile}
               >
                 Cancel
               </Button>
@@ -764,16 +1003,61 @@ export default function ImportPanel({
 
       {/* Grid Size Controls */}
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Use Case Presets</Label>
+        <div className="rounded-xl border border-[#24786f]/25 bg-[#e8f5ef] p-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-black text-[#17384a]">
+            <Gamepad2 className="size-3.5" /> Game-matched surface
+          </div>
+          <p className="mt-1 text-[0.68rem] leading-4 text-[#526975]">
+            The drawing surface stays 256×256: one Studio cell equals one game
+            pixel. Choose a 4, 8, 16, or 32px snapped stamp after import.
+          </p>
+          <div
+            className="mt-2 grid gap-1.5"
+            role="group"
+            aria-label="Game-matched surface"
+          >
+            <Button
+              type="button"
+              variant={
+                gridWidth === 256 && gridHeight === 256 ? "default" : "outline"
+              }
+              size="sm"
+              className="h-auto min-h-11 justify-between rounded-lg py-2 text-xs"
+              aria-pressed={gridWidth === 256 && gridHeight === 256}
+              onClick={applyGameMatchedGrid}
+            >
+              <span className="font-black">256×256 game pixels</span>
+              <span className="text-[0.62rem] opacity-80">
+                one-for-one surface
+              </span>
+            </Button>
+            <div
+              className="grid grid-cols-4 gap-1"
+              role="list"
+              aria-label="Available snapped brush footprints"
+            >
+              {GAME_BRUSH_FOOTPRINTS.map((brushPixels) => (
+                <span
+                  key={brushPixels}
+                  className="rounded-md bg-white px-1 py-1.5 text-center font-mono text-[0.62rem] font-black text-[#526975]"
+                  role="listitem"
+                >
+                  {brushPixels}px
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs font-semibold">Use Case Presets</p>
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="text-xs"
-            onClick={applyMiiMaskPreset}
+            onClick={applyFacePaintPreset}
           >
-            Mii Mask
+            Face Paint
           </Button>
           <Button
             type="button"
@@ -782,7 +1066,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyCharacterPreset}
           >
-            Character 64
+            Character
           </Button>
           <Button
             type="button"
@@ -791,7 +1075,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyFaceDetailPreset}
           >
-            Face 96
+            Face detail
           </Button>
           <Button
             type="button"
@@ -800,7 +1084,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyCharacterDetailPreset}
           >
-            Character 128
+            Character detail
           </Button>
           <Button
             type="button"
@@ -809,7 +1093,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applySpritePreset}
           >
-            Sprite 32
+            Sprite blocks
           </Button>
           <Button
             type="button"
@@ -818,7 +1102,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyLogoPreset}
           >
-            Logo 64
+            Logo
           </Button>
           <Button
             type="button"
@@ -827,7 +1111,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyStickerPreset}
           >
-            Sticker 64
+            Sticker
           </Button>
           <Button
             type="button"
@@ -836,7 +1120,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyIconPreset}
           >
-            Icon 16
+            Icon blocks
           </Button>
           <Button
             type="button"
@@ -845,7 +1129,7 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyFullImagePreset}
           >
-            Full 64
+            Full image
           </Button>
           <Button
             type="button"
@@ -854,13 +1138,14 @@ export default function ImportPanel({
             className="text-xs"
             onClick={applyPixelDetailPreset}
           >
-            Pixel 256
+            Pixel detail
           </Button>
         </div>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-10">Width</span>
             <Slider
+              aria-label="Grid width"
               value={[gridWidth]}
               onValueChange={([v]) => setGridWidth(v)}
               min={8}
@@ -875,6 +1160,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-10">Height</span>
             <Slider
+              aria-label="Grid height"
               value={[gridHeight]}
               onValueChange={([v]) => setGridHeight(v)}
               min={8}
@@ -890,7 +1176,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Framing</Label>
+        <p className="text-xs font-semibold">Framing</p>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
@@ -915,6 +1201,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Focus X</span>
             <Slider
+              aria-label="Horizontal image focus"
               value={[focusX]}
               onValueChange={([v]) => setFocusX(v)}
               min={0}
@@ -927,6 +1214,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Focus Y</span>
             <Slider
+              aria-label="Vertical image focus"
               value={[focusY]}
               onValueChange={([v]) => setFocusY(v)}
               min={0}
@@ -940,7 +1228,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Source Type</Label>
+        <p className="text-xs font-semibold">Source Type</p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -963,7 +1251,7 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Background</Label>
+        <p className="text-xs font-semibold">Background</p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -989,6 +1277,7 @@ export default function ImportPanel({
               Tolerance
             </span>
             <Slider
+              aria-label="Background cleanup tolerance"
               value={[backgroundTolerance]}
               onValueChange={([v]) => setBackgroundTolerance(v)}
               min={8}
@@ -1004,11 +1293,12 @@ export default function ImportPanel({
       </div>
 
       <div className="space-y-3 p-3 rounded-sm border border-border bg-card">
-        <Label className="text-xs font-semibold">Image Adjustments</Label>
+        <p className="text-xs font-semibold">Image Adjustments</p>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Colors</span>
             <Slider
+              aria-label="Maximum palette colors"
               value={[maxColors]}
               onValueChange={([v]) => setMaxColors(v)}
               min={0}
@@ -1023,6 +1313,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Bright</span>
             <Slider
+              aria-label="Image brightness"
               value={[brightness]}
               onValueChange={([v]) => setBrightness(v)}
               min={50}
@@ -1037,6 +1328,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Contrast</span>
             <Slider
+              aria-label="Image contrast"
               value={[contrast]}
               onValueChange={([v]) => setContrast(v)}
               min={50}
@@ -1051,6 +1343,7 @@ export default function ImportPanel({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-16">Saturate</span>
             <Slider
+              aria-label="Image saturation"
               value={[saturation]}
               onValueChange={([v]) => setSaturation(v)}
               min={0}
@@ -1071,6 +1364,55 @@ export default function ImportPanel({
           <p className="text-xs text-muted-foreground mt-2">Converting...</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function CropNumberControl({
+  id,
+  label,
+  value,
+  min = 0,
+  max,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min?: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <Label htmlFor={id} className="text-[0.68rem] text-muted-foreground">
+        {label}
+      </Label>
+      <div className="relative">
+        <Input
+          id={id}
+          name={id}
+          autoComplete="off"
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          step={1}
+          value={value}
+          aria-describedby="crop-keyboard-help"
+          className="h-8 pr-7 font-mono text-xs"
+          onChange={(event) => {
+            const nextValue = event.currentTarget.valueAsNumber;
+            if (Number.isFinite(nextValue)) onChange(nextValue);
+          }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[0.65rem] text-muted-foreground"
+        >
+          %
+        </span>
+      </div>
     </div>
   );
 }
@@ -1222,20 +1564,114 @@ function getSourceSquareCrop(
 
 type ImportFileKind = "image" | "json" | "unsupported";
 
-const IMAGE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "avif",
-  "bmp",
+const IMAGE_TYPES_BY_EXTENSION = new Map<string, ReadonlySet<string>>([
+  ["png", new Set(["image/png"])],
+  ["jpg", new Set(["image/jpeg"])],
+  ["jpeg", new Set(["image/jpeg"])],
+  ["gif", new Set(["image/gif"])],
+  ["webp", new Set(["image/webp"])],
+  ["avif", new Set(["image/avif"])],
+  ["bmp", new Set(["image/bmp", "image/x-ms-bmp"])],
+]);
+
+const ALLOWED_IMAGE_MIME_TYPES = new Set(
+  Array.from(IMAGE_TYPES_BY_EXTENSION.values()).flatMap((types) =>
+    Array.from(types),
+  ),
+);
+
+const ALLOWED_JSON_MIME_TYPES = new Set([
+  "application/json",
+  "text/json",
+  "text/plain",
 ]);
 
 function getImportFileKind(file: File): ImportFileKind {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (extension === "json" || file.type === "application/json") return "json";
-  if (file.type.startsWith("image/") || IMAGE_EXTENSIONS.has(extension))
-    return "image";
+  const mimeType = file.type.trim().toLowerCase();
+  if (
+    (extension === "json" &&
+      (!mimeType || ALLOWED_JSON_MIME_TYPES.has(mimeType))) ||
+    (!extension && mimeType === "application/json")
+  ) {
+    return "json";
+  }
+
+  const allowedForExtension = IMAGE_TYPES_BY_EXTENSION.get(extension);
+  if (allowedForExtension) {
+    return !mimeType || allowedForExtension.has(mimeType)
+      ? "image"
+      : "unsupported";
+  }
+
+  if (!extension && ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) return "image";
   return "unsupported";
+}
+
+interface DecodedImageDimensions {
+  height: number;
+  width: number;
+}
+
+async function decodeImageDimensions(
+  file: File,
+): Promise<DecodedImageDimensions> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const dimensions = { height: bitmap.height, width: bitmap.width };
+      bitmap.close();
+      return dimensions;
+    } catch {
+      // Some browsers can display a format that createImageBitmap cannot
+      // decode. The HTML image fallback keeps support capability-based.
+    }
+  }
+
+  return await new Promise<DecodedImageDimensions>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    const finish = () => {
+      image.onload = null;
+      image.onerror = null;
+      URL.revokeObjectURL(objectUrl);
+    };
+    image.onload = () => {
+      const dimensions = {
+        height: image.naturalHeight,
+        width: image.naturalWidth,
+      };
+      finish();
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      finish();
+      reject(new Error("Image decoding failed"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function validateDecodedDimensions({
+  height,
+  width,
+}: DecodedImageDimensions): string | null {
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1
+  ) {
+    return "That image does not have valid pixel dimensions.";
+  }
+  if (
+    width > LOCAL_IMAGE_LIMITS.dimension ||
+    height > LOCAL_IMAGE_LIMITS.dimension
+  ) {
+    return "Image dimensions must not exceed 8192×8192 pixels.";
+  }
+  if (width * height > LOCAL_IMAGE_LIMITS.pixels) {
+    return "That image contains more than the 40 megapixel local limit.";
+  }
+  return null;
 }

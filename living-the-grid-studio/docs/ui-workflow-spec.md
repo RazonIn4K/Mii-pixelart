@@ -1,7 +1,7 @@
 # UI Workflow Specification — Living The Grid Repaint Studio
 
 **Version:** 1.0  
-**Last Updated:** 2026-04-26
+**Last Updated:** 2026-07-14
 
 ---
 
@@ -12,7 +12,7 @@ The studio uses an asymmetric two-column layout optimized for the primary task o
 | Zone | Width | Content |
 |------|-------|---------|
 | Canvas workspace | ~65% | Grid rendering with zoom, pan, grid lines, and labels |
-| Control panel | ~35% (320-384px) | Tabbed sidebar with Import, Palette, Optimize, Export |
+| Control panel | ~35% (320-384px) | Task-oriented sidebar with Import, Create, Palette, Optimize, AI, Copy Guide, and Export |
 | Top bar | Full width, 44px | Project name, view toggles, undo/redo |
 
 ## Navigation
@@ -26,14 +26,15 @@ The top bar provides a home button to return to the landing page from the studio
 
 ## Tab Workflow
 
-The control panel uses four tabs that correspond to the linear workflow:
+The control panel uses seven keyboard-operable tabs grouped into Start, Edit,
+Improve, and Finish:
 
 ### Tab 1: Import
 
 **Purpose:** Load a project from an image or JSON file.
 
 **Controls:**
-- Drag-and-drop zone accepting images (PNG, JPG, GIF) and JSON files.
+- Drag-and-drop zone accepting images (PNG, JPG, GIF, WebP, AVIF, and BMP) and JSON files.
 - Separate buttons for "Image" and "JSON" file pickers.
 - Grid size sliders (width and height, 8-256, step 8) for image imports.
 - Loading spinner during conversion.
@@ -44,7 +45,30 @@ The control panel uses four tabs that correspond to the linear workflow:
 - On success, the canvas displays the grid and the Palette tab populates.
 - On error, a toast notification explains the issue.
 
-### Tab 2: Palette
+### Tab 2: Create
+
+**Purpose:** Paint and inspect the current grid with the same canvas used by the
+rest of the Studio workflow.
+
+**Controls:**
+- Pencil, eraser, eyedropper, fill, and inspect tools.
+- Smooth 1/3/7/13/19/27px and snapped 4/8/16/32px brush footprints.
+- Mirror, independent cell/stamp/section/center guides, zoom, fit, and hand-pan controls.
+- Quick colors plus access to the complete Studio palette.
+- Undo and redo for bounded document edits.
+
+**Behavior:**
+- New work starts on one transparent 256×256 reference surface. Older/custom
+  documents remain editable but are never labeled one-for-one until explicitly
+  converted.
+- Pointer, pen, touch, mouse, and keyboard input edit one authoritative canvas.
+- The cursor outlines the exact cells a smooth or snapped footprint will mutate.
+- A browser-local source can remain beside the canvas or appear Under, Over, or
+  in a Split comparison without entering project data.
+- A completed stroke is one undoable operation.
+- Switching tools safely closes any active stroke.
+
+### Tab 3: Palette
 
 **Purpose:** Inspect and manage the colors used in the current grid.
 
@@ -57,7 +81,7 @@ The control panel uses four tabs that correspond to the linear workflow:
    - Usage bar (proportional width)
    - Lock/unlock toggle
    - Merge button
-3. **Game Palette Reference:** 11×7 grid of all 77 base colors plus a row of 7 saturated extras. Colors in use get a visible border.
+3. **Studio Palette Reference:** 11×7 grid of all 77 base colors plus a row of 7 saturated extras. Colors in use get a visible border.
 
 **Interactions:**
 - Hovering a swatch highlights all cells of that color on the canvas.
@@ -65,7 +89,7 @@ The control panel uses four tabs that correspond to the linear workflow:
 - Clicking the merge button enters "merge mode": the next color clicked becomes the merge target.
 - Clicking the lock button protects the color from optimizer passes.
 
-### Tab 3: Optimize
+### Tab 4: Optimize
 
 **Purpose:** Run deterministic optimization passes to simplify the grid.
 
@@ -81,7 +105,38 @@ The control panel uses four tabs that correspond to the linear workflow:
 - A toast notification summarizes the results (colors removed, cells changed).
 - The palette tab updates to reflect the new color distribution.
 
-### Tab 4: Export
+### Tab 5: AI
+
+**Purpose:** Request a bounded, validated pixel sketch or refinement without
+giving a model direct control of the canvas.
+
+**Controls:**
+- Curated model and creation-mode choices.
+- Prompt input and explicit current-grid snapshot consent.
+- Review, apply, and discard actions for a returned sketch.
+
+**Behavior:**
+- AI use requires an onboarded account and explicit third-party-processing
+  consent.
+- Only validated palette IDs and bounded dimensions can reach the review step.
+- Applying an accepted sketch creates one undoable document revision.
+
+### Tab 6: Copy Guide
+
+**Purpose:** Recreate the current artwork manually, row by row, without
+mutating it.
+
+**Controls:**
+- Previous, complete-and-next, next, and reset progress actions.
+- Deterministic one-based row runs with palette identifiers and highlighted
+  cells on the existing canvas.
+- Direct access to the browser-local reference image when one is available.
+
+**Behavior:**
+- Copy Guide keeps the canvas read-only and never creates a project revision.
+- Progress stays in local browser storage for the current project.
+
+### Tab 7: Export
 
 **Purpose:** Download the finished project in various formats.
 
@@ -89,7 +144,9 @@ The control panel uses four tabs that correspond to the linear workflow:
 - **Export JSON:** Downloads the GridDocument as a `.json` file.
 - **Export Guide (with labels):** Downloads a PNG with grid lines and paint-by-numbers labels.
 - **Export Clean Image:** Downloads a PNG without grid lines or labels.
-- **Export Reference Pack:** Downloads all three files (JSON, labeled PNG, HTML reference page).
+- **Export Reference Pack:** Downloads a ZIP containing project JSON, labeled
+  and clean PNG guides, a palette sheet, paint-order CSV, notes, a manifest,
+  and an HTML reference page.
 
 ## Keyboard Shortcuts
 
@@ -110,7 +167,7 @@ When no project is loaded, the canvas area displays a centered illustration with
 Merge mode is a temporary state activated by clicking the merge button on a color:
 
 1. A banner appears at the top of the control panel: "Merge mode: Click a target color to merge [source] into it."
-2. The user clicks any other color (in the palette list, the game palette grid, or directly on the canvas).
+2. The user clicks any other color (in the palette list, the Studio palette grid, or directly on the canvas).
 3. All cells of the source color are replaced with the target color.
 4. A toast confirms the merge.
 5. Merge mode exits automatically. The user can also cancel by clicking "Cancel" in the banner.

@@ -44,7 +44,7 @@ export interface GridMeta {
   notes?: string;
 }
 
-/** Mapping from an imported palette entry to a game palette color */
+/** Mapping from an imported palette entry to a Studio working color */
 export interface SourcePaletteMapping {
   sourceIndex: number;
   sourceHex: string;
@@ -75,6 +75,46 @@ export interface GridDocument {
   usedColors: string[];
   /** Color lock states: locked colors won't be changed by optimizer */
   lockedColors: string[];
+}
+
+/**
+ * Ephemeral render-only delta between immutable documents. It is held in a
+ * WeakMap, never serialized, and lets the canvas update a few changed pixels
+ * without rebuilding the complete 256×256 bitmap on every pointer sample.
+ */
+export interface GridMutationHint {
+  base: GridDocument;
+  updates: ReadonlyArray<{
+    colorId: string | null;
+    index: number;
+  }>;
+}
+
+const gridMutationHints = new WeakMap<GridDocument, GridMutationHint>();
+
+/**
+ * Consume a render delta exactly once.
+ *
+ * A hint strongly references its immutable base document so the renderer can
+ * derive the next bitmap. Leaving a consumed hint in the WeakMap would let the
+ * newest document retain every intermediate document in a long stroke. Taking
+ * deletes the entry before rendering, which keeps the optimization without
+ * turning an in-progress stroke into a retained document chain.
+ */
+export function takeGridMutationHint(
+  doc: GridDocument,
+): GridMutationHint | null {
+  const hint = gridMutationHints.get(doc) ?? null;
+  gridMutationHints.delete(doc);
+  return hint;
+}
+
+function recordGridMutation(
+  doc: GridDocument,
+  hint: GridMutationHint,
+): GridDocument {
+  gridMutationHints.set(doc, hint);
+  return doc;
 }
 
 // ─── Factory ──────────────────────────────────────────────────
@@ -122,13 +162,18 @@ export function setCell(
   colorId: string | null,
 ): GridDocument {
   if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) return doc;
+  const index = y * doc.width + x;
+  if (doc.cells[index] === colorId) return doc;
   const cells = [...doc.cells];
-  cells[y * doc.width + x] = colorId;
-  return {
-    ...doc,
-    cells,
-    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
-  };
+  cells[index] = colorId;
+  return recordGridMutation(
+    {
+      ...doc,
+      cells,
+      meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+    },
+    { base: doc, updates: [{ colorId, index }] },
+  );
 }
 
 /**
@@ -152,21 +197,28 @@ export function setCells(
   colorId: string | null,
 ): GridDocument {
   let nextCells: (string | null)[] | null = null;
+  const changedIndices: number[] = [];
   for (const { x, y } of cells) {
     if (x < 0 || x >= doc.width || y < 0 || y >= doc.height) continue;
     const index = y * doc.width + x;
-    if (nextCells === null) {
-      if (doc.cells[index] === colorId) continue;
-      nextCells = [...doc.cells];
-    }
+    const currentCells = nextCells ?? doc.cells;
+    if (currentCells[index] === colorId) continue;
+    if (nextCells === null) nextCells = [...doc.cells];
     nextCells[index] = colorId;
+    changedIndices.push(index);
   }
   if (nextCells === null) return doc;
-  return {
-    ...doc,
-    cells: nextCells,
-    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
-  };
+  return recordGridMutation(
+    {
+      ...doc,
+      cells: nextCells,
+      meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+    },
+    {
+      base: doc,
+      updates: changedIndices.map((index) => ({ colorId, index })),
+    },
+  );
 }
 
 /**
@@ -233,11 +285,14 @@ export function recomputeUsedColors(doc: GridDocument): GridDocument {
   for (const id of doc.cells) {
     if (id !== null) usedSet.add(id);
   }
-  return {
-    ...doc,
-    usedColors: Array.from(usedSet),
-    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
-  };
+  return recordGridMutation(
+    {
+      ...doc,
+      usedColors: Array.from(usedSet),
+      meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+    },
+    { base: doc, updates: [] },
+  );
 }
 
 /** Replace all occurrences of one color with another */
@@ -332,6 +387,55 @@ export function resampleGridNearest(
         Math.floor(((x + 0.5) / newWidth) * doc.width),
       );
       cells[y * newWidth + x] = doc.cells[sourceY * doc.width + sourceX];
+    }
+  }
+
+  return recomputeUsedColors({
+    ...doc,
+    width: newWidth,
+    height: newHeight,
+    cells,
+    meta: { ...doc.meta, modifiedAt: new Date().toISOString() },
+  });
+}
+
+/**
+ * Place a grid on a new transparent surface without changing its aspect ratio.
+ *
+ * Upscaling uses the largest whole-number multiplier that fits so one source
+ * cell always becomes a countable square block. This is the safe conversion
+ * for compact imports and AI sketches targeting the game's 256×256 surface;
+ * unlike an independent width/height resize, portraits and wide marks are not
+ * stretched into different horizontal and vertical brush footprints.
+ */
+export function containGridNearest(
+  doc: GridDocument,
+  newWidth: number,
+  newHeight: number,
+): GridDocument {
+  if (newWidth <= 0 || newHeight <= 0) return doc;
+  if (newWidth === doc.width && newHeight === doc.height) return doc;
+
+  const fitScale = Math.min(newWidth / doc.width, newHeight / doc.height);
+  const scale = fitScale >= 1 ? Math.max(1, Math.floor(fitScale)) : fitScale;
+  const contentWidth = Math.max(
+    1,
+    Math.min(newWidth, Math.round(doc.width * scale)),
+  );
+  const contentHeight = Math.max(
+    1,
+    Math.min(newHeight, Math.round(doc.height * scale)),
+  );
+  const content = resampleGridNearest(doc, contentWidth, contentHeight);
+  const offsetX = Math.floor((newWidth - contentWidth) / 2);
+  const offsetY = Math.floor((newHeight - contentHeight) / 2);
+  const cells: (string | null)[] = new Array(newWidth * newHeight).fill(null);
+
+  for (let y = 0; y < contentHeight; y += 1) {
+    const sourceOffset = y * contentWidth;
+    const destinationOffset = (offsetY + y) * newWidth + offsetX;
+    for (let x = 0; x < contentWidth; x += 1) {
+      cells[destinationOffset + x] = content.cells[sourceOffset + x];
     }
   }
 

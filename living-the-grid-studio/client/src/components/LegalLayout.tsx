@@ -20,6 +20,7 @@ const otherDocs: Array<{ href: string; label: string }> = [
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms of Service" },
   { href: "/cookies", label: "Cookie Notice" },
+  { href: "/security", label: "Security" },
   { href: "/affiliate-disclosure", label: "Affiliate Disclosure" },
 ];
 

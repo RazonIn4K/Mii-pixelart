@@ -30,7 +30,7 @@ The `reference-page.html` template (below) is used as the base for the HTML expo
   <title>{{PROJECT_NAME}} — Reference Pack</title>
   <style>
     body {
-      font-family: "Noto Sans JP", sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
       background: #FAFAF5;
       color: #4A4A4A;
       padding: 2rem;
