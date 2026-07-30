@@ -158,16 +158,31 @@ test("game-matched drawing setup separates brush, cell lines, and game guides", 
     "pixel-perfect",
   );
   await expect(canvas).toHaveAttribute("data-brush-grid-step", "4");
-  await expect(canvas).toHaveAttribute("data-brush-grid-lines", "suppressed");
+  await expect(canvas).toHaveAttribute("data-brush-grid-lines", "visible");
   await expect(canvas).toHaveAttribute("data-center-guide", "visible");
   await expect(canvas).toHaveAttribute("data-game-grid-sections", "8");
   await expect(
     page.getByRole("button", { name: "In-game grid view: 8×8" }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  // At Fit, a true 1px smooth brush is intentionally one CSS pixel wide. The
-  // high-contrast aid must stay visible while the exact hitbox remains one
-  // canonical cell.
+  const paintControlsBox = await page
+    .locator('[aria-label="Canvas paint controls"]')
+    .boundingBox();
+  const workspaceBox = await page.getByTestId("canvas-workspace").boundingBox();
+  expect(paintControlsBox).not.toBeNull();
+  expect(workspaceBox).not.toBeNull();
+  expect(paintControlsBox!.height).toBeLessThan(300);
+  expect(workspaceBox!.height).toBeGreaterThanOrEqual(500);
+  await expect
+    .poll(() =>
+      canvas.evaluate((element) =>
+        Number(element.getAttribute("data-cell-size")),
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+
+  // At Fit, a true 1px smooth brush remains one canonical cell. The
+  // high-contrast aid must stay visible even at the compact fitted scale.
   await page.getByRole("button", { name: "Smooth" }).click();
   await page.getByRole("combobox", { name: "Brush size" }).selectOption("1");
   const fittedCanvasBox = await canvas.boundingBox();

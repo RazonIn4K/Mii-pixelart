@@ -328,12 +328,14 @@ export default function CanvasViewer({
         viewportSize.height ||
         containerRef.current?.clientHeight ||
         (typeof window === "undefined" ? 600 : window.innerHeight);
-      // Reserve real chrome space above and below the artboard. Controls and the
-      // coordinate HUD stay visible without intercepting the first/last rows.
-      // Tiny screens retain a compact ruler gutter and at least four-pixel cells.
-      const horizontalPadding = width <= 360 ? 24 : 40;
-      const topInset = width <= 360 ? 68 : 60;
-      const bottomInset = width <= 360 ? 56 : 52;
+      // Wide workbenches place both HUDs on a shared top rail so the artboard can
+      // use the full height below it. Compact layouts retain separate top and
+      // bottom gutters to prevent the controls from overlapping one another.
+      const hasHorizontalControlRail = width >= 640;
+      const horizontalPadding =
+        width <= 360 ? 24 : hasHorizontalControlRail ? 32 : 40;
+      const topInset = width <= 360 ? 68 : hasHorizontalControlRail ? 48 : 60;
+      const bottomInset = width <= 360 ? 56 : hasHorizontalControlRail ? 2 : 52;
       const availableWidth = Math.max(1, width - horizontalPadding);
       const availableHeight = Math.max(1, height - topInset - bottomInset);
       const fitCellSize = Math.min(
@@ -1714,7 +1716,7 @@ export default function CanvasViewer({
       </div>
 
       {/* Grid info + live coordinate readout */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border-2 border-[#26485a]/20 bg-[#fffaf0]/95 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border-2 border-[#26485a]/20 bg-[#fffaf0]/95 px-3 py-1.5 shadow-sm backdrop-blur-sm sm:bottom-auto sm:top-3">
         <span className="text-xs font-mono font-bold text-[#526975]">
           {doc.width}×{doc.height} ·{" "}
           {formatCountLabel(doc.usedColors.length, "color")}

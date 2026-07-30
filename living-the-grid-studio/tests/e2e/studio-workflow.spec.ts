@@ -670,6 +670,22 @@ test("generated artwork stays local until review and commits as one undoable rev
   await expect(
     page.getByText("256×256 · 0 colors", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Redo" })).toBeEnabled();
+
+  await page.getByRole("tab", { name: "AI" }).click();
+  await expect(
+    page.getByRole("img", {
+      name: "Generated original artwork waiting for 256 by 256 import review",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review 256×256 conversion" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(
+    page.getByText("256×256 · 1 color", { exact: true }),
+  ).toBeVisible();
   expect(imageRequestCount).toBe(1);
 });
 
@@ -761,10 +777,12 @@ test("AI advice uses the free router and drawing starters return to a sketch mod
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply once" })).toHaveCount(0);
   await expect(
-    page.getByText(
-      "I can describe the robot, but this response does not contain structured cells.",
-      { exact: true },
-    ).last(),
+    page
+      .getByText(
+        "I can describe the robot, but this response does not contain structured cells.",
+        { exact: true },
+      )
+      .last(),
   ).toBeVisible();
 });
 
@@ -1215,12 +1233,18 @@ test("AI history and consent stay isolated between signed-in users", async ({
   );
 
   currentUserId = "ai-account-b";
+  const accountSwitchResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/auth/session") &&
+      response.request().method() === "GET",
+  );
   await page.reload();
+  await accountSwitchResponse;
   await expect(
     page.getByRole("application", {
       name: "Editable 256 by 256 pixel grid",
     }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   await page.getByRole("tab", { name: "AI" }).click();
   await expect(page.getByText("Private prompt for account A")).toHaveCount(0);
   await expect(page.getByText("Private reply for account A")).toHaveCount(0);

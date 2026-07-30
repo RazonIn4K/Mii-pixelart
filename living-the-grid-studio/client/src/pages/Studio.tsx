@@ -169,6 +169,7 @@ export default function Studio() {
   const [brushSize, setBrushSize] = useState<BrushSize>(4);
   const [selectedPaintColorId, setSelectedPaintColorId] = useState("R10C1");
   const [activePanel, setActivePanel] = useState<StudioPanel>("import");
+  const [hasVisitedAi, setHasVisitedAi] = useState(false);
   const [generatedImport, setGeneratedImport] = useState<{
     file: File;
     requestId: string;
@@ -1237,6 +1238,7 @@ export default function Studio() {
             onValueChange={(value) => {
               const nextPanel = value as StudioPanel;
               setActivePanel(nextPanel);
+              if (nextPanel === "ai") setHasVisitedAi(true);
               if (nextPanel !== "copy") setActiveCopyRun(null);
             }}
             className="min-w-0 flex-1 flex-col overflow-hidden"
@@ -1318,17 +1320,24 @@ export default function Studio() {
                 </Suspense>
               </TabsContent>
 
-              <TabsContent value="ai" className="mt-0">
+              <TabsContent
+                value="ai"
+                forceMount
+                className="mt-0 data-[state=inactive]:hidden"
+              >
                 <Suspense fallback={<PanelLoading />}>
+                  {hasVisitedAi ? (
+                    <div className={imagePreview ? "hidden" : undefined}>
+                      <AiPanel
+                        currentDoc={doc}
+                        onApplySketch={handleApplyAiSketch}
+                        onOpenGeneratedImage={handleOpenGeneratedImage}
+                      />
+                    </div>
+                  ) : null}
                   {imagePreview ? (
                     <PreviewBlockedPanel title="AI Draw" />
-                  ) : (
-                    <AiPanel
-                      currentDoc={doc}
-                      onApplySketch={handleApplyAiSketch}
-                      onOpenGeneratedImage={handleOpenGeneratedImage}
-                    />
-                  )}
+                  ) : null}
                 </Suspense>
               </TabsContent>
 

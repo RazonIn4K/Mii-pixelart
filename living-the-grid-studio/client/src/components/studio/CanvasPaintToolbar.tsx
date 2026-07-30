@@ -363,231 +363,236 @@ export function CanvasPaintToolbar({
           <span className="hidden sm:inline">Match game</span>
         </Button>
       </div>
-      <div className="mb-2 flex min-w-0 flex-nowrap items-center gap-1.5 border-b border-[#26485a]/15 px-1 pb-2 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
-        <span className="shrink-0 text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#526975]">
-          Cell lines
-        </span>
-        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:min-w-max">
-          <div
-            className="hidden min-w-0 items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
-            role="group"
-            aria-label="Grid density"
-          >
-            {GRID_DENSITY_PRESETS.map(
-              ({ density, label, title, visibleLabel }) => (
-                <button
-                  key={density}
-                  type="button"
-                  className={`h-9 min-w-8 rounded-lg px-2 text-[0.68rem] font-black transition-colors sm:px-2.5 ${
-                    gridDensity === density
-                      ? "bg-[#24786f] text-white shadow-sm"
-                      : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
-                  }`}
-                  aria-label={`Grid density: ${label} · ${visibleLabel}`}
-                  aria-pressed={gridDensity === density}
-                  title={title}
-                  onClick={() => onGridDensityChange(density)}
-                >
-                  {visibleLabel}
-                </button>
-              ),
-            )}
-          </div>
-
-          <Popover open={isGridDensityOpen} onOpenChange={setIsGridDensityOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-11 min-w-[4.75rem] items-center justify-center rounded-lg border border-[#26485a]/20 bg-white px-2 text-[0.68rem] font-black text-[#17384a] sm:hidden"
-                aria-label={`Cell line density: ${
-                  GRID_DENSITY_PRESETS.find(
-                    ({ density }) => density === gridDensity,
-                  )?.label ?? "Cell"
-                }`}
-              >
-                {GRID_DENSITY_PRESETS.find(
-                  ({ density }) => density === gridDensity,
-                )?.visibleLabel ?? "Every"}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              collisionPadding={8}
-              className="w-56 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
-              aria-label="Cell line density options"
+      <div className="lg:flex lg:min-w-0 lg:items-center lg:gap-2">
+        <div className="mb-2 flex min-w-0 flex-nowrap items-center gap-1.5 border-b border-[#26485a]/15 px-1 pb-2 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden lg:mb-0 lg:flex-1 lg:border-b-0 lg:pb-0">
+          <span className="shrink-0 text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#526975]">
+            Cell lines
+          </span>
+          <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:min-w-max">
+            <div
+              className="hidden min-w-0 items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
+              role="group"
+              aria-label="Grid density"
             >
-              <div
-                className="grid gap-1"
-                role="group"
-                aria-label="Grid density"
-              >
-                {GRID_DENSITY_PRESETS.map(
-                  ({ density, label, title, visibleLabel }) => (
-                    <button
-                      key={density}
-                      type="button"
-                      className={`flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
-                        gridDensity === density
-                          ? "bg-[#24786f] text-white"
-                          : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
-                      }`}
-                      aria-label={`Grid density: ${label}`}
-                      aria-pressed={gridDensity === density}
-                      title={title}
-                      onClick={() => {
-                        onGridDensityChange(density);
-                        setIsGridDensityOpen(false);
-                      }}
-                    >
-                      <span>{label}</span>
-                      <span aria-hidden="true">{visibleLabel}</span>
-                    </button>
-                  ),
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+              {GRID_DENSITY_PRESETS.map(
+                ({ density, label, title, visibleLabel }) => (
+                  <button
+                    key={density}
+                    type="button"
+                    className={`h-9 min-w-8 rounded-lg px-2 text-[0.68rem] font-black transition-colors sm:px-2.5 ${
+                      gridDensity === density
+                        ? "bg-[#24786f] text-white shadow-sm"
+                        : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+                    }`}
+                    aria-label={`Grid density: ${label} · ${visibleLabel}`}
+                    aria-pressed={gridDensity === density}
+                    title={title}
+                    onClick={() => onGridDensityChange(density)}
+                  >
+                    {visibleLabel}
+                  </button>
+                ),
+              )}
+            </div>
 
+            <Popover
+              open={isGridDensityOpen}
+              onOpenChange={setIsGridDensityOpen}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-11 min-w-[4.75rem] items-center justify-center rounded-lg border border-[#26485a]/20 bg-white px-2 text-[0.68rem] font-black text-[#17384a] sm:hidden"
+                  aria-label={`Cell line density: ${
+                    GRID_DENSITY_PRESETS.find(
+                      ({ density }) => density === gridDensity,
+                    )?.label ?? "Cell"
+                  }`}
+                >
+                  {GRID_DENSITY_PRESETS.find(
+                    ({ density }) => density === gridDensity,
+                  )?.visibleLabel ?? "Every"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                collisionPadding={8}
+                className="w-56 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
+                aria-label="Cell line density options"
+              >
+                <div
+                  className="grid gap-1"
+                  role="group"
+                  aria-label="Grid density"
+                >
+                  {GRID_DENSITY_PRESETS.map(
+                    ({ density, label, title, visibleLabel }) => (
+                      <button
+                        key={density}
+                        type="button"
+                        className={`flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
+                          gridDensity === density
+                            ? "bg-[#24786f] text-white"
+                            : "text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+                        }`}
+                        aria-label={`Grid density: ${label}`}
+                        aria-pressed={gridDensity === density}
+                        title={title}
+                        onClick={() => {
+                          onGridDensityChange(density);
+                          setIsGridDensityOpen(false);
+                        }}
+                      >
+                        <span>{label}</span>
+                        <span aria-hidden="true">{visibleLabel}</span>
+                      </button>
+                    ),
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <div
+              className="hidden items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
+              role="group"
+              aria-label="Canvas background"
+            >
+              {CANVAS_BACKGROUND_PRESETS.map(({ icon: Icon, label, value }) => (
+                <Tooltip key={value}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
+                        background === value
+                          ? "bg-[#f6d67a] text-[#17384a] shadow-sm"
+                          : "text-[#526975] hover:bg-[#fff0c2]"
+                      }`}
+                      aria-label={`Canvas background: ${label}`}
+                      aria-pressed={background === value}
+                      onClick={() => onBackgroundChange(value)}
+                    >
+                      <Icon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">{label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+
+            <Popover open={isBackgroundOpen} onOpenChange={setIsBackgroundOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[#26485a]/20 bg-white text-[#526975] transition-colors hover:bg-[#fff0c2] hover:text-[#17384a] sm:hidden"
+                  aria-label={`Canvas background options: ${
+                    CANVAS_BACKGROUND_PRESETS.find(
+                      ({ value }) => value === background,
+                    )?.label ?? "Light checker"
+                  }`}
+                >
+                  <ActiveBackgroundIcon className="size-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                collisionPadding={8}
+                className="w-52 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
+                aria-label="Canvas background options"
+              >
+                <div
+                  className="grid gap-1"
+                  role="group"
+                  aria-label="Choose canvas background"
+                >
+                  {CANVAS_BACKGROUND_PRESETS.map(
+                    ({ icon: Icon, label, value }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
+                          background === value
+                            ? "bg-[#f6d67a] text-[#17384a]"
+                            : "text-[#526975] hover:bg-[#fff0c2] hover:text-[#17384a]"
+                        }`}
+                        aria-label={`Use ${label.toLowerCase()} canvas background`}
+                        aria-pressed={background === value}
+                        onClick={() => {
+                          onBackgroundChange(value);
+                          setIsBackgroundOpen(false);
+                        }}
+                      >
+                        <Icon className="size-4" /> {label}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex size-11 items-center justify-center rounded-lg border transition-colors sm:size-10 ${
+                    showCenterGuide
+                      ? "border-[#2d8f86] bg-[#e8f5ef] text-[#17384a]"
+                      : "border-[#26485a]/20 bg-white text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
+                  }`}
+                  aria-keyshortcuts="G"
+                  aria-label="Show center guides"
+                  aria-pressed={showCenterGuide}
+                  title="Show horizontal and vertical center guides (G)"
+                  onClick={() => onShowCenterGuideChange(!showCenterGuide)}
+                >
+                  <Crosshair className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Center crosshair · G</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:shrink-0 lg:pb-0">
           <div
-            className="hidden items-center rounded-xl border border-[#26485a]/20 bg-white p-0.5 sm:flex"
-            role="group"
-            aria-label="Canvas background"
+            className="flex shrink-0 items-center gap-1"
+            role="toolbar"
+            aria-label="Paint tools"
           >
-            {CANVAS_BACKGROUND_PRESETS.map(({ icon: Icon, label, value }) => (
-              <Tooltip key={value}>
+            {PAINT_TOOLS.map(({ icon: Icon, label, shortcut, tool }) => (
+              <Tooltip key={tool}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
-                      background === value
-                        ? "bg-[#f6d67a] text-[#17384a] shadow-sm"
-                        : "text-[#526975] hover:bg-[#fff0c2]"
+                    className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg border transition-colors sm:size-10 ${
+                      activeTool === tool
+                        ? "border-[#96381e] bg-[#b84426] text-white shadow-sm"
+                        : "border-[#26485a]/20 bg-white text-[#526975] hover:border-[#ef6b3b]/50 hover:text-[#17384a]"
                     }`}
-                    aria-label={`Canvas background: ${label}`}
-                    aria-pressed={background === value}
-                    onClick={() => onBackgroundChange(value)}
+                    aria-keyshortcuts={shortcut}
+                    aria-label={`${label} tool`}
+                    aria-pressed={activeTool === tool}
+                    title={`${label} (${shortcut})`}
+                    onClick={() => onToolChange(tool)}
                   >
-                    <Icon className="size-3.5" />
+                    <Icon className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-xs">{label}</p>
+                  <p className="text-xs">
+                    {label} <span className="font-mono">{shortcut}</span>
+                  </p>
                 </TooltipContent>
               </Tooltip>
             ))}
           </div>
-
-          <Popover open={isBackgroundOpen} onOpenChange={setIsBackgroundOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[#26485a]/20 bg-white text-[#526975] transition-colors hover:bg-[#fff0c2] hover:text-[#17384a] sm:hidden"
-                aria-label={`Canvas background options: ${
-                  CANVAS_BACKGROUND_PRESETS.find(
-                    ({ value }) => value === background,
-                  )?.label ?? "Light checker"
-                }`}
-              >
-                <ActiveBackgroundIcon className="size-4" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              collisionPadding={8}
-              className="w-52 p-2 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:hidden"
-              aria-label="Canvas background options"
-            >
-              <div
-                className="grid gap-1"
-                role="group"
-                aria-label="Choose canvas background"
-              >
-                {CANVAS_BACKGROUND_PRESETS.map(
-                  ({ icon: Icon, label, value }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-left text-sm font-bold transition-colors ${
-                        background === value
-                          ? "bg-[#f6d67a] text-[#17384a]"
-                          : "text-[#526975] hover:bg-[#fff0c2] hover:text-[#17384a]"
-                      }`}
-                      aria-label={`Use ${label.toLowerCase()} canvas background`}
-                      aria-pressed={background === value}
-                      onClick={() => {
-                        onBackgroundChange(value);
-                        setIsBackgroundOpen(false);
-                      }}
-                    >
-                      <Icon className="size-4" /> {label}
-                    </button>
-                  ),
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className={`inline-flex size-11 items-center justify-center rounded-lg border transition-colors sm:size-10 ${
-                  showCenterGuide
-                    ? "border-[#2d8f86] bg-[#e8f5ef] text-[#17384a]"
-                    : "border-[#26485a]/20 bg-white text-[#526975] hover:bg-[#e8f5ef] hover:text-[#17384a]"
-                }`}
-                aria-keyshortcuts="G"
-                aria-label="Show center guides"
-                aria-pressed={showCenterGuide}
-                title="Show horizontal and vertical center guides (G)"
-                onClick={() => onShowCenterGuideChange(!showCenterGuide)}
-              >
-                <Crosshair className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Center crosshair · G</p>
-            </TooltipContent>
-          </Tooltip>
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div
-          className="flex shrink-0 items-center gap-1"
-          role="toolbar"
-          aria-label="Paint tools"
-        >
-          {PAINT_TOOLS.map(({ icon: Icon, label, shortcut, tool }) => (
-            <Tooltip key={tool}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg border transition-colors sm:size-10 ${
-                    activeTool === tool
-                      ? "border-[#96381e] bg-[#b84426] text-white shadow-sm"
-                      : "border-[#26485a]/20 bg-white text-[#526975] hover:border-[#ef6b3b]/50 hover:text-[#17384a]"
-                  }`}
-                  aria-keyshortcuts={shortcut}
-                  aria-label={`${label} tool`}
-                  aria-pressed={activeTool === tool}
-                  title={`${label} (${shortcut})`}
-                  onClick={() => onToolChange(tool)}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">
-                  {label} <span className="font-mono">{shortcut}</span>
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-1 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-1.5 rounded-xl border border-[#26485a]/15 bg-white/70 p-1">
+      <div className="mt-1 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-1.5 rounded-xl border border-[#26485a]/15 bg-white/70 p-1 lg:flex lg:flex-nowrap lg:items-center lg:overflow-x-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
         <div
           className="flex min-w-max items-center gap-1 rounded-lg border border-border bg-white p-0.5"
           role="group"
