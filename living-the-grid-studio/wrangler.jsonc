@@ -218,6 +218,11 @@
       "name": "tomodachi-studio-production",
       "workers_dev": false,
       "preview_urls": false,
+      "assets": {
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": true,
+      },
       "routes": [
         { "pattern": "tomodachi.pw", "custom_domain": true },
         { "pattern": "www.tomodachi.pw", "custom_domain": true },
@@ -228,10 +233,10 @@
         "PUBLIC_SITE_URL": "https://tomodachi.pw",
         "GOOGLE_OIDC_REDIRECT_URI": "https://tomodachi.pw/api/auth/google/callback",
         "TERMS_VERSION": "2026-07-16",
-        "COMMUNITY_MUTATIONS_ENABLED": "false",
-        "AI_IMAGE_GENERATION_ENABLED": "false",
-        "AI_IMAGE_DAILY_BUDGET_MICRO_USD": "0",
-        "AI_IMAGE_USER_DAILY_LIMIT": "0",
+        "COMMUNITY_MUTATIONS_ENABLED": "true",
+        "AI_IMAGE_GENERATION_ENABLED": "true",
+        "AI_IMAGE_DAILY_BUDGET_MICRO_USD": "2000000",
+        "AI_IMAGE_USER_DAILY_LIMIT": "3",
       },
       "secrets": {
         "required": [
