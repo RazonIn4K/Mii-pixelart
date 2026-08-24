@@ -294,6 +294,11 @@ likes, reports, profile/showcase images, and reversible moderation actions.
 David Ortiz remains the human moderation decision-maker; AI may summarize but
 may not execute an action.
 
+Start the bounded Phase A lane with `pnpm verify:hosted-staging-p4-phase-a`.
+Copy `config/staging-p4-phase-a.example.json` into the gitignored
+`.deployment-readiness/staging-p4-phase-a.json` approval file with mode
+`0600` before the run.
+
 **Required scenarios**
 
 1. User B creates a private project, saves/autosaves, retries offline, and
