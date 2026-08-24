@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-24
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -17,41 +17,39 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- The exact review head is
-  `6fab02622996b2aafac16f221e0e78aeb4867458` on GitHub and GitLab. Its owned
-  GitHub checks pass and immutable tag
-  `security/github-pr-2-6fab02622996` exists. The external `code/snyk` context
-  remains an account test-limit result, not an owned gate or vulnerability
-  finding.
-- Staging runs exact head `6fab02622996b2aafac16f221e0e78aeb4867458`
-  as deployment `e9059345-9504-4588-9e2b-cffd77a20357`, Worker version
+- GitHub `main` is exact source
+  `0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10, merged 2026-07-30).
+  Tomodachi Studio CI passed on that SHA. The checked-in production Worker
+  config names writable community and AI image generation as the target state;
+  it does not authorize skipping the read-only production cutover in gate P11.
+- Staging still runs the prior exact head
+  `6fab02622996b2aafac16f221e0e78aeb4867458` as deployment
+  `e9059345-9504-4588-9e2b-cffd77a20357`, Worker version
   `58ad3432-9ab0-4eec-b1e5-3fc7b52d7600`, with community mutations and AI image
   generation enabled and payment surfaces retired. The verified rollback
   remains deployment `1c9f969c-27c0-41c9-bc85-8248d793d3ff`, version
-  `4632d9e1-5a2c-4d07-bc16-848f453e0676`; it was not activated. The anonymous
-  hosted harness passed its prior 380 assertions, Studio and retired-payment
-  checks passed, and the no-provider browser matrix recorded 412 passes, 408
-  intentional project skips, and zero failures.
-- Exact-head anonymous mobile evidence passed the numerical P1 targets: cold
-  home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75 was 2,274 ms with
-  CLS 0; restored-local-draft readiness p75 was 2,235 ms with maximum CLS 0.03
-  and one canvas on every run; and Start blank input INP was 104 ms with CLS 0.
-  Authenticated cloud-load timing was not run because the approved gate did not
-  authorize a new OAuth session or fixture.
+  `4632d9e1-5a2c-4d07-bc16-848f453e0676`; it was not activated. Prior
+  anonymous hosted, Studio, and no-provider browser evidence on `6fab026` does
+  not cover `0e2da5a`.
+- Prior exact-head anonymous mobile evidence on `6fab026` passed the numerical
+  P1 targets: cold home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75
+  was 2,274 ms with CLS 0; restored-local-draft readiness p75 was 2,235 ms
+  with maximum CLS 0.03 and one canvas on every run; and Start blank input INP
+  was 104 ms with CLS 0. Authenticated cloud-load timing was not run because the
+  approved gate did not authorize a new OAuth session or fixture.
 - P1 remains conditional because Cloudflare currently injects its browser
   analytics beacon after the Worker response and posts `/cdn-cgi/rum` before
-  an application consent choice. A 2026-07-25 private staging attestation
-  records this platform observation without treating it as an application
-  provider call. The current local correction removes the Cloudflare Insights
-  CSP origins and makes source, hosted, and browser checks fail closed on beacon
-  markup, attributes, and RUM requests. It is not a reviewed remote commit,
-  deployed artifact, or control-plane change.
-- The 25-assertion run is foundational P2/P3 evidence only. It exercised one
-  bounded private create/read/save/stale-ETag conflict/delete flow across two
-  approved identities and reconciliation; it does not satisfy the full P4
-  cross-user, publishing, social, moderation, media, quota, or export matrix,
-  and it does not satisfy P5 deletion/retention/cron acceptance. Any new source
-  commit also requires fresh exact-head evidence before a P9 decision.
+  an application consent choice. Source on `main` already omits Cloudflare
+  Insights CSP origins and makes hosted/browser checks fail closed on beacon
+  markup, attributes, and RUM requests. The remaining work is a separate
+  control-plane approval to disable automatic Web Analytics on staging, apex,
+  and `www`, followed by an exact-new-head staging deploy and a full P1 rerun.
+- The 25-assertion run is foundational P2/P3 evidence only on older SHAs. It
+  exercised one bounded private create/read/save/stale-ETag conflict/delete
+  flow across two approved identities and reconciliation; it does not satisfy
+  the full P4 cross-user, publishing, social, moderation, media, quota, or
+  export matrix, and it does not satisfy P5 deletion/retention/cron acceptance.
+  Any new source commit requires fresh exact-head evidence before a P9 decision.
 - Production traffic remains on Cloudflare Pages. Isolated production D1, R2,
   KV, rate limits, OAuth, secrets, and migrations `0001`-`0009` have been
   prepared, and a hidden triggerless Worker exists at deployment
@@ -60,13 +58,13 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release lane is a reviewable RUM/consent corrective Git and security
-  gate, followed by a separately approved Cloudflare automatic-Web-Analytics
-  disable gate covering staging/apex/`www`, then an exact-new-head staging
-  deployment and affected P1 rerun. P9 evaluation remains later, after P4-P8
-  are satisfied. No current approval authorizes commit/push, a Cloudflare
-  setting change, deploy, new staging data, merge, production cutover,
-  DNS/OAuth/secret/role change, or production write enablement.
+- The next release lane is: (1) disable Cloudflare automatic browser RUM under
+  a control-plane approval, (2) deploy exact head `0e2da5a` to staging with a
+  fresh rollback record, (3) rerun P1–P3 on that deployment, (4) complete P4–P5,
+  (5) close P6/P8, then evaluate P9. No current approval authorizes a
+  Cloudflare setting change, deploy, new staging data, production cutover,
+  DNS/OAuth/secret/role change, or production write enablement outside those
+  named gates.
 
 ## Authority and evidence rules
 
@@ -93,9 +91,9 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Anonymous numerical, hosted-read-only, Studio, CSP/crawler, and no-provider browser checks pass on `6fab026`; exit remains conditional on disabling platform-injected RUM, deploying the corrective head, rerunning all consent paths, and capturing authenticated cloud-load timing |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4` with fixture cleanup, reconciliation, and both sessions revoked; a later source commit requires fresh exact-head evidence |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; both sessions were D1-revoked and the complete temporary profile tree was removed |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Source fail-closed RUM checks are on `main`; staging still on `6fab026`; exit blocked until Cloudflare automatic RUM is disabled, `0e2da5a` is deployed, consent paths are rerun, and authenticated cloud-load timing is captured |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |

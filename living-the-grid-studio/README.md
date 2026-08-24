@@ -11,22 +11,19 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-07-16):** Exact source
-> `80fdcd5da432b88d06d84bfd084e9f0993edc363` is the active deployment on
-> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) as Cloudflare
-> deployment `9803bbba-4ee5-45fc-9027-7afd4e902089`, Worker version
-> `c56f580f-2238-4775-846d-3d2c08f17c78` (version 19, 100% traffic).
-> Community mutations are enabled only on staging, its D1 ledger contains
-> migrations `0001` through `0008`, and payments, tips, recovery-product sales,
-> and consultations are retired. The current review branch adds retry-safe
-> first cloud saves, exact runtime source identity, and fail-closed P2/P3
-> release runners. Those changes are locally and CI validated but are not
-> deployed; they require a new approval naming the exact final review SHA.
-> Production [`tomodachi.pw`](https://tomodachi.pw/) remains on the existing
-> Cloudflare Pages deployment until cross-user staging, merge, production
-> provisioning, cutover, and soak receive their independent approvals. See the
-> [production-readiness plan](docs/production-readiness-plan.md) and
-> [local release-tooling record](docs/release-evidence/2026-07-16-local-release-tooling.md).
+> **Deployment status (2026-07-30):** GitHub `main` is exact source
+> `0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10). Tomodachi Studio CI
+> passed on that SHA. Staging still runs the prior exact head
+> `6fab02622996b2aafac16f221e0e78aeb4867458` as deployment
+> `e9059345-9504-4588-9e2b-cffd77a20357` until a separately approved
+> exact-new-head deploy is completed. Production [`tomodachi.pw`](https://tomodachi.pw/)
+> remains on Cloudflare Pages; the checked-in production Worker config names
+> writable community and AI image generation as the target state but does not
+> authorize skipping the read-only cutover in
+> [production-readiness plan](docs/production-readiness-plan.md) gate P11.
+> The active staging-exit lane is: disable Cloudflare automatic browser RUM,
+> deploy `0e2da5a` to staging, refresh P1–P3 evidence, complete P4–P5, then
+> proceed through P9–P13.
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 

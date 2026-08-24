@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -48,38 +49,22 @@ const REQUIRED_INDEXES = [
   "users_deleted_cleanup_idx",
 ] as const;
 
-const migrationsDirectory = path.join(ROOT, "migrations");
-const migrationFiles = (await readdir(migrationsDirectory))
-  .filter((file) => MIGRATION_PATTERN.test(file))
-  .sort((left, right) => left.localeCompare(right));
-
-if (migrationFiles.length === 0)
-  throw new Error("No forward-only D1 migrations were found.");
-for (const [index, file] of migrationFiles.entries()) {
-  const match = MIGRATION_PATTERN.exec(file);
-  const expectedNumber = index + 1;
-  if (!match || Number(match[1]) !== expectedNumber) {
-    throw new Error(
-      `D1 migrations must be contiguous from 0001; expected ${String(expectedNumber).padStart(4, "0")}, found ${file}.`,
-    );
+function supportsFts5(): boolean {
+  const probe = new DatabaseSync(":memory:");
+  try {
+    probe.exec("CREATE VIRTUAL TABLE fts5_probe USING fts5(content);");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    probe.close();
   }
 }
 
-const database = new DatabaseSync(":memory:");
-try {
-  database.exec("PRAGMA foreign_keys = ON;");
-  for (const file of migrationFiles) {
-    try {
-      database.exec(
-        await readFile(path.join(migrationsDirectory, file), "utf8"),
-      );
-    } catch (error) {
-      throw new Error(
-        `Failed to apply ${file}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
+function validateMigratedDatabase(
+  database: DatabaseSync,
+  migrationCount: number,
+): void {
   const foreignKeysEnabled = database
     .prepare("PRAGMA foreign_keys")
     .get() as Record<string, unknown>;
@@ -145,8 +130,99 @@ try {
   }
 
   console.log(
-    `Applied ${migrationFiles.length} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables and ${REQUIRED_INDEXES.length} required indexes.`,
+    `Applied ${migrationCount} migrations; foreign-key and integrity checks passed for ${REQUIRED_TABLES.length} required tables and ${REQUIRED_INDEXES.length} required indexes.`,
   );
-} finally {
-  database.close();
+}
+
+async function applyMigrationsInMemory(
+  migrationFiles: readonly string[],
+): Promise<void> {
+  const database = new DatabaseSync(":memory:");
+  try {
+    database.exec("PRAGMA foreign_keys = ON;");
+    for (const file of migrationFiles) {
+      try {
+        database.exec(
+          await readFile(path.join(ROOT, "migrations", file), "utf8"),
+        );
+      } catch (error) {
+        throw new Error(
+          `Failed to apply ${file}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    validateMigratedDatabase(database, migrationFiles.length);
+  } finally {
+    database.close();
+  }
+}
+
+async function resolveWranglerLocalDatabasePath(): Promise<string> {
+  const localDatabaseDirectory = path.join(
+    ROOT,
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
+  );
+  const databaseFiles = (await readdir(localDatabaseDirectory)).filter(
+    (file) => file.endsWith(".sqlite") && file !== "metadata.sqlite",
+  );
+  if (databaseFiles.length !== 1) {
+    throw new Error(
+      `Expected exactly one Wrangler local D1 database file, found ${databaseFiles.length}.`,
+    );
+  }
+  return path.join(localDatabaseDirectory, databaseFiles[0]!);
+}
+
+async function validateWranglerLocalDatabase(
+  migrationCount: number,
+): Promise<void> {
+  const migrationResult = spawnSync(
+    "pnpm",
+    ["db:migrate:local"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  if (migrationResult.status !== 0) {
+    throw new Error(
+      `Failed to apply local D1 migrations through Wrangler: ${migrationResult.stderr || migrationResult.stdout}`,
+    );
+  }
+
+  const databasePath = await resolveWranglerLocalDatabasePath();
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    database.exec("PRAGMA foreign_keys = ON;");
+    validateMigratedDatabase(database, migrationCount);
+  } finally {
+    database.close();
+  }
+}
+
+const migrationsDirectory = path.join(ROOT, "migrations");
+const migrationFiles = (await readdir(migrationsDirectory))
+  .filter((file) => MIGRATION_PATTERN.test(file))
+  .sort((left, right) => left.localeCompare(right));
+
+if (migrationFiles.length === 0)
+  throw new Error("No forward-only D1 migrations were found.");
+for (const [index, file] of migrationFiles.entries()) {
+  const match = MIGRATION_PATTERN.exec(file);
+  const expectedNumber = index + 1;
+  if (!match || Number(match[1]) !== expectedNumber) {
+    throw new Error(
+      `D1 migrations must be contiguous from 0001; expected ${String(expectedNumber).padStart(4, "0")}, found ${file}.`,
+    );
+  }
+}
+
+if (supportsFts5()) {
+  await applyMigrationsInMemory(migrationFiles);
+} else {
+  console.warn(
+    "node:sqlite lacks FTS5; validating migrations through Wrangler local D1 instead.",
+  );
+  await validateWranglerLocalDatabase(migrationFiles.length);
 }
