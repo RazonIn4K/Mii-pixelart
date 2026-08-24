@@ -37,13 +37,13 @@ staging check does not authorize the next gate.
   with maximum CLS 0.03 and one canvas on every run; and Start blank input INP
   was 104 ms with CLS 0. Authenticated cloud-load timing was not run because the
   approved gate did not authorize a new OAuth session or fixture.
-- P1 remains conditional because Cloudflare currently injects its browser
-  analytics beacon after the Worker response and posts `/cdn-cgi/rum` before
-  an application consent choice. Source on `main` already omits Cloudflare
-  Insights CSP origins and makes hosted/browser checks fail closed on beacon
-  markup, attributes, and RUM requests. The remaining work is a separate
-  control-plane approval to disable automatic Web Analytics on staging, apex,
-  and `www`, followed by an exact-new-head staging deploy and a full P1 rerun.
+- A 2026-08-24 live staging probe on the current `6fab026` deployment recorded
+  410 hosted read-only assertions with zero failures, no `data-cf-beacon` or
+  `/cdn-cgi/rum` markers in the transformed homepage HTML, and passing desktop
+  cookie-consent checks under `PLAYWRIGHT_ANALYTICS_MODE=no-provider`. That
+  evidence supports closing the Cloudflare RUM control-plane item for the
+  current staging artifact, but it does not cover `0e2da5a` and does not
+  replace authenticated cloud-load timing or a full multi-viewport P1 rerun.
 - The 25-assertion run is foundational P2/P3 evidence only on older SHAs. It
   exercised one bounded private create/read/save/stale-ETag conflict/delete
   flow across two approved identities and reconciliation; it does not satisfy
@@ -91,7 +91,7 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Source fail-closed RUM checks are on `main`; staging still on `6fab026`; exit blocked until Cloudflare automatic RUM is disabled, `0e2da5a` is deployed, consent paths are rerun, and authenticated cloud-load timing is captured |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | `6fab026` staging shows no RUM markers and passes 410 hosted read-only assertions; `0e2da5a` still needs deploy, authenticated cloud-load timing, and full multi-viewport rerun |
 | P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
 | P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
@@ -188,7 +188,10 @@ object prefixes, maximum writes, and cleanup plan.
 **Commands and evidence**
 
 The integrated command reads only the gitignored
-`.deployment-readiness/staging-writable.json` file. It refuses any other path,
+`.deployment-readiness/staging-writable.json` file. Copy
+`config/staging-writable.example.json` as a starting point, then move the
+filled file to `.deployment-readiness/staging-writable.json` with mode `0600`.
+It refuses any other path,
 requires mode `0600`, and accepts no CLI-supplied identity or approval values.
 The private file must bind a fresh 30-minute-or-shorter window to the exact
 source SHA, active Worker version, owner internal UUID, distinct second-user

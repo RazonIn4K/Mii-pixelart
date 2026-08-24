@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "target": "https://staging.tomodachi.pw",
+  "sourceCommit": "replace-with-the-current-40-character-git-commit",
+  "workerVersion": "replace-with-the-active-staging-worker-version-uuid",
+  "ownerUserId": "replace-with-owner-internal-uuid-v4",
+  "secondUserId": "replace-with-second-user-internal-uuid-v4",
+  "runId": "replace-with-a-fresh-uuid-v4",
+  "issuedAt": "replace-with-a-current-ISO-8601-timestamp",
+  "expiresAt": "replace-with-issuedAt-plus-30-minutes-max",
+  "limits": {
+    "fixtureR2Bytes": 4194304,
+    "maxMutationAttempts": 9,
+    "maxPendingR2Objects": 16,
+    "maxRequests": 11,
+    "maxSingleR2ObjectBytes": 2097152,
+    "requestBodyBytes": 131072,
+    "routeOperations": 5
+  },
+  "confirmations": {
+    "approvedTwoUserStagingMutationRun": true,
+    "noProductionDnsSecretsMigrationsOrRoles": true,
+    "normalApiCleanupOnly": true,
+    "noFallbackCleanup": true
+  }
+}
