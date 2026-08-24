@@ -283,15 +283,13 @@ human-authorized moderation.
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
 Production `tomodachi.pw` remains on Cloudflare Pages. GitHub `main` is
-`0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10) with green Tomodachi
-Studio CI, but staging still runs prior exact head `6fab026` until a separately
-approved exact-new-head deploy. The checked-in production Worker config names
-writable community and AI image generation as the target state; it does not
-authorize skipping the read-only cutover in
-`docs/production-readiness-plan.md` gate P11. Payments and consultations are
-retired everywhere, and no roadmap status grants approval for production. See
-`docs/release-evidence/2026-07-16-payment-retirement.md` and the remaining
-gates in `docs/production-readiness-plan.md`.
+`0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10). Live staging still runs
+`57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` as Worker version
+`1a90ac21-57a9-4903-a36c-8ed6b0d38269` until a separately approved exact-new-head
+deploy. Use `pnpm print:hosted-release-identity` before filling writable
+approval files. The checked-in production Worker config names writable community
+and AI image generation as the target state; it does not authorize skipping the
+read-only cutover in `docs/production-readiness-plan.md` gate P11.
 
 ---
 

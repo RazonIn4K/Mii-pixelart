@@ -10,6 +10,7 @@ export default defineConfig({
       "scripts/release-output-hygiene.test.ts",
       "scripts/staging-r2-prefix-audit-worker.test.ts",
       "scripts/verify-hosted-read-only.test.ts",
+      "scripts/hosted-release-identity.test.ts",
       "scripts/verify-hosted-staging-writable-cli.test.ts",
       "scripts/verify-hosted-staging-writable.test.ts",
       "scripts/verify-hosted-staging-p4-phase-a.test.ts",

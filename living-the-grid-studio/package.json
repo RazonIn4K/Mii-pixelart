@@ -34,6 +34,7 @@
     "verify:residents": "tsx scripts/verify-residents.ts",
     "verify:bundle": "tsx scripts/verify-bundle-budgets.ts",
     "verify:hosted-read-only": "tsx scripts/verify-hosted-read-only.ts",
+    "print:hosted-release-identity": "tsx scripts/print-hosted-release-identity.ts",
     "verify:hosted-staging-writable": "tsx scripts/verify-hosted-staging-writable-cli.ts",
     "verify:hosted-staging-p4-phase-a": "tsx scripts/verify-hosted-staging-p4-phase-a-cli.ts",
     "verify:staging-live-auth": "tsx scripts/verify-staging-live-auth.ts",
