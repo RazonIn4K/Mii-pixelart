@@ -18,8 +18,7 @@ const QUICK_STEPS = [
   ["pnpm", ["verify:release-output"]],
 ] as const;
 
-const FULL_STEPS = [
-  ["pnpm", ["verify"]],
+const FULL_EXTRA_STEPS = [
   ["pnpm", ["test:worker"]],
   ["pnpm", ["build"]],
   ["pnpm", ["verify:bundle"]],
@@ -79,7 +78,15 @@ function readLocalCommit(): string {
 
 async function main(): Promise<void> {
   const { baseUrl, full } = readArgs(process.argv.slice(2));
-  const steps = full ? [...FULL_STEPS, ...QUICK_STEPS] : QUICK_STEPS;
+  const steps = full
+    ? [
+        ["pnpm", ["verify"]],
+        ...FULL_EXTRA_STEPS,
+        ["pnpm", ["test:preflight"]],
+        ["pnpm", ["worker:dry-run:staging"]],
+        ["pnpm", ["verify:release-output"]],
+      ]
+    : QUICK_STEPS;
 
   for (const [command, args] of steps) {
     runStep(command, args);

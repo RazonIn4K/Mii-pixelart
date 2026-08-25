@@ -1,6 +1,5 @@
 import type { HostedReleaseIdentity } from "./hosted-release-identity";
-
-const COMMIT_SHA = /^[0-9a-f]{40}$/iu;
+import { SOURCE_SHA_PATTERN } from "./hosted-release-identity";
 
 export interface StagingHeadComparison {
   deployRequired: boolean;
@@ -16,7 +15,7 @@ export function compareStagingHead(
   const normalizedLocal = localCommit.trim().toLowerCase();
   const normalizedRemote = remote.sourceCommit.toLowerCase();
 
-  if (!COMMIT_SHA.test(normalizedLocal)) {
+  if (!SOURCE_SHA_PATTERN.test(normalizedLocal)) {
     return {
       deployRequired: true,
       localCommit: normalizedLocal,

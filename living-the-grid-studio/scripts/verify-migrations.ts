@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const LOCAL_D1_NAME = "tomodachi-studio-local";
 const MIGRATION_PATTERN = /^(\d{4})_[a-z0-9_]+[.]sql$/u;
 const REQUIRED_TABLES = [
   "ai_image_requests",
@@ -157,47 +159,64 @@ async function applyMigrationsInMemory(
   }
 }
 
-async function resolveWranglerLocalDatabasePath(): Promise<string> {
+async function resolveIsolatedWranglerDatabasePath(
+  persistRoot: string,
+): Promise<string> {
   const localDatabaseDirectory = path.join(
-    ROOT,
-    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
+    persistRoot,
+    "v3/d1/miniflare-D1DatabaseObject",
   );
   const databaseFiles = (await readdir(localDatabaseDirectory)).filter(
     (file) => file.endsWith(".sqlite") && file !== "metadata.sqlite",
   );
   if (databaseFiles.length !== 1) {
     throw new Error(
-      `Expected exactly one Wrangler local D1 database file, found ${databaseFiles.length}.`,
+      `Expected exactly one isolated Wrangler D1 database file, found ${databaseFiles.length}.`,
     );
   }
   return path.join(localDatabaseDirectory, databaseFiles[0]!);
 }
 
-async function validateWranglerLocalDatabase(
+async function validateIsolatedWranglerDatabase(
   migrationCount: number,
 ): Promise<void> {
-  const migrationResult = spawnSync(
-    "pnpm",
-    ["db:migrate:local"],
-    {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-  if (migrationResult.status !== 0) {
-    throw new Error(
-      `Failed to apply local D1 migrations through Wrangler: ${migrationResult.stderr || migrationResult.stdout}`,
-    );
-  }
-
-  const databasePath = await resolveWranglerLocalDatabasePath();
-  const database = new DatabaseSync(databasePath, { readOnly: true });
+  const persistRoot = await mkdtemp(path.join(tmpdir(), "tomodachi-migrations-"));
   try {
-    database.exec("PRAGMA foreign_keys = ON;");
-    validateMigratedDatabase(database, migrationCount);
+    const migrationResult = spawnSync(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "d1",
+        "migrations",
+        "apply",
+        LOCAL_D1_NAME,
+        "--local",
+        "--persist-to",
+        persistRoot,
+      ],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    if (migrationResult.status !== 0) {
+      throw new Error(
+        `Failed to apply isolated local D1 migrations through Wrangler: ${migrationResult.stderr || migrationResult.stdout}`,
+      );
+    }
+
+    const databasePath = await resolveIsolatedWranglerDatabasePath(persistRoot);
+    const database = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      database.exec("PRAGMA foreign_keys = ON;");
+      validateMigratedDatabase(database, migrationCount);
+    } finally {
+      database.close();
+    }
   } finally {
-    database.close();
+    await rm(persistRoot, { force: true, recursive: true });
   }
 }
 
@@ -222,7 +241,7 @@ if (supportsFts5()) {
   await applyMigrationsInMemory(migrationFiles);
 } else {
   console.warn(
-    "node:sqlite lacks FTS5; validating migrations through Wrangler local D1 instead.",
+    "node:sqlite lacks FTS5; validating migrations through an isolated Wrangler local D1 database instead.",
   );
-  await validateWranglerLocalDatabase(migrationFiles.length);
+  await validateIsolatedWranglerDatabase(migrationFiles.length);
 }

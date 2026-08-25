@@ -17,19 +17,17 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- GitHub `main` is exact source
-  `0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10, merged 2026-07-30).
-  Tomodachi Studio CI passed on that SHA. The checked-in production Worker
-  config names writable community and AI image generation as the target state;
-  it does not authorize skipping the read-only production cutover in gate P11.
+- GitHub `main` is `0e2da5ab571b58c4f407125b9f912b8febe50ece` until the open
+  release-checkpoint PR merges. After merge, bind every staging deploy and
+  acceptance gate to the exact merged squash SHA from `git rev-parse origin/main`,
+  not a parent commit.
 - Staging still runs prior exact head
   `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` (PR #2 squash) as Worker version
   `1a90ac21-57a9-4903-a36c-8ed6b0d38269`, confirmed by live
   `X-Tomodachi-*` response headers on 2026-08-24. That deployment is behind
-  GitHub `main` (`0e2da5a`) and behind the previously recorded `6fab026`
   acceptance checkpoint. Community mutations and AI image generation are enabled
   and payment surfaces are retired. Prior evidence on `6fab026` does not cover
-  the live staging artifact.
+  the live staging artifact or any post-merge release SHA.
 - Prior exact-head anonymous mobile evidence on `6fab026` passed the numerical
   P1 targets: cold home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75
   was 2,274 ms with CLS 0; restored-local-draft readiness p75 was 2,235 ms
@@ -41,8 +39,9 @@ staging check does not authorize the next gate.
   `/cdn-cgi/rum` markers in the transformed homepage HTML, and passing desktop
   cookie-consent checks under `PLAYWRIGHT_ANALYTICS_MODE=no-provider`. That
   evidence supports closing the Cloudflare RUM control-plane item for the
-  current staging artifact, but it does not cover `0e2da5a` and does not
-  replace authenticated cloud-load timing or a full multi-viewport P1 rerun.
+  current staging artifact, but it does not cover the post-merge release SHA and
+  does not replace authenticated cloud-load timing or a full multi-viewport P1
+  rerun.
   Use `pnpm print:hosted-release-identity` to read the live
   `sourceCommit` and `workerVersion` values before filling writable approvals.
 - The 25-assertion run is foundational P2/P3 evidence only on older SHAs. It
@@ -59,13 +58,12 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release lane is: (1) disable Cloudflare automatic browser RUM under
-  a control-plane approval, (2) deploy exact head `0e2da5a` to staging with a
-  fresh rollback record, (3) rerun P1–P3 on that deployment, (4) complete P4–P5,
-  (5) close P6/P8, then evaluate P9. No current approval authorizes a
-  Cloudflare setting change, deploy, new staging data, production cutover,
-  DNS/OAuth/secret/role change, or production write enablement outside those
-  named gates.
+- The next release lane is: (1) merge the release-checkpoint PR, (2) deploy the
+  exact merged `origin/main` SHA to staging with a fresh rollback record, (3)
+  rerun P1–P3 on that deployment, (4) complete P4–P5, (5) close P6/P8, then
+  evaluate P9. No current approval authorizes a Cloudflare setting change,
+  deploy, new staging data, production cutover, DNS/OAuth/secret/role change,
+  or production write enablement outside those named gates.
 
 ## Authority and evidence rules
 
@@ -92,9 +90,9 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Live staging is `57beeaf` / `1a90ac21…`; no RUM markers and 410 hosted read-only assertions pass; deploy `0e2da5a`, then capture auth cloud-load and full multi-viewport rerun |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; `0e2da5a` requires fresh exact-head evidence |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Live staging is `57beeaf` / `1a90ac21…`; no RUM markers and 410 hosted read-only assertions pass; deploy the merged release SHA, then capture auth cloud-load and full multi-viewport rerun |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4`; the merged release SHA requires fresh exact-head evidence |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; the merged release SHA requires fresh exact-head evidence |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |
