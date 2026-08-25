@@ -1,6 +1,6 @@
 # Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-08-25
 
 ---
 
@@ -15,7 +15,7 @@
 | 4     | Image Import               | Implemented; refining   | Crop/framing, subject focus, cleanup, tone controls, color limits, preview, and palette quantization          |
 | 5     | Reference Pack Export      | ✅ Complete             | ZIP plus JSON, labeled/clean guide images, palette sheet, paint order, notes, manifest, and HTML              |
 | 6     | AI Suggestions             | Chat implemented; image prototype gated | Account-gated advice/sketch review remains; a dedicated generated-artwork import path is local-only and not deployed |
-| 7     | Island Workshop Community  | Writable single-account staging; final release gates open | Staging runs exact runtime `80fdcd5`; branch checkpoint `b34f821` is runtime-equivalent, but exact-head P1 evidence and P2-P5 hosted acceptance remain incomplete |
+| 7     | Island Workshop Community  | Writable staging; operator deploy pending | GitHub `main` is `7dd9c5a` (PR #11); live staging still runs `57beeaf` until an operator deploy; exact-head P1–P5 hosted acceptance remains incomplete |
 
 ---
 
@@ -283,13 +283,14 @@ human-authorized moderation.
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
 Production `tomodachi.pw` remains on Cloudflare Pages. GitHub `main` is
-`0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10). Live staging still runs
+`7dd9c5aa87271981cde1b89e67083f71366ad2e8` (PR #11). Live staging still runs
 `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` as Worker version
-`1a90ac21-57a9-4903-a36c-8ed6b0d38269` until a separately approved exact-new-head
-deploy. Use `pnpm print:hosted-release-identity` before filling writable
-approval files. The checked-in production Worker config names writable community
-and AI image generation as the target state; it does not authorize skipping the
-read-only cutover in `docs/production-readiness-plan.md` gate P11.
+`1a90ac21-57a9-4903-a36c-8ed6b0d38269` until an operator deploys the current
+`origin/main` SHA. Run `pnpm verify:staging-deploy-preflight` to confirm
+deploy-required drift and `pnpm print:hosted-release-identity` before filling
+writable approval files. The checked-in production Worker config names writable
+community and AI image generation as the target state; it does not authorize
+skipping the read-only cutover in `docs/production-readiness-plan.md` gate P11.
 
 ---
 

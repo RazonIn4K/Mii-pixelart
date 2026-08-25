@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-08-25
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -17,10 +17,9 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- GitHub `main` is `0e2da5ab571b58c4f407125b9f912b8febe50ece` until the open
-  release-checkpoint PR merges. After merge, bind every staging deploy and
-  acceptance gate to the exact merged squash SHA from `git rev-parse origin/main`,
-  not a parent commit.
+- GitHub `main` is `7dd9c5aa87271981cde1b89e67083f71366ad2e8` (PR #11 squash
+  merge on 2026-08-25). Bind every staging deploy and acceptance gate to that
+  exact SHA from `git rev-parse origin/main`, not a parent commit.
 - Staging still runs prior exact head
   `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` (PR #2 squash) as Worker version
   `1a90ac21-57a9-4903-a36c-8ed6b0d38269`, confirmed by live
@@ -58,12 +57,14 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release lane is: (1) merge the release-checkpoint PR, (2) deploy the
-  exact merged `origin/main` SHA to staging with a fresh rollback record, (3)
-  rerun P1–P3 on that deployment, (4) complete P4–P5, (5) close P6/P8, then
-  evaluate P9. No current approval authorizes a Cloudflare setting change,
-  deploy, new staging data, production cutover, DNS/OAuth/secret/role change,
-  or production write enablement outside those named gates.
+- The next release lane is: (1) deploy the exact `origin/main` SHA (`7dd9c5a`)
+  to staging with a fresh rollback record, (2) rerun P1–P3 on that deployment,
+  (3) complete P4–P5, (4) close P6/P8, then (5) evaluate P9. Use
+  `pnpm verify:staging-deploy-preflight -- --full` before deploy and
+  `pnpm print:hosted-release-identity` after deploy to confirm head parity.
+  No current approval authorizes a Cloudflare setting change, deploy, new
+  staging data, production cutover, DNS/OAuth/secret/role change, or
+  production write enablement outside those named gates.
 
 ## Authority and evidence rules
 

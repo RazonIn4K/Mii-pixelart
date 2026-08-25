@@ -11,19 +11,21 @@
   <img src="https://tomodachi.pw/readme-banner.png" alt="Hero banner: colored pencils fanned across light gray engineering graph paper next to a cluster of hand-painted pixel-art tiles in coral red, dusty blue, peach, soft yellow, and sage green — the Paper Studio aesthetic of the Tomodachi project." width="100%">
 </p>
 
-> **Deployment status (2026-08-25):** After merging the open release-checkpoint
-> PR, bind staging deploy and acceptance to that exact merged SHA from
-> `git rev-parse origin/main` (not a parent commit). Live
-> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) currently runs prior head
+> **Deployment status (2026-08-25):** GitHub `main` is
+> `7dd9c5aa87271981cde1b89e67083f71366ad2e8` (PR #11 — staging-exit checkpoint
+> and operator preflight tooling). Live
+> [`staging.tomodachi.pw`](https://staging.tomodachi.pw/) still runs prior head
 > `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` as Worker version
 > `1a90ac21-57a9-4903-a36c-8ed6b0d38269` (verify with
-> `pnpm print:hosted-release-identity`). Production
+> `pnpm print:hosted-release-identity`). `pnpm verify:staging-deploy-preflight`
+> reports deploy-required drift until an operator deploys the current
+> `origin/main` SHA. Production
 > [`tomodachi.pw`](https://tomodachi.pw/) remains on Cloudflare Pages. The
 > checked-in production Worker config names writable community and AI image
 > generation as the target state but does not authorize skipping the read-only
 > cutover in [production-readiness plan](docs/production-readiness-plan.md)
-> gate P11. Next lane: merge the release PR, deploy that merged SHA to staging,
-> refresh P1–P3 evidence, complete P4–P5, then proceed through P9–P13.
+> gate P11. Next lane: operator staging deploy from `7dd9c5a`, refresh P1–P3
+> evidence on that deployment, complete P4–P5, then proceed through P9–P13.
 
 Two things stacked on one site. The **Studio** is a browser-first pixel-art editor for planning Mii-inspired face art. Import a face photo or character art, reduce the colors against the Studio's 84-color working palette, and export a paint-by-numbers Copy Guide for manual recreation in a game's drawing tools. It does not transfer game files or connect to a Nintendo title. The **recovery hub** is for visitors arriving from the Tomodachishare credential leak: free, calm, no-spam steps to rotate passwords and lock down accounts.
 
