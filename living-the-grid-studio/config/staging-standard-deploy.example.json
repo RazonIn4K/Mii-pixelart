@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 5,
+  "target": "staging",
+  "intent": "deploy",
+  "deploymentPhase": "standard",
+  "gitCommit": "replace-with-the-current-40-character-git-commit",
+  "approvedAt": "replace-with-a-current-ISO-8601-timestamp",
+  "approvedBy": "replace-with-the-approver-identity",
+  "changeTicket": "replace-with-the-change-or-approval-reference",
+  "infrastructure": {
+    "cloudflareAccount": "replace-with-the-audited-account-name-or-reference",
+    "googleProjectId": "tomodachi-studio-staging",
+    "domainControlConfirmation": "replace-with-the-domain-control-check-reference",
+    "cloudflarePricingDecision": "replace-with-the-approved-pricing-decision",
+    "imagesUsageDecision": "approved"
+  },
+  "legal": {
+    "operatorIdentity": "replace-with-the-legal-operator",
+    "jurisdiction": "replace-with-the-governing-jurisdiction",
+    "postalAddress": "replace-with-the-complete-public-postal-contact",
+    "contactEmail": "replace-with-the-public-contact-email",
+    "copyrightProcess": "replace-with-the-approved-copyright-process",
+    "retentionConfirmation": "replace-with-the-approved-retention-check"
+  },
+  "owners": {
+    "adminInternalId": "replace-with-the-staging-admin-internal-uuid-v4",
+    "moderatorInternalId": null,
+    "legalOwner": "replace-with-the-named-legal-owner",
+    "privacyOwner": "replace-with-the-named-privacy-owner",
+    "securityOwner": "replace-with-the-named-security-owner",
+    "helpOwner": "replace-with-the-named-help-owner",
+    "abuseOwner": "replace-with-the-named-abuse-owner"
+  },
+  "confirmations": {
+    "targetIsolationConfirmed": true,
+    "bindingsVerified": true,
+    "secretsConfigured": true,
+    "migrationsApproved": true,
+    "legalPlaceholdersReplaced": true,
+    "scheduledMaintenanceWritesApproved": true,
+    "adminModeratorAssigned": true,
+    "pricingApproved": true,
+    "rollbackReady": true,
+    "deployApproved": true,
+    "stagingDeployApproved": true,
+    "stagingAcceptancePassed": true,
+    "productionCutoverApproved": false,
+    "communityMutationsEnabled": true,
+    "writableCommunityDeployApproved": true,
+    "bootstrapReadOnlyApproved": false
+  }
+}
