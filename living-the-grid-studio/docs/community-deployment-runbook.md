@@ -3,7 +3,7 @@
 **Status:** Implementation runbook; remote execution is not authorized by this
 document.
 **Last checked against Cloudflare documentation:** 2026-07-13
-**Operational state refreshed:** 2026-07-29
+**Operational state refreshed:** 2026-08-25
 
 This runbook supersedes the compute portion of `cloudflare-deployment.md` only
 after the Worker cutover. Until then, the existing Pages project remains the
@@ -26,29 +26,30 @@ deploy, provision, or modify DNS/OAuth from an implementation-only request.
 
 This snapshot is operational context, not deployment authority:
 
-- GitHub PR #2 and GitLab MR !2 review exact head
-  `151447b91f6c0e2f07632cac5ddc555f839a2034`. Owned GitHub CI and immutable
-  exact-head GitLab SAST, secret-detection, and dependency-scanning evidence
-  passed. The reviews remain Draft / HOLD, and this exact head is not deployed
-  to staging or production.
-- Staging serves `6796f563847f1fa71d2d3cdca5df422ded528cc1` as deployment
-  `62c4d58f-b3c0-464e-9f7e-acbe5ade4ff0`, Worker version
-  `0e2159c4-62b0-4912-b4dc-f873483ed842`, with community mutations and AI image
-  generation enabled, payment surfaces retired, and migrations `0001`-`0009`.
-  Its anonymous and bounded P2/P3 evidence is partial launch evidence;
-  `stagingAcceptancePassed` remains false. The review-head cleanup removes only
-  unreachable modules and unused dependencies, but it still requires a fresh
-  exact-head staging deployment and acceptance evidence.
+- GitHub `main` is `7dd9c5aa87271981cde1b89e67083f71366ad2e8` (PR #11 squash
+  merge on 2026-08-25). Owned GitHub CI passed on the merged release lane.
+- Live staging serves `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` as Worker
+  version `1a90ac21-57a9-4903-a36c-8ed6b0d38269`, with community mutations and
+  AI image generation enabled, payment surfaces retired, and migrations
+  `0001`-`0009`. That artifact is behind `origin/main`; `pnpm
+  verify:staging-deploy-preflight` reports deploy-required drift. A 2026-08-25
+  hosted read-only probe recorded 410 assertions with zero failures and no RUM
+  markers in the transformed homepage HTML. Bounded P2/P3 evidence on older SHAs
+  does not cover the current live head or the post-merge release SHA;
+  `stagingAcceptancePassed` remains false until P1–P5 complete on one exact-head
+  deployment.
 - Production traffic remains on Pages. A hidden triggerless production Worker
   exists at deployment `fa682161-be1c-4211-8559-01e14896f4cc`, version
   `f4e8c796-6e18-4fc9-9e35-2aec0f57391a`, from source `9a4026f`. It has no
   hostname, route, cron, workers.dev, or preview exposure. Production resources,
   OAuth, secrets, and migrations `0001`-`0009` exist, but the triggerless
   approval/evidence is not a cutover record.
-- No current readiness file authorizes deploying `151447b`, writing new staging
-  fixtures, merging the reviews, attaching a production hostname, changing a
-  role, or enabling production writes. Every historical evidence file remains
-  immutable.
+- No checked-in readiness file authorizes deploying `7dd9c5a`, writing new
+  staging fixtures, attaching a production hostname, changing a role, or
+  enabling production writes. Operator copies from
+  `config/staging-standard-deploy.example.json` into gitignored
+  `.deployment-readiness/staging.json` (mode `0600`) bind deploy authority to the
+  exact `origin/main` SHA. Every historical evidence file remains immutable.
 
 ## Launch blockers outside infrastructure
 
@@ -84,7 +85,7 @@ This snapshot is operational context, not deployment authority:
   in local or production configuration. Cloudflare may allow occasional CPU
   overruns, so treat this as a cost and runaway-work guardrail rather than a
   hard wall. This resolves the plan-level 10 ms blocker only. Staging is now
-  writable for approved acceptance on `6796f563`, but the complete image,
+  writable for approved acceptance on live staging `57beeaf`, but the complete
   quota, retention, scheduled-cleanup, cost, and exact-review-head acceptance
   remains open. See
   [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
@@ -119,6 +120,7 @@ This snapshot is operational context, not deployment authority:
    pnpm test:e2e
    pnpm worker:dry-run
    pnpm verify:bundle
+   pnpm verify:staging-deploy-preflight
    ```
 
 4. Run `pnpm verify:migrations`. The verifier applies every tracked migration
