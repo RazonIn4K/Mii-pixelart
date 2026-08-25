@@ -5,7 +5,7 @@ DNS, merge, or production authority
 
 **Plan owner and final go/no-go authority:** David Ortiz
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-24
 
 **Runtime boundary:** Production remains on Cloudflare Pages until the separate
 production cutover gate in this plan is explicitly approved and completed.
@@ -17,41 +17,39 @@ staging check does not authorize the next gate.
 
 ## Current checkpoint
 
-- The exact review head is
-  `6fab02622996b2aafac16f221e0e78aeb4867458` on GitHub and GitLab. Its owned
-  GitHub checks pass and immutable tag
-  `security/github-pr-2-6fab02622996` exists. The external `code/snyk` context
-  remains an account test-limit result, not an owned gate or vulnerability
-  finding.
-- Staging runs exact head `6fab02622996b2aafac16f221e0e78aeb4867458`
-  as deployment `e9059345-9504-4588-9e2b-cffd77a20357`, Worker version
-  `58ad3432-9ab0-4eec-b1e5-3fc7b52d7600`, with community mutations and AI image
-  generation enabled and payment surfaces retired. The verified rollback
-  remains deployment `1c9f969c-27c0-41c9-bc85-8248d793d3ff`, version
-  `4632d9e1-5a2c-4d07-bc16-848f453e0676`; it was not activated. The anonymous
-  hosted harness passed its prior 380 assertions, Studio and retired-payment
-  checks passed, and the no-provider browser matrix recorded 412 passes, 408
-  intentional project skips, and zero failures.
-- Exact-head anonymous mobile evidence passed the numerical P1 targets: cold
-  home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75 was 2,274 ms with
-  CLS 0; restored-local-draft readiness p75 was 2,235 ms with maximum CLS 0.03
-  and one canvas on every run; and Start blank input INP was 104 ms with CLS 0.
-  Authenticated cloud-load timing was not run because the approved gate did not
-  authorize a new OAuth session or fixture.
-- P1 remains conditional because Cloudflare currently injects its browser
-  analytics beacon after the Worker response and posts `/cdn-cgi/rum` before
-  an application consent choice. A 2026-07-25 private staging attestation
-  records this platform observation without treating it as an application
-  provider call. The current local correction removes the Cloudflare Insights
-  CSP origins and makes source, hosted, and browser checks fail closed on beacon
-  markup, attributes, and RUM requests. It is not a reviewed remote commit,
-  deployed artifact, or control-plane change.
-- The 25-assertion run is foundational P2/P3 evidence only. It exercised one
-  bounded private create/read/save/stale-ETag conflict/delete flow across two
-  approved identities and reconciliation; it does not satisfy the full P4
-  cross-user, publishing, social, moderation, media, quota, or export matrix,
-  and it does not satisfy P5 deletion/retention/cron acceptance. Any new source
-  commit also requires fresh exact-head evidence before a P9 decision.
+- GitHub `main` is `0e2da5ab571b58c4f407125b9f912b8febe50ece` until the open
+  release-checkpoint PR merges. After merge, bind every staging deploy and
+  acceptance gate to the exact merged squash SHA from `git rev-parse origin/main`,
+  not a parent commit.
+- Staging still runs prior exact head
+  `57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` (PR #2 squash) as Worker version
+  `1a90ac21-57a9-4903-a36c-8ed6b0d38269`, confirmed by live
+  `X-Tomodachi-*` response headers on 2026-08-24. That deployment is behind
+  acceptance checkpoint. Community mutations and AI image generation are enabled
+  and payment surfaces are retired. Prior evidence on `6fab026` does not cover
+  the live staging artifact or any post-merge release SHA.
+- Prior exact-head anonymous mobile evidence on `6fab026` passed the numerical
+  P1 targets: cold home LCP p75 was 2,383 ms with CLS 0; cold Studio LCP p75
+  was 2,274 ms with CLS 0; restored-local-draft readiness p75 was 2,235 ms
+  with maximum CLS 0.03 and one canvas on every run; and Start blank input INP
+  was 104 ms with CLS 0. Authenticated cloud-load timing was not run because the
+  approved gate did not authorize a new OAuth session or fixture.
+- A 2026-08-24 live staging probe on the current `57beeaf` deployment recorded
+  410 hosted read-only assertions with zero failures, no `data-cf-beacon` or
+  `/cdn-cgi/rum` markers in the transformed homepage HTML, and passing desktop
+  cookie-consent checks under `PLAYWRIGHT_ANALYTICS_MODE=no-provider`. That
+  evidence supports closing the Cloudflare RUM control-plane item for the
+  current staging artifact, but it does not cover the post-merge release SHA and
+  does not replace authenticated cloud-load timing or a full multi-viewport P1
+  rerun.
+  Use `pnpm print:hosted-release-identity` to read the live
+  `sourceCommit` and `workerVersion` values before filling writable approvals.
+- The 25-assertion run is foundational P2/P3 evidence only on older SHAs. It
+  exercised one bounded private create/read/save/stale-ETag conflict/delete
+  flow across two approved identities and reconciliation; it does not satisfy
+  the full P4 cross-user, publishing, social, moderation, media, quota, or
+  export matrix, and it does not satisfy P5 deletion/retention/cron acceptance.
+  Any new source commit requires fresh exact-head evidence before a P9 decision.
 - Production traffic remains on Cloudflare Pages. Isolated production D1, R2,
   KV, rate limits, OAuth, secrets, and migrations `0001`-`0009` have been
   prepared, and a hidden triggerless Worker exists at deployment
@@ -60,13 +58,12 @@ staging check does not authorize the next gate.
   hostname, route, cron, workers.dev, or preview exposure. Its partial
   triggerless evidence is bootstrap history, not current staging acceptance or
   production-cutover approval.
-- The next release lane is a reviewable RUM/consent corrective Git and security
-  gate, followed by a separately approved Cloudflare automatic-Web-Analytics
-  disable gate covering staging/apex/`www`, then an exact-new-head staging
-  deployment and affected P1 rerun. P9 evaluation remains later, after P4-P8
-  are satisfied. No current approval authorizes commit/push, a Cloudflare
-  setting change, deploy, new staging data, merge, production cutover,
-  DNS/OAuth/secret/role change, or production write enablement.
+- The next release lane is: (1) merge the release-checkpoint PR, (2) deploy the
+  exact merged `origin/main` SHA to staging with a fresh rollback record, (3)
+  rerun P1–P3 on that deployment, (4) complete P4–P5, (5) close P6/P8, then
+  evaluate P9. No current approval authorizes a Cloudflare setting change,
+  deploy, new staging data, production cutover, DNS/OAuth/secret/role change,
+  or production write enablement outside those named gates.
 
 ## Authority and evidence rules
 
@@ -93,9 +90,9 @@ project contents, or report free-text in release logs.
 
 | Gate | Outcome | Depends on | Current state |
 | --- | --- | --- | --- |
-| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Anonymous numerical, hosted-read-only, Studio, CSP/crawler, and no-provider browser checks pass on `6fab026`; exit remains conditional on disabling platform-injected RUM, deploying the corrective head, rerunning all consent paths, and capturing authenticated cloud-load timing |
-| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4` with fixture cleanup, reconciliation, and both sessions revoked; a later source commit requires fresh exact-head evidence |
-| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; both sessions were D1-revoked and the complete temporary profile tree was removed |
+| P1 | Exact-head Studio performance and functional closeout | Current staging checkpoint | Live staging is `57beeaf` / `1a90ac21…`; no RUM markers and 410 hosted read-only assertions pass; deploy the merged release SHA, then capture auth cloud-load and full multi-viewport rerun |
+| P2 | Fail-closed writable hosted harness | P1 source candidate | Bounded two-user run passed 25 assertions on `6bbadd4`; the merged release SHA requires fresh exact-head evidence |
+| P3 | Secret-free live-auth runner | P2 safety primitives | Exact-head ephemeral-profile two-session run passed on `6bbadd4`; the merged release SHA requires fresh exact-head evidence |
 | P4 | Two-user authorization, social, report, moderation, and conflict acceptance | P2-P3 | Not complete; the private matrix remains unchecked |
 | P5 | Deletion, cancellation, retention, and scheduled cleanup acceptance | P2-P4 | Not complete; disposable identities and a narrow data/cron approval are still required |
 | P6 | Legal, operator, contact-channel, provider-cost, and licensing sign-off | Can run beside P1-P5 | Operator/legal values are recorded; delivery/escalation, cost, license, and asset-rights evidence remain |
@@ -190,7 +187,10 @@ object prefixes, maximum writes, and cleanup plan.
 **Commands and evidence**
 
 The integrated command reads only the gitignored
-`.deployment-readiness/staging-writable.json` file. It refuses any other path,
+`.deployment-readiness/staging-writable.json` file. Copy
+`config/staging-writable.example.json` as a starting point, then move the
+filled file to `.deployment-readiness/staging-writable.json` with mode `0600`.
+It refuses any other path,
 requires mode `0600`, and accepts no CLI-supplied identity or approval values.
 The private file must bind a fresh 30-minute-or-shorter window to the exact
 source SHA, active Worker version, owner internal UUID, distinct second-user
@@ -292,6 +292,11 @@ and second-user UUIDs and allow only synthetic creations, comments, follows,
 likes, reports, profile/showcase images, and reversible moderation actions.
 David Ortiz remains the human moderation decision-maker; AI may summarize but
 may not execute an action.
+
+Start the bounded Phase A lane with `pnpm verify:hosted-staging-p4-phase-a`.
+Copy `config/staging-p4-phase-a.example.json` into the gitignored
+`.deployment-readiness/staging-p4-phase-a.json` approval file with mode
+`0600` before the run.
 
 **Required scenarios**
 

@@ -265,7 +265,11 @@ spawn unless every deploy gate below is satisfied.
 For an approved deployment, copy
 `config/deployment-readiness.example.json` to the ignored
 `.deployment-readiness/<target>.json`, replace every placeholder, and bind it
-to the exact clean Git commit. The approval expires after 30 minutes and records
+to the exact clean Git commit. Writable staging deploys that keep community
+mutations enabled should use `config/staging-standard-deploy.example.json`
+with `deploymentPhase=standard` instead of the bootstrap template. Run
+`pnpm verify:staging-deploy-preflight` before deploy to validate local gates
+and detect live staging head drift. The approval expires after 30 minutes and records
 the intended read-only/writable mutation mode. It must also confirm the exact
 Cloudflare/Google/domain, pricing/Images, legal/contact/retention,
 admin/moderator/inbox, payment-retirement, rollback, and migration

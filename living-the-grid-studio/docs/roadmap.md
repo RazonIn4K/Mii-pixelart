@@ -1,6 +1,6 @@
 # Roadmap — Tomodachi Studio
 
-**Last Updated:** 2026-07-19
+**Last Updated:** 2026-08-24
 
 ---
 
@@ -282,15 +282,14 @@ human-authorized moderation.
 - [ ] PR merge, production resources/OAuth/secrets/migrations, read-only Worker
       cutover, admin bootstrap, writable enablement, rollback drill, and soak
 
-Production `tomodachi.pw` remains on Cloudflare Pages at exact source
-`c044134ec4ecd33e0ab00437e1a6e9283bd9ae91`, deployment
-`b73cc5ba-c91f-4896-90e5-b7f22d4af80b`. No production Worker or isolated
-production resources exist; checked-in production IDs remain placeholders.
-The accepted staging deployment enables community mutations only in isolated
-staging for its approved single-account scope. Payments and consultations are
-retired everywhere, and no roadmap status grants approval for production. See
-`docs/release-evidence/2026-07-16-payment-retirement.md` and the remaining gates
-in `docs/production-readiness-plan.md`.
+Production `tomodachi.pw` remains on Cloudflare Pages. GitHub `main` is
+`0e2da5ab571b58c4f407125b9f912b8febe50ece` (PR #10). Live staging still runs
+`57beeafbdb9e177f9fc51e0ce212e2ff9e7f6bdb` as Worker version
+`1a90ac21-57a9-4903-a36c-8ed6b0d38269` until a separately approved exact-new-head
+deploy. Use `pnpm print:hosted-release-identity` before filling writable
+approval files. The checked-in production Worker config names writable community
+and AI image generation as the target state; it does not authorize skipping the
+read-only cutover in `docs/production-readiness-plan.md` gate P11.
 
 ---
 
