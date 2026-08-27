@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tomodachi Pixel Art Studio",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1280,
+      920
+    ],
+    "views": [
+      {
+        "id": "studio-path",
+        "label": "Studio to Worker",
+        "focus": [
+          "user",
+          "studio",
+          "worker",
+          "d1"
+        ],
+        "note": "User HTTPS to the React studio, then /api/* on the Cloudflare Worker to D1."
+      },
+      {
+        "id": "cf-storage",
+        "label": "D1 R2 KV",
+        "focus": [
+          "worker",
+          "d1",
+          "r2",
+          "kv"
+        ],
+        "note": "Worker bindings: D1 SQL, R2 object I/O, and KV for the OpenRouter model list."
+      },
+      {
+        "id": "oidc-ai",
+        "label": "OIDC and OpenRouter",
+        "focus": [
+          "worker",
+          "google-oidc",
+          "openrouter"
+        ],
+        "note": "Google OIDC with PKCE and OpenRouter AI chat/images sit beside the Worker."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "frontend",
+      "label": "User",
+      "sublabel": "Browser",
+      "pos": [
+        40,
+        400
+      ],
+      "size": [
+        120,
+        56
+      ]
+    },
+    {
+      "id": "studio",
+      "type": "frontend",
+      "label": "React studio",
+      "sublabel": "Vite + wouter",
+      "brand": "react",
+      "tag": "prod: Pages",
+      "pos": [
+        220,
+        388
+      ],
+      "size": [
+        180,
+        80
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Cloudflare Worker",
+      "sublabel": "Hono /api/*",
+      "brand": "cloudflare",
+      "pos": [
+        480,
+        388
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "D1 SQLite",
+      "sublabel": "FTS5",
+      "pos": [
+        760,
+        392
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "cloud",
+      "label": "Cloudflare Pages",
+      "sublabel": "tomodachi.pw prod",
+      "brand": "cloudflare",
+      "pos": [
+        220,
+        140
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "google-oidc",
+      "type": "security",
+      "label": "Google OIDC",
+      "sublabel": "auth-code + PKCE",
+      "pos": [
+        480,
+        140
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "r2",
+      "type": "cloud",
+      "label": "R2",
+      "sublabel": "projects / media",
+      "brand": "cloudflare",
+      "pos": [
+        760,
+        140
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "openrouter",
+      "type": "external",
+      "label": "OpenRouter",
+      "sublabel": "AI chat / images",
+      "brand": "openrouter",
+      "pos": [
+        480,
+        660
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "kv",
+      "type": "database",
+      "label": "KV",
+      "sublabel": "model list 1h TTL",
+      "pos": [
+        760,
+        660
+      ],
+      "size": [
+        160,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Public Internet",
+      "wraps": [
+        "user"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Studio",
+      "wraps": [
+        "studio",
+        "pages"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Cloudflare Edge",
+      "wraps": [
+        "worker",
+        "d1",
+        "r2",
+        "kv"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Identity and AI",
+      "wraps": [
+        "google-oidc",
+        "openrouter"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-studio",
+      "from": "user",
+      "to": "studio",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "studio-worker",
+      "from": "studio",
+      "to": "worker",
+      "label": "/api/*",
+      "variant": "emphasis"
+    },
+    {
+      "id": "worker-d1",
+      "from": "worker",
+      "to": "d1",
+      "label": "D1 SQL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "studio-pages",
+      "from": "studio",
+      "to": "pages",
+      "label": "prod host",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "worker-oidc",
+      "from": "worker",
+      "to": "google-oidc",
+      "label": "/api/auth/google",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDx": -56
+    },
+    {
+      "id": "worker-r2",
+      "from": "worker",
+      "to": "r2",
+      "label": "R2 object I/O",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "worker-openrouter",
+      "from": "worker",
+      "to": "openrouter",
+      "label": "AI chat/images",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24,
+      "labelDx": -50
+    },
+    {
+      "id": "worker-kv",
+      "from": "worker",
+      "to": "kv",
+      "label": "KV get/put",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Studio path",
+      "items": [
+        "React 19 Vite studio on tomodachi.pw talks to the Hono Worker over /api/*",
+        "Production still serves from Cloudflare Pages; Worker is the staging/target runtime"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Edge storage",
+      "items": [
+        "D1 SQLite + FTS5 holds identity, creations, and social data",
+        "R2 stores project revisions/media; KV caches the OpenRouter model list for 1 hour"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Sides",
+      "items": [
+        "Google OIDC authorization-code + PKCE via POST /api/auth/google/start",
+        "OpenRouter free-tier rotation for AI chat and POST /api/ai/images"
+      ]
+    }
+  ]
+}
